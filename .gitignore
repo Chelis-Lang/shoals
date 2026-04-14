@@ -1,0 +1,10 @@
+target/
+dist/
+reef.lock
+*.chb
+.DS_Store
+.env
+*.swp
+*.swo
+__pycache__/
+*.py[cod]
