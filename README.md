@@ -1,6 +1,6 @@
 # Shoals
 
-Numerical methods, statistics, and optimization shell for the
+Quantitative finance shell for the
 [Chelis](https://github.com/Chelis-Lang/chelis) programming language.
 Ships as a reef package under the `Shoals` module prefix.
 
