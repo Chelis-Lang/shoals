@@ -19,6 +19,27 @@ curves, stochastic processes, order books. Built entirely on `chelis-std` + `nau
 for loading/manipulating financial data), 3i (Std.Time for dates, Std.Decimal for cash
 amounts).
 
+### Key Design Decision: Instruments as Dicts, Not Closed ADTs
+
+Financial instruments are open-ended — structuring desks invent new payoff formulas
+continuously. Representing instruments as `Dict[String, f32]` (or `Dict[String, Column]`
+for term structures) lets new instrument types be added as data without modifying the
+Shoals source or releasing a new package version. The pricing function dispatches on a
+key (e.g., `get(instrument, "type")`), not on a pattern match over a closed enum. This
+also serves the AI coding story: an agent generating a new instrument definition writes
+a dict literal (well within current LLM capability), not a new ADT variant (which
+requires understanding the type system's extension points).
+
+### API Stability Convention
+
+Every function in Shoals' SKILL.md API surface tables carries an implicit stability
+label per the cross-cutting design decision in
+`chelis/spec/design/chelis_canonical_reference.md`: `stable` (signature frozen —
+training-corpus safe) or `alpha` (signature may change — excluded or down-weighted).
+Shoals v0.1.0 ships with all public API marked `alpha` by default; promotion to
+`stable` waits until pricing, risk, and curves pass the Phase 3l acceptance oracle and
+the AD-through-instrument-dict story is validated end-to-end.
+
 ### Modules
 
 | Module | Contents | Key Dependencies |
