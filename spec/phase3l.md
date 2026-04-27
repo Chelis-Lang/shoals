@@ -81,6 +81,45 @@ the AD-through-instrument-dict story is validated end-to-end.
 - Effect tracking: MC pricing propagates `Random`, curve construction propagates `IO`
   for market data
 - Reproducibility: same seed produces identical prices across runs
+- Manifest: `chelis manifest --check` passes for every Shoals example program (all
+  Random ops covered by seed handlers)
+
+**Reproducibility manifests.** The `chelis manifest` command (compiler-side pass)
+extracts all `Random`-effect-annotated operations into a structured JSON report.
+`chelis manifest --check` is a CI gate: fail the build if any random operation in a
+Shoals program is unseeded. Status: **demo-blocking, scoped, ready to build.** Full
+design: `chelis_manifest_spec.md` in the chelis monorepo (concrete CLI surface and
+JSON schema); historical context in `chelis_reproducibility_manifests.md`.
+
+**Canonical finance properties.** Shoals ships with a `properties/` directory of
+reference `@property` functions:
+
+- `properties/pricing.ch` — put-call parity, price positivity, call bounded by spot,
+  delta in [0,1], gamma positive for vanilla Europeans
+- `properties/greeks.ch` — grad-derived Greeks match finite-difference Greeks within
+  tolerance, vega positive for vanilla options
+- `properties/monte_carlo.ch` — Monte Carlo price converges to analytic price as path
+  count increases, variance decreases with path count
+- `properties/no_arbitrage.ch` — bull spread payoff non-negative, butterfly spread
+  payoff non-negative
+
+Convention (cross-cutting, applies to every domain shell): properties are co-located
+with the implementation code they constrain — same repo, same package, version-
+controlled together. Properties are NOT a separate shell. `chelis fuzz src/` runs them
+all against the shipped exports. Status of the underlying tool: `chelis fuzz` with
+first-class `@property` annotations is **demo-blocking, scoped, ready to build** for
+the first commercial CProof prospect. Full conventions: `chelis_trust_stack.md`,
+`chelis_fuzz_spec.md`.
+
+**Reference implementations.** Shoals' delivery scope now includes a `references/`
+directory alongside `properties/`. Each standard model in `Shoals.Pricing`,
+`Shoals.Stochastic`, `Shoals.Curves`, and `Shoals.Risk` ships a simple
+textbook-formula reference (Black-Scholes call/put + Greeks, Heston, Vasicek, CIR,
+vanilla Monte Carlo, VaR/CVaR via historical simulation). The optimized `src/`
+implementation is verified against the reference by
+`@property fn matches_textbook_reference(...)` in `properties/pricing.ch`. Customers
+write their own references only for proprietary models. Full design:
+`chelis_reference_implementations_spec.md` in the chelis monorepo.
 
 ### Acceptance Oracle
 
