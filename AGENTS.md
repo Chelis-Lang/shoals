@@ -17,8 +17,8 @@ to this file so Claude-style and Codex-style entry points do not drift.
 
 ## Toolchain Pin
 
-- `chelis v0.1.3` is the single supported compiler binary. `reef.toml`
-  pins `compiler = "=0.1.3"`. Version bumps must land in every Chelis
+- `chelis v0.4.0` is the single supported compiler binary. `reef.toml`
+  pins `compiler = "=0.4.0"`. Version bumps must land in every Chelis
   shell repo in the same change set — do not bump unilaterally.
 - Do not vendor or build the Chelis compiler from source inside this
   repo. Consume the released tarball from the private
@@ -30,11 +30,11 @@ to this file so Claude-style and Codex-style entry points do not drift.
 ## Phase Spec
 
 The owning spec section for this shell is checked in at
-`spec/phase3j.md`, extracted verbatim from the Chelis monorepo's
-`spec/design/chelis_phase3_plan.md`. That file is the source of truth
-for module scope, test plan, and acceptance oracle. Update this repo's
-copy in the same change set as any monorepo-side changes to the
-original section.
+`spec/phase3l.md`, extracted verbatim from the Chelis monorepo's
+`spec/design/chelis_phase3_plan.md` §3l. That file is the source of
+truth for module scope, test plan, and acceptance oracle. Update this
+repo's copy in the same change set as any monorepo-side changes to
+the original section.
 
 ## Shared Local Skills
 

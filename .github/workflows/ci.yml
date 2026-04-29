@@ -18,18 +18,33 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
         run: |
-          gh release download v0.1.3 \
+          gh release download v0.4.0 \
             --repo Chelis-Lang/chelis \
-            --pattern 'chelis-v0.1.3-linux-x86_64.tar.gz' \
+            --pattern 'chelis-v0.4.0-linux-x86_64.tar.gz' \
             --dir /tmp/chelis-toolchain
-          tar -xzf /tmp/chelis-toolchain/chelis-v0.1.3-linux-x86_64.tar.gz \
+          tar -xzf /tmp/chelis-toolchain/chelis-v0.4.0-linux-x86_64.tar.gz \
             -C /tmp/chelis-toolchain
-          echo "/tmp/chelis-toolchain/chelis-v0.1.3-linux-x86_64" >> "$GITHUB_PATH"
+          echo "/tmp/chelis-toolchain/chelis-v0.4.0-linux-x86_64" >> "$GITHUB_PATH"
 
       - name: Verify toolchain version
         run: |
           chelis --version
-          test "$(chelis --version)" = "chelis 0.1.3"
+          test "$(chelis --version)" = "chelis 0.4.0"
 
-      - name: chelis check
-        run: chelis check src/core.ch
+      - name: chelis check (all source modules)
+        run: |
+          set -euo pipefail
+          for f in src/*.ch src/properties/*.ch src/references/*.ch; do
+            echo "checking $f"
+            chelis check "$f"
+          done
+
+      - name: chelis fmt --check
+        run: |
+          set -euo pipefail
+          for f in src/*.ch src/properties/*.ch src/references/*.ch tests/*.ch; do
+            chelis fmt --check "$f"
+          done
+
+      - name: chelis test
+        run: chelis test tests/

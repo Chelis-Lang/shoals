@@ -1,3 +1,3 @@
 module Shoals.Core
 export (version)
-def version() -> i32 = 0
+def version() -> int64 = cast(1, int64)
