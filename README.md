@@ -147,17 +147,16 @@ at `chelis test tests/` going green.
    normal CDF), bypassing the higher-level distribution wrapper. No
    shell-private special functions are shipped.
 
-### Layout deviation: `properties/` and `references/`
+### Layout (canonical, since v0.1.0)
 
-Per the trust stack spec (`chelis_reference_implementations_spec.md`,
-`chelis_canonical_reference.md`), `properties/` and `references/`
-are top-level directories alongside `src/`. chelis-reef v0.4.0 only
-supports `src/` as the source root. Shoals v0.1.0 ships with the
-directories under `src/` (i.e. `src/properties/...` and
-`src/references/...`) as a workaround. When reef gains multi-root
-support (tracked at
-`chelis/spec/upstream-bugs/reef-multi-source-roots.md`), Shoals will
-move them to the canonical location in v0.1.x or v0.2.0.
+Per the trust stack spec, `properties/` and `references/` are top-level
+directories alongside `src/`. Shoals v0.1.0 ships at the canonical layout
+following the chelis-reef v0.4.1 multi-source-roots fix
+(`6b58030 feat(reef): multi-source-roots — additional_sources in reef.toml;
+bump v0.4.1`). The reef.toml declares
+`additional_sources = ["properties", "references"]`. Shoals v0.1.0-alpha
+shipped with these directories under `src/` as a workaround pending the
+reef fix; v0.1.0 migrates to the canonical layout.
 
 ## Python interop
 

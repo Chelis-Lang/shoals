@@ -1,8 +1,9 @@
 [package]
 name = "shoals"
 version = "0.1.0"
-compiler = "=0.4.0"
+compiler = "=0.4.1"
 module_prefix = "Shoals"
+additional_sources = ["properties", "references"]
 
 [dependencies]
 chelis-std = { version = "0.1.0" }
