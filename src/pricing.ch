@@ -1,6 +1,11 @@
 module Shoals.Pricing
-import Nautilus.Distributions (normal_cdf, normal_sample)
+import Nautilus.Distributions (normal_sample)
+import Nautilus.Special (erfc)
 export (bs_call_scalar, bs_put_scalar, call_prices, put_prices, call_total, put_total, deltas_call, deltas_put, vegas_call, mc_call_price)
+def n_cdf(x: f32) -> f32 = {
+  inv_sqrt_2 = cast(0.7071067811865475, f32)
+  mul(cast(0.5, f32), erfc(neg(mul(x, inv_sqrt_2))))
+}
 def bs_call_scalar(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = {
   sqrt_t = sqrt(t)
   sig_sqrt_t = mul(sigma, sqrt_t)
@@ -9,8 +14,8 @@ def bs_call_scalar(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = {
   drift = mul(add(r, sigma_sq_half), t)
   d1 = div(add(log_sk, drift), sig_sqrt_t)
   d2 = sub(d1, sig_sqrt_t)
-  nd1 = normal_cdf(d1, cast(0.0, f32), cast(1.0, f32))
-  nd2 = normal_cdf(d2, cast(0.0, f32), cast(1.0, f32))
+  nd1 = n_cdf(d1)
+  nd2 = n_cdf(d2)
   disc = exp(neg(mul(r, t)))
   sub(mul(s, nd1), mul(k, mul(disc, nd2)))
 }
@@ -22,8 +27,8 @@ def bs_put_scalar(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = {
   drift = mul(add(r, sigma_sq_half), t)
   d1 = div(add(log_sk, drift), sig_sqrt_t)
   d2 = sub(d1, sig_sqrt_t)
-  n_neg_d1 = normal_cdf(neg(d1), cast(0.0, f32), cast(1.0, f32))
-  n_neg_d2 = normal_cdf(neg(d2), cast(0.0, f32), cast(1.0, f32))
+  n_neg_d1 = n_cdf(neg(d1))
+  n_neg_d2 = n_cdf(neg(d2))
   disc = exp(neg(mul(r, t)))
   sub(mul(k, mul(disc, n_neg_d2)), mul(s, n_neg_d1))
 }

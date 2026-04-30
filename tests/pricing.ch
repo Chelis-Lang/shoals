@@ -50,12 +50,12 @@ def test_mc_reproducible() -> unit ! { Test } = {
   assert_close(px1, px2, cast(0.0, f32), "same seed, same price")
 }
 def test_mc_converges_to_bs() -> unit ! { Test } = {
-  template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(2000, int64))))
+  template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(20000, int64))))
   mc_px = with seed(42) { mc_call_price(template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32)) }
   bs_px = bs_call_scalar(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
   diff = sub(mc_px, bs_px)
   abs_diff = if lt(diff, cast(0.0, f32)) then neg(diff) else diff
   rel = div(abs_diff, bs_px)
-  ok = lt(rel, cast(0.05, f32))
-  assert_close(if ok then cast(1.0, f32) else cast(0.0, f32), cast(1.0, f32), cast(0.001, f32), "MC within 5% of BS")
+  ok = lt(rel, cast(0.02, f32))
+  assert_close(if ok then cast(1.0, f32) else cast(0.0, f32), cast(1.0, f32), cast(0.001, f32), "MC within 2% of BS at 20K paths")
 }

@@ -47,4 +47,4 @@ jobs:
           done
 
       - name: chelis test
-        run: chelis test tests/
+        run: chelis test tests/ --timeout 120

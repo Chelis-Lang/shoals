@@ -6,5 +6,5 @@ module_prefix = "Shoals"
 
 [dependencies]
 chelis-std = { version = "0.1.0" }
-nautilus = { version = "0.3.4" }
+nautilus = { version = "0.4.0" }
 coral = { version = "0.4.0" }
