@@ -22,7 +22,7 @@ the Chelis monorepo is wired and green.
 | `Shoals.Stochastic` | GBM path generation (log-Euler), terminal draws, antithetic-variates terminal-mean estimator | alpha |
 | `Shoals.Orderbook` | Limit order book (price-priority sorted lists), best bid/ask, bid-ask spread, VWAP, side quantities | alpha |
 
-The reference implementations under `src/references/` ship the
+The reference implementations under `references/` ship the
 textbook-formula versions of Black-Scholes (call, put, all five
 first-order Greeks), Vasicek (zero-bond pricing, conditional-rate
 moments), historical VaR/CVaR, and vanilla Monte Carlo. They are the
@@ -31,10 +31,10 @@ ground-truth oracles that `Shoals.Pricing`, `Shoals.Risk`, and
 
 ## Properties
 
-`src/properties/` ships function bodies for the canonical finance
+`properties/` ships function bodies for the canonical finance
 properties (put-call parity, call-bounded-by-spot, FD-delta-in-[0,1],
 vega non-negative, MC-reproducibility, bull/butterfly-spread
-no-arbitrage). Status: design-only. The compiler v0.4.0 does not yet
+no-arbitrage). Status: design-only. The compiler v0.4.1 does not yet
 parse `@property` annotations and ships no `chelis fuzz` subcommand;
 the property bodies are written as plain `def name(...) -> bool`
 ready to flip to `@property` when the tool ships. See
@@ -43,17 +43,17 @@ plan.
 
 ## Toolchain
 
-Pinned to `chelis v0.4.0` in `reef.toml`:
+Pinned to `chelis v0.4.1` in `reef.toml`:
 
 ```toml
 [package]
-compiler = "=0.4.0"
+compiler = "=0.4.1"
 ```
 
 Dependencies resolve via the local Reef registry (`~/.chelis/reef/`):
 
 * `chelis-std` 0.1.0 — standard library
-* `nautilus`   0.3.x — distributions, special functions, stats,
+* `nautilus`   0.4.0 — distributions, special functions, stats,
   interpolation
 * `coral`      0.4.0 — dataframe runtime (transitively required for
   the same `nautilus` minor version)
@@ -71,7 +71,7 @@ chelis test tests/ --timeout 120
 chelis fmt --check src/pricing.ch
 ```
 
-`chelis fmt` accepts only one file per invocation in v0.4.0; CI loops
+`chelis fmt` accepts only one file per invocation in v0.4.1; CI loops
 over the directory in a shell `for` loop. See `.github/workflows/ci.yml`.
 
 The default test tier uses 20 000 Monte-Carlo paths and 2 % tolerance
@@ -89,9 +89,15 @@ chelis test manual-gates/mc_rigorous.ch --timeout 900
 ```
 
 The rigor tier asserts 1 % MC convergence and 2 % terminal-variance
-agreement at 100K paths. Wall-clock is ~10-15 minutes per test under
-the v0.4.0 host evaluator. Run before any release tag; not run on
-every push.
+agreement at 100K paths. **Currently not runnable on the chelis v0.4.1
+host evaluator** — 100K-path MC simulation in the interpreted host
+evaluator does not complete in reasonable wall-clock (>30 min and not
+terminating, measured 2026-05-01 on AMD Ryzen AI Max+ 395). The
+gate becomes practical once Shoals can compile to native code via
+`chelis build` AOT; until then the spec rigor at 100K paths is
+deferred. See `chelis/spec/upstream-bugs/host-eval-perf-mc-rigor.md`.
+The default-tier 20K-path tests in `tests/` exercise the same
+correctness invariants at lower rigor and run as part of every push.
 
 ## Acceptance gate
 
@@ -103,7 +109,7 @@ reproducibility, parametric and historical VaR/CVaR, yield-curve
 interpolation and bootstrap round-trip, GBM path positivity, full-path
 bit-exact reproducibility, terminal-mean and terminal-variance
 theorems, and order-book invariants. Properties under
-`src/properties/` are exercised through `tests/properties.ch` (14 grid
+`properties/` are exercised through `tests/properties.ch` (14 grid
 cases for textbook-call/put agreement plus the new FD-delta-vs-N(d1)
 and optimized-vs-textbook-MC properties).
 
@@ -122,7 +128,7 @@ at `chelis test tests/` going green.
    to verify the analytical reference until Phase 5 host-scalar AD
    ships. Compiled-C-backend Greeks are exercised in the
    `chelis-cli` test harness upstream.
-2. **`@property` is design-only.** Compiler v0.4.0 does not parse the
+2. **`@property` is design-only.** Compiler v0.4.1 does not parse the
    annotation; the property bodies are plain `def`s that flip to
    `@property` when `chelis fuzz` ships. See above.
 3. **`chelis manifest` is design-only.** The MC reproducibility
@@ -131,7 +137,7 @@ at `chelis test tests/` going green.
    for CI is a Chelis-side follow-up.
 4. **MC convergence test uses 20 000 paths at 2 % tolerance.** Default
    `chelis test` timeout is 30 s; the suite is invoked with
-   `--timeout 120` because the 20K MC test takes ~60 s under the v0.4.0
+   `--timeout 120` because the 20K MC test takes ~60 s under the v0.4.1
    host evaluator. The 100 000-path / 1 % spec-rigor tier lives at
    `manual-gates/mc_rigorous.ch` and is invoked explicitly (see
    "Manual rigor gate" above). The reproducibility test (which is the
@@ -204,9 +210,15 @@ loss = next(r for r in result.roots if r.name == "loss")
 ```
 
 The reference harness lives at
-`/tmp/shoals-python-gate/test_call_price.py` (in this fix-up
-session); copy it into your work tree before running. Expected
-output:
+`manual-gates/python_interop/test_call_price.py` and is committed
+to this repo. Run from the Shoals root with the chelis-python venv:
+
+```sh
+/path/to/chelis/py/.venv/bin/python manual-gates/python_interop/test_call_price.py
+```
+
+See `manual-gates/python_interop/README.md` for setup details.
+Expected output:
 
 ```
   check: score=1.0 typed_nodes=147
