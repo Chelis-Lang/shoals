@@ -49,8 +49,8 @@ def main() -> int:
 
     src_files = (
         sorted((REPO_ROOT / "src").glob("*.ch"))
-        + sorted((REPO_ROOT / "src" / "properties").glob("*.ch"))
-        + sorted((REPO_ROOT / "src" / "references").glob("*.ch"))
+        + sorted((REPO_ROOT / "properties").glob("*.ch"))
+        + sorted((REPO_ROOT / "references").glob("*.ch"))
     )
     test_files = sorted((REPO_ROOT / "tests").glob("*.ch"))
     fmt_files = src_files + test_files

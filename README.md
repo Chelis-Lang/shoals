@@ -6,7 +6,7 @@ Ships as a reef package under the `Shoals` module prefix.
 
 ## Status
 
-v0.1.0-alpha. The full Phase 3l module shape is in place: pricing,
+v0.2.0. The full Phase 3l module shape is in place: pricing,
 risk, curves, stochastic, and orderbook. Every public function carries
 the `alpha` stability label per the cross-cutting Chelis convention.
 Promotion to `stable` waits until the Phase 3l acceptance oracle in
@@ -34,7 +34,7 @@ ground-truth oracles that `Shoals.Pricing`, `Shoals.Risk`, and
 `properties/` ships function bodies for the canonical finance
 properties (put-call parity, call-bounded-by-spot, FD-delta-in-[0,1],
 vega non-negative, MC-reproducibility, bull/butterfly-spread
-no-arbitrage). Status: design-only. The compiler v0.4.1 does not yet
+no-arbitrage). Status: design-only. The compiler v0.5.0 does not yet
 parse `@property` annotations and ships no `chelis fuzz` subcommand;
 the property bodies are written as plain `def name(...) -> bool`
 ready to flip to `@property` when the tool ships. See
@@ -43,19 +43,19 @@ plan.
 
 ## Toolchain
 
-Pinned to `chelis v0.4.1` in `reef.toml`:
+Pinned to `chelis v0.5.0` in `reef.toml`:
 
 ```toml
 [package]
-compiler = "=0.4.1"
+compiler = "=0.5.0"
 ```
 
 Dependencies resolve via the local Reef registry (`~/.chelis/reef/`):
 
 * `chelis-std` 0.1.0 — standard library
-* `nautilus`   0.4.0 — distributions, special functions, stats,
+* `nautilus`   0.5.0 — distributions, special functions, stats,
   interpolation
-* `coral`      0.4.0 — dataframe runtime (transitively required for
+* `coral`      0.5.0 — dataframe runtime (transitively required for
   the same `nautilus` minor version)
 
 ## Build
@@ -71,7 +71,7 @@ chelis test tests/ --timeout 120
 chelis fmt --check src/pricing.ch
 ```
 
-`chelis fmt` accepts only one file per invocation in v0.4.1; CI loops
+`chelis fmt` accepts only one file per invocation in v0.5.0; CI loops
 over the directory in a shell `for` loop. See `.github/workflows/ci.yml`.
 
 The default test tier uses 20 000 Monte-Carlo paths and 2 % tolerance
@@ -89,7 +89,7 @@ chelis test manual-gates/mc_rigorous.ch --timeout 900
 ```
 
 The rigor tier asserts 1 % MC convergence and 2 % terminal-variance
-agreement at 100K paths. **Currently not runnable on the chelis v0.4.1
+agreement at 100K paths. **Currently not runnable on the chelis v0.5.0
 host evaluator** — 100K-path MC simulation in the interpreted host
 evaluator does not complete in reasonable wall-clock (>30 min and not
 terminating, measured 2026-05-01 on AMD Ryzen AI Max+ 395). The
@@ -128,7 +128,7 @@ at `chelis test tests/` going green.
    to verify the analytical reference until Phase 5 host-scalar AD
    ships. Compiled-C-backend Greeks are exercised in the
    `chelis-cli` test harness upstream.
-2. **`@property` is design-only.** Compiler v0.4.1 does not parse the
+2. **`@property` is design-only.** Compiler v0.5.0 does not parse the
    annotation; the property bodies are plain `def`s that flip to
    `@property` when `chelis fuzz` ships. See above.
 3. **`chelis manifest` is design-only.** The MC reproducibility
@@ -137,7 +137,7 @@ at `chelis test tests/` going green.
    for CI is a Chelis-side follow-up.
 4. **MC convergence test uses 20 000 paths at 2 % tolerance.** Default
    `chelis test` timeout is 30 s; the suite is invoked with
-   `--timeout 120` because the 20K MC test takes ~60 s under the v0.4.1
+   `--timeout 120` because the 20K MC test takes ~60 s under the v0.5.0
    host evaluator. The 100 000-path / 1 % spec-rigor tier lives at
    `manual-gates/mc_rigorous.ch` and is invoked explicitly (see
    "Manual rigor gate" above). The reproducibility test (which is the
@@ -147,7 +147,7 @@ at `chelis test tests/` going green.
    handles the integer-year-spaced case (one coupon per pillar). A
    multi-curve / non-uniform-spacing variant is a v0.2 candidate.
 6. **`erfc` direct routing.** Per Chelis architecture, special
-   functions live in `Nautilus.Special`. As of `nautilus 0.4.0`
+   functions live in `Nautilus.Special`. As of `nautilus 0.5.0`
    Shoals routes Black-Scholes through `Nautilus.Special.erfc`
    directly (computing `0.5 * erfc(-x / sqrt(2))` for the standard
    normal CDF), bypassing the higher-level distribution wrapper. No
@@ -156,13 +156,13 @@ at `chelis test tests/` going green.
 ### Layout (canonical, since v0.1.0)
 
 Per the trust stack spec, `properties/` and `references/` are top-level
-directories alongside `src/`. Shoals v0.1.0 ships at the canonical layout
+directories alongside `src/`. Shoals v0.1.0 shipped at the canonical layout
 following the chelis-reef v0.4.1 multi-source-roots fix
 (`6b58030 feat(reef): multi-source-roots — additional_sources in reef.toml;
 bump v0.4.1`). The reef.toml declares
-`additional_sources = ["properties", "references"]`. Shoals v0.1.0-alpha
-shipped with these directories under `src/` as a workaround pending the
-reef fix; v0.1.0 migrates to the canonical layout.
+`additional_sources = ["properties", "references"]`. v0.2.0 carries the
+canonical layout forward and bumps the toolchain pin to chelis 0.5.0
+(nautilus 0.5.0, coral 0.5.0).
 
 ## Python interop
 

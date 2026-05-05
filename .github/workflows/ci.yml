@@ -18,23 +18,63 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
         run: |
-          gh release download v0.4.0 \
+          gh release download v0.5.0 \
             --repo Chelis-Lang/chelis \
-            --pattern 'chelis-v0.4.0-linux-x86_64.tar.gz' \
+            --pattern 'chelis-v0.5.0-linux-x86_64.tar.gz' \
             --dir /tmp/chelis-toolchain
-          tar -xzf /tmp/chelis-toolchain/chelis-v0.4.0-linux-x86_64.tar.gz \
+          tar -xzf /tmp/chelis-toolchain/chelis-v0.5.0-linux-x86_64.tar.gz \
             -C /tmp/chelis-toolchain
-          echo "/tmp/chelis-toolchain/chelis-v0.4.0-linux-x86_64" >> "$GITHUB_PATH"
+          echo "/tmp/chelis-toolchain/chelis-v0.5.0-linux-x86_64/bin" >> "$GITHUB_PATH"
 
       - name: Verify toolchain version
         run: |
           chelis --version
-          test "$(chelis --version)" = "chelis 0.4.0"
+          test "$(chelis --version)" = "chelis 0.5.0"
+
+      - name: Populate reef registry (chelis-std + nautilus + coral)
+        env:
+          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+        run: |
+          set -euo pipefail
+          COMPILER_PIN=$(grep '^compiler' reef.toml | sed 's/.*"\(.*\)"/\1/')
+
+          # chelis-std lives in the chelis monorepo's prebuilt artifact
+          # tree; clone the matching tag and publish from there.
+          rm -rf /tmp/chelis-monorepo-for-std
+          gh repo clone Chelis-Lang/chelis /tmp/chelis-monorepo-for-std \
+            -- --depth 1 --branch v0.5.0 --quiet
+          chelis reef install --from-monorepo \
+            /tmp/chelis-monorepo-for-std chelis-std
+
+          # Nautilus 0.5.0 from its release.
+          mkdir -p /tmp/reef-deps/nautilus-dl /tmp/reef-deps/nautilus
+          gh release download v0.5.0 \
+            --repo Chelis-Lang/nautilus \
+            --pattern 'nautilus-0.5.0.tar.zst' \
+            --dir /tmp/reef-deps/nautilus-dl
+          tar -xf /tmp/reef-deps/nautilus-dl/nautilus-0.5.0.tar.zst \
+            -C /tmp/reef-deps/nautilus
+          sed -i "s|compiler = \".*\"|compiler = \"$COMPILER_PIN\"|" \
+            /tmp/reef-deps/nautilus/reef.toml
+          chelis reef publish /tmp/reef-deps/nautilus
+
+          # Coral 0.5.0 from its release.
+          mkdir -p /tmp/reef-deps/coral-dl /tmp/reef-deps/coral
+          gh release download v0.5.0 \
+            --repo Chelis-Lang/coral \
+            --pattern 'coral-0.5.0.tar.zst' \
+            --dir /tmp/reef-deps/coral-dl
+          tar -xf /tmp/reef-deps/coral-dl/coral-0.5.0.tar.zst \
+            -C /tmp/reef-deps/coral
+          sed -i "s|compiler = \".*\"|compiler = \"$COMPILER_PIN\"|" \
+            /tmp/reef-deps/coral/reef.toml
+          chelis reef publish /tmp/reef-deps/coral
 
       - name: chelis check (all source modules)
         run: |
           set -euo pipefail
-          for f in src/*.ch src/properties/*.ch src/references/*.ch; do
+          for f in src/*.ch properties/*.ch references/*.ch; do
+            [ -e "$f" ] || continue
             echo "checking $f"
             chelis check "$f"
           done
@@ -42,9 +82,13 @@ jobs:
       - name: chelis fmt --check
         run: |
           set -euo pipefail
-          for f in src/*.ch src/properties/*.ch src/references/*.ch tests/*.ch; do
+          for f in src/*.ch properties/*.ch references/*.ch tests/*.ch; do
+            [ -e "$f" ] || continue
             chelis fmt --check "$f"
           done
+
+      - name: chelis reef build
+        run: chelis reef build
 
       - name: chelis test
         run: chelis test tests/ --timeout 120
