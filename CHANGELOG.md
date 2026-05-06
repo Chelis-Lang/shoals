@@ -6,6 +6,13 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-05-06
+
+Compiler-pin alignment release. Tracks chelis 0.6.0 → 0.6.1
+(bootstrap-list patch), nautilus 0.6.0 → 0.6.1, and coral 0.6.0 →
+0.6.1 (companion alignments). No source changes from 0.3.0 — only
+version + pin bumps.
+
 ## [0.3.0] — 2026-05-06
 
 Naming-convention release. Aligns shoals with the recorded style
