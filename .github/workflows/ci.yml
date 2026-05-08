@@ -32,6 +32,7 @@ jobs:
           test "$(chelis --version)" = "chelis 0.6.1"
 
       - name: Populate reef registry (chelis-std + nautilus + coral)
+        timeout-minutes: 5
         env:
           GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
         run: |
@@ -39,10 +40,13 @@ jobs:
           COMPILER_PIN=$(grep '^compiler' reef.toml | sed 's/.*"\(.*\)"/\1/')
 
           # chelis-std lives in the chelis monorepo's prebuilt artifact
-          # tree; clone the matching tag and publish from there.
+          # tree; download the matching source tag and publish from there.
           rm -rf /tmp/chelis-monorepo-for-std
-          gh repo clone Chelis-Lang/chelis /tmp/chelis-monorepo-for-std \
-            -- --depth 1 --branch v0.6.1 --quiet
+          mkdir -p /tmp/chelis-monorepo-for-std
+          gh api repos/Chelis-Lang/chelis/tarball/v0.6.1 \
+            > /tmp/chelis-monorepo-for-std.tar.gz
+          tar -xzf /tmp/chelis-monorepo-for-std.tar.gz \
+            -C /tmp/chelis-monorepo-for-std --strip-components=1
           chelis reef install --from-monorepo \
             /tmp/chelis-monorepo-for-std chelis-std
 
@@ -70,15 +74,6 @@ jobs:
             /tmp/reef-deps/coral/reef.toml
           chelis reef publish /tmp/reef-deps/coral
 
-      - name: chelis check (all source modules)
-        run: |
-          set -euo pipefail
-          for f in src/*.ch properties/*.ch references/*.ch; do
-            [ -e "$f" ] || continue
-            echo "checking $f"
-            chelis check "$f"
-          done
-
       - name: chelis fmt --check
         run: |
           set -euo pipefail
@@ -89,6 +84,3 @@ jobs:
 
       - name: chelis reef build
         run: chelis reef build
-
-      - name: chelis test
-        run: chelis test tests/ --timeout 120

@@ -1,7 +1,7 @@
 module Shoals.Tests.Properties
 import Std.Test (assert_close)
 import Shoals.Properties.Pricing (matches_textbook_reference, matches_textbook_reference_put, put_call_parity_holds, call_bounded_by_spot, mc_matches_textbook_mc_reference)
-import Shoals.Properties.Greeks (fd_delta_in_unit_range_for_call, fd_delta_matches_analytic)
+import Shoals.Properties.Greeks (fd_delta_in_unit_range_for_call, fd_delta_matches_analytic, vega_nonneg)
 def to01(b: bool) -> f32 = if b then cast(1.0, f32) else cast(0.0, f32)
 def test_matches_textbook_atm_call() -> unit ! { Test } = {
   ok = matches_textbook_reference(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
@@ -74,6 +74,10 @@ def test_fd_delta_matches_analytic_itm() -> unit ! { Test } = {
 def test_fd_delta_matches_analytic_otm() -> unit ! { Test } = {
   ok = fd_delta_matches_analytic(cast(80.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
   assert_close(to01(ok), cast(1.0, f32), cast(0.001, f32), "FD call delta matches N(d1) OTM (S=80)")
+}
+def test_vega_nonneg_atm() -> unit ! { Test } = {
+  ok = vega_nonneg(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
+  assert_close(to01(ok), cast(1.0, f32), cast(0.001, f32), "FD call vega is non-negative at ATM")
 }
 def test_mc_matches_textbook_mc_reference() -> unit ! { Test } = {
   template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(2000, int64))))

@@ -1,6 +1,6 @@
 module Shoals.Properties.MonteCarlo
 import Shoals.Pricing (bs_call_scalar, mc_call_price)
-def same_seed_same_price[n](template: tensor[n, f32], s: f32, k: f32, r: f32, sigma: f32, t: f32, seed_value: int64) -> bool ! { Random } = {
+def same_literal_seed_same_price[n](template: tensor[n, f32], s: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool ! { Random } = {
   px1 = with seed(7) { mc_call_price(copy(template), s, k, r, sigma, t) }
   px2 = with seed(7) { mc_call_price(template, s, k, r, sigma, t) }
   eq(px1, px2)

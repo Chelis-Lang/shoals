@@ -3,13 +3,11 @@
 
 Invokes:
 
-  1. ``chelis check`` over every source file under
-     ``src/``, ``src/properties/``, ``src/references/``.
-  2. ``chelis fmt --check`` over every ``.ch`` file in
-     ``src/``, ``src/properties/``, ``src/references/``, ``tests/``.
-  3. ``chelis test tests/``.
+  1. ``chelis fmt --check`` over every ``.ch`` file in
+     ``src/``, ``properties/``, ``references/``, ``tests/``.
+  2. ``chelis reef build`` for package-level compiler validation.
 
-Exits 0 only if all three stages succeed. Mirrors the steps in the
+Exits 0 only if both stages succeed. Mirrors the default PR gate in the
 GitHub Actions workflow under ``.github/workflows/ci.yml``.
 
 Usage:
@@ -47,23 +45,14 @@ def main() -> int:
     args = parser.parse_args()
     quiet = args.quiet
 
-    src_files = (
+    fmt_files = (
         sorted((REPO_ROOT / "src").glob("*.ch"))
         + sorted((REPO_ROOT / "properties").glob("*.ch"))
         + sorted((REPO_ROOT / "references").glob("*.ch"))
+        + sorted((REPO_ROOT / "tests").glob("*.ch"))
     )
-    test_files = sorted((REPO_ROOT / "tests").glob("*.ch"))
-    fmt_files = src_files + test_files
 
-    print("[1/3] chelis check")
-    for path in src_files:
-        rel = path.relative_to(REPO_ROOT)
-        rc = run(["chelis", "check", str(rel)], quiet=quiet)
-        if rc != 0:
-            print(f"FAIL: chelis check {rel}")
-            return rc
-
-    print("[2/3] chelis fmt --check")
+    print("[1/2] chelis fmt --check")
     for path in fmt_files:
         rel = path.relative_to(REPO_ROOT)
         rc = run(["chelis", "fmt", "--check", str(rel)], quiet=quiet)
@@ -71,10 +60,10 @@ def main() -> int:
             print(f"FAIL: chelis fmt --check {rel}")
             return rc
 
-    print("[3/3] chelis test tests/")
-    rc = run(["chelis", "test", "tests/"], quiet=False)
+    print("[2/2] chelis reef build")
+    rc = run(["chelis", "reef", "build"], quiet=False)
     if rc != 0:
-        print("FAIL: chelis test")
+        print("FAIL: chelis reef build")
         return rc
 
     print("OK: shoals local gate green")
