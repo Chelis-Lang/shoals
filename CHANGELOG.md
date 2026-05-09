@@ -6,6 +6,17 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced the stale blanket host-runtime AD limitation with scoped
+  documentation: Shoals keeps executable Greek coverage on finite
+  differences, while `Shoals.Pricing`'s grad-derived Greeks remain a
+  deferred runtime path until the full pricing body is IR-lowerable by
+  host-runtime `grad`.
+- Scoped the default Shoals CI/local gate to formatter checks plus
+  `chelis reef build`. The full `chelis test tests/ --timeout 120`
+  runtime suite remains documented as an explicit manual/local gate.
+
 ## [0.3.1] — 2026-05-06
 
 Compiler-pin alignment release. Tracks chelis 0.6.0 → 0.6.1
