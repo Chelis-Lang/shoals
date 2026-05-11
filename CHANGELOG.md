@@ -6,6 +6,19 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.6] — 2026-05-11
+
+Compiler and dependency alignment release. Tracks chelis 0.7.6,
+chelis-std 0.3.0, nautilus 0.7.6, and coral 0.7.6. CI now consumes
+released Chelis artifacts only, installs released Nautilus and Coral
+packages, and runs the native Shoals suite as
+`chelis test tests/ --timeout 120 --jobs auto`.
+
+Validation recorded in `docs/testing_cutover_0.7.6.json`:
+
+- `chelis test tests/ --timeout 120 --jobs auto`: 48 passed, 0 failed, 1:04.89
+- `chelis test tests/ --timeout 120 --jobs 1`: 48 passed, 0 failed, 1:25.44
+
 ### Changed
 
 - Replaced the stale blanket host-runtime AD limitation with scoped
@@ -13,9 +26,8 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   differences, while `Shoals.Pricing`'s grad-derived Greeks remain a
   deferred runtime path until the full pricing body is IR-lowerable by
   host-runtime `grad`.
-- Scoped the default Shoals CI/local gate to formatter checks plus
-  `chelis reef build`. The full `chelis test tests/ --timeout 120`
-  runtime suite remains documented as an explicit manual/local gate.
+- Scoped the default Shoals CI/local gate to formatter checks,
+  `chelis reef build`, and the node-local runtime suite.
 
 ## [0.3.1] — 2026-05-06
 

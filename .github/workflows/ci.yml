@@ -2,10 +2,16 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, shoals-grad]
   pull_request:
-    branches: [main]
+    branches: [main, shoals-grad]
   workflow_dispatch:
+
+env:
+  CHELIS_TAG: v0.7.6
+  CHELIS_VERSION: 0.7.6
+  NAUTILUS_TAG: v0.7.6
+  CORAL_TAG: v0.7.6
 
 jobs:
   check:
@@ -18,61 +24,26 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
         run: |
-          gh release download v0.6.1 \
+          gh release download "$CHELIS_TAG" \
             --repo Chelis-Lang/chelis \
-            --pattern 'chelis-v0.6.1-linux-x86_64.tar.gz' \
+            --pattern "chelis-${CHELIS_TAG}-linux-x86_64.tar.gz" \
             --dir /tmp/chelis-toolchain
-          tar -xzf /tmp/chelis-toolchain/chelis-v0.6.1-linux-x86_64.tar.gz \
+          tar -xzf "/tmp/chelis-toolchain/chelis-${CHELIS_TAG}-linux-x86_64.tar.gz" \
             -C /tmp/chelis-toolchain
-          echo "/tmp/chelis-toolchain/chelis-v0.6.1-linux-x86_64/bin" >> "$GITHUB_PATH"
+          echo "/tmp/chelis-toolchain/chelis-${CHELIS_TAG}-linux-x86_64/bin" >> "$GITHUB_PATH"
 
       - name: Verify toolchain version
-        run: |
-          chelis --version
-          test "$(chelis --version)" = "chelis 0.6.1"
+        run: test "$(chelis --version)" = "chelis ${CHELIS_VERSION}"
 
-      - name: Populate reef registry (chelis-std + nautilus + coral)
+      - name: Install released dependencies
         timeout-minutes: 5
         env:
           GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
         run: |
           set -euo pipefail
-          COMPILER_PIN=$(grep '^compiler' reef.toml | sed 's/.*"\(.*\)"/\1/')
-
-          # chelis-std lives in the chelis monorepo's prebuilt artifact
-          # tree; download the matching source tag and publish from there.
-          rm -rf /tmp/chelis-monorepo-for-std
-          mkdir -p /tmp/chelis-monorepo-for-std
-          gh api repos/Chelis-Lang/chelis/tarball/v0.6.1 \
-            > /tmp/chelis-monorepo-for-std.tar.gz
-          tar -xzf /tmp/chelis-monorepo-for-std.tar.gz \
-            -C /tmp/chelis-monorepo-for-std --strip-components=1
-          chelis reef install --from-monorepo \
-            /tmp/chelis-monorepo-for-std chelis-std
-
-          # Nautilus 0.6.0 from its release.
-          mkdir -p /tmp/reef-deps/nautilus-dl /tmp/reef-deps/nautilus
-          gh release download v0.6.1 \
-            --repo Chelis-Lang/nautilus \
-            --pattern 'nautilus-0.6.1.tar.zst' \
-            --dir /tmp/reef-deps/nautilus-dl
-          tar -xf /tmp/reef-deps/nautilus-dl/nautilus-0.6.1.tar.zst \
-            -C /tmp/reef-deps/nautilus
-          sed -i "s|compiler = \".*\"|compiler = \"$COMPILER_PIN\"|" \
-            /tmp/reef-deps/nautilus/reef.toml
-          chelis reef publish /tmp/reef-deps/nautilus
-
-          # Coral 0.6.0 from its release.
-          mkdir -p /tmp/reef-deps/coral-dl /tmp/reef-deps/coral
-          gh release download v0.6.1 \
-            --repo Chelis-Lang/coral \
-            --pattern 'coral-0.6.1.tar.zst' \
-            --dir /tmp/reef-deps/coral-dl
-          tar -xf /tmp/reef-deps/coral-dl/coral-0.6.1.tar.zst \
-            -C /tmp/reef-deps/coral
-          sed -i "s|compiler = \".*\"|compiler = \"$COMPILER_PIN\"|" \
-            /tmp/reef-deps/coral/reef.toml
-          chelis reef publish /tmp/reef-deps/coral
+          chelis reef install --from-github "Chelis-Lang/nautilus@${NAUTILUS_TAG}"
+          chelis reef install --from-github "Chelis-Lang/coral@${CORAL_TAG}"
 
       - name: chelis fmt --check
         run: |
@@ -84,3 +55,6 @@ jobs:
 
       - name: chelis reef build
         run: chelis reef build
+
+      - name: chelis test (node-local parallel)
+        run: chelis test tests/ --timeout 120 --jobs auto

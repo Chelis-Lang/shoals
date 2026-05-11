@@ -60,7 +60,7 @@ A non-zero exit code or a missing `PASS` line indicates regression.
 
 ## Pinned versions
 
-- `chelis-python` from chelis monorepo at `0.5.0` or compatible.
+- `chelis-python` from chelis monorepo at `0.7.6` or compatible.
 - `numpy` (any reasonably recent release; the harness uses only
   `np.array(..., dtype=np.float32)`).
 
