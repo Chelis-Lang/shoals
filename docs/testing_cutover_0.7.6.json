@@ -1,0 +1,28 @@
+{
+  "package": "shoals",
+  "package_version": "0.7.6",
+  "chelis_tag": "v0.7.6",
+  "chelis_version": "0.7.6",
+  "nautilus_tag": "v0.7.6",
+  "nautilus_version": "0.7.6",
+  "coral_tag": "v0.7.6",
+  "coral_version": "0.7.6",
+  "measured_at": "2026-05-11",
+  "native_tests": {
+    "test_count": 48,
+    "auto": {
+      "command": "/usr/bin/time -f 'elapsed_auto=%E' chelis test tests/ --timeout 120 --jobs auto",
+      "result": "48 passed, 0 failed",
+      "elapsed": "1:04.89"
+    },
+    "serial": {
+      "command": "/usr/bin/time -f 'elapsed_serial=%E' chelis test tests/ --timeout 120 --jobs 1",
+      "result": "48 passed, 0 failed",
+      "elapsed": "1:25.44"
+    }
+  },
+  "legacy_ci": {
+    "strategy": "formatter plus reef-build only; runtime tests documented as manual",
+    "documented_runtime_class": "about 60 seconds for the 20K-path MC test tier"
+  }
+}

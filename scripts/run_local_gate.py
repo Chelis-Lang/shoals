@@ -6,8 +6,10 @@ Invokes:
   1. ``chelis fmt --check`` over every ``.ch`` file in
      ``src/``, ``properties/``, ``references/``, ``tests/``.
   2. ``chelis reef build`` for package-level compiler validation.
+  3. ``chelis test tests/ --timeout 120 --jobs auto`` for the native
+     runtime suite.
 
-Exits 0 only if both stages succeed. Mirrors the default PR gate in the
+Exits 0 only if all stages succeed. Mirrors the default PR gate in the
 GitHub Actions workflow under ``.github/workflows/ci.yml``.
 
 Usage:
@@ -52,7 +54,7 @@ def main() -> int:
         + sorted((REPO_ROOT / "tests").glob("*.ch"))
     )
 
-    print("[1/2] chelis fmt --check")
+    print("[1/3] chelis fmt --check")
     for path in fmt_files:
         rel = path.relative_to(REPO_ROOT)
         rc = run(["chelis", "fmt", "--check", str(rel)], quiet=quiet)
@@ -60,10 +62,16 @@ def main() -> int:
             print(f"FAIL: chelis fmt --check {rel}")
             return rc
 
-    print("[2/2] chelis reef build")
+    print("[2/3] chelis reef build")
     rc = run(["chelis", "reef", "build"], quiet=False)
     if rc != 0:
         print("FAIL: chelis reef build")
+        return rc
+
+    print("[3/3] chelis test tests/ --jobs auto")
+    rc = run(["chelis", "test", "tests/", "--timeout", "120", "--jobs", "auto"], quiet=False)
+    if rc != 0:
+        print("FAIL: chelis test tests/ --jobs auto")
         return rc
 
     print("OK: shoals local gate green")

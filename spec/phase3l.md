@@ -53,7 +53,7 @@ the AD-through-instrument-dict story is validated end-to-end.
 ### What Makes This Work in Chelis
 
 - **Greeks with scoped runtime coverage:** Shoals exposes grad-derived Greek functions
-  for the intended AD surface, but v0.3.1 executable properties use finite differences
+  for the intended AD surface, but v0.7.6 executable properties use finite differences
   against textbook Black-Scholes references. Full grad-vs-textbook runtime properties
   are deferred until the pricing body lowers cleanly through the host-runtime `grad`
   path.
@@ -73,7 +73,7 @@ the AD-through-instrument-dict story is validated end-to-end.
 - `Shoals.Pricing`: Monte Carlo price converges to Black-Scholes analytical for
   vanilla European call. Current executable runtime coverage uses a 20K-path / 2%
   tolerance check; the 100K-path / 1% rigor tier is an explicit manual gate and is
-  deferred under the v0.6.1 host evaluator.
+  deferred under the v0.7.6 host evaluator.
 - `Shoals.Pricing`: finite-difference Greek checks match analytical Black-Scholes
   Greeks. Grad-vs-textbook runtime coverage is deferred; the focused upstream smoke
   skips with a warning until the full pricing body is IR-lowerable under host-runtime
@@ -92,7 +92,7 @@ the AD-through-instrument-dict story is validated end-to-end.
 
 **Reproducibility manifests.** The `chelis manifest` command (compiler-side pass)
 extracts all `Random`-effect-annotated operations into a structured JSON report.
-`chelis manifest --check` is not shipped in the v0.6.1 toolchain and is not part of
+`chelis manifest --check` is not shipped in the v0.7.6 toolchain and is not part of
 the Shoals CI gate. Target behavior: fail the build if any random operation in a Shoals
 program is unseeded once the compiler-side pass exists. Status: **demo-blocking,
 scoped, ready to build.** Full design: `chelis_manifest_spec.md` in the chelis monorepo
@@ -117,7 +117,7 @@ with the implementation code they constrain — same repo, same package, version
 controlled together. Properties are NOT a separate shell. The intended future
 `chelis fuzz src/` runner should run them all against the shipped exports once the
 compiler-side property runner exists. In the
-v0.6.1 toolchain, Shoals exercises property bodies through ordinary `Test` functions
+v0.7.6 toolchain, Shoals exercises property bodies through ordinary `Test` functions
 under `tests/`; `chelis fuzz` and first-class `@property` annotations are not part of
 the default CI gate. Status of the underlying tool: `chelis fuzz` with first-class
 `@property` annotations is **demo-blocking, scoped, ready to build** for the first

@@ -6,7 +6,7 @@ Ships as a reef package under the `Shoals` module prefix.
 
 ## Status
 
-v0.2.0. The full Phase 3l module shape is in place: pricing,
+v0.7.6. The full Phase 3l module shape is in place: pricing,
 risk, curves, stochastic, and orderbook. Every public function carries
 the `alpha` stability label per the cross-cutting Chelis convention.
 Promotion to `stable` waits until the Phase 3l acceptance oracle in
@@ -34,7 +34,7 @@ ground-truth oracles that `Shoals.Pricing`, `Shoals.Risk`, and
 `properties/` ships function bodies for the canonical finance
 properties (put-call parity, call-bounded-by-spot, finite-difference
 delta/vega smoke, MC-reproducibility, bull/butterfly-spread
-no-arbitrage). Status: mixed. The compiler v0.6.1 does not yet
+no-arbitrage). Status: mixed. The compiler v0.7.6 does not yet
 parse `@property` annotations and ships no `chelis fuzz` subcommand;
 the property bodies are written as plain `def name(...) -> bool`
 ready to flip to `@property` when the tool ships. See
@@ -46,19 +46,19 @@ Shoals's full pricing body is not yet IR-lowerable by host-runtime
 
 ## Toolchain
 
-Pinned to `chelis v0.6.1` in `reef.toml`:
+Pinned to `chelis v0.7.6` in `reef.toml`:
 
 ```toml
 [package]
-compiler = "=0.6.1"
+compiler = "=0.7.6"
 ```
 
 Dependencies resolve via the local Reef registry (`~/.chelis/reef/`):
 
-* `chelis-std` 0.2.0 — standard library
-* `nautilus`   0.6.1 — distributions, special functions, stats,
+* `chelis-std` 0.3.0 — standard library
+* `nautilus`   0.7.6 — distributions, special functions, stats,
   interpolation
-* `coral`      0.6.1 — dataframe runtime (transitively required for
+* `coral`      0.7.6 — dataframe runtime (transitively required for
   the same `nautilus` minor version)
 
 ## Build
@@ -68,21 +68,23 @@ Dependencies resolve via the local Reef registry (`~/.chelis/reef/`):
 chelis reef build
 
 # run the in-tree runtime test suite explicitly
-chelis test tests/ --timeout 120
+chelis test tests/ --timeout 120 --jobs auto
+
+# serial debugging fallback
+chelis test tests/ --timeout 120 --jobs 1
 
 # canonical-formatter parseability gate (single file at a time today)
 chelis fmt --check src/pricing.ch
 ```
 
-`chelis fmt` accepts only one file per invocation in v0.6.1; CI loops
+`chelis fmt` accepts only one file per invocation in v0.7.6; CI loops
 over the directory in Python. See `.github/workflows/ci.yml` and
 `scripts/run_local_gate.py`.
 
 The default test tier uses 20 000 Monte-Carlo paths and 2 % tolerance
 for convergence assertions. The longer `--timeout 120` is required
 because the host evaluator runs the 20K MC sample loop in ~60 s. It is
-not part of the default PR gate; invoke it as a runtime/manual check
-when changing pricing, stochastic, or property behavior.
+part of the default PR gate as of v0.7.6.
 
 ### Manual rigor gate
 
@@ -95,7 +97,7 @@ chelis test manual-gates/mc_rigorous.ch --timeout 900
 ```
 
 The rigor tier asserts 1 % MC convergence and 2 % terminal-variance
-agreement at 100K paths. **Currently not runnable on the chelis v0.6.1
+agreement at 100K paths. **Currently not runnable on the chelis v0.7.6
 host evaluator** — 100K-path MC simulation in the interpreted host
 evaluator does not complete in reasonable wall-clock (>30 min and not
 terminating, measured 2026-05-01 on AMD Ryzen AI Max+ 395). The
@@ -109,14 +111,13 @@ gate, not part of every PR push.
 ## Acceptance gate
 
 Default PR/repo-local gate: `scripts/run_local_gate.py` and CI run
-`chelis fmt --check` over repository `.ch` sources and `chelis reef
-build`. `chelis reef build` is the compiler-owned package oracle: it
-resolves the Reef manifest, lowers the package, and rejects stale source
-or dependency wiring without duplicating semantic module checks in
-repository scripts.
+`chelis fmt --check` over repository `.ch` sources, `chelis reef build`,
+and `chelis test tests/ --timeout 120 --jobs auto`. `chelis reef build`
+is the compiler-owned package oracle: it resolves the Reef manifest,
+lowers the package, and rejects stale source or dependency wiring; the
+runtime lane exercises the finance invariants.
 
-Runtime/manual gate: `chelis test tests/ --timeout 120`. Expected
-success condition: all 47 tests pass. This covers pricing correctness,
+Runtime gate expected success condition: all 48 tests pass. This covers pricing correctness,
 finite-difference Greeks (in-unit-range and matches-N(d1) checks), MC
 convergence (20K paths, 2 % tolerance) and reproducibility, parametric
 and historical VaR/CVaR, yield-curve interpolation and bootstrap
@@ -127,34 +128,36 @@ Properties under `properties/` are exercised through
 finite-difference-delta smoke, and optimized-vs-textbook-MC
 properties). Grad-vs-textbook Greek runtime properties are deferred
 until the full pricing body is IR-lowerable under host-runtime `grad`.
+The v0.7.6 testing cutover timing is recorded in
+`docs/testing_cutover_0.7.6.json`: node-local `--jobs auto` ran 48
+tests in 1:04.89; serial `--jobs 1` ran the same suite in 1:25.44.
 
 Phase oracle: the Chelis-monorepo-side
 `cargo test -p chelis-cli --test phase3l_shoals_oracle phase3l_shoals_oracle -- --ignored --exact --nocapture`
 is a manual gate and is not exercised from this repo. The Shoals
-default PR scope ends at `chelis reef build` going green; runtime tests
-remain available as the explicit manual gate above.
+default PR scope includes `chelis reef build` and the node-local
+runtime suite; the monorepo oracle remains a separate manual gate.
 
-## Known limitations in v0.3.1
+## Known limitations in v0.7.6
 
-1. **`@property` is design-only.** Compiler v0.6.1 does not parse the
+1. **`@property` is design-only.** Compiler v0.7.6 does not parse the
    annotation; the property bodies are plain `def`s that flip to
    `@property` when `chelis fuzz` ships. See above.
 2. **`chelis manifest` is design-only.** The MC reproducibility
    contract is enforced by the `Random` effect (the compiler refuses
    unseeded random ops at type-check time). The JSON manifest artifact
    for CI is a Chelis-side follow-up.
-3. **MC convergence runtime tests are manual/local.** The 20 000-path
-   test uses 2 % tolerance and needs `chelis test tests/ --timeout 120`
-   because it takes ~60 s under the v0.6.1 host evaluator. The 100
-   000-path / 1 % spec-rigor tier lives at `manual-gates/mc_rigorous.ch`
-   and is invoked explicitly (see "Manual rigor gate" above). The
-   default PR gate stops at compiler/package validation instead of
-   spending CI time in the Shoals host-runtime evaluator.
+3. **MC convergence rigor is split by tier.** The default 20 000-path
+   test uses 2 % tolerance and runs in CI through
+   `chelis test tests/ --timeout 120 --jobs auto`; it takes about one
+   minute under the v0.7.6 host evaluator. The 100 000-path / 1 %
+   spec-rigor tier lives at `manual-gates/mc_rigorous.ch` and is
+   invoked explicitly (see "Manual rigor gate" above).
 4. **Single-curve bootstrap only.** `bootstrap_zero_from_par`
    handles the integer-year-spaced case (one coupon per pillar). A
    multi-curve / non-uniform-spacing variant is a v0.2 candidate.
 5. **`erfc` direct routing.** Per Chelis architecture, special
-   functions live in `Nautilus.Special`. As of `nautilus 0.6.1`
+   functions live in `Nautilus.Special`. As of `nautilus 0.7.6`
    Shoals routes Black-Scholes through `Nautilus.Special.erfc`
    directly (computing `0.5 * erfc(-x / sqrt(2))` for the standard
    normal CDF), bypassing the higher-level distribution wrapper. No
@@ -167,9 +170,9 @@ directories alongside `src/`. Shoals v0.1.0 shipped at the canonical layout
 following the chelis-reef v0.4.1 multi-source-roots fix
 (`6b58030 feat(reef): multi-source-roots — additional_sources in reef.toml;
 bump v0.4.1`). The reef.toml declares
-`additional_sources = ["properties", "references"]`. v0.3.1 carries the
-canonical layout forward and pins chelis 0.6.1, nautilus 0.6.1, and
-coral 0.6.1.
+`additional_sources = ["properties", "references"]`. v0.7.6 carries the
+canonical layout forward and pins chelis 0.7.6, nautilus 0.7.6, and
+coral 0.7.6.
 
 ## Python interop
 

@@ -1,0 +1,71 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CHELIS_VERSION: 0.7.6
+  CHELIS_TAG: v0.7.6
+  NAUTILUS_TAG: v0.7.6
+  CORAL_TAG: v0.7.6
+  PACKAGE_NAME: shoals
+  PACKAGE_VERSION: 0.7.6
+
+jobs:
+  build-reef-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download chelis toolchain
+        env:
+          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
+        run: |
+          gh release download "${CHELIS_TAG}" \
+            --repo Chelis-Lang/chelis \
+            --pattern "chelis-${CHELIS_TAG}-linux-x86_64.tar.gz" \
+            --dir /tmp/chelis-toolchain
+          tar -xzf "/tmp/chelis-toolchain/chelis-${CHELIS_TAG}-linux-x86_64.tar.gz" \
+            -C /tmp/chelis-toolchain
+          echo "/tmp/chelis-toolchain/chelis-${CHELIS_TAG}-linux-x86_64/bin" >> "$GITHUB_PATH"
+
+      - name: Verify toolchain
+        run: test "$(chelis --version)" = "chelis ${CHELIS_VERSION}"
+
+      - name: Install released dependencies
+        env:
+          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
+          GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
+        run: |
+          chelis reef install --from-github "Chelis-Lang/nautilus@${NAUTILUS_TAG}"
+          chelis reef install --from-github "Chelis-Lang/coral@${CORAL_TAG}"
+
+      - name: Build reef assets
+        env:
+          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
+          GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
+        run: chelis reef build
+
+      - name: Verify release assets
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        run: |
+          test "${GITHUB_REF_NAME#v}" = "${PACKAGE_VERSION}"
+          test -f "dist/${PACKAGE_NAME}-${PACKAGE_VERSION}.tar.zst"
+          test -f "dist/${PACKAGE_NAME}-${PACKAGE_VERSION}.chb"
+
+      - name: Publish GitHub Release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/${{ env.PACKAGE_NAME }}-${{ env.PACKAGE_VERSION }}.tar.zst
+            dist/${{ env.PACKAGE_NAME }}-${{ env.PACKAGE_VERSION }}.chb
+          generate_release_notes: true
+          fail_on_unmatched_files: true

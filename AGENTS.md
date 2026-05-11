@@ -17,8 +17,8 @@ to this file so Claude-style and Codex-style entry points do not drift.
 
 ## Toolchain Pin
 
-- `chelis v0.5.0` is the single supported compiler binary. `reef.toml`
-  pins `compiler = "=0.5.0"`. Version bumps must land in every Chelis
+- `chelis v0.7.6` is the single supported compiler binary. `reef.toml`
+  pins `compiler = "=0.7.6"`. Version bumps must land in every Chelis
   shell repo in the same change set — do not bump unilaterally.
 - Do not vendor or build the Chelis compiler from source inside this
   repo. Consume the released tarball from the private
@@ -26,6 +26,11 @@ to this file so Claude-style and Codex-style entry points do not drift.
   `CHELIS_RELEASE_TOKEN`, which must hold a PAT with `contents: read`
   on `Chelis-Lang/chelis`. Rotate with
   `gh secret set CHELIS_RELEASE_TOKEN --repo Chelis-Lang/shoals`.
+- Native test CI uses the released compiler's node-local concurrency:
+  `chelis test tests/ --timeout 120 --jobs auto`. Keep `--jobs 1` as
+  the local serial debugging fallback; do not reintroduce per-file
+  matrix sharding or Chelis source checkouts unless a documented
+  semantic reason appears.
 
 ## Phase Spec
 
