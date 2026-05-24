@@ -4,12 +4,16 @@ export (YieldCurve, yield_curve_from_pillars, rate_at, discount_factor, bootstra
 type YieldCurve[n] =
   | YieldCurve { times: tensor[n, f32], rates: tensor[n, f32] }
 def yield_curve_from_pillars[n](times: tensor[n, f32], rates: tensor[n, f32]) -> YieldCurve[n] = { YieldCurve { times: times, rates: rates } }
-def rate_at[n](curve: YieldCurve[n], t: f32) -> f32 = { match curve with {
-  | YieldCurve { times: ts, rates: rs } => linear_interp_sorted(ts, rs, t)
-} }
-def spline_rate_at[n](curve: YieldCurve[n], t: f32) -> f32 = { match curve with {
-  | YieldCurve { times: ts, rates: rs } => spline_eval(ts, rs, t)
-} }
+def rate_at[n](curve: YieldCurve[n], t: f32) -> f32 = {
+  match curve with {
+    | YieldCurve { times: ts, rates: rs } => linear_interp_sorted(ts, rs, t)
+  }
+}
+def spline_rate_at[n](curve: YieldCurve[n], t: f32) -> f32 = {
+  match curve with {
+    | YieldCurve { times: ts, rates: rs } => spline_eval(ts, rs, t)
+  }
+}
 def discount_factor[n](curve: YieldCurve[n], t: f32) -> f32 = {
   r = rate_at(curve, t)
   exp(neg(mul(r, t)))

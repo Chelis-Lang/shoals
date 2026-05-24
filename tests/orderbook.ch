@@ -1,12 +1,16 @@
 module Shoals.Tests.Orderbook
 import Std.Test (assert_close, assert_eq_int)
 import Shoals.Orderbook (Order, OrderBook, empty_book, add_bid, add_ask, best_bid, best_ask, bid_ask_spread, vwap, total_bid_qty, total_ask_qty)
-def order_price_of(o: Order) -> f32 = { match o with {
-  | Order { price: p, qty: _ } => p
-} }
-def order_qty_of(o: Order) -> f32 = { match o with {
-  | Order { price: _, qty: q } => q
-} }
+def order_price_of(o: Order) -> f32 = {
+  match o with {
+    | Order { price: p, qty: _ } => p
+  }
+}
+def order_qty_of(o: Order) -> f32 = {
+  match o with {
+    | Order { price: _, qty: q } => q
+  }
+}
 def test_best_bid_highest() -> unit ! { Test } = {
   book = empty_book()
   b1 = add_bid(book, cast(99.0, f32), cast(10.0, f32))

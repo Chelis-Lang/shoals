@@ -36,8 +36,10 @@ Every function in Shoals' SKILL.md API surface tables carries an implicit stabil
 label per the cross-cutting design decision in
 `chelis/spec/design/chelis_canonical_reference.md`: `stable` (signature frozen —
 training-corpus safe) or `alpha` (signature may change — excluded or down-weighted).
-Shoals v0.1.0 ships with all public API marked `alpha` by default; promotion to
-`stable` waits until pricing, risk, and curves pass the Phase 3l acceptance oracle and
+Shoals ships with all public API marked `alpha` by default (and starts the
+v0.0.1 version track post-reset; the pre-reset v0.1.0 / v0.7.x labelling
+remains valid as historical release-history); promotion to `stable` waits
+until pricing, risk, and curves pass the Phase 3l acceptance oracle and
 the AD-through-instrument-dict story is validated end-to-end.
 
 ### Modules
@@ -53,10 +55,14 @@ the AD-through-instrument-dict story is validated end-to-end.
 ### What Makes This Work in Chelis
 
 - **Greeks with scoped runtime coverage:** Shoals exposes grad-derived Greek functions
-  for the intended AD surface, but v0.7.6 executable properties use finite differences
-  against textbook Black-Scholes references. Full grad-vs-textbook runtime properties
-  are deferred until the pricing body lowers cleanly through the host-runtime `grad`
-  path.
+  for the intended AD surface, but executable properties currently use finite differences
+  against textbook Black-Scholes references. The upstream `grad-eval-host-runtime`
+  bug closed (chelis 2026-05-07) — host-runtime `grad` is supported in general — but
+  Shoals's specific pricing body uses host-lane list combinators (`to_list` + `map` +
+  `to_tensor`) and has not been verified end-to-end through `grad` under the new
+  compiler. Full grad-vs-textbook runtime properties remain deferred pending that
+  Shoals-specific verification (re-evaluated at the M6 Greeks discipline milestone in
+  `docs/plan-quant-surface.md`).
 - **Reproducible Monte Carlo:** The `Random` effect with `withSeed` handlers means every
   simulation is exactly reproducible. Two runs with the same seed produce identical
   paths. This is a regulatory requirement.
@@ -73,11 +79,14 @@ the AD-through-instrument-dict story is validated end-to-end.
 - `Shoals.Pricing`: Monte Carlo price converges to Black-Scholes analytical for
   vanilla European call. Current executable runtime coverage uses a 20K-path / 2%
   tolerance check; the 100K-path / 1% rigor tier is an explicit manual gate and is
-  deferred under the v0.7.6 host evaluator.
+  deferred under the host evaluator (last measured under chelis 0.7.6; not re-measured
+  under 0.7.11 at M0).
 - `Shoals.Pricing`: finite-difference Greek checks match analytical Black-Scholes
-  Greeks. Grad-vs-textbook runtime coverage is deferred; the focused upstream smoke
-  skips with a warning until the full pricing body is IR-lowerable under host-runtime
-  `grad`.
+  Greeks. Grad-vs-textbook runtime coverage is deferred: the upstream host-runtime
+  `grad` constraint resolved (chelis 2026-05-07) but the Shoals pricing body's
+  host-lane list-combinator shape has not been verified end-to-end through `grad` —
+  the focused upstream smoke continues to skip with a warning pending that
+  Shoals-specific verification at M6.
 - `Shoals.Risk`: Parametric VaR matches `Nautilus.Distributions.Normal.ppf` at standard
   confidence levels
 - `Shoals.Curves`: Bootstrap reproduces known market instrument prices (< 1bp error)
@@ -92,8 +101,8 @@ the AD-through-instrument-dict story is validated end-to-end.
 
 **Reproducibility manifests.** The `chelis manifest` command (compiler-side pass)
 extracts all `Random`-effect-annotated operations into a structured JSON report.
-`chelis manifest --check` is not shipped in the v0.7.6 toolchain and is not part of
-the Shoals CI gate. Target behavior: fail the build if any random operation in a Shoals
+`chelis manifest --check` is not shipped in the chelis 0.7.11 toolchain and is not
+part of the Shoals CI gate. Target behavior: fail the build if any random operation in a Shoals
 program is unseeded once the compiler-side pass exists. Status: **demo-blocking,
 scoped, ready to build.** Full design: `chelis_manifest_spec.md` in the chelis monorepo
 (concrete CLI surface and JSON schema); historical context in
@@ -106,7 +115,9 @@ reference `@property` functions:
   and optimized-vs-textbook price agreement
 - `properties/greeks.ch` — finite-difference delta range/matches-textbook checks and
   non-negative finite-difference vega smoke; grad-vs-textbook runtime properties are
-  deferred until the full pricing body is IR-lowerable under host-runtime `grad`
+  deferred — host-runtime `grad` is now supported upstream (chelis 2026-05-07), but
+  Shoals's pricing body's host-lane `to_list` + `map` shape has not yet been verified
+  end-to-end through `grad`
 - `properties/montecarlo.ch` — Monte Carlo price converges to analytic price as path
   count increases, variance decreases with path count
 - `properties/noarbitrage.ch` — bull spread payoff non-negative, butterfly spread
@@ -117,7 +128,7 @@ with the implementation code they constrain — same repo, same package, version
 controlled together. Properties are NOT a separate shell. The intended future
 `chelis fuzz src/` runner should run them all against the shipped exports once the
 compiler-side property runner exists. In the
-v0.7.6 toolchain, Shoals exercises property bodies through ordinary `Test` functions
+chelis 0.7.11 toolchain, Shoals exercises property bodies through ordinary `Test` functions
 under `tests/`; `chelis fuzz` and first-class `@property` annotations are not part of
 the default CI gate. Status of the underlying tool: `chelis fuzz` with first-class
 `@property` annotations is **demo-blocking, scoped, ready to build** for the first
@@ -147,3 +158,23 @@ constructs the IR DAG path cannot execute.
 **Effort:** medium. Black-Scholes + Monte Carlo + basic risk is the core; curves and
 order book are smaller. The bulk of the work is composing existing primitives (`nautilus`
 solvers, `coral` dataframes, tensor ops), not implementing new infrastructure.
+
+---
+
+## Forward-looking scope: verified-AD quant finance surface
+
+The baseline above is the v0.0.1 starting point (post-version-track
+reset; the originally-shipped surface was tagged v0.7.6 before the
+reset). The full functional
+surface and the structural AD commitments required for verified-AD-
+for-quant-finance — distributions, dates, calendars, tenors,
+multi-curve, vol surfaces, advanced SDE schemes, the pricer zoo,
+Greek discipline, XVA, calibration, advanced risk measures, and the
+type-level `Differentiable`/`Discrete` discipline — are specified in
+the companion document `spec/shoals_quant_surface.md`. The
+milestone-by-milestone implementation plan, agent-team allocation,
+and red-team exit checkpoints live in `docs/plan-quant-surface.md`.
+
+The companion spec is a Shoals-owned extension to §3l. When changes
+to the extended scope land here, mirror them into the chelis monorepo
+in the same change set per the Scaffolding Drift Rule in `AGENTS.md`.
