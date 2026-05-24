@@ -6,12 +6,14 @@ Ships as a reef package under the `Shoals` module prefix.
 
 ## Status
 
-v0.3.0 (unreleased). M0 baseline + M1 foundations (Date, Calendar,
+v0.4.0 (unreleased). M0 baseline + M1 foundations (Date, Calendar,
 Tenor, MarketData, Distributions) + M2 yield-curve sensitivity ops
 (parallel/key-rate/twist/butterfly shifts, log-linear and
 Nelson-Siegel-Svensson interpolation, curve-kind metadata for
 OIS/IBOR/SOFR/SONIA/ESTR) + M3 vol surfaces (SVI parameterization,
-implied-vol solver via bisection, shifts). Every public function carries the
+implied-vol solver via bisection, shifts) + M4 SDE-zoo slice
+(Merton jump-diffusion with compensated drift; 2-asset correlated
+GBM via 2x2 Cholesky). Every public function carries the
 `alpha` stability label per the cross-cutting Chelis convention.
 Shoals's version track is its own — the prior 0.7.x labelling was
 chasing the compiler version and has been reset; minor bumps now
@@ -28,7 +30,7 @@ calibration, and advanced risk — is specified in
 | `Shoals.Pricing` | Black-Scholes call/put (closed form), call/put price tensors, MC engine with `Random` effect, finite-difference Greek checks; grad-derived Greeks are an alpha runtime path | alpha |
 | `Shoals.Risk` | Parametric VaR + CVaR (Gaussian), historical VaR + CVaR (empirical-quantile + tail-mean), empirical loss quantiles | alpha |
 | `Shoals.Curves` | Linear / cubic-spline / log-linear / Nelson-Siegel-Svensson yield-curve interpolation; discount factors; single-curve par-bond bootstrap; curve-kind metadata (OIS/IBOR/SOFR/SONIA/ESTR/Custom); sensitivity ops (parallel/key-rate/twist/butterfly shifts, scale) | alpha |
-| `Shoals.Stochastic` | GBM path generation (log-Euler), terminal draws, antithetic-variates terminal-mean estimator | alpha |
+| `Shoals.Stochastic` | GBM path generation (log-Euler), terminal draws, antithetic-variates terminal-mean estimator; Merton lognormal jump-diffusion (compensated drift, aggregate-jump Gaussian approximation); 2-asset correlated GBM via 2x2 Cholesky | alpha |
 | `Shoals.Orderbook` | Limit order book (price-priority sorted lists), best bid/ask, bid-ask spread, VWAP, side quantities | alpha |
 | `Shoals.Date` | Day-count conventions (Act360/Act365/30/360/ActAct), year-fraction, weekend detection, business-day rolling (following/modified-following/preceding), tenor-stepped schedule generation | alpha |
 | `Shoals.Calendar` | NYC + LDN 2025 holiday tables, joint-calendar combinator, business-day predicate | alpha |
@@ -136,7 +138,7 @@ is the compiler-owned package oracle: it resolves the Reef manifest,
 lowers the package, and rejects stale source or dependency wiring; the
 runtime lane exercises the finance invariants.
 
-Runtime gate expected success condition: all 128 tests pass at v0.3.0 (48 baseline + 48 in M1 + 3 in M1 red-team fix-up + 13 in M2 + 11 in M3 + 5 in M3 red-team fix-up). This covers pricing correctness,
+Runtime gate expected success condition: all 137 tests pass at v0.4.0 (48 baseline + 48 in M1 + 3 in M1 red-team fix-up + 13 in M2 + 11 in M3 + 5 in M3 red-team fix-up + 9 in M4 SDE slice). This covers pricing correctness,
 finite-difference Greeks (in-unit-range and matches-N(d1) checks), MC
 convergence (20K paths, 2 % tolerance) and reproducibility, parametric
 and historical VaR/CVaR, yield-curve interpolation and bootstrap
@@ -163,7 +165,7 @@ is a manual gate and is not exercised from this repo. The Shoals
 default PR scope includes `chelis reef build` and the node-local
 runtime suite; the monorepo oracle remains a separate manual gate.
 
-## Known limitations in v0.3.0
+## Known limitations in v0.4.0
 
 1. **`@property` is design-only.** Compiler v0.7.11 does not parse
    the annotation; the property bodies are plain `def`s that flip to

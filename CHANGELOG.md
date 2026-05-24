@@ -6,6 +6,81 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] — unreleased
+
+M4 SDE-zoo slice. Lands Merton jump-diffusion (lognormal jumps with
+compensated drift) and 2-asset correlated GBM via a hand-rolled 2x2
+Cholesky helper.
+
+### Added
+
+- `Shoals.Stochastic.merton_compensated_drift(mu, sigma, lambda,
+  jump_mean, jump_vol)` — Merton-style compensated drift accounting
+  for the expected jump contribution. AD: composed.
+- `Shoals.Stochastic.merton_jump_terminal(template_diff, template_jump,
+  s0, mu, sigma, lambda, jump_mean, jump_vol, t)` — terminal-value
+  generator with one aggregate-jump Gaussian per path. Aggregate
+  variance is the correct compound-Poisson variance under
+  deterministic-N approximation: `λt * (jump_vol² + jump_mean²)`
+  (law of total variance is dropped, treating the jump count at its
+  mean λt; the per-jump variance term `jump_mean²` is included).
+  Mean drift is exact via Merton compensated drift. AD: unsupported
+  (runs over `Random` effect; gated on upstream effect-AD per spec
+  §3.2).
+- `Shoals.Stochastic.cholesky_2x2_lower(sigma_xx, sigma_xy, sigma_yy)
+  -> (L11, L21, L22)` — 2x2 Cholesky factor; standalone helper that
+  avoids Nautilus.LinAlg dependency for the 2D case. AD: composed.
+- `Shoals.Stochastic.correlated_gbm_terminal_2d(template_x,
+  template_y, s0_x, s0_y, mu_x, mu_y, sigma_x, sigma_y, rho, t)` —
+  2-asset correlated GBM terminal-value generator using
+  `rho * Z_x + sqrt(1 - rho^2) * Z_y` correlation injection. Returns
+  a `(tensor[n, f32], tensor[n, f32])` tuple. **`|rho| > 1` is
+  silently clamped**: when `1 - rho^2 < 0`, the implementation
+  substitutes `sqrt(...) = 0`, producing perfectly comonotonic
+  paths. Callers should validate `rho` is in `[-1, 1]` before
+  invoking; documented as a known limitation. AD: unsupported (runs
+  over `Random` effect; gated on upstream effect-AD per spec §3.2).
+- `tests/stochastic_extended.ch` — 9 tests covering Merton drift
+  identities, Cholesky 2x2 closed-form algebra, round-trip recovery
+  of the covariance matrix, MC terminal-mean checks for both Merton
+  and correlated 2-asset GBM at 5% relative tolerance / 5000 paths.
+
+### Deferred
+
+- **Heston QE (Andersen)** — substantial own implementation with two
+  conditional regimes (quadratic-Gaussian vs exponential) based on
+  `psi = m^2 / s2`; the next priority continuation per spec §2.9
+  and the M4.1 acceptance gate `phase3l_shoals_oracle_heston_qe`.
+- **SABR path simulation** — pairs with the Hagan analytic from M3
+  vol surfaces; deferred to a continuation.
+- **Hull-White 1F/2F** — Gaussian short-rate with closed-form bond
+  pricing as reference; bounded implementation.
+- **Libor Market Model** — shifted-lognormal drift correction.
+- **HJM framework** — no-arbitrage drift condition.
+- **Kou double-exponential jumps** — Merton-shape extension once a
+  pos/neg jump regime distinction is available.
+- **N-dim Cholesky** — the 2x2 helper here is a stand-in for the
+  general case that lives in Nautilus.LinAlg as a follow-up.
+
+### AD verification status
+
+- `merton_compensated_drift` and `cholesky_2x2_lower` are
+  `AD: composed` — pure arithmetic over verified primitives, no
+  effects.
+- `merton_jump_terminal` and `correlated_gbm_terminal_2d` are
+  `AD: unsupported` — both run over the `Random` effect (via
+  `normal_sample`). Per `spec/shoals_quant_surface.md` §3.2 and the
+  plan's M4 acceptance criterion (every process's path-generation
+  function lands as `unsupported` until effect-AD upstream lands).
+  Functional behavior FD-cross-checked; verified-AD label flips when
+  chelis D3 (effect-AD) closes upstream.
+
+### Verification
+
+- `python3 scripts/run_local_gate.py` — exits 0.
+- `chelis test tests/ --timeout 120 --jobs auto` — 137 passed, 0
+  failed (was 128 at end of M3; +9 from `tests/stochastic_extended.ch`).
+
 ## [0.3.0] — unreleased
 
 M3 vol-surface slice. Lands the SVI parameterization, implied-vol

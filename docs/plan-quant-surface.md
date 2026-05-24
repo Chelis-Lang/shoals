@@ -294,6 +294,13 @@ log-moneyness × time interpolation.
 
 **Tag:** `FN+V` (functional ships; verified-AD label gates on effect-AD interaction theorem for any process exercised through MC).
 **Spec sections:** §2.9.
+**Status (as landed):** first-ship slice complete at v0.4.0. Merton
+jump-diffusion with compensated drift (aggregate-jump Gaussian
+approximation) and 2-asset correlated GBM via a hand-rolled 2x2
+Cholesky helper. 137/137 tests pass. Heston QE (M4.1 with the pinned
+Feller-violation stress config), SABR path simulation (M4.2),
+Hull-White 1F/2F (M4.4), LMM (M4.5), HJM (M4.6), and Kou
+double-exponential jumps are explicit M4-continuation items.
 
 **Process-pricer AD pairing matrix (spec-pinned in §3.3) governs what each process expects from the pricer side; M5 obeys the same matrix.**
 
