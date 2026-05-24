@@ -6,7 +6,7 @@ Ships as a reef package under the `Shoals` module prefix.
 
 ## Status
 
-v0.5.0 (unreleased). M0 baseline + M1 foundations (Date, Calendar,
+v0.6.0 (unreleased). M0 baseline + M1 foundations (Date, Calendar,
 Tenor, MarketData, Distributions) + M2 yield-curve sensitivity ops
 (parallel/key-rate/twist/butterfly shifts, log-linear and
 Nelson-Siegel-Svensson interpolation, curve-kind metadata for
@@ -14,7 +14,9 @@ OIS/IBOR/SOFR/SONIA/ESTR) + M3 vol surfaces (SVI parameterization,
 implied-vol solver via bisection, shifts) + M4 SDE-zoo slice
 (Merton jump-diffusion with compensated drift; 2-asset correlated
 GBM via 2x2 Cholesky) + M5 closed-form pricers (Bachelier, Black,
-Garman-Kohlhagen, Margrabe). Every public function carries the
+Garman-Kohlhagen, Margrabe) + M6 Greeks discipline (FD first- and
+second-order Greeks, analytic-Greek references, pathwise vs LR
+dispatch). Every public function carries the
 `alpha` stability label per the cross-cutting Chelis convention.
 Shoals's version track is its own — the prior 0.7.x labelling was
 chasing the compiler version and has been reset; minor bumps now
@@ -40,6 +42,7 @@ calibration, and advanced risk — is specified in
 | `Shoals.Distributions` | Lognormal pdf + cdf (composed over Nautilus normal), Student-t pdf (composed over `Nautilus.Special.log_gamma`), Student-t cdf approximation, bivariate-normal pdf | alpha |
 | `Shoals.VolSurface` | SVI 5-parameter total-variance + implied-vol; ATM/skew/parallel/smile shifts; implied-vol-from-call bisection solver over Black-Scholes | alpha |
 | `Shoals.PricingExtended` | Bachelier (normal-underlying) call/put; Black (forward-priced) call/put; Garman-Kohlhagen (FX) call/put; Margrabe exchange-option call with degenerate-vol intrinsic guard | alpha |
+| `Shoals.Greeks` | First-order FD Greeks (delta/vega/rho/theta, call+put); second-order FD (gamma/vanna/volga); analytic-Greek references for FD cross-check; pathwise-smooth and likelihood-ratio dispatchers for the digital-option payoff family | alpha |
 
 The reference implementations under `references/` ship the
 textbook-formula versions of Black-Scholes (call, put, all five
@@ -140,7 +143,7 @@ is the compiler-owned package oracle: it resolves the Reef manifest,
 lowers the package, and rejects stale source or dependency wiring; the
 runtime lane exercises the finance invariants.
 
-Runtime gate expected success condition: all 148 tests pass at v0.5.0 (48 baseline + 48 in M1 + 3 in M1 red-team fix-up + 13 in M2 + 11 in M3 + 5 in M3 red-team fix-up + 9 in M4 SDE slice + 11 in M5 closed-form pricers). This covers pricing correctness,
+Runtime gate expected success condition: all 165 tests pass at v0.6.0 (48 baseline + 48 in M1 + 3 in M1 red-team fix-up + 13 in M2 + 11 in M3 + 5 in M3 red-team fix-up + 9 in M4 SDE slice + 11 in M5 closed-form pricers + 17 in M6 Greeks). This covers pricing correctness,
 finite-difference Greeks (in-unit-range and matches-N(d1) checks), MC
 convergence (20K paths, 2 % tolerance) and reproducibility, parametric
 and historical VaR/CVaR, yield-curve interpolation and bootstrap
@@ -167,7 +170,7 @@ is a manual gate and is not exercised from this repo. The Shoals
 default PR scope includes `chelis reef build` and the node-local
 runtime suite; the monorepo oracle remains a separate manual gate.
 
-## Known limitations in v0.5.0
+## Known limitations in v0.6.0
 
 1. **`@property` is design-only.** Compiler v0.7.11 does not parse
    the annotation; the property bodies are plain `def`s that flip to

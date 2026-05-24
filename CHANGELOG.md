@@ -6,6 +6,81 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] — unreleased
+
+M6 Greeks-discipline slice. Adds `Shoals.Greeks` module covering
+first-order Greek constructors (delta, vega, rho, theta — call and
+put each), second-order constructors (gamma, vanna, volga) marked
+alpha + FD-checked, analytic-Greek references for cross-check, and
+the pathwise-vs-likelihood-ratio dispatch on a smooth-call and
+digital-call example.
+
+### Added
+
+- `Shoals.Greeks` module (`src/greeks.ch`):
+  - **First-order via central FD over Black-Scholes**: `fd_delta_call`,
+    `fd_delta_put`, `fd_vega_call`, `fd_vega_put`, `fd_rho_call`,
+    `fd_rho_put`, `fd_theta_call`, `fd_theta_put`. Theta returns the
+    conventional sign (negative for long calls/puts at long T).
+  - **Second-order via FD**: `fd_gamma_call` (second central diff in
+    spot), `fd_volga_call` (second in vol), `fd_vanna_call` (mixed
+    first/first via nested deltas).
+  - **Analytic-Greek references** for cross-check: `analytic_delta_call`,
+    `analytic_delta_put`, `analytic_vega_call`, `analytic_gamma_call`
+    using the standard `N(d1)` / `S*phi(d1)*sqrt(t)` /
+    `phi(d1)/(S*sigma*sqrt(t))` formulas.
+  - **Pathwise vs LR dispatch** (single-path constructors illustrating
+    the M6.4 pattern):
+    - `pathwise_smooth_call_terminal_delta(s_terminal, k, df, s0)` —
+      pathwise delta for a smooth European call on one MC path
+      (returns `df * s_terminal/s0` when ITM, 0 otherwise).
+    - `lr_digital_call_delta(s_terminal, k, s0, sigma, t, df)` —
+      likelihood-ratio (score-function) delta for a digital call on
+      one MC path. Used where the payoff has a discontinuity (the
+      indicator is not pathwise-differentiable; LR routes via the
+      log-density score).
+- `tests/greeks.ch` — 17 tests covering FD-vs-analytic agreement at
+  ATM, sign invariants (delta range, theta sign, rho signs,
+  vega ≥ 0), put-call parity on delta (`delta_c - delta_p == 1`),
+  pathwise / LR identities on single-path inputs.
+
+### Deferred
+
+- **Bucket sensitivities** (M6.3): `curve_delta` returning
+  `Curve[Differentiable[f32]]`, `surface_vega` returning
+  `Surface[Differentiable[f32]]`. Verified label gates on upstream
+  linearity-AD theorem; functional implementation depends on the
+  curve-shape-preserving AD that doesn't compose cleanly out of the
+  current `grad` primitive in chelis 0.7.11.
+- **`grad`-derived Greeks** (the AD-composed alternative to FD): the
+  Shoals pricing body uses host-lane `to_list` + `map` +
+  `to_tensor`; whether that composes through `grad` end-to-end under
+  chelis 0.7.11 is unverified — same condition as the M0/M3 hedges
+  document. FD-derived Greeks ship as the load-bearing surface.
+- **vmap-over-portfolio** Greek aggregator (single function applied
+  to a portfolio of pricers) — needs a portfolio-type abstraction
+  that depends on the calibration module (M8).
+
+### AD verification status
+
+- `n_pdf`, `n_cdf`, `analytic_*`, `pathwise_smooth_call_terminal_delta`,
+  `lr_digital_call_delta` are `AD: composed` (pure arithmetic over
+  `erfc`, `log`, `exp`, `sqrt`).
+- `fd_*` Greek constructors are `AD: unproven-primitive` — each is a
+  central-difference quotient that itself can be composed but
+  inherits the unproven-leaf status of the underlying `bs_call_scalar`
+  / `bs_put_scalar` (those rely on `erfc` which is `unproven-primitive`
+  in Nautilus).
+- Second-order Greeks (`fd_gamma_call`, `fd_volga_call`, `fd_vanna_call`)
+  ship as alpha; verified-AD label requires upstream higher-order
+  AD per spec §3.4.
+
+### Verification
+
+- `python3 scripts/run_local_gate.py` — exits 0.
+- `chelis test tests/ --timeout 120 --jobs auto` — 165 passed, 0
+  failed (was 148 at end of M5; +17 from `tests/greeks.ch`).
+
 ## [0.5.0] — unreleased
 
 M5 closed-form pricer slice. Adds a new `Shoals.PricingExtended`

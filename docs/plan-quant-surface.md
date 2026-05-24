@@ -366,6 +366,17 @@ items per the CHANGELOG.
 
 **Tag:** `FN+V` partial — first-order Greeks land verified once AdjointTyping closes; second-order gates on higher-order AD theorem.
 **Spec sections:** §2.11.
+**Status (as landed):** first-ship slice complete at v0.6.0.
+First-order FD Greeks (delta/vega/rho/theta, call+put), second-order
+FD (gamma/vanna/volga, marked alpha), analytic-Greek references for
+cross-check, and pathwise / LR dispatchers on a smooth-call and
+digital-call example. 165/165 tests pass. Bucket sensitivities
+(M6.3 — `curve_delta`, `surface_vega` returning shape-preserving
+sensitivity objects) are explicit M6-continuation items; functional
+implementation depends on linearity-AD upstream. `grad`-derived
+Greeks (the AD-composed alternative to FD) deferred until the
+Shoals pricing body's host-lane composition is verified end-to-end
+through `grad`.
 
 **Work packets:**
 
