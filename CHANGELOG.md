@@ -6,6 +6,110 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.0] — unreleased
+
+Bundles the M8 calibration and M9 extended-risk slices. Concludes
+the M0-M9 sweep on Shoals's planned milestone surface; M10
+(verified-AD typing migration) is upstream-gated and not part of
+this release.
+
+### Added — M8 calibration
+
+- `Shoals.Calibration` module (`src/calibration.ch`):
+  - `clamp_to_bounds(x, lo, hi)` — bound projection for constrained
+    optimization steps.
+  - `weighted_squared_residuals(observed, predicted, weights)` and
+    `weighted_absolute_residuals` — per-point WLS and WL1 residual
+    contributions, returned as a tensor for downstream aggregation.
+  - `vega_weighted_squared_residuals(observed, predicted, vegas)` —
+    standard vega-weighted variant for vol-surface calibration;
+    weights are `1/vega²` (zero-vega protected by branching to
+    zero weight).
+  - `sse_loss(residuals)` — sum-of-residuals scalar loss.
+  - `lm_bounded_step_scalar(jtj, jtr, lambda, current, lo, hi)` —
+    single-parameter Levenberg-Marquardt update with damping
+    `(jtj + lambda)` and bound projection on the proposed step.
+    Returns the clamped new parameter value.
+- `tests/calibration.ch` — 13 tests covering bound clamping, WLS /
+  WL1 zero-residual / known-value identities, vega-weighting puts
+  more weight on low-vega points, LM step direction (negative
+  J^T r moves up; positive moves down), bound clamping under
+  large proposals, damping attenuation.
+
+### Added — M9 extended risk
+
+- `Shoals.RiskExt` module (`src/riskext.ch`):
+  - `mc_var(losses, confidence)`, `mc_expected_shortfall(losses,
+    confidence)` — alias to historical quantile / tail-mean from
+    `Shoals.Risk`. The M9 distinction is intentional (these
+    accept MC-simulated path losses, not historical observations)
+    even though the closed-form computation is the same on a
+    quantile basis.
+  - `expected_shortfall_frtb_975(losses)` — the Basel FRTB-IMA
+    97.5% expected shortfall, the standard regulatory tail measure.
+  - `scenario_pnl_grid(base_value, scenario_shifts,
+    pnl_per_unit_shift)` — produces a per-scenario PnL tensor for
+    a linear sensitivity model. Used for stress-test reporting.
+  - `kupiec_pof_statistic_simple(num_violations, total_observations,
+    expected_rate)` — proportion-of-failures likelihood-ratio
+    statistic, the standard regulatory backtest. Returns the LR
+    test statistic (chi-squared under H0; degree 1).
+- `tests/riskext.ch` — 9 tests covering VaR / ES on a 0..100 loss
+  vector with known quantile, FRTB-975 ES matches explicit ES
+  call, ES at 100% confidence collapses to max loss, scenario PnL
+  grid linearity, Kupiec POF statistic is 0 when observed equals
+  expected, Kupiec POF > 5 when 20/100 vs expected 5%, VaR
+  monotone in confidence, ES ≥ VaR (coherence).
+
+### Deferred — M8 continuation
+
+- **BFGS with bounds** — bounded vector-parameter optimizer; the
+  current LM helper handles single-parameter only.
+- **SQP** for nonlinear constraints (vol-surface no-arbitrage).
+- **Multi-target combinator** — fit one model to many products at
+  once with shared parameters.
+- **Sequential pipeline** — chain curves → surfaces → exotic params
+  with IFT-threaded gradient flow at each optimum.
+- **Full vectorized LM** — extending `Nautilus.CurveFit.lm_scalar_1param`
+  to multi-parameter with bound handling.
+
+### Deferred — M9 continuation
+
+- **Christoffersen conditional-coverage test** — extends Kupiec POF
+  with serial-dependence checks.
+- **Acerbi-Szekely ES backtest** — direct ES backtest from a
+  realized-loss series and an ES forecast series.
+- **Sensitivity-based VaR** (delta-gamma approximation) — requires
+  the M6.3 bucket-sensitivity surface.
+- **250-day rolling FRTB-IMA zone classifier** (green / yellow /
+  amber / red zones based on backtest exceptions).
+
+### AD verification status
+
+- `Shoals.Calibration` exports (`clamp_to_bounds`, `weighted_*`,
+  `sse_loss`, `lm_bounded_step_scalar`) are all `AD: composed` —
+  pure arithmetic. The LM step's `clamp_to_bounds` branch is on a
+  constant threshold (`lo`, `hi`) so gradient is well-defined
+  almost-everywhere; non-smooth at the bound boundary, marked alpha
+  with a doc-string warning.
+- `Shoals.RiskExt`:
+  - `mc_var`, `mc_expected_shortfall`,
+    `expected_shortfall_frtb_975`: `AD: unproven-primitive` (depend
+    on Nautilus `quantile_vec` whose AD status is unproven
+    upstream).
+  - `scenario_pnl_grid`: `AD: unproven-primitive` (uses host-lane
+    `to_list` + `map`).
+  - `kupiec_pof_statistic_simple`: `AD: composed` (pure arithmetic
+    with constant-threshold branches; non-smooth at violations =
+    0 and observed_rate = 1 — alpha at those degenerate cases).
+
+### Verification
+
+- `python3 scripts/run_local_gate.py` — exits 0.
+- `chelis test tests/ --timeout 120 --jobs auto` — 201 passed, 0
+  failed (was 179 at end of M7; +13 from `tests/calibration.ch` + 9
+  from `tests/riskext.ch`).
+
 ## [0.7.0] — unreleased
 
 M7 XVA core slice. Adds `Shoals.Xva` module with the basic

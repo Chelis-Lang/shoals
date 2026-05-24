@@ -6,8 +6,9 @@ Ships as a reef package under the `Shoals` module prefix.
 
 ## Status
 
-v0.7.0 (unreleased). M0 baseline + M1 foundations (Date, Calendar,
-Tenor, MarketData, Distributions) + M2 yield-curve sensitivity ops
+v0.8.0 (unreleased). M0-M9 milestone sweep complete. Full slice:
+M0 baseline + M1 foundations (Date, Calendar, Tenor, MarketData,
+Distributions) + M2 yield-curve sensitivity ops
 (parallel/key-rate/twist/butterfly shifts, log-linear and
 Nelson-Siegel-Svensson interpolation, curve-kind metadata for
 OIS/IBOR/SOFR/SONIA/ESTR) + M3 vol surfaces (SVI parameterization,
@@ -17,7 +18,12 @@ GBM via 2x2 Cholesky) + M5 closed-form pricers (Bachelier, Black,
 Garman-Kohlhagen, Margrabe) + M6 Greeks discipline (FD first- and
 second-order Greeks, analytic-Greek references, pathwise vs LR
 dispatch) + M7 XVA core (constant-hazard survival probabilities,
-EPE/ENE aggregation, pointwise netting, CVA + DVA aggregators). Every public function carries the
+EPE/ENE aggregation, pointwise netting, CVA + DVA aggregators) +
+M8 calibration (weighted-LS / WL1 / vega-weighted residuals,
+bound-clamped LM step) + M9 extended risk (MC VaR / ES,
+FRTB-IMA 97.5% ES, scenario PnL grid, Kupiec POF backtest
+statistic). M10 (verified-AD typing migration) is upstream-gated
+and not part of this release line. Every public function carries the
 `alpha` stability label per the cross-cutting Chelis convention.
 Shoals's version track is its own — the prior 0.7.x labelling was
 chasing the compiler version and has been reset; minor bumps now
@@ -45,6 +51,8 @@ calibration, and advanced risk — is specified in
 | `Shoals.PricingExtended` | Bachelier (normal-underlying) call/put; Black (forward-priced) call/put; Garman-Kohlhagen (FX) call/put; Margrabe exchange-option call with degenerate-vol intrinsic guard | alpha |
 | `Shoals.Greeks` | First-order FD Greeks (delta/vega/rho/theta, call+put); second-order FD (gamma/vanna/volga); analytic-Greek references for FD cross-check; pathwise-smooth and likelihood-ratio dispatchers for the digital-option payoff family | alpha |
 | `Shoals.Xva` | Constant-hazard survival / default probability; constant-rate discount factor; expected positive / negative exposure aggregators; pointwise 2-deal netting; CVA + DVA aggregators over a discrete time grid | alpha |
+| `Shoals.Calibration` | Bound projection; weighted-LS / WL1 / vega-weighted residuals; SSE loss; single-parameter bound-clamped LM step (`jtj + lambda` damping with bound projection on the proposed value) | alpha |
+| `Shoals.RiskExt` | MC VaR / expected shortfall; FRTB-IMA 97.5% ES helper; linear scenario PnL grid; Kupiec proportion-of-failures backtest statistic | alpha |
 
 The reference implementations under `references/` ship the
 textbook-formula versions of Black-Scholes (call, put, all five
@@ -145,7 +153,7 @@ is the compiler-owned package oracle: it resolves the Reef manifest,
 lowers the package, and rejects stale source or dependency wiring; the
 runtime lane exercises the finance invariants.
 
-Runtime gate expected success condition: all 179 tests pass at v0.7.0 (48 baseline + 48 in M1 + 3 in M1 red-team fix-up + 13 in M2 + 11 in M3 + 5 in M3 red-team fix-up + 9 in M4 SDE slice + 11 in M5 closed-form pricers + 17 in M6 Greeks + 14 in M7 XVA). This covers pricing correctness,
+Runtime gate expected success condition: all 201 tests pass at v0.8.0 (48 baseline + 48 in M1 + 3 in M1 red-team fix-up + 13 in M2 + 11 in M3 + 5 in M3 red-team fix-up + 9 in M4 SDE slice + 11 in M5 closed-form pricers + 17 in M6 Greeks + 14 in M7 XVA + 13 in M8 calibration + 9 in M9 extended risk). This covers pricing correctness,
 finite-difference Greeks (in-unit-range and matches-N(d1) checks), MC
 convergence (20K paths, 2 % tolerance) and reproducibility, parametric
 and historical VaR/CVaR, yield-curve interpolation and bootstrap
@@ -172,7 +180,7 @@ is a manual gate and is not exercised from this repo. The Shoals
 default PR scope includes `chelis reef build` and the node-local
 runtime suite; the monorepo oracle remains a separate manual gate.
 
-## Known limitations in v0.7.0
+## Known limitations in v0.8.0
 
 1. **`@property` is design-only.** Compiler v0.7.11 does not parse
    the annotation; the property bodies are plain `def`s that flip to

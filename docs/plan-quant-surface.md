@@ -439,6 +439,12 @@ explicit M7-continuation items per the CHANGELOG.
 
 **Tag:** `FN+V` (functional ships; verified-AD label gates on AdjointTyping and on the underlying pricers' status).
 **Spec sections:** §2.13.
+**Status (as landed):** first-ship slice complete at v0.8.0.
+Weighted-LS / WL1 / vega-weighted residuals, SSE loss,
+single-parameter bound-clamped LM step. 201/201 tests pass. BFGS
+with bounds, SQP, multi-target combinator, sequential pipeline, and
+full vectorized LM are explicit M8-continuation items per the
+CHANGELOG.
 
 **Work packets:**
 
@@ -468,6 +474,14 @@ explicit M7-continuation items per the CHANGELOG.
 
 **Tag:** `FN` (functional ships; verified-AD label gates on effect-AD for any MC-based VaR / ES).
 **Spec sections:** §2.14.
+**Status (as landed):** first-ship slice complete at v0.8.0. MC VaR
+/ ES (alias to historical quantile / tail-mean on MC-simulated
+losses), FRTB-IMA 97.5% ES helper, linear scenario PnL grid,
+Kupiec POF backtest statistic. 201/201 tests pass.
+Christoffersen CC, Acerbi-Szekely ES backtest, sensitivity-based
+VaR (gates on M6.3 bucket sensitivities), and the 250-day FRTB-IMA
+zone classifier are explicit M9-continuation items per the
+CHANGELOG.
 
 **Work packets:**
 
