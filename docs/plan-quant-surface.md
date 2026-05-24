@@ -406,6 +406,13 @@ through `grad`.
 
 **Tag:** `FN` shipping; verified-AD label gates on effect-AD AND (for portfolios with exercise decisions) control-flow AD.
 **Spec sections:** §2.12.
+**Status (as landed):** first-ship core slice complete at v0.7.0.
+Constant-hazard survival / default probability, constant-rate
+discount factor, EPE/ENE aggregators, pointwise 2-deal netting, CVA
+and DVA aggregators over a discrete time grid. 179/179 tests pass.
+Stochastic hazard / term-structured CDS bootstrap, FVA, KVA,
+wrong-way risk, multi-CSA netting, and stochastic recovery are
+explicit M7-continuation items per the CHANGELOG.
 
 **Work packets:**
 

@@ -6,6 +6,75 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] — unreleased
+
+M7 XVA core slice. Adds `Shoals.Xva` module with the basic
+exposure-aggregation, default-modeling, and CVA / DVA computation
+surface. Constant-hazard / constant-discount-rate baseline; full
+stochastic versions are M7-continuation.
+
+### Added
+
+- `Shoals.Xva` module (`src/xva.ch`):
+  - **Default modeling:**
+    `survival_probability_constant_hazard(hazard, t) = exp(-hazard*t)`,
+    `default_probability_in_interval(hazard, t_start, t_end) = S(t_start) - S(t_end)`,
+    `discount_factor_constant_rate(r, t) = exp(-r*t)`.
+  - **Exposure aggregation:** `expected_positive_exposure(exposures)`
+    averages `max(x, 0)` across paths; `expected_negative_exposure`
+    averages `min(x, 0)`. `netted_exposure_2_deals(deal_a, deal_b)`
+    sums pointwise per-path exposures.
+  - **CVA aggregator:** `cva_constant_hazard(time_grid, epe,
+    hazard, recovery, discount_rate)` integrates discounted EPE
+    times default-probability-in-interval times loss-given-default
+    over a discrete time grid. Standard form
+    `CVA ≈ LGD * sum_i EPE(t_i) * df(t_i) * [S(t_{i-1}) - S(t_i)]`.
+    First interval is `[0, t_0]`.
+  - **DVA aggregator:** `dva_constant_hazard(time_grid, ene,
+    hazard_own, recovery_own, discount_rate)` — same shape with
+    own-default hazard and `-ene` as the positive payout.
+- `tests/xva.ch` — 14 tests covering survival monotonicity, default
+  probability decomposition, EPE / ENE positivity / negativity
+  invariants, netting linearity, CVA edge cases (zero hazard /
+  full recovery / zero EPE → CVA = 0), CVA monotone-in-hazard, DVA
+  positive when ENE is negative.
+
+### Deferred
+
+- **Stochastic hazard** (term-structure of survival probabilities
+  from CDS quotes) — needs the curve-bootstrap M2-continuation.
+- **FVA, KVA** — funding-valuation and capital-valuation
+  adjustments are sister aggregators to CVA / DVA; bounded
+  extension once funding-spread and regulatory-capital input
+  shapes are decided.
+- **Wrong-way risk** — correlated default × exposure paths require
+  joint MC simulation against a credit-equity correlation model;
+  M7-continuation.
+- **Multi-CSA netting** — CSA threshold / MTA / IA / collateral
+  haircut models; bounded.
+- **Stochastic recovery** — current recovery rate is deterministic;
+  beta-distributed recovery is a bounded extension.
+
+### AD verification status
+
+- `survival_probability_constant_hazard`,
+  `default_probability_in_interval`,
+  `discount_factor_constant_rate`: `AD: composed` (pure
+  arithmetic over `exp` + `mul` + `neg`).
+- `expected_positive_exposure`, `expected_negative_exposure`,
+  `netted_exposure_2_deals`, `cva_constant_hazard`,
+  `dva_constant_hazard`: `AD: unproven-primitive` (each uses
+  host-lane `to_list` + `map` / `fold` over a list combinator).
+  Functional behavior FD-cross-checked through the test suite;
+  composed-AD label requires the same chelis upstream gating as
+  the existing pricing-body grad path.
+
+### Verification
+
+- `python3 scripts/run_local_gate.py` — exits 0.
+- `chelis test tests/ --timeout 120 --jobs auto` — 179 passed, 0
+  failed (was 165 at end of M6; +14 from `tests/xva.ch`).
+
 ## [0.6.0] — unreleased
 
 M6 Greeks-discipline slice. Adds `Shoals.Greeks` module covering
