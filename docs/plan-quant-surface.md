@@ -258,6 +258,14 @@ lint script are explicit follow-ups per the CHANGELOG.
 
 **Tag:** `FN` (functional ships; M3.4 Dupire local vol cannot be differentiated through until upstream higher-order AD lands).
 **Spec sections:** §2.8.
+**Status (as landed):** first-ship slice complete at v0.3.0. SVI
+parameterization (5 params), ATM / skew / parallel / smile shifts,
+implied-vol-from-Black-Scholes solver via bisection (60 iterations,
+1e-6 tolerance; round-trips to 1e-3). 123/123 tests pass. Deferred to
+M3-continuation: SABR Hagan analytic (uses Bessel-like functions
+that want a Nautilus.Special extension), Dupire local volatility
+(blocked on upstream higher-order AD per spec §3.4), cubic-in-
+log-moneyness × time interpolation.
 
 **Work packets:**
 

@@ -6,6 +6,77 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] — unreleased
+
+M3 vol-surface slice. Lands the SVI parameterization, implied-vol
+solver via bisection, and shift operations.
+
+### Added
+
+- **`Shoals.VolSurface`** module:
+  - **SVI parameterization** (Gatheral 5-parameter): `SVI { a, b,
+    rho, m, sigma }`. `svi_total_variance(p, k)` returns `a + b*(rho*(k-m) + sqrt((k-m)^2 + sigma^2))`. `svi_implied_vol(p, k, t) = sqrt(max(w, 0)/t)`.
+  - **Surface shifts**: `svi_shift_atm` (delta on `a`),
+    `svi_shift_skew` (delta on `rho`), `parallel_shift_atm_iv(p,
+    delta_iv, t)` (lifts ATM implied vol by exactly `delta_iv` —
+    computes the correct `delta_a` for `IV_new^2 * t - IV_old^2 * t`),
+    `smile_shift_skew_wing` (delta on `b`). All differentiable in
+    their shift parameter.
+  - **Implied vol solver via bisection**: `implied_vol_from_call(spot, strike, r, t, target_price)` inverts Black-Scholes via bracketing on `[1e-4, 5.0]` with 60 iterations and `1e-6` tolerance. Calls `Shoals.Pricing.bs_call_scalar`. Returns NaN sentinel (`is_iv_solver_failed(iv)` test) when the bracket does not contain a root (target above/below the achievable Black-Scholes price range under the search bounds). The public `bracket_brackets_root` predicate exposes the same check for callers that want to validate ahead of time.
+- **`tests/volsurface.ch`** (16 tests): SVI variance flatness, ATM
+  level, OTM > ATM for smile, IV round-trip at three configurations
+  (ATM 1y, ITM 6m, OTM 2y), `parallel_shift_atm_iv` lifts ATM IV by
+  exactly the requested delta, IV solver returns NaN on unbracketed
+  targets, `bracket_brackets_root` discriminates valid/invalid
+  brackets.
+- **`properties/volsurface.ch`** (3 properties): non-negative ATM
+  variance, IV matches `sqrt(variance/t)`, BS round-trip within
+  `1e-3`.
+
+### Deferred to a future milestone
+
+- **SABR (Hagan analytic)** — uses incomplete elliptic / Bessel-like
+  functions whose composition we want to keep in Nautilus.Special;
+  scope for an M3-continuation.
+- **Dupire local volatility** — requires upstream higher-order AD per
+  spec §3.4. Evaluating the formula is bounded engineering;
+  differentiating through it is the gated piece.
+- **Cubic-in-log-moneyness × time interpolation** — straightforward
+  extension over the existing `Nautilus.Interpolation` surface;
+  scope for an M3-continuation.
+
+### AD verification status
+
+- All new exports ship at `alpha`.
+- `svi_total_variance`, `svi_implied_vol`, `svi_shift_*`,
+  `parallel_shift_vol`, `smile_shift_vol` are `AD: composed` over
+  arithmetic + `sqrt`.
+- `implied_vol_from_call` is `AD: unproven-primitive` — the
+  bisection loop is the leaf and AD through iterative root-finds
+  needs the upstream IFT hook for verified status. Functionally
+  correct (round-trips to 1e-3 in three configurations); FD
+  cross-check covers the alpha label until upstream lands.
+
+### Verification
+
+- `python3 scripts/run_local_gate.py` — exits 0.
+- `chelis test tests/ --timeout 120 --jobs auto` — 128 passed, 0
+  failed (was 112 at end of M2; +16 from `tests/volsurface.ch`).
+
+### Red-team fix-ups landed before commit
+
+- `parallel_shift_vol` (had a wrong formula `delta_a = 2*b*shift`)
+  renamed to `parallel_shift_atm_iv(p, delta_iv, t)` and the formula
+  rewritten to lift ATM implied vol by exactly the requested delta
+  (`delta_a = (IV+delta)^2 * t - IV^2 * t`). New test verifies the
+  invariant on a smile surface.
+- `implied_vol_bisect` was silently pinning at `vol_hi` for
+  unbracketed targets. Now validates `bracket_brackets_root` at
+  entry and returns NaN sentinel on failure; `is_iv_solver_failed`
+  predicate exposed for callers. Two new tests cover this.
+- `smile_shift_vol` renamed to `smile_shift_skew_wing` for clarity
+  (it shifts `b`, the smile-wing parameter, not the smile per se).
+
 ## [0.2.0] — unreleased
 
 M2 yield-curve slice. Extends `Shoals.Curves` with parametric forms,

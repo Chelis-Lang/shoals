@@ -6,11 +6,12 @@ Ships as a reef package under the `Shoals` module prefix.
 
 ## Status
 
-v0.2.0 (unreleased). M0 baseline + M1 foundations (Date, Calendar,
+v0.3.0 (unreleased). M0 baseline + M1 foundations (Date, Calendar,
 Tenor, MarketData, Distributions) + M2 yield-curve sensitivity ops
 (parallel/key-rate/twist/butterfly shifts, log-linear and
 Nelson-Siegel-Svensson interpolation, curve-kind metadata for
-OIS/IBOR/SOFR/SONIA/ESTR). Every public function carries the
+OIS/IBOR/SOFR/SONIA/ESTR) + M3 vol surfaces (SVI parameterization,
+implied-vol solver via bisection, shifts). Every public function carries the
 `alpha` stability label per the cross-cutting Chelis convention.
 Shoals's version track is its own — the prior 0.7.x labelling was
 chasing the compiler version and has been reset; minor bumps now
@@ -34,6 +35,7 @@ calibration, and advanced risk — is specified in
 | `Shoals.Tenor` | Programmatic `Tenor { count, unit }` constructors (`days_n`, `weeks_n`, `months_n`, `years_n`, `overnight`, `tomorrow_next`, `spot_next`), `tenor_apply` to advance a date; string parsing deferred | alpha |
 | `Shoals.MarketData` | `Quote`, `Bar`, `Snapshot` record types with constructors / accessors / linear-scan lookup | alpha |
 | `Shoals.Distributions` | Lognormal pdf + cdf (composed over Nautilus normal), Student-t pdf (composed over `Nautilus.Special.log_gamma`), Student-t cdf approximation, bivariate-normal pdf | alpha |
+| `Shoals.VolSurface` | SVI 5-parameter total-variance + implied-vol; ATM/skew/parallel/smile shifts; implied-vol-from-call bisection solver over Black-Scholes | alpha |
 
 The reference implementations under `references/` ship the
 textbook-formula versions of Black-Scholes (call, put, all five
@@ -134,7 +136,7 @@ is the compiler-owned package oracle: it resolves the Reef manifest,
 lowers the package, and rejects stale source or dependency wiring; the
 runtime lane exercises the finance invariants.
 
-Runtime gate expected success condition: all 112 tests pass at v0.2.0 (48 in the v0.0.1 baseline + 48 in M1 + 3 in M1 red-team fix-up + 13 in M2 curves ops). This covers pricing correctness,
+Runtime gate expected success condition: all 128 tests pass at v0.3.0 (48 baseline + 48 in M1 + 3 in M1 red-team fix-up + 13 in M2 + 11 in M3 + 5 in M3 red-team fix-up). This covers pricing correctness,
 finite-difference Greeks (in-unit-range and matches-N(d1) checks), MC
 convergence (20K paths, 2 % tolerance) and reproducibility, parametric
 and historical VaR/CVaR, yield-curve interpolation and bootstrap
@@ -161,7 +163,7 @@ is a manual gate and is not exercised from this repo. The Shoals
 default PR scope includes `chelis reef build` and the node-local
 runtime suite; the monorepo oracle remains a separate manual gate.
 
-## Known limitations in v0.2.0
+## Known limitations in v0.3.0
 
 1. **`@property` is design-only.** Compiler v0.7.11 does not parse
    the annotation; the property bodies are plain `def`s that flip to
