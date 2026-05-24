@@ -27,18 +27,17 @@ def cva_constant_hazard[n](time_grid: tensor[n, f32], epe: tensor[n, f32], hazar
   ts_l = to_list(copy(time_grid))
   epe_l = to_list(copy(epe))
   pairs = zip(ts_l, epe_l)
-  init = (cast(0.0, f32), cast(0.0, f32), cast(0.0, f32))
+  init = (cast(0.0, f32), cast(0.0, f32))
   loss_given_default = sub(cast(1.0, f32), recovery)
-  out = fold(fn (state: (f32, f32, f32), entry: (f32, f32)) -> {
+  out = fold(fn (state: (f32, f32), entry: (f32, f32)) -> {
     prev_t = state.0
     accum = state.1
-    last_t = state.2
     t_i = entry.0
     epe_i = entry.1
     p_default = default_probability_in_interval(hazard, prev_t, t_i)
     df_i = discount_factor_constant_rate(discount_rate, t_i)
     contribution = mul(loss_given_default, mul(p_default, mul(epe_i, df_i)))
-    (t_i, add(accum, contribution), t_i)
+    (t_i, add(accum, contribution))
   }, init, pairs)
   out.1
 }
@@ -46,18 +45,17 @@ def dva_constant_hazard[n](time_grid: tensor[n, f32], ene: tensor[n, f32], hazar
   ts_l = to_list(copy(time_grid))
   ene_l = to_list(copy(ene))
   pairs = zip(ts_l, ene_l)
-  init = (cast(0.0, f32), cast(0.0, f32), cast(0.0, f32))
+  init = (cast(0.0, f32), cast(0.0, f32))
   loss_given_default = sub(cast(1.0, f32), recovery_own)
-  out = fold(fn (state: (f32, f32, f32), entry: (f32, f32)) -> {
+  out = fold(fn (state: (f32, f32), entry: (f32, f32)) -> {
     prev_t = state.0
     accum = state.1
-    last_t = state.2
     t_i = entry.0
     ene_i = entry.1
     p_default = default_probability_in_interval(hazard_own, prev_t, t_i)
     df_i = discount_factor_constant_rate(discount_rate, t_i)
     contribution = mul(loss_given_default, mul(p_default, mul(neg(ene_i), df_i)))
-    (t_i, add(accum, contribution), t_i)
+    (t_i, add(accum, contribution))
   }, init, pairs)
   out.1
 }

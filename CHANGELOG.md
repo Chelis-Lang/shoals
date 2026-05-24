@@ -86,12 +86,20 @@ this release.
 
 ### AD verification status
 
-- `Shoals.Calibration` exports (`clamp_to_bounds`, `weighted_*`,
-  `sse_loss`, `lm_bounded_step_scalar`) are all `AD: composed` —
-  pure arithmetic. The LM step's `clamp_to_bounds` branch is on a
-  constant threshold (`lo`, `hi`) so gradient is well-defined
-  almost-everywhere; non-smooth at the bound boundary, marked alpha
-  with a doc-string warning.
+- `Shoals.Calibration.clamp_to_bounds`, `sse_loss`,
+  `lm_bounded_step_scalar` are `AD: composed` over pure arithmetic.
+  The LM step's `clamp_to_bounds` branch is on a constant threshold
+  (`lo`, `hi`) so gradient is well-defined almost-everywhere;
+  non-smooth at the bound boundary, marked alpha with a doc-string
+  warning.
+- `Shoals.Calibration.weighted_squared_residuals`,
+  `weighted_absolute_residuals`, `vega_weighted_squared_residuals`
+  are `AD: unproven-primitive` — each uses host-lane `to_list` +
+  `map` over a list combinator (same pattern as `Shoals.Xva`
+  aggregators and `Shoals.RiskExt.scenario_pnl_grid`).
+  Functional behavior FD-cross-checked through the test suite;
+  composed-AD label requires the same chelis upstream gating as the
+  existing pricing-body grad path.
 - `Shoals.RiskExt`:
   - `mc_var`, `mc_expected_shortfall`,
     `expected_shortfall_frtb_975`: `AD: unproven-primitive` (depend
