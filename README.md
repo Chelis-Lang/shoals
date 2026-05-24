@@ -23,7 +23,9 @@ M8 calibration (weighted-LS / WL1 / vega-weighted residuals,
 bound-clamped LM step) + M9 extended risk (MC VaR / ES,
 FRTB-IMA 97.5% ES, scenario PnL grid, Kupiec POF backtest
 statistic). M10 (verified-AD typing migration) is upstream-gated
-and not part of this release line. Every public function carries the
+and not part of this release line. `Shoals.CurrencyTag` adds the
+runtime-tagged money primitives used by Whale and FlukeBall bankroll
+code. Every public function carries the
 `alpha` stability label per the cross-cutting Chelis convention.
 Shoals's version track is its own — the prior 0.7.x labelling was
 chasing the compiler version and has been reset; minor bumps now
@@ -53,6 +55,7 @@ calibration, and advanced risk — is specified in
 | `Shoals.Xva` | Constant-hazard survival / default probability; constant-rate discount factor; expected positive / negative exposure aggregators; pointwise 2-deal netting; CVA + DVA aggregators over a discrete time grid | alpha |
 | `Shoals.ModelFit` | Bound projection; weighted-LS / WL1 / vega-weighted residuals; SSE loss; single-parameter bound-clamped LM step (`jtj + lambda` damping with bound projection on the proposed value) | alpha |
 | `Shoals.RiskExt` | MC VaR / expected shortfall; FRTB-IMA 97.5% ES helper; linear scenario PnL grid; Kupiec proportion-of-failures backtest statistic | alpha |
+| `Shoals.CurrencyTag` | Runtime-tagged `Currency`, `Money`, and `NonNegativeMoney` constructors plus same-currency arithmetic used by Whale bankroll code | alpha |
 
 The reference implementations under `references/` ship the
 textbook-formula versions of Black-Scholes (call, put, all five
