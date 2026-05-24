@@ -6,14 +6,15 @@ Ships as a reef package under the `Shoals` module prefix.
 
 ## Status
 
-v0.4.0 (unreleased). M0 baseline + M1 foundations (Date, Calendar,
+v0.7.7 support slice. M0 baseline + M1 foundations (Date, Calendar,
 Tenor, MarketData, Distributions) + M2 yield-curve sensitivity ops
 (parallel/key-rate/twist/butterfly shifts, log-linear and
 Nelson-Siegel-Svensson interpolation, curve-kind metadata for
 OIS/IBOR/SOFR/SONIA/ESTR) + M3 vol surfaces (SVI parameterization,
 implied-vol solver via bisection, shifts) + M4 SDE-zoo slice
 (Merton jump-diffusion with compensated drift; 2-asset correlated
-GBM via 2x2 Cholesky). Every public function carries the
+GBM via 2x2 Cholesky) plus `Shoals.CurrencyTag` for Whale and
+FlukeBall bankroll primitives. Every public function carries the
 `alpha` stability label per the cross-cutting Chelis convention.
 Shoals's version track is its own — the prior 0.7.x labelling was
 chasing the compiler version and has been reset; minor bumps now
@@ -38,6 +39,7 @@ calibration, and advanced risk — is specified in
 | `Shoals.MarketData` | `Quote`, `Bar`, `Snapshot` record types with constructors / accessors / linear-scan lookup | alpha |
 | `Shoals.Distributions` | Lognormal pdf + cdf (composed over Nautilus normal), Student-t pdf (composed over `Nautilus.Special.log_gamma`), Student-t cdf approximation, bivariate-normal pdf | alpha |
 | `Shoals.VolSurface` | SVI 5-parameter total-variance + implied-vol; ATM/skew/parallel/smile shifts; implied-vol-from-call bisection solver over Black-Scholes | alpha |
+| `Shoals.CurrencyTag` | Runtime-tagged `Currency`, `Money`, and `NonNegativeMoney` constructors plus same-currency arithmetic used by Whale bankroll code | alpha |
 
 The reference implementations under `references/` ship the
 textbook-formula versions of Black-Scholes (call, put, all five
