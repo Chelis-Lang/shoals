@@ -6,6 +6,64 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] — unreleased
+
+M5 closed-form pricer slice. Adds a new `Shoals.PricingExtended`
+module with the standard non-Black-Scholes closed-form pricers used
+across rates / FX / multi-asset desks.
+
+### Added
+
+- `Shoals.PricingExtended` module (file `src/pricingextended.ch`):
+  - `n_cdf_ext`, `n_pdf_ext` — Phi and phi for the standard normal.
+  - **Bachelier** (normal-distributed underlying — standard for
+    negative-rate environments): `bachelier_call(f, k, sigma, t,
+    df)`, `bachelier_put(f, k, sigma, t, df)`.
+  - **Black** (forward-priced — standard for caplets, swaptions):
+    `black_call(f, k, sigma, t, df)`, `black_put(f, k, sigma, t,
+    df)`. Reduces to Black-Scholes when `f = s*exp(r*t)` and
+    `df = exp(-r*t)`.
+  - **Garman-Kohlhagen** (FX with domestic + foreign rates):
+    `garman_kohlhagen_call(s, k, r_d, r_f, sigma, t)`,
+    `garman_kohlhagen_put(s, k, r_d, r_f, sigma, t)`. Reduces to
+    Black-Scholes when `r_f = 0`.
+  - **Margrabe exchange option** (option on the spread between two
+    assets): `margrabe_exchange_call(s1, s2, sigma1, sigma2, rho,
+    t)`. Handles the degenerate-vol case (`variance < 1e-10`,
+    e.g. `rho=1, sigma1=sigma2`) by returning intrinsic.
+- `tests/pricingextended.ch` (11 tests): Phi/phi at zero, Bachelier
+  ATM identity (`sigma*phi(0)`), Bachelier put-call parity, Black
+  reduces to BS when `f=s*exp(r*t)`, Black put-call parity, GK
+  reduces to BS at `r_f=0`, GK put-call parity, Margrabe reduces to
+  BS at `sigma2≈0`, Margrabe positivity, Margrabe degenerate-vol
+  intrinsic.
+
+### Deferred
+
+- **Tree methods** (CRR / Tian / Jarrow-Rudd binomial; trinomial) —
+  American exercise via backward induction; AD-through-early-exercise
+  gates on chelis D1 (control-flow AD).
+- **PDE methods** (Crank-Nicolson + Rannacher; 2-D ADI) — adjoint-PDE
+  AD approach pinned in spec §2.10; substantial own implementation.
+- **Longstaff-Schwartz** for American MC — IFT-through-regression AD
+  approach pinned in spec §2.10.
+- **Fourier methods** (Heston char-fn + Carr-Madan FFT) — depends on
+  complex-arithmetic surface that isn't in chelis-std yet.
+- **Margrabe-Stulz** (stochastic correlation extension).
+
+### AD verification status
+
+- All new exports are `AD: composed` (pure arithmetic over `erfc`,
+  `log`, `exp`, `sqrt`). The Margrabe degenerate-vol branch is a
+  `Discrete` decision (`if lt(variance, 1e-10)`) that does not break
+  AD-composition because the variance threshold is a constant.
+
+### Verification
+
+- `python3 scripts/run_local_gate.py` — exits 0.
+- `chelis test tests/ --timeout 120 --jobs auto` — 148 passed, 0
+  failed (was 137 at end of M4; +11 from `tests/pricingextended.ch`).
+
 ## [0.4.0] — unreleased
 
 M4 SDE-zoo slice. Lands Merton jump-diffusion (lognormal jumps with

@@ -331,6 +331,13 @@ double-exponential jumps are explicit M4-continuation items.
 
 **Tag:** `FN` (functional ships; verified-AD label gates on multiple upstream theorems per pricer family — see matrix in §3.3).
 **Spec sections:** §2.10.
+**Status (as landed):** first-ship closed-form slice complete at
+v0.5.0. Bachelier (normal-underlying), Black (forward-priced),
+Garman-Kohlhagen (FX), Margrabe (exchange option) all landed with
+put-call parity and BS-reduction identity checks. 148/148 tests
+pass. Tree methods (M5.2), PDE methods (M5.3), Longstaff-Schwartz
+(M5.4), and Fourier methods (M5.5) are explicit M5-continuation
+items per the CHANGELOG.
 
 **Work packets (parallelizable across pricer families):**
 

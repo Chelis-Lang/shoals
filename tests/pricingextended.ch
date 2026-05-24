@@ -1,0 +1,101 @@
+module Shoals.Tests.PricingExtended
+import Std.Test (assert_close, assert_true)
+import Shoals.Pricing (bs_call_scalar, bs_put_scalar)
+import Shoals.PricingExtended (n_cdf_ext, n_pdf_ext, bachelier_call, bachelier_put, black_call, black_put, garman_kohlhagen_call, garman_kohlhagen_put, margrabe_exchange_call)
+def test_n_cdf_at_zero() -> unit ! { Test } = assert_close(n_cdf_ext(cast(0.0, f32)), cast(0.5, f32), cast(0.00001, f32), "Phi(0) = 0.5")
+def test_n_pdf_at_zero() -> unit ! { Test } = assert_close(n_pdf_ext(cast(0.0, f32)), cast(0.3989423, f32), cast(0.00001, f32), "phi(0) = 1/sqrt(2pi)")
+def test_bachelier_call_atm() -> unit ! { Test } = {
+  px = bachelier_call(cast(100.0, f32), cast(100.0, f32), cast(10.0, f32), cast(1.0, f32), cast(1.0, f32))
+  expected = mul(cast(10.0, f32), cast(0.3989423, f32))
+  assert_close(px, expected, cast(0.001, f32), "Bachelier ATM call == sigma * phi(0)")
+}
+def test_bachelier_put_call_parity() -> unit ! { Test } = {
+  f = cast(100.0, f32)
+  k = cast(95.0, f32)
+  sigma = cast(8.0, f32)
+  t = cast(0.5, f32)
+  df = cast(0.98, f32)
+  c = bachelier_call(f, k, sigma, t, df)
+  p = bachelier_put(f, k, sigma, t, df)
+  diff = sub(c, p)
+  expected = mul(df, sub(f, k))
+  assert_close(diff, expected, cast(0.001, f32), "C - P == df * (F - K)")
+}
+def test_black_call_matches_bs_when_f_eq_s_exp_rt() -> unit ! { Test } = {
+  s = cast(100.0, f32)
+  k = cast(100.0, f32)
+  r = cast(0.05, f32)
+  sigma = cast(0.2, f32)
+  t = cast(1.0, f32)
+  f = mul(s, exp(mul(r, t)))
+  df = exp(neg(mul(r, t)))
+  black = black_call(f, k, sigma, t, df)
+  bs = bs_call_scalar(s, k, r, sigma, t)
+  assert_close(black, bs, cast(0.001, f32), "Black-on-forward equals Black-Scholes")
+}
+def test_black_put_call_parity() -> unit ! { Test } = {
+  f = cast(110.0, f32)
+  k = cast(100.0, f32)
+  sigma = cast(0.25, f32)
+  t = cast(0.75, f32)
+  df = cast(0.97, f32)
+  c = black_call(f, k, sigma, t, df)
+  p = black_put(f, k, sigma, t, df)
+  diff = sub(c, p)
+  expected = mul(df, sub(f, k))
+  assert_close(diff, expected, cast(0.001, f32), "Black C - P == df * (F - K)")
+}
+def test_garman_kohlhagen_zero_foreign_rate_equals_bs() -> unit ! { Test } = {
+  s = cast(1.25, f32)
+  k = cast(1.3, f32)
+  r_d = cast(0.04, f32)
+  sigma = cast(0.1, f32)
+  t = cast(0.5, f32)
+  gk = garman_kohlhagen_call(s, k, r_d, cast(0.0, f32), sigma, t)
+  bs = bs_call_scalar(s, k, r_d, sigma, t)
+  assert_close(gk, bs, cast(0.0001, f32), "GK with r_f=0 reduces to Black-Scholes")
+}
+def test_garman_kohlhagen_put_call_parity() -> unit ! { Test } = {
+  s = cast(1.25, f32)
+  k = cast(1.3, f32)
+  r_d = cast(0.04, f32)
+  r_f = cast(0.02, f32)
+  sigma = cast(0.1, f32)
+  t = cast(0.5, f32)
+  c = garman_kohlhagen_call(s, k, r_d, r_f, sigma, t)
+  p = garman_kohlhagen_put(s, k, r_d, r_f, sigma, t)
+  diff = sub(c, p)
+  disc_f = exp(neg(mul(r_f, t)))
+  disc_d = exp(neg(mul(r_d, t)))
+  expected = sub(mul(s, disc_f), mul(k, disc_d))
+  assert_close(diff, expected, cast(0.0001, f32), "GK C - P == S*exp(-r_f*t) - K*exp(-r_d*t)")
+}
+def test_margrabe_equals_bs_when_one_asset_deterministic() -> unit ! { Test } = {
+  s1 = cast(100.0, f32)
+  s2 = cast(100.0, f32)
+  sigma1 = cast(0.2, f32)
+  sigma2 = cast(0.000001, f32)
+  rho = cast(0.0, f32)
+  t = cast(1.0, f32)
+  margrabe = margrabe_exchange_call(s1, s2, sigma1, sigma2, rho, t)
+  bs_zero_rate = bs_call_scalar(s1, s2, cast(0.0, f32), sigma1, t)
+  assert_close(margrabe, bs_zero_rate, cast(0.01, f32), "Margrabe with sigma2=~0 reduces to BS at zero rate")
+}
+def test_margrabe_symmetric_in_s1_eq_s2() -> unit ! { Test } = {
+  s = cast(100.0, f32)
+  sigma1 = cast(0.2, f32)
+  sigma2 = cast(0.3, f32)
+  rho = cast(0.5, f32)
+  t = cast(1.0, f32)
+  px = margrabe_exchange_call(s, s, sigma1, sigma2, rho, t)
+  assert_true(gt(px, cast(0.0, f32)), "Margrabe ATM > 0 when both vols nonzero")
+}
+def test_margrabe_zero_at_correlation_one_equal_vols() -> unit ! { Test } = {
+  s1 = cast(100.0, f32)
+  s2 = cast(100.0, f32)
+  sigma = cast(0.2, f32)
+  rho = cast(1.0, f32)
+  t = cast(1.0, f32)
+  px = margrabe_exchange_call(s1, s2, sigma, sigma, rho, t)
+  assert_close(px, cast(0.0, f32), cast(0.001, f32), "Margrabe == 0 when assets are identical (rho=1, sigma1=sigma2, s1=s2)")
+}
