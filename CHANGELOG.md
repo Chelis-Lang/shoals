@@ -6,6 +6,103 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0] — unreleased
+
+M1 foundations slice. Lands the substrate that subsequent milestones
+build on: dates, calendars, tenors, market-data record types, and a
+slice of the distributions surface.
+
+### Added
+
+- **`Shoals.Date`** — day-count conventions (`Act360`, `Act365`,
+  `ThirtyThreeSixty`, `ActAct`), `year_fraction`, weekend detection,
+  business-day rolling (`roll_following`,
+  `roll_modified_following`, `roll_preceding`), tenor-stepped
+  schedule generation. Built on `Std.Time`. M1-slice scope: holiday
+  calendars are integrated separately via `Shoals.Calendar`; the
+  `weekend_only` parameter on roll/business-day functions is a
+  forward-compatible no-op until that integration lands at a future
+  milestone. AD profile: `year_fraction` is `composed` over
+  arithmetic; the rest are `unsupported` (`Discrete`).
+- **`Shoals.Calendar`** — `Calendar { name, holidays }` records,
+  `nyc_calendar()` and `ldn_calendar()` with 2025 holiday tables,
+  `joint_calendar` combinator (holiday union), `weekend_only_calendar`,
+  `empty_calendar`, `is_holiday`, `is_business_day`. Holiday tables
+  are 2025-only at M1; multi-year + algorithmic generation lands at
+  a future milestone. AD profile: all `unsupported` (`Discrete`).
+- **`Shoals.Tenor`** — `Tenor { count, unit }` with `TenorUnit ∈ {Day,
+  Week, Month, Year, Overnight, TomorrowNext, SpotNext}`,
+  constructors (`days_n`, `weeks_n`, `months_n`, `years_n`,
+  `overnight`, `tomorrow_next`, `spot_next`, `tenor`),
+  `tenor_to_days`, `tenor_apply`. M1-slice scope: string parsing
+  (`"3M"`, `"1Y"`, `"30Y"`, `"ON"`) is **deferred** pending an
+  available `Std.String` primitive import path — calls landed in
+  the agent's first attempt as `unbound variable: char_at`. The
+  programmatic constructor surface covers the same payoffs without
+  the parser dependency.
+- **`Shoals.MarketData`** — `Side`, `Quote`, `Bar`, `Snapshot` record
+  types with constructors and accessors; `snapshot_lookup` does
+  linear scan over the quote list. AD profile: all `unsupported`
+  (carrier types for non-differentiable metadata).
+- **`Shoals.Distributions`** — `lognormal_pdf`, `lognormal_cdf`
+  composed over `Nautilus.Distributions.normal_*` + arithmetic;
+  `student_t_pdf` composed over `Nautilus.Special.log_gamma` +
+  arithmetic; `student_t_cdf_approx` (Fisher-Cornish scale-only
+  approximation — accuracy ~2.3% at `nu=5, x=2.0`, suitable for
+  tail-region screening; marked `alpha`); `bvn_pdf` (bivariate
+  normal density, no Cholesky needed). AD profile: all four are
+  `composed`. Full N-dim multivariate normal via Cholesky and the
+  remaining 7 distributions (gamma, beta, chi-squared, exponential,
+  Poisson, uniform — pdf/cdf/inv_cdf/sample for each) are deferred
+  to M1-continuation.
+- **`references/{date,distributions}.ch`, `properties/{date,
+  distributions,tenor,marketdata}.ch`** — textbook references and
+  property functions per the trust-stack convention.
+- **`tests/{calendar,date,distributions,marketdata,tenor}.ch`** — 48
+  new tests covering the M1 surface.
+
+### Changed
+
+- `reef.toml`: `version` 0.0.1 → 0.1.0 (M1 ladder per
+  `docs/plan-quant-surface.md`).
+- File-naming convention: `Shoals.MarketData` lives in
+  `src/marketdata.ch` (single-token lowercase per the chelis
+  module-↔-file-path discipline observed in `src/orderbook.ch`).
+
+### Deferred to M1-continuation
+
+- **`Shoals.Rng`** — Sobol/Halton low-discrepancy sequences. The
+  Joe-Kuo direction-number table is a 21201-entry data file that
+  needs its own engineering pass; not in scope for the M1 first
+  ship.
+- **`Shoals.Date` schedule month-stepping** uses 30-day approximation
+  per spec; calendar-aware month-stepping is a future M2 candidate.
+- **`Shoals.Distributions`** remaining 7 univariate families and
+  N-dim Cholesky-based MVN.
+- **`Shoals.Tenor` string parsing** pending `Std.String` import
+  resolution (`char_at` / `string_len` / `string_slice` / `to_int`
+  primitives surface needs to be located in chelis-std).
+
+### AD verification status
+
+- All M1 exports ship at `alpha` stability.
+- `year_fraction`, `lognormal_pdf`, `lognormal_cdf`, `student_t_pdf`,
+  `student_t_cdf_approx`, `bvn_pdf` are tagged `AD: composed`
+  (composition over verified Nautilus/chelis-std primitives) —
+  promotion to verified-AD-stable label gates on the upstream
+  AdjointTyping theorem closing per `spec/shoals_quant_surface.md`
+  §3.2.
+- Date/Calendar/Tenor/MarketData exports are tagged
+  `AD: unsupported` (`Discrete` carriers; type-system rejection of
+  `grad(..., wrt=date)` lands via doc-string + lint convention
+  pre-D5).
+
+### Verification
+
+- `python3 scripts/run_local_gate.py` — exits 0.
+- `chelis test tests/ --timeout 120 --jobs auto` — 96 passed, 0
+  failed (was 48 at M0; +48 new tests in M1).
+
 ## [0.0.1] — unreleased
 
 Version-track reset and dep cascade. Shoals's package version is now

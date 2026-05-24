@@ -6,16 +6,15 @@ Ships as a reef package under the `Shoals` module prefix.
 
 ## Status
 
-v0.0.1 (unreleased). The Phase 3l baseline module shape is in place:
-pricing, risk, curves, stochastic, and orderbook. Every public
-function carries the `alpha` stability label per the cross-cutting
-Chelis convention. The version was reset out of the chelis-chasing
-0.7.x line; Shoals's own version track now reflects Shoals's
-milestone progression, not the compiler pin. Forward scope —
-distributions, dates, calendars, tenors, multi-curve, vol surfaces,
-advanced SDE, the pricer zoo, Greeks discipline, XVA, calibration,
-and advanced risk — is specified in
-`spec/shoals_quant_surface.md`, planned in
+v0.1.0 (unreleased). The Phase 3l baseline plus the M1 foundations
+slice (Date, Calendar, Tenor, MarketData, Distributions). Every
+public function carries the `alpha` stability label per the
+cross-cutting Chelis convention. Shoals's version track is its own —
+the prior 0.7.x labelling was chasing the compiler version and has
+been reset; minor bumps now reflect Shoals's milestone progression.
+Forward scope — multi-curve, vol surfaces, advanced SDE, the pricer
+zoo, Greeks discipline, XVA, calibration, and advanced risk — is
+specified in `spec/shoals_quant_surface.md`, planned in
 `docs/plan-quant-surface.md`, and milestone-gated.
 
 ## Modules
@@ -27,6 +26,11 @@ and advanced risk — is specified in
 | `Shoals.Curves` | Linear and cubic-spline yield-curve interpolation, discount factors, single-curve par-bond bootstrap | alpha |
 | `Shoals.Stochastic` | GBM path generation (log-Euler), terminal draws, antithetic-variates terminal-mean estimator | alpha |
 | `Shoals.Orderbook` | Limit order book (price-priority sorted lists), best bid/ask, bid-ask spread, VWAP, side quantities | alpha |
+| `Shoals.Date` | Day-count conventions (Act360/Act365/30/360/ActAct), year-fraction, weekend detection, business-day rolling (following/modified-following/preceding), tenor-stepped schedule generation | alpha |
+| `Shoals.Calendar` | NYC + LDN 2025 holiday tables, joint-calendar combinator, business-day predicate | alpha |
+| `Shoals.Tenor` | Programmatic `Tenor { count, unit }` constructors (`days_n`, `weeks_n`, `months_n`, `years_n`, `overnight`, `tomorrow_next`, `spot_next`), `tenor_apply` to advance a date; string parsing deferred | alpha |
+| `Shoals.MarketData` | `Quote`, `Bar`, `Snapshot` record types with constructors / accessors / linear-scan lookup | alpha |
+| `Shoals.Distributions` | Lognormal pdf + cdf (composed over Nautilus normal), Student-t pdf (composed over `Nautilus.Special.log_gamma`), Student-t cdf approximation, bivariate-normal pdf | alpha |
 
 The reference implementations under `references/` ship the
 textbook-formula versions of Black-Scholes (call, put, all five
@@ -127,7 +131,7 @@ is the compiler-owned package oracle: it resolves the Reef manifest,
 lowers the package, and rejects stale source or dependency wiring; the
 runtime lane exercises the finance invariants.
 
-Runtime gate expected success condition: all 48 tests pass. This covers pricing correctness,
+Runtime gate expected success condition: all 96 tests pass at v0.1.0 (48 in the v0.0.1 baseline plus 48 added in M1 across Date, Calendar, Tenor, MarketData, and Distributions). This covers pricing correctness,
 finite-difference Greeks (in-unit-range and matches-N(d1) checks), MC
 convergence (20K paths, 2 % tolerance) and reproducibility, parametric
 and historical VaR/CVaR, yield-curve interpolation and bootstrap
@@ -154,7 +158,7 @@ is a manual gate and is not exercised from this repo. The Shoals
 default PR scope includes `chelis reef build` and the node-local
 runtime suite; the monorepo oracle remains a separate manual gate.
 
-## Known limitations in v0.0.1
+## Known limitations in v0.1.0
 
 1. **`@property` is design-only.** Compiler v0.7.11 does not parse
    the annotation; the property bodies are plain `def`s that flip to
@@ -186,12 +190,12 @@ directories alongside `src/`. Shoals adopted the canonical layout
 following the chelis-reef v0.4.1 multi-source-roots fix
 (`6b58030 feat(reef): multi-source-roots — additional_sources in reef.toml;
 bump v0.4.1`). The reef.toml declares
-`additional_sources = ["properties", "references"]`. v0.0.1 carries the
+`additional_sources = ["properties", "references"]`. v0.1.0 carries the
 canonical layout forward and pins chelis 0.7.11, nautilus 0.7.13, and
-coral 0.7.13. (References to the prior v0.1.0 / v0.7.6 numbering point
-at the pre-reset version track and remain valid as historical
-release-history records; current planning lives at v0.0.1 on Shoals's
-own track per `docs/plan-quant-surface.md`.)
+coral 0.7.13. (References to the pre-reset v0.7.x numbering point at
+the historical version track and remain valid as release-history
+records; current planning lives on Shoals's own track per
+`docs/plan-quant-surface.md`.)
 
 ## Python interop
 
@@ -200,8 +204,8 @@ The Chelis monorepo ships a `chelis-python` package
 exposes `chelis.check(...)` and `chelis.eval(source, bindings)` to
 Python. The pre-reset v0.1.0-alpha release verified a Shoals-shaped
 program round-trips through that surface; the program shape is
-unchanged at v0.0.1, the verification remains valid, and re-running
-it under chelis 0.7.11 is a M1+ verification task.
+unchanged at v0.1.0, the verification remains valid, and re-running
+it under chelis 0.7.11 is a follow-up verification task.
 
 Setup (one-time):
 

@@ -176,6 +176,17 @@ can incorporate it later.
 
 **Tag:** `FN+V` (functional surface ships; verified-AD label per export gates on AdjointTyping theorem upstream).
 **Spec sections:** §2.1, §2.2, §2.3, §2.4, §2.5, §2.6.
+**Status (as landed):** first-ship slice complete at v0.1.0. Date,
+Calendar, Tenor (programmatic constructors only — string parser
+deferred pending `Std.String` import resolution), MarketData record
+types, and a 4-function Distributions slice (lognormal pdf+cdf,
+Student-t pdf+cdf approximation, bivariate-normal pdf) landed and
+green: 96/96 tests pass. The Joe-Kuo Sobol direction-number table
+(M1.2) and the remaining 7 univariate distribution families (full
+M1.1) are explicit M1-continuation items per the CHANGELOG; the
+v0.1.0 surface is the smallest credible foundation slice for M2 to
+build on. See CHANGELOG `## [0.1.0]` for the full slice / deferral
+breakdown.
 
 **Work packets (parallelizable):**
 
