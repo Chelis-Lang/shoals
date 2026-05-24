@@ -6,6 +6,77 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] — unreleased
+
+M2 yield-curve slice. Extends `Shoals.Curves` with parametric forms,
+extended interpolation, curve-kind metadata, and the standard
+sensitivity-operation shape (parallel shift, key-rate shift, twist,
+butterfly).
+
+### Added
+
+- **Curve kind discriminator.** `CurveKind = Ois | Ibor | Sofr |
+  Sonia | Estr | Custom { label }`. Constructors `ois()`, `ibor()`,
+  `sofr()`, `sonia()`, `estr()`, `custom_curve(label)`. Carried as a
+  field on `YieldCurve`; preserved through every transformation.
+  AD profile: `unsupported` (`Discrete`).
+- **`yield_curve_tagged`** — alternative constructor that takes a
+  `CurveKind`. `yield_curve_from_pillars` preserved for backward
+  compatibility, defaults to `Custom { label: "untagged" }`.
+- **`curve_kind`** — extracts the discriminator from a curve.
+- **Curve operations:** `parallel_shift(curve, delta)`,
+  `key_rate_shift(curve, pillar_idx, delta)`, `twist(curve,
+  short_delta, long_delta)`, `butterfly(curve, wing_delta,
+  body_delta)`, `scale_rates(curve, factor)`. Each is differentiable
+  in its scaling parameters and preserves the curve kind. AD profile:
+  `composed` over arithmetic.
+- **`log_linear_rate_at`** — interpolates in log-space (standard for
+  discount-factor curves). AD profile: `composed`.
+- **`nss_rate(beta0, beta1, beta2, beta3, tau1, tau2, t)`** —
+  Nelson-Siegel-Svensson parametric form for the instantaneous
+  forward / zero rate. Six-parameter family that captures level,
+  slope, curvature, and a second hump. AD profile: `composed`.
+- **`tests/curves_ops.ch`** — 13 tests covering the new ops, curve
+  kinds, log-linear interpolation, NSS limits (`t=0` and `t→∞`), and
+  custom-label preservation.
+- **`properties/curves.ch`** — `parallel_shift_uniformly_lifts`,
+  `parallel_shift_zero_is_identity`, `twist_at_midpoint_is_average`,
+  `key_rate_shift_localized`, `scale_rates_linear`.
+
+### Changed
+
+- `YieldCurve[n]` gained a `kind: CurveKind` field. The previous
+  `yield_curve_from_pillars` constructor signature is preserved
+  (defaults `kind` to `Custom { label: "untagged" }`); existing
+  curves tests (4) still pass without modification.
+
+### Deferred to a future milestone
+
+- **Multi-instrument bootstrap** (deposits + FRAs + futures + swaps)
+  with implicit-differentiation gradient through the solve. The
+  existing `bootstrap_zero_from_par` covers the single-curve
+  integer-year-spaced case; multi-instrument joint calibration via
+  an IFT-hooked solver lands at a continuation milestone.
+- **Cross-currency basis curves** — a `CurveBasis` type relating two
+  curves under a basis swap is a sibling-shell follow-up.
+- **Lint script** for the doc-string AD-profile convention (M2.5).
+
+### AD verification status
+
+- All new exports ship at `alpha`.
+- `parallel_shift`, `key_rate_shift`, `twist`, `butterfly`,
+  `scale_rates`, `log_linear_rate_at`, `nss_rate`, `discount_factor`
+  are `AD: composed` over arithmetic + the underlying interpolator.
+- `CurveKind` constructors and `curve_kind` are `AD: unsupported`
+  (`Discrete` carriers).
+
+### Verification
+
+- `python3 scripts/run_local_gate.py` — exits 0.
+- `chelis test tests/ --timeout 120 --jobs auto` — 112 passed, 0
+  failed (was 99 at end of M1 red-team fix-up; +13 from
+  `tests/curves_ops.ch`).
+
 ## [0.1.0] — unreleased
 
 M1 foundations slice. Lands the substrate that subsequent milestones

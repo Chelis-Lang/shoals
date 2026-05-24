@@ -221,6 +221,14 @@ breakdown.
 
 **Tag:** `FN+V` (functional surface ships; verified-AD label gates on AdjointTyping theorem AND linearity-AD interaction theorem for bucket-shape returns).
 **Spec sections:** §2.7.
+**Status (as landed):** first-ship slice complete at v0.2.0. Curve
+operations (parallel/key-rate/twist/butterfly shifts, scale), curve
+kind discriminator (OIS / IBOR / SOFR / SONIA / ESTR / Custom),
+log-linear and Nelson-Siegel-Svensson interpolation all landed.
+112/112 tests pass. Multi-instrument bootstrap (deposits + FRAs +
+futures + swaps with IFT gradient through the joint solve, M2.4a +
+M2.4b), cross-currency basis curves, and the M2.5 AD-doc-convention
+lint script are explicit follow-ups per the CHANGELOG.
 
 **Work packets:**
 
