@@ -10,9 +10,11 @@ permissions:
   contents: write
 
 env:
-  CHELIS_VERSION: 0.7.16
-  CHELIS_TAG: v0.7.16
+  CHELIS_VERSION: 0.7.18
+  CHELIS_TAG: v0.7.18
+  # TODO: bump NAUTILUS_TAG once a 0.7.18-aligned nautilus release ships.
   NAUTILUS_TAG: v0.7.16
+  # TODO: bump CORAL_TAG once a 0.7.18-aligned coral release ships.
   CORAL_TAG: v0.7.15
   PACKAGE_NAME: shoals
   PACKAGE_VERSION: 0.8.2

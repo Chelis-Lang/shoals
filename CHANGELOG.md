@@ -6,6 +6,17 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Bump compiler pin to chelis 0.7.18.** Updates `reef.toml`
+  `compiler = "=0.7.18"` and CI / release workflow env vars
+  (`CHELIS_TAG`, `CHELIS_VERSION`) to track v0.7.18. nautilus
+  (currently `0.7.16`) and coral (currently `0.7.15`) deps remain
+  at the latest published versions; bumps to 0.7.18-aligned
+  releases are tracked as TODOs in `reef.toml` and the workflow
+  envs and will land in follow-up cascade PRs once those
+  republishes ship.
+
 ## [0.8.2] - 2026-05-25
 
 FlukeBall support release. Adds `Shoals.CurrencyTag`, including
