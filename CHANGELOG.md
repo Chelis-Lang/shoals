@@ -6,6 +6,77 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.0] — unreleased
+
+Milestone B PR-1: forward multi-instrument bootstrap. Two-PR
+sequence per the plan; PR-2 (IFT-grad) lands as 0.10.1.
+
+### Added
+
+- **`Shoals.Curves.bootstrap_multi`** — multi-instrument bootstrap
+  over a `List[Instrument]`. Each pillar solves for the zero rate
+  using `Nautilus.Roots.brent` over an instrument-specific residual
+  function. Returns `(times, rates)` lists.
+- **`Shoals.Curves.bootstrap_multi_curve`** — convenience wrapper
+  building a `YieldCurve[n]` from bootstrap output (kind tagged
+  `Custom { "bootstrap-multi" }`).
+- **`Instrument`** type with three variants: `Deposit { tenor,
+  rate }`, `ZeroCoupon { tenor, price }`, `ParSwap { tenor,
+  par_rate }`. Constructors `deposit`, `zero_coupon`,
+  `cur_par_swap` (the `cur_` prefix per §7.1 prefix-namespace
+  lint; the underlying instrument variant is named `ParSwap`).
+- **`bootstrap_residual_at_pillar(inst, times_so_far, rates_so_far,
+  zero_rate_candidate)`** — the inner residual exposed for testing
+  and for the PR-2 IFT-grad hook.
+- **`scripts/manual_gates/phase3l_shoals_oracle_multi_curve_bootstrap_forward.py`**
+  — first-cut forward gate exercising `bootstrap_multi` over a
+  synthesized 20-instrument zero-coupon calibration set. Pass/fail
+  via `chelis reef build` success plus a JSON measurement blob
+  carrying the target zero curve. The 1bp acceptance is enforced
+  by `tests/curves_bootstrap.ch`'s per-pillar round-trip
+  assertions; the manual gate exists to exercise the 20-instrument
+  end-to-end path against compile-time regressions.
+- **`tests/curves_bootstrap.ch`** (11 tests): instrument type
+  round-trips; single-deposit / single-zero-coupon / single-par-swap
+  bootstrap implied-zero round-trip; two-pillar consistency; mixed
+  deposit+par-swap bootstrap; residual function returns zero at the
+  solved rate and nonzero off-solution; `bootstrap_multi_curve`
+  produces a well-formed `YieldCurve` with rate at pillar 2
+  matching the textbook implied zero.
+
+### Deferred to PR-2 (v0.10.1)
+
+- `Shoals.Curves.bootstrap_grad_at_solution` — implicit-
+  differentiation hook returning per-pillar sensitivity. Hand-
+  rolled IFT: `dy*/dx = -(∂F/∂y)^-1 · (∂F/∂x)` at the optimum.
+- `scripts/manual_gates/phase3l_shoals_oracle_multi_curve_bootstrap_grad.py`
+  — five-probe acceptance gate (well-conditioned baseline,
+  near-collinear instruments, parameter-at-bound, FD step-size
+  sensitivity, pathological pillar spacing).
+
+### AD verification status
+
+- `Instrument` constructors, `instrument_tenor`,
+  `instrument_market_price_or_rate`: `AD: unsupported` (Discrete
+  carriers; sum-type, not numeric).
+- `bootstrap_residual_at_pillar`, `cur_par_swap_residual`,
+  `cum_pv_at`, `deposit_implied_zero`, `zero_coupon_implied_zero`:
+  `AD: composed` (pure arithmetic over standard primitives).
+- `solve_pillar_rate`, `bootstrap_multi`, `bootstrap_multi_curve`:
+  `AD: unproven-primitive` (use `Nautilus.Roots.brent` whose AD
+  status is unproven upstream; the wrapping fold pattern is
+  composed). Verified-AD label gates on PR-2 landing an IFT hook
+  that bypasses brent's iterative inner loop.
+
+### Verification
+
+- `python3 scripts/run_local_gate.py` — exits 0 across fmt + lint
+  + reef build + test.
+- `chelis test tests/curves_bootstrap.ch --timeout 60 --jobs auto`
+  — 11/11 pass.
+- `python3 scripts/manual_gates/phase3l_shoals_oracle_multi_curve_bootstrap_forward.py`
+  — exits 0 with `PASS:` terminator.
+
 ## [0.9.0] — unreleased
 
 Milestone A. Foundations cleanup + small wins under the

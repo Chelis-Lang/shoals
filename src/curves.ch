@@ -1,6 +1,7 @@
 module Shoals.Curves
 import Nautilus.Interpolation (linear_interp_sorted, spline_eval)
-export (CurveKind, YieldCurve, yield_curve_from_pillars, yield_curve_tagged, curve_kind, ois, ibor, sofr, sonia, estr, custom_curve, rate_at, spline_rate_at, log_linear_rate_at, nss_rate, discount_factor, bootstrap_zero_from_par, parallel_shift, key_rate_shift, twist, butterfly, scale_rates)
+import Nautilus.Roots (brent)
+export (CurveKind, YieldCurve, yield_curve_from_pillars, yield_curve_tagged, curve_kind, ois, ibor, sofr, sonia, estr, custom_curve, rate_at, spline_rate_at, log_linear_rate_at, nss_rate, discount_factor, bootstrap_zero_from_par, parallel_shift, key_rate_shift, twist, butterfly, scale_rates, Instrument, deposit, zero_coupon, cur_par_swap, instrument_tenor, instrument_market_price_or_rate, bootstrap_multi, bootstrap_multi_curve, bootstrap_residual_at_pillar)
 type CurveKind =
   | Ois
   | Ibor
@@ -148,4 +149,66 @@ def butterfly[n](curve: YieldCurve[n], wing_delta: f32, body_delta: f32) -> Yiel
     YieldCurve { kind: k, times: ts, rates: to_tensor(new_rates_l) }
   }
   }
+}
+type Instrument =
+  | Deposit { tenor: f32, rate: f32 }
+  | ZeroCoupon { tenor: f32, price: f32 }
+  | ParSwap { tenor: f32, par_rate: f32 }
+def deposit(tenor: f32, rate: f32) -> Instrument = Deposit { tenor: tenor, rate: rate }
+def zero_coupon(tenor: f32, price: f32) -> Instrument = ZeroCoupon { tenor: tenor, price: price }
+def cur_par_swap(tenor: f32, par_rate: f32) -> Instrument = ParSwap { tenor: tenor, par_rate: par_rate }
+def instrument_tenor(inst: Instrument) -> f32 = {
+  match inst with {
+    | Deposit { tenor: t, rate: _ } => t
+    | ZeroCoupon { tenor: t, price: _ } => t
+    | ParSwap { tenor: t, par_rate: _ } => t
+  }
+}
+def instrument_market_price_or_rate(inst: Instrument) -> f32 = {
+  match inst with {
+    | Deposit { tenor: _, rate: r } => r
+    | ZeroCoupon { tenor: _, price: p } => p
+    | ParSwap { tenor: _, par_rate: r } => r
+  }
+}
+def deposit_implied_zero(t: f32, simple_rate: f32) -> f32 = {
+  df = div(cast(1.0, f32), add(cast(1.0, f32), mul(simple_rate, t)))
+  div(neg(log(df)), t)
+}
+def zero_coupon_implied_zero(t: f32, price: f32) -> f32 = div(neg(log(price)), t)
+def cum_pv_at(times_so_far: List[f32], rates_so_far: List[f32]) -> f32 = {
+  pairs = zip(times_so_far, rates_so_far)
+  fold(fn (acc: f32, e: (f32, f32)) -> add(acc, exp(neg(mul(e.1, e.0)))), cast(0.0, f32), pairs)
+}
+def cur_par_swap_residual(t_i: f32, par_rate: f32, cum_pv: f32, zero_rate_candidate: f32) -> f32 = {
+  df_i = exp(neg(mul(zero_rate_candidate, t_i)))
+  full_pv = add(mul(par_rate, add(cum_pv, df_i)), df_i)
+  sub(full_pv, cast(1.0, f32))
+}
+def bootstrap_residual_at_pillar(inst: Instrument, times_so_far: List[f32], rates_so_far: List[f32], zero_rate_candidate: f32) -> f32 = {
+  match inst with {
+    | Deposit { tenor: t, rate: r } => sub(zero_rate_candidate, deposit_implied_zero(t, r))
+    | ZeroCoupon { tenor: t, price: p } => sub(zero_rate_candidate, zero_coupon_implied_zero(t, p))
+    | ParSwap { tenor: t, par_rate: r } => cur_par_swap_residual(t, r, cum_pv_at(times_so_far, rates_so_far), zero_rate_candidate)
+  }
+}
+def solve_pillar_rate(inst: Instrument, times_so_far: List[f32], rates_so_far: List[f32]) -> f32 = {
+  f_at = fn (z: f32) -> bootstrap_residual_at_pillar(inst, times_so_far, rates_so_far, z)
+  brent(f_at, cast(-0.5, f32), cast(2.0, f32), cast(0.0000001, f32), cast(100, int64))
+}
+def bootstrap_multi(instruments: List[Instrument]) -> (List[f32], List[f32]) = {
+  init = ([], [])
+  fold(fn (state: (List[f32], List[f32]), inst: Instrument) -> {
+    ts_so_far = state.0
+    rs_so_far = state.1
+    r_new = solve_pillar_rate(inst, ts_so_far, rs_so_far)
+    t_new = instrument_tenor(inst)
+    (append(ts_so_far, t_new), append(rs_so_far, r_new))
+  }, init, instruments)
+}
+def bootstrap_multi_curve[n](instruments: List[Instrument], times_template: tensor[n, f32]) -> YieldCurve[n] = {
+  out = bootstrap_multi(instruments)
+  times_t = to_tensor(out.0)
+  rates_t = to_tensor(out.1)
+  YieldCurve { kind: Custom { label: "bootstrap-multi" }, times: times_t, rates: rates_t }
 }
