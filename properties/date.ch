@@ -1,8 +1,8 @@
 module Shoals.Properties.Date
 import Std.Time (Date, date_lt, date_lte)
-import Shoals.Date (DayCount, year_fraction, schedule_from_tenor, roll_following, is_weekend)
+import Shoals.Date (DayCount, year_fraction, schedule_from_tenor, date_roll_following, is_weekend)
 import Shoals.References.Date (year_fraction_act_360_textbook, year_fraction_act_365_textbook, year_fraction_thirty_360_textbook, year_fraction_act_act_textbook)
-export (year_fraction_matches_textbook, schedule_monotone_increasing, roll_following_idempotent_on_weekday)
+export (year_fraction_matches_textbook, schedule_monotone_increasing, date_roll_following_idempotent_on_weekday)
 def abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 def date_eq(a: Date, b: Date) -> bool = and(date_lte(a, b), date_lte(b, a))
 def year_fraction_matches_textbook(start: Date, end: Date, convention: DayCount) -> bool = {
@@ -34,4 +34,4 @@ def schedule_monotone_increasing(start: Date, end: Date, step_months: int64) -> 
     }, true, idxs)
   }
 }
-def roll_following_idempotent_on_weekday(d: Date) -> bool = { if is_weekend(d) then true else date_eq(roll_following(d, true), d) }
+def date_roll_following_idempotent_on_weekday(d: Date) -> bool = { if is_weekend(d) then true else date_eq(date_roll_following(d, true), d) }

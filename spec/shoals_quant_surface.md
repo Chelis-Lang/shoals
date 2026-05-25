@@ -110,7 +110,7 @@ Type-system rule: `Date` is `Discrete` (§3.1); the type checker rejects
 computations through year-fraction conversions; the resulting `f64` is
 `Differentiable`.
 
-### 2.4 `Shoals.Calendar` (new module)
+### 2.4 `Shoals.HolidayCal` (new module)
 
 - **Built-in calendars:** NYC, LDN, TYO, SYD, FRA, HKG, joint
   calendars (NYC ∩ LDN, etc.).
@@ -318,7 +318,7 @@ function. The module surface:
   AD-correct sensitivities is the highest-value verified-AD outcome
   on the Shoals surface.
 
-### 2.13 `Shoals.Calibration` (new module)
+### 2.13 `Shoals.ModelFit` (new module)
 
 - **Loss functions:** weighted least squares (vega-weighted is the
   standard for vol surfaces), weighted absolute differences, mixed.

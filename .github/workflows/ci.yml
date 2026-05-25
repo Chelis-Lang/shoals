@@ -53,6 +53,9 @@ jobs:
             chelis fmt --check "$f"
           done
 
+      - name: chelis lint --check
+        run: chelis lint --check src/ properties/ references/ tests/ manual-gates/
+
       - name: chelis reef build
         run: chelis reef build
 

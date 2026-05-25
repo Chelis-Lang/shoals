@@ -1,7 +1,7 @@
-module Shoals.Tests.Calendar
+module Shoals.Tests.HolidayCal
 import Std.Test (assert_true, assert_false, assert_eq_bool)
 import Std.Time (date)
-import Shoals.Calendar (Calendar, is_holiday, is_business_day, nyc_calendar, ldn_calendar, joint_calendar, weekend_only_calendar, empty_calendar)
+import Shoals.HolidayCal (Calendar, is_holiday, is_business_day, nyc_calendar, ldn_calendar, joint_calendar, weekend_only_calendar, empty_calendar)
 def test_nyc_new_year_is_holiday() -> unit ! { Test } = {
   cal = nyc_calendar()
   d = date(cast(2025, int64), cast(1, int64), cast(1, int64))

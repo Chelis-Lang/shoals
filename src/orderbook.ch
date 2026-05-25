@@ -5,6 +5,7 @@ type Order =
 type OrderBook =
   | OrderBook { bids: List[Order], asks: List[Order] }
 def empty_book() -> OrderBook = OrderBook { bids: [], asks: [] }
+def nan_f32() -> f32 = cast(0.0, f32) |> div(cast(0.0, f32))
 def order_price(o: Order) -> f32 = {
   match o with {
     | Order { price: p, qty: _ } => p
@@ -18,15 +19,15 @@ def order_qty(o: Order) -> f32 = {
 def append_list(xs: List[Order], ys: List[Order]) -> List[Order] = { fold(fn (acc: List[Order], y: Order) -> append(acc, y), xs, ys) }
 def insert_desc(orders: List[Order], new_order: Order) -> List[Order] = {
   n_p = order_price(new_order)
-  before = fold(fn (acc: List[Order], o: Order) -> { if gt(order_price(o), n_p) then append(acc, o) else acc }, [], orders)
-  after = fold(fn (acc: List[Order], o: Order) -> { if lte(order_price(o), n_p) then append(acc, o) else acc }, [], orders)
-  append_list(append(before, new_order), after)
+  before = fold(fn (acc: List[Order], o: Order) -> { if o |> order_price |> gt(n_p) then append(acc, o) else acc }, [], orders)
+  after = fold(fn (acc: List[Order], o: Order) -> { if o |> order_price |> lte(n_p) then append(acc, o) else acc }, [], orders)
+  before |> append(new_order) |> append_list(after)
 }
 def insert_asc(orders: List[Order], new_order: Order) -> List[Order] = {
   n_p = order_price(new_order)
-  before = fold(fn (acc: List[Order], o: Order) -> { if lt(order_price(o), n_p) then append(acc, o) else acc }, [], orders)
-  after = fold(fn (acc: List[Order], o: Order) -> { if gte(order_price(o), n_p) then append(acc, o) else acc }, [], orders)
-  append_list(append(before, new_order), after)
+  before = fold(fn (acc: List[Order], o: Order) -> { if o |> order_price |> lt(n_p) then append(acc, o) else acc }, [], orders)
+  after = fold(fn (acc: List[Order], o: Order) -> { if o |> order_price |> gte(n_p) then append(acc, o) else acc }, [], orders)
+  before |> append(new_order) |> append_list(after)
 }
 def add_bid(book: OrderBook, price: f32, qty: f32) -> OrderBook = {
   match book with {
@@ -40,18 +41,18 @@ def add_ask(book: OrderBook, price: f32, qty: f32) -> OrderBook = {
 }
 def best_bid(book: OrderBook) -> Order = {
   match book with {
-    | OrderBook { bids: bs, asks: _ } => if eq(len(bs), cast(0, int64)) then Order { price: div(cast(0.0, f32), cast(0.0, f32)), qty: cast(0.0, f32) } else index(bs, cast(0, int64))
+    | OrderBook { bids: bs, asks: _ } => if bs |> len |> eq(cast(0, int64)) then Order { price: nan_f32(), qty: cast(0.0, f32) } else index(bs, cast(0, int64))
   }
 }
 def best_ask(book: OrderBook) -> Order = {
   match book with {
-    | OrderBook { bids: _, asks: as_ } => if eq(len(as_), cast(0, int64)) then Order { price: div(cast(0.0, f32), cast(0.0, f32)), qty: cast(0.0, f32) } else index(as_, cast(0, int64))
+    | OrderBook { bids: _, asks: as_ } => if as_ |> len |> eq(cast(0, int64)) then Order { price: nan_f32(), qty: cast(0.0, f32) } else index(as_, cast(0, int64))
   }
 }
 def bid_ask_spread(book: OrderBook) -> f32 = {
   ba = best_ask(book)
   bb = best_bid(book)
-  sub(order_price(ba), order_price(bb))
+  ba |> order_price |> sub(order_price(bb))
 }
 def vwap(book: OrderBook) -> f32 = {
   match book with {
@@ -62,7 +63,7 @@ def vwap(book: OrderBook) -> f32 = {
       q = order_qty(o)
       (add(acc.0, mul(p, q)), add(acc.1, q))
     }, (cast(0.0, f32), cast(0.0, f32)), all_orders)
-    if eq(pq.1, cast(0.0, f32)) then div(cast(0.0, f32), cast(0.0, f32)) else div(pq.0, pq.1)
+    if eq(pq.1, cast(0.0, f32)) then nan_f32() else div(pq.0, pq.1)
   }
   }
 }

@@ -1,27 +1,27 @@
 module Shoals.VolSurface
 import Shoals.Pricing (bs_call_scalar)
-export (SVI, svi_total_variance, svi_implied_vol, svi_shift_atm, svi_shift_skew, parallel_shift_atm_iv, smile_shift_skew_wing, implied_vol_bisect, implied_vol_from_call, bracket_brackets_root, is_iv_solver_failed)
+export (SVI, vs_total_variance, vs_implied_vol, vs_shift_atm, vs_shift_skew, parallel_shift_atm_iv, smile_shift_skew_wing, implied_vol_bisect, implied_vol_from_call, bracket_brackets_root, is_iv_solver_failed)
 type SVI =
   | SVI { a: f32, b: f32, rho: f32, m: f32, sigma: f32 }
-def svi_total_variance(p: SVI, k: f32) -> f32 = {
+def vs_total_variance(p: SVI, k: f32) -> f32 = {
   km = sub(k, p.m)
   sq_term = sqrt(add(mul(km, km), mul(p.sigma, p.sigma)))
   add(p.a, mul(p.b, add(mul(p.rho, km), sq_term)))
 }
-def svi_implied_vol(p: SVI, k: f32, t: f32) -> f32 = {
-  w = svi_total_variance(p, k)
+def vs_implied_vol(p: SVI, k: f32, t: f32) -> f32 = {
+  w = vs_total_variance(p, k)
   w_clamped = if lt(w, cast(0.0, f32)) then cast(0.0, f32) else w
   sqrt(div(w_clamped, t))
 }
-def svi_shift_atm(p: SVI, delta_a: f32) -> SVI = SVI { a: add(p.a, delta_a), b: p.b, rho: p.rho, m: p.m, sigma: p.sigma }
-def svi_shift_skew(p: SVI, delta_rho: f32) -> SVI = SVI { a: p.a, b: p.b, rho: add(p.rho, delta_rho), m: p.m, sigma: p.sigma }
+def vs_shift_atm(p: SVI, delta_a: f32) -> SVI = SVI { a: add(p.a, delta_a), b: p.b, rho: p.rho, m: p.m, sigma: p.sigma }
+def vs_shift_skew(p: SVI, delta_rho: f32) -> SVI = SVI { a: p.a, b: p.b, rho: add(p.rho, delta_rho), m: p.m, sigma: p.sigma }
 def parallel_shift_atm_iv(p: SVI, delta_iv: f32, t: f32) -> SVI = {
-  w_now = svi_total_variance(p, cast(0.0, f32))
+  w_now = vs_total_variance(p, cast(0.0, f32))
   w_clamped = if lt(w_now, cast(0.0, f32)) then cast(0.0, f32) else w_now
   iv_now = sqrt(div(w_clamped, t))
   iv_new = add(iv_now, delta_iv)
   w_new = mul(mul(iv_new, iv_new), t)
-  svi_shift_atm(p, sub(w_new, w_now))
+  vs_shift_atm(p, sub(w_new, w_now))
 }
 def smile_shift_skew_wing(p: SVI, delta_b: f32) -> SVI = SVI { a: p.a, b: add(p.b, delta_b), rho: p.rho, m: p.m, sigma: p.sigma }
 def bs_call_minus_target(spot: f32, strike: f32, r: f32, sigma: f32, t: f32, target: f32) -> f32 = sub(bs_call_scalar(spot, strike, r, sigma, t), target)

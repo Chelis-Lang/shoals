@@ -6,7 +6,7 @@ Ships as a reef package under the `Shoals` module prefix.
 
 ## Status
 
-v0.8.0 (unreleased). M0-M9 milestone sweep complete. Full slice:
+v0.8.1 (unreleased). M0-M9 milestone sweep complete. Full slice:
 M0 baseline + M1 foundations (Date, Calendar, Tenor, MarketData,
 Distributions) + M2 yield-curve sensitivity ops
 (parallel/key-rate/twist/butterfly shifts, log-linear and
@@ -43,7 +43,7 @@ calibration, and advanced risk — is specified in
 | `Shoals.Stochastic` | GBM path generation (log-Euler), terminal draws, antithetic-variates terminal-mean estimator; Merton lognormal jump-diffusion (compensated drift, aggregate-jump Gaussian approximation); 2-asset correlated GBM via 2x2 Cholesky | alpha |
 | `Shoals.Orderbook` | Limit order book (price-priority sorted lists), best bid/ask, bid-ask spread, VWAP, side quantities | alpha |
 | `Shoals.Date` | Day-count conventions (Act360/Act365/30/360/ActAct), year-fraction, weekend detection, business-day rolling (following/modified-following/preceding), tenor-stepped schedule generation | alpha |
-| `Shoals.Calendar` | NYC + LDN 2025 holiday tables, joint-calendar combinator, business-day predicate | alpha |
+| `Shoals.HolidayCal` | NYC + LDN 2025 holiday tables, joint-calendar combinator, business-day predicate | alpha |
 | `Shoals.Tenor` | Programmatic `Tenor { count, unit }` constructors (`days_n`, `weeks_n`, `months_n`, `years_n`, `overnight`, `tomorrow_next`, `spot_next`), `tenor_apply` to advance a date; string parsing deferred | alpha |
 | `Shoals.MarketData` | `Quote`, `Bar`, `Snapshot` record types with constructors / accessors / linear-scan lookup | alpha |
 | `Shoals.Distributions` | Lognormal pdf + cdf (composed over Nautilus normal), Student-t pdf (composed over `Nautilus.Special.log_gamma`), Student-t cdf approximation, bivariate-normal pdf | alpha |
@@ -51,7 +51,7 @@ calibration, and advanced risk — is specified in
 | `Shoals.PricingExtended` | Bachelier (normal-underlying) call/put; Black (forward-priced) call/put; Garman-Kohlhagen (FX) call/put; Margrabe exchange-option call with degenerate-vol intrinsic guard | alpha |
 | `Shoals.Greeks` | First-order FD Greeks (delta/vega/rho/theta, call+put); second-order FD (gamma/vanna/volga); analytic-Greek references for FD cross-check; pathwise-smooth and likelihood-ratio dispatchers for the digital-option payoff family | alpha |
 | `Shoals.Xva` | Constant-hazard survival / default probability; constant-rate discount factor; expected positive / negative exposure aggregators; pointwise 2-deal netting; CVA + DVA aggregators over a discrete time grid | alpha |
-| `Shoals.Calibration` | Bound projection; weighted-LS / WL1 / vega-weighted residuals; SSE loss; single-parameter bound-clamped LM step (`jtj + lambda` damping with bound projection on the proposed value) | alpha |
+| `Shoals.ModelFit` | Bound projection; weighted-LS / WL1 / vega-weighted residuals; SSE loss; single-parameter bound-clamped LM step (`jtj + lambda` damping with bound projection on the proposed value) | alpha |
 | `Shoals.RiskExt` | MC VaR / expected shortfall; FRTB-IMA 97.5% ES helper; linear scenario PnL grid; Kupiec proportion-of-failures backtest statistic | alpha |
 
 The reference implementations under `references/` ship the
@@ -147,13 +147,17 @@ gate, not part of every PR push.
 ## Acceptance gate
 
 Default PR/repo-local gate: `scripts/run_local_gate.py` and CI run
-`chelis fmt --check` over repository `.ch` sources, `chelis reef build`,
-and `chelis test tests/ --timeout 120 --jobs auto`. `chelis reef build`
-is the compiler-owned package oracle: it resolves the Reef manifest,
-lowers the package, and rejects stale source or dependency wiring; the
-runtime lane exercises the finance invariants.
+`chelis fmt --check` over repository `.ch` sources,
+`chelis lint --check src/ properties/ references/ tests/ manual-gates/`,
+`chelis reef build`, and `chelis test tests/ --timeout 120 --jobs auto`.
+`chelis reef build` is the compiler-owned package oracle: it resolves
+the Reef manifest, lowers the package, and rejects stale source or
+dependency wiring; the runtime lane exercises the finance invariants.
+The `chelis lint --check` step blocks on any blocking nomenclature
+violation per `crates/chelis-lint/` rules; advisory warnings are
+non-blocking.
 
-Runtime gate expected success condition: all 201 tests pass at v0.8.0 (48 baseline + 48 in M1 + 3 in M1 red-team fix-up + 13 in M2 + 11 in M3 + 5 in M3 red-team fix-up + 9 in M4 SDE slice + 11 in M5 closed-form pricers + 17 in M6 Greeks + 14 in M7 XVA + 13 in M8 calibration + 9 in M9 extended risk). This covers pricing correctness,
+Runtime gate expected success condition: all 201 tests pass at v0.8.1 (48 baseline + 48 in M1 + 3 in M1 red-team fix-up + 13 in M2 + 11 in M3 + 5 in M3 red-team fix-up + 9 in M4 SDE slice + 11 in M5 closed-form pricers + 17 in M6 Greeks + 14 in M7 XVA + 13 in M8 calibration + 9 in M9 extended risk). This covers pricing correctness,
 finite-difference Greeks (in-unit-range and matches-N(d1) checks), MC
 convergence (20K paths, 2 % tolerance) and reproducibility, parametric
 and historical VaR/CVaR, yield-curve interpolation and bootstrap
@@ -180,7 +184,7 @@ is a manual gate and is not exercised from this repo. The Shoals
 default PR scope includes `chelis reef build` and the node-local
 runtime suite; the monorepo oracle remains a separate manual gate.
 
-## Known limitations in v0.8.0
+## Known limitations in v0.8.1
 
 1. **`@property` is design-only.** Compiler v0.7.11 does not parse
    the annotation; the property bodies are plain `def`s that flip to

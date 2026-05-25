@@ -1,6 +1,6 @@
 module Shoals.MarketData
 import Std.Time (Date)
-export (Side, Quote, Bar, Snapshot, quote, bar, snapshot, quote_side, quote_value, bar_open, bar_high, bar_low, bar_close, bar_volume, snapshot_lookup)
+export (Side, Quote, Bar, Snapshot, quote, bar, snapshot, quote_side, quote_value, md_bar_open, md_bar_high, md_bar_low, md_bar_close, md_bar_volume, snapshot_lookup)
 type Side =
   | Bid
   | Ask
@@ -25,11 +25,11 @@ def quote_value(q: Quote) -> f32 = {
     | Quote { side: _, value: v, asof: _ } => v
   }
 }
-def bar_open(b: Bar) -> f32 = b.open
-def bar_high(b: Bar) -> f32 = b.high
-def bar_low(b: Bar) -> f32 = b.low
-def bar_close(b: Bar) -> f32 = b.close
-def bar_volume(b: Bar) -> f32 = b.volume
+def md_bar_open(b: Bar) -> f32 = b.open
+def md_bar_high(b: Bar) -> f32 = b.high
+def md_bar_low(b: Bar) -> f32 = b.low
+def md_bar_close(b: Bar) -> f32 = b.close
+def md_bar_volume(b: Bar) -> f32 = b.volume
 def snapshot_lookup(s: Snapshot, key: string) -> Option[Quote] = {
   match s with {
     | Snapshot { asof: _, quotes: qs } => fold(fn (acc: Option[Quote], entry: (string, Quote)) -> match acc with {

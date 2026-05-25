@@ -1,42 +1,42 @@
 module Shoals.Tests.VolSurface
 import Std.Test (assert_close, assert_true, assert_eq_bool)
 import Shoals.Pricing (bs_call_scalar)
-import Shoals.VolSurface (SVI, svi_total_variance, svi_implied_vol, svi_shift_atm, svi_shift_skew, parallel_shift_atm_iv, smile_shift_skew_wing, implied_vol_from_call, implied_vol_bisect, is_iv_solver_failed, bracket_brackets_root)
+import Shoals.VolSurface (SVI, vs_total_variance, vs_implied_vol, vs_shift_atm, vs_shift_skew, parallel_shift_atm_iv, smile_shift_skew_wing, implied_vol_from_call, implied_vol_bisect, is_iv_solver_failed, bracket_brackets_root)
 def flat_svi() -> SVI = SVI { a: cast(0.04, f32), b: cast(0.0, f32), rho: cast(0.0, f32), m: cast(0.0, f32), sigma: cast(0.1, f32) }
 def smile_svi() -> SVI = SVI { a: cast(0.04, f32), b: cast(0.2, f32), rho: cast(-0.3, f32), m: cast(0.0, f32), sigma: cast(0.1, f32) }
 def test_flat_svi_total_variance_equals_a() -> unit ! { Test } = {
   p = flat_svi()
-  w = svi_total_variance(p, cast(0.0, f32))
+  w = vs_total_variance(p, cast(0.0, f32))
   assert_close(w, cast(0.04, f32), cast(0.000001, f32), "flat SVI at k=0 has w == a")
 }
 def test_flat_svi_independent_of_strike() -> unit ! { Test } = {
   p = flat_svi()
-  w0 = svi_total_variance(p, cast(0.0, f32))
-  w1 = svi_total_variance(p, cast(0.2, f32))
+  w0 = vs_total_variance(p, cast(0.0, f32))
+  w1 = vs_total_variance(p, cast(0.2, f32))
   diff = sub(w1, w0)
   assert_close(diff, cast(0.0, f32), cast(0.000001, f32), "flat SVI variance constant in k")
 }
 def test_smile_svi_higher_otm() -> unit ! { Test } = {
   p = smile_svi()
-  w_atm = svi_total_variance(p, cast(0.0, f32))
-  w_otm = svi_total_variance(p, cast(0.5, f32))
+  w_atm = vs_total_variance(p, cast(0.0, f32))
+  w_otm = vs_total_variance(p, cast(0.5, f32))
   assert_true(gt(w_otm, w_atm), "OTM total variance > ATM for smile")
 }
 def test_svi_implied_vol_atm_one_year() -> unit ! { Test } = {
   p = flat_svi()
-  iv = svi_implied_vol(p, cast(0.0, f32), cast(1.0, f32))
+  iv = vs_implied_vol(p, cast(0.0, f32), cast(1.0, f32))
   assert_close(iv, cast(0.2, f32), cast(0.00001, f32), "sqrt(a/t) = 0.2 for a=0.04, t=1")
 }
 def test_svi_shift_atm() -> unit ! { Test } = {
   p = flat_svi()
-  shifted = svi_shift_atm(p, cast(0.02, f32))
-  w_before = svi_total_variance(p, cast(0.0, f32))
-  w_after = svi_total_variance(shifted, cast(0.0, f32))
+  shifted = vs_shift_atm(p, cast(0.02, f32))
+  w_before = vs_total_variance(p, cast(0.0, f32))
+  w_after = vs_total_variance(shifted, cast(0.0, f32))
   assert_close(sub(w_after, w_before), cast(0.02, f32), cast(0.000001, f32), "ATM shift adds delta_a to total variance")
 }
 def test_svi_shift_skew_changes_rho() -> unit ! { Test } = {
   p = smile_svi()
-  shifted = svi_shift_skew(p, cast(0.1, f32))
+  shifted = vs_shift_skew(p, cast(0.1, f32))
   assert_close(shifted.rho, cast(-0.2, f32), cast(0.000001, f32), "rho updated from -0.3 to -0.2")
 }
 def test_smile_shift_adds_to_b() -> unit ! { Test } = {
@@ -77,17 +77,17 @@ def test_implied_vol_from_call_high_vol() -> unit ! { Test } = {
 def test_parallel_shift_atm_iv_actually_shifts_iv_by_delta() -> unit ! { Test } = {
   p = smile_svi()
   t = cast(1.0, f32)
-  iv_before = svi_implied_vol(p, cast(0.0, f32), t)
+  iv_before = vs_implied_vol(p, cast(0.0, f32), t)
   shifted = parallel_shift_atm_iv(p, cast(0.01, f32), t)
-  iv_after = svi_implied_vol(shifted, cast(0.0, f32), t)
+  iv_after = vs_implied_vol(shifted, cast(0.0, f32), t)
   assert_close(sub(iv_after, iv_before), cast(0.01, f32), cast(0.0001, f32), "parallel_shift_atm_iv lifts ATM IV by exactly delta")
 }
 def test_parallel_shift_atm_iv_on_flat_surface() -> unit ! { Test } = {
   p = flat_svi()
   t = cast(1.0, f32)
-  iv_before = svi_implied_vol(p, cast(0.0, f32), t)
+  iv_before = vs_implied_vol(p, cast(0.0, f32), t)
   shifted = parallel_shift_atm_iv(p, cast(0.02, f32), t)
-  iv_after = svi_implied_vol(shifted, cast(0.0, f32), t)
+  iv_after = vs_implied_vol(shifted, cast(0.0, f32), t)
   assert_close(sub(iv_after, iv_before), cast(0.02, f32), cast(0.0001, f32), "parallel_shift_atm_iv on flat surface lifts IV by delta")
 }
 def test_iv_solver_failure_on_unbracketed_target() -> unit ! { Test } = {

@@ -1,7 +1,7 @@
 module Shoals.Tests.Date
 import Std.Test (assert_close)
 import Std.Time (Date, date, days_between, date_lte)
-import Shoals.Date (DayCount, year_fraction, is_weekend, roll_following, schedule_from_tenor)
+import Shoals.Date (DayCount, year_fraction, is_weekend, date_roll_following, schedule_from_tenor)
 def to01(b: bool) -> f32 = if b then cast(1.0, f32) else cast(0.0, f32)
 def test_act_360_one_year() -> unit ! { Test } = {
   start = date(cast(2025, int64), cast(1, int64), cast(1, int64))
@@ -34,9 +34,9 @@ def test_weekend_monday_is_not() -> unit ! { Test } = {
   d = date(cast(2025, int64), cast(1, int64), cast(6, int64))
   assert_close(to01(is_weekend(d)), cast(0.0, f32), cast(0.001, f32), "2025-01-06 is Monday, not weekend")
 }
-def test_roll_following_from_saturday() -> unit ! { Test } = {
+def test_date_roll_following_from_saturday() -> unit ! { Test } = {
   sat = date(cast(2025, int64), cast(1, int64), cast(4, int64))
-  rolled = roll_following(sat, true)
+  rolled = date_roll_following(sat, true)
   expected_mon = date(cast(2025, int64), cast(1, int64), cast(6, int64))
   gap = cast(days_between(rolled, expected_mon), f32)
   assert_close(gap, cast(0.0, f32), cast(0.001, f32), "Saturday rolls to following Monday")

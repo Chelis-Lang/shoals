@@ -1,4 +1,4 @@
-module Shoals.Calendar
+module Shoals.HolidayCal
 import Std.Time (Date, date, day_of_week, DayOfWeek)
 export (Calendar, is_holiday, is_business_day, nyc_calendar, ldn_calendar, joint_calendar, weekend_only_calendar, empty_calendar)
 type Calendar =

@@ -1,6 +1,6 @@
 module Shoals.Date
 import Std.Time (Date, add_days, days_between, day_of_week, DayOfWeek)
-export (DayCount, year_fraction, add_business_days, is_weekend, roll_following, roll_modified_following, roll_preceding, schedule_from_tenor)
+export (DayCount, year_fraction, add_business_days, is_weekend, date_roll_following, date_roll_modified_following, date_roll_preceding, schedule_from_tenor)
 type DayCount =
   | Act360
   | Act365
@@ -41,9 +41,9 @@ def add_business_days(d: Date, n: int64, weekend_only: bool) -> Date = {
 }
 def advance_to_business(d: Date) -> Date = { if is_weekend(d) then advance_to_business(add_days(d, cast(1, int64))) else d }
 def retreat_to_business(d: Date) -> Date = { if is_weekend(d) then retreat_to_business(add_days(d, cast(-1, int64))) else d }
-def roll_following(d: Date, weekend_only: bool) -> Date = { if weekend_only then advance_to_business(d) else advance_to_business(d) }
-def roll_preceding(d: Date, weekend_only: bool) -> Date = { if weekend_only then retreat_to_business(d) else retreat_to_business(d) }
-def roll_modified_following(d: Date, weekend_only: bool) -> Date = {
+def date_roll_following(d: Date, weekend_only: bool) -> Date = { if weekend_only then advance_to_business(d) else advance_to_business(d) }
+def date_roll_preceding(d: Date, weekend_only: bool) -> Date = { if weekend_only then retreat_to_business(d) else retreat_to_business(d) }
+def date_roll_modified_following(d: Date, weekend_only: bool) -> Date = {
   rolled = if weekend_only then advance_to_business(d) else advance_to_business(d)
   if eq(rolled.month, d.month) then rolled else retreat_to_business(d)
 }
