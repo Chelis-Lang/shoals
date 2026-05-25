@@ -6,7 +6,15 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.8.1] — unreleased
+## [0.8.2] - 2026-05-25
+
+FlukeBall support release. Adds `Shoals.CurrencyTag`, including
+runtime-tagged `Currency`, `Money`, and `NonNegativeMoney` helpers for
+Whale bankroll and stake sizing code. Retargets CI, release metadata,
+and Reef dependencies to chelis 0.7.16, Nautilus 0.7.16, and Coral
+0.7.15.
+
+## [0.8.1] - 2026-05-25
 
 Lint-clean pass. Surface and behavior unchanged; only style /
 naming changes plus a gate-step addition. All 201 tests continue to

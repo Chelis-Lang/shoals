@@ -6,7 +6,7 @@ Ships as a reef package under the `Shoals` module prefix.
 
 ## Status
 
-v0.8.1 (unreleased). M0-M9 milestone sweep complete. Full slice:
+v0.8.2. M0-M9 milestone sweep complete. Full slice:
 M0 baseline + M1 foundations (Date, Calendar, Tenor, MarketData,
 Distributions) + M2 yield-curve sensitivity ops
 (parallel/key-rate/twist/butterfly shifts, log-linear and
@@ -69,7 +69,7 @@ ground-truth oracles that `Shoals.Pricing`, `Shoals.Risk`, and
 `properties/` ships function bodies for the canonical finance
 properties (put-call parity, call-bounded-by-spot, finite-difference
 delta/vega smoke, MC-reproducibility, bull/butterfly-spread
-no-arbitrage). Status: mixed. The compiler v0.7.11 does not yet
+no-arbitrage). Status: mixed. The compiler v0.7.16 does not yet
 parse `@property` annotations and ships no `chelis fuzz` subcommand;
 the property bodies are written as plain `def name(...) -> bool`
 ready to flip to `@property` when the tool ships. See
@@ -84,20 +84,19 @@ that adds grad-derived Greek properties re-evaluates.
 
 ## Toolchain
 
-Pinned to `chelis v0.7.11` in `reef.toml`:
+Pinned to `chelis v0.7.16` in `reef.toml`:
 
 ```toml
 [package]
-compiler = "=0.7.11"
+compiler = "=0.7.16"
 ```
 
 Dependencies resolve via the local Reef registry (`~/.chelis/reef/`):
 
 * `chelis-std` 0.3.0 — standard library
-* `nautilus`   0.7.13 — distributions, special functions, stats,
+* `nautilus`   0.7.16 — distributions, special functions, stats,
   interpolation
-* `coral`      0.7.13 — dataframe runtime (transitively required for
-  the same `nautilus` minor version)
+* `coral`      0.7.15 — dataframe runtime
 
 ## Build
 
@@ -139,7 +138,7 @@ agreement at 100K paths. **Currently not runnable on the chelis host
 evaluator** — 100K-path MC simulation in the interpreted host
 evaluator does not complete in reasonable wall-clock (>30 min and not
 terminating, measured 2026-05-01 on AMD Ryzen AI Max+ 395 under
-chelis 0.7.6; not re-measured under 0.7.11 at M0). The gate becomes
+chelis 0.7.6; not re-measured under 0.7.16 at M0). The gate becomes
 practical once Shoals can compile to native code via `chelis build`
 AOT; until then the spec rigor at 100K paths is deferred. See
 `chelis/spec/upstream-bugs/host-eval-perf-mc-rigor.md`.
@@ -160,7 +159,7 @@ The `chelis lint --check` step blocks on any blocking nomenclature
 violation per `crates/chelis-lint/` rules; advisory warnings are
 non-blocking.
 
-Runtime gate expected success condition: all 201 tests pass at v0.8.1 (48 baseline + 48 in M1 + 3 in M1 red-team fix-up + 13 in M2 + 11 in M3 + 5 in M3 red-team fix-up + 9 in M4 SDE slice + 11 in M5 closed-form pricers + 17 in M6 Greeks + 14 in M7 XVA + 13 in M8 calibration + 9 in M9 extended risk). This covers pricing correctness,
+Runtime gate expected success condition: all 207 tests pass at v0.8.2 (48 baseline + 48 in M1 + 3 in M1 red-team fix-up + 13 in M2 + 11 in M3 + 5 in M3 red-team fix-up + 9 in M4 SDE slice + 11 in M5 closed-form pricers + 17 in M6 Greeks + 14 in M7 XVA + 13 in M8 calibration + 9 in M9 extended risk + 6 currency-tag tests). This covers pricing correctness,
 finite-difference Greeks (in-unit-range and matches-N(d1) checks), MC
 convergence (20K paths, 2 % tolerance) and reproducibility, parametric
 and historical VaR/CVaR, yield-curve interpolation and bootstrap
@@ -179,7 +178,7 @@ discipline milestone in `docs/plan-quant-surface.md`.
 The v0.7.6 testing cutover timing is recorded in
 `docs/testing_cutover_0.7.6.json`: node-local `--jobs auto` ran 48
 tests in 1:04.89; serial `--jobs 1` ran the same suite in 1:25.44.
-(Not re-measured under 0.7.11 at M0.)
+(Not re-measured under 0.7.16 at M0.)
 
 Phase oracle: the Chelis-monorepo-side
 `cargo test -p chelis-cli --test phase3l_shoals_oracle phase3l_shoals_oracle -- --ignored --exact --nocapture`
@@ -187,9 +186,9 @@ is a manual gate and is not exercised from this repo. The Shoals
 default PR scope includes `chelis reef build` and the node-local
 runtime suite; the monorepo oracle remains a separate manual gate.
 
-## Known limitations in v0.8.1
+## Known limitations in v0.8.2
 
-1. **`@property` is design-only.** Compiler v0.7.11 does not parse
+1. **`@property` is design-only.** Compiler v0.7.16 does not parse
    the annotation; the property bodies are plain `def`s that flip to
    `@property` when `chelis fuzz` ships. See above.
 2. **`chelis manifest` is design-only.** The MC reproducibility
@@ -207,7 +206,7 @@ runtime suite; the monorepo oracle remains a separate manual gate.
    with implicit-differentiation gradient through the joint solve is
    an M2-continuation candidate per `docs/plan-quant-surface.md`.
 5. **`erfc` direct routing.** Per Chelis architecture, special
-   functions live in `Nautilus.Special`. As of `nautilus 0.7.13`
+   functions live in `Nautilus.Special`. As of `nautilus 0.7.16`
    Shoals routes Black-Scholes through `Nautilus.Special.erfc`
    directly (computing `0.5 * erfc(-x / sqrt(2))` for the standard
    normal CDF), bypassing the higher-level distribution wrapper. No
@@ -221,8 +220,8 @@ following the chelis-reef v0.4.1 multi-source-roots fix
 (`6b58030 feat(reef): multi-source-roots — additional_sources in reef.toml;
 bump v0.4.1`). The reef.toml declares
 `additional_sources = ["properties", "references"]`. v0.1.0 carries the
-canonical layout forward and pins chelis 0.7.11, nautilus 0.7.13, and
-coral 0.7.13. (References to the pre-reset v0.7.x numbering point at
+canonical layout forward and pins chelis 0.7.16, nautilus 0.7.16, and
+coral 0.7.15. (References to the pre-reset v0.7.x numbering point at
 the historical version track and remain valid as release-history
 records; current planning lives on Shoals's own track per
 `docs/plan-quant-surface.md`.)
@@ -235,7 +234,7 @@ exposes `chelis.check(...)` and `chelis.eval(source, bindings)` to
 Python. The pre-reset v0.1.0-alpha release verified a Shoals-shaped
 program round-trips through that surface; the program shape is
 unchanged at v0.1.0, the verification remains valid, and re-running
-it under chelis 0.7.11 is a follow-up verification task.
+it under chelis 0.7.16 is a follow-up verification task.
 
 Setup (one-time):
 

@@ -22,7 +22,7 @@ def money_currency(m: Money) -> Currency = {
     | Money { amount: _, currency: currency } => currency
   }
 }
-def money_non_negative(m: Money) -> NonNegativeMoney = NonNegativeMoney { money: Money { amount: clamp_non_negative(money_value(m)), currency: money_currency(m) } }
+def money_non_negative(m: Money) -> NonNegativeMoney = NonNegativeMoney { money: Money { amount: money_value(m) |> clamp_non_negative, currency: money_currency(m) } }
 def money_non_negative_value(m: NonNegativeMoney) -> f32 = {
   match m with {
     | NonNegativeMoney { money: money } => money_value(money)
@@ -33,16 +33,20 @@ def money_non_negative_currency(m: NonNegativeMoney) -> Currency = {
     | NonNegativeMoney { money: money } => money_currency(money)
   }
 }
-def convert(m: Money, target: Currency, rate: f32) -> Money = Money { amount: mul(money_value(m), rate), currency: target }
+def convert(m: Money, target: Currency, rate: f32) -> Money = Money { amount: money_value(m) |> mul(rate), currency: target }
 def money_add(lhs: Money, rhs: Money) -> Money = {
   lhs_currency = money_currency(lhs)
   rhs_currency = money_currency(rhs)
-  if same_currency(lhs_currency, rhs_currency) then Money { amount: add(money_value(lhs), money_value(rhs)), currency: lhs_currency } else fail("money_add: currency mismatch")
+  lhs_amount = money_value(lhs)
+  rhs_amount = money_value(rhs)
+  if same_currency(lhs_currency, rhs_currency) then Money { amount: lhs_amount |> add(rhs_amount), currency: lhs_currency } else fail("money_add: currency mismatch")
 }
 def money_sub(lhs: Money, rhs: Money) -> Money = {
   lhs_currency = money_currency(lhs)
   rhs_currency = money_currency(rhs)
-  if same_currency(lhs_currency, rhs_currency) then Money { amount: sub(money_value(lhs), money_value(rhs)), currency: lhs_currency } else fail("money_sub: currency mismatch")
+  lhs_amount = money_value(lhs)
+  rhs_amount = money_value(rhs)
+  if same_currency(lhs_currency, rhs_currency) then Money { amount: lhs_amount |> sub(rhs_amount), currency: lhs_currency } else fail("money_sub: currency mismatch")
 }
 def same_currency(lhs: Currency, rhs: Currency) -> bool = {
   match lhs with {
