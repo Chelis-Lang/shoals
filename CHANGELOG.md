@@ -6,6 +6,71 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.1] — unreleased
+
+Milestone B PR-2: implicit-differentiation hook for the multi-
+instrument bootstrap. Closes the Milestone B two-PR sequence.
+
+### Added
+
+- **`Shoals.Curves.bootstrap_grad_at_solution(instruments)`** —
+  hand-rolled implicit-function-theorem hook returning the per-pillar
+  diagonal sensitivity `dz_i*/dx_i` at the solved curve. For each
+  pillar, computes `-((dF/dx_i) / (dF/dz_i))` at the brent root.
+  No global Jacobian inverse — per-pillar diagonal only, which is
+  what end-users actually need for bumping a single market input.
+  Phase 1 inventory confirmed `Nautilus.Roots` has no IFT primitive,
+  so this is hand-rolled per the plan.
+- **`Shoals.Curves.bootstrap_grad_diagonal(inst, solved_rate,
+  cum_pv_before)`** — the per-instrument IFT diagonal kernel,
+  exposed for testability. Dispatches on the `Instrument` variant.
+- **`Shoals.Curves.fd_bump_pillar_rate(inst, times_so_far,
+  rates_so_far, step)`** — finite-difference cross-check helper
+  used by tests and the manual gate.
+- **Internal IFT partials** (private): `dF_dz_deposit`,
+  `dF_dr_deposit`, `dF_dz_zero_coupon`, `dF_dp_zero_coupon`,
+  `dF_dz_par_swap`, `dF_dr_par_swap`. Inline closed-form
+  derivatives of the residual `F(z; x) = 0` with respect to both
+  the solved zero rate and the market-side parameter.
+- **`tests/curves_bootstrap_ift.ch`** (9 tests): single-pillar IFT
+  matches closed-form for deposit / zero_coupon / par_swap; the
+  five plan-pinned failure-mode probes — well-conditioned IFT-FD
+  agreement on each pillar, near-collinear-instruments finite-and-
+  bounded diagonal, parameter-at-lower-bound bounded gradient,
+  FD-step-size stability (IFT vs FD@1e-4 inside the f32+brent-1e-7
+  precision floor of ~2%), and pathological same-tenor pillars
+  returning the analytic single-instrument value with no silent
+  garbage.
+- **`scripts/manual_gates/phase3l_shoals_oracle_multi_curve_bootstrap_grad.py`**
+  — aggregates the IFT test outcomes into per-probe pass/fail JSON
+  with methodology fields documenting the FD-step-size, near-
+  collinear, and pathological-pillar configurations. Exit 0 on
+  full PASS.
+
+### Fixed
+
+- **Sign error in `dF_dp_zero_coupon`** caught during IFT test
+  development. The zero-coupon residual is `F(z; p) = z + log(p)/t`,
+  so `dF/dp = +1/(t*p)` (not negative). Corrected before any
+  downstream caller exercised it.
+
+### Verification
+
+- `chelis reef build` green.
+- `tests/curves_bootstrap_ift.ch`: 9 / 9 pass.
+- Manual gate
+  `phase3l_shoals_oracle_multi_curve_bootstrap_grad.py`: PASS on
+  all five plan-pinned probes plus the analytic single-pillar
+  checks.
+
+### Notes
+
+- The diagonal-only IFT is a conscious scope choice. A full
+  off-diagonal Jacobian would need a triangular back-substitution
+  through the cumulative-PV chain (par-swap residuals depend on
+  all earlier pillars). That extension is deferred to a future PR
+  if a downstream consumer needs full sensitivities.
+
 ## [0.10.0] — unreleased
 
 Milestone B PR-1: forward multi-instrument bootstrap. Two-PR

@@ -1,7 +1,7 @@
 module Shoals.Curves
 import Nautilus.Interpolation (linear_interp_sorted, spline_eval)
 import Nautilus.Roots (brent)
-export (CurveKind, YieldCurve, yield_curve_from_pillars, yield_curve_tagged, curve_kind, ois, ibor, sofr, sonia, estr, custom_curve, rate_at, spline_rate_at, log_linear_rate_at, nss_rate, discount_factor, bootstrap_zero_from_par, parallel_shift, key_rate_shift, twist, butterfly, scale_rates, Instrument, deposit, zero_coupon, cur_par_swap, instrument_tenor, instrument_market_price_or_rate, bootstrap_multi, bootstrap_multi_curve, bootstrap_residual_at_pillar)
+export (CurveKind, YieldCurve, yield_curve_from_pillars, yield_curve_tagged, curve_kind, ois, ibor, sofr, sonia, estr, custom_curve, rate_at, spline_rate_at, log_linear_rate_at, nss_rate, discount_factor, bootstrap_zero_from_par, parallel_shift, key_rate_shift, twist, butterfly, scale_rates, Instrument, deposit, zero_coupon, cur_par_swap, instrument_tenor, instrument_market_price_or_rate, bootstrap_multi, bootstrap_multi_curve, bootstrap_residual_at_pillar, bootstrap_grad_diagonal, bootstrap_grad_at_solution, fd_bump_pillar_rate)
 type CurveKind =
   | Ois
   | Ibor
@@ -211,4 +211,41 @@ def bootstrap_multi_curve[n](instruments: List[Instrument], times_template: tens
   times_t = to_tensor(out.0)
   rates_t = to_tensor(out.1)
   YieldCurve { kind: Custom { label: "bootstrap-multi" }, times: times_t, rates: rates_t }
+}
+def bootstrap_grad_diagonal(inst: Instrument, solved_rate: f32, cum_pv_before: f32) -> f32 = {
+  match inst with {
+    | Deposit { tenor: t, rate: r } => div(cast(1.0, f32), add(cast(1.0, f32), mul(r, t)))
+    | ZeroCoupon { tenor: t, price: p } => neg(div(cast(1.0, f32), mul(t, p)))
+    | ParSwap { tenor: t, par_rate: r } => {
+    e_neg_zt = exp(neg(mul(solved_rate, t)))
+    partial_z = neg(mul(t, mul(add(r, cast(1.0, f32)), e_neg_zt)))
+    partial_r = add(cum_pv_before, e_neg_zt)
+    neg(div(partial_r, partial_z))
+  }
+  }
+}
+def fd_bump_pillar_rate(inst: Instrument, times_so_far: List[f32], rates_so_far: List[f32], step: f32) -> f32 = {
+  bumped = match inst with {
+    | Deposit { tenor: t, rate: r } => deposit(t, add(r, step))
+    | ZeroCoupon { tenor: t, price: p } => zero_coupon(t, add(p, step))
+    | ParSwap { tenor: t, par_rate: r } => cur_par_swap(t, add(r, step))
+  }
+  z_up = solve_pillar_rate(bumped, times_so_far, rates_so_far)
+  z_base = solve_pillar_rate(inst, times_so_far, rates_so_far)
+  div(sub(z_up, z_base), step)
+}
+def bootstrap_grad_at_solution(instruments: List[Instrument]) -> List[f32] = {
+  init = ([], [], [], cast(0.0, f32))
+  out = fold(fn (state: (List[f32], List[f32], List[f32], f32), inst: Instrument) -> {
+    ts_so_far = state.0
+    rs_so_far = state.1
+    grads_so_far = state.2
+    cum_pv_so_far = state.3
+    r_new = solve_pillar_rate(inst, ts_so_far, rs_so_far)
+    t_new = instrument_tenor(inst)
+    g_new = bootstrap_grad_diagonal(inst, r_new, cum_pv_so_far)
+    df_new = exp(neg(mul(r_new, t_new)))
+    (append(ts_so_far, t_new), append(rs_so_far, r_new), append(grads_so_far, g_new), add(cum_pv_so_far, df_new))
+  }, init, instruments)
+  out.2
 }
