@@ -55,6 +55,10 @@ PROBE_TO_TEST = {
     "5_pathological_pillar_spacing": [
         "test_grad_pathological_pillar_returns_finite_or_documented",
     ],
+    "6_brent_bracket_robustness": [
+        "test_grad_high_rate_within_bracket",
+        "test_grad_out_of_bracket_propagates_nan_observably",
+    ],
 }
 
 ANALYTIC_PROBES = [
@@ -120,9 +124,21 @@ def main() -> int:
         "ift_failure_mode_probes": per_probe,
         "fd_step_size_methodology": (
             "IFT uses no finite difference; FD uses central-rate forward bump with "
-            "step in {1e-2, 1e-4, 1e-6}. Tolerance on IFT-FD@1e-4 relative agreement "
-            "is 2%, set by the f32 precision floor on a brent root finder converging "
-            "to abs tol 1e-7."
+            "step in {1e-2, 1e-4, 1e-6}. The 2% tolerance is scoped to the specific "
+            "test configuration (2y zero_coupon at p=0.9 → IFT≈-0.556); it is NOT a "
+            "universal floor — longer-tenor par-swaps have a worse FD noise knee "
+            "(red-team probe found ~2.7% on a 5y par-swap @ 4.5%). The IFT itself is "
+            "exact to f32 precision; the tolerance budget exists purely to absorb "
+            "FD artifact, not IFT error."
+        ),
+        "bracket_robustness_methodology": (
+            "Brent solver is bracketed at [-0.5, 2.0] (covering implied zero rates "
+            "up to ~200%). Inputs whose implied zero exceeds the bracket return NaN "
+            "from brent; bootstrap_grad_at_solution explicitly NaN-guards the "
+            "gradient (via eq(r_new, r_new) self-equality test) so a caller can "
+            "detect the failure by testing eq(g_i, g_i). Probe 6 verifies both the "
+            "in-bracket-stress path (deposit r=200%) and the out-of-bracket "
+            "NaN-propagation path (deposit r=5000%)."
         ),
         "near_collinear_methodology": (
             "Two adjacent zero-coupon pillars at t=1.0 (p=0.95) and t=1.001 (p=0.949) — "
@@ -142,7 +158,7 @@ def main() -> int:
     sys.stdout.write(json.dumps(report, indent=2) + "\n")
     if all_pass:
         print(
-            f"PASS: {GATE_NAME} — all 5 IFT failure-mode probes + analytic single-pillar checks passed."
+            f"PASS: {GATE_NAME} — all 6 IFT failure-mode probes + analytic single-pillar checks passed."
         )
         return 0
     print(

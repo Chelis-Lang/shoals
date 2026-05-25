@@ -49,27 +49,71 @@ instrument bootstrap. Closes the Milestone B two-PR sequence.
 
 ### Fixed
 
-- **Sign error in `dF_dp_zero_coupon`** caught during IFT test
-  development. The zero-coupon residual is `F(z; p) = z + log(p)/t`,
-  so `dF/dp = +1/(t*p)` (not negative). Corrected before any
-  downstream caller exercised it.
+- **Sign error in the zero-coupon partial dF/dp** caught during
+  IFT test development. The zero-coupon residual is
+  `F(z; p) = z + log(p)/t`, so `dF/dp = +1/(t*p)` (not negative).
+  Corrected before any downstream caller exercised it.
+- **Silent-NaN gap in `bootstrap_grad_at_solution`** caught by
+  red-team. For inputs whose implied zero exceeds the brent
+  bracket `[-0.5, 2.0]`, `solve_pillar_rate` returns NaN. For the
+  Deposit and ZeroCoupon variants the analytic gradient kernel
+  does not consume the solved rate, so the gradient looked valid
+  even when the underlying curve was NaN. Fix: the fold now
+  explicitly tests `eq(r_new, r_new)` (NaN-self-inequality) and
+  emits NaN gradient for any pillar whose brent solve failed, so
+  callers can detect the failure mode by testing `eq(g_i, g_i)`.
+
+### AD label updates (carrying over v0.10.0 gating)
+
+- The v0.10.0 entry noted `solve_pillar_rate`, `bootstrap_multi`,
+  and `bootstrap_multi_curve` carried `AD: unproven-primitive`
+  pending a PR-2 IFT hook. PR-2 ships that hook in
+  `bootstrap_grad_at_solution`. The trio remains
+  `AD: unproven-primitive` for the *forward* call (brent is still
+  an iterative inner loop), but the *gradient* path is now
+  explicitly `AD: composed (hand-rolled IFT)` — composed of
+  closed-form partials and an algebraic inversion, no inner
+  iteration. End users wanting gradient-through-bootstrap should
+  call `bootstrap_grad_at_solution` directly.
 
 ### Verification
 
 - `chelis reef build` green.
-- `tests/curves_bootstrap_ift.ch`: 9 / 9 pass.
+- `tests/curves_bootstrap_ift.ch`: 11 / 11 pass (added the
+  bracket-robustness probes after red-team fixup).
 - Manual gate
   `phase3l_shoals_oracle_multi_curve_bootstrap_grad.py`: PASS on
-  all five plan-pinned probes plus the analytic single-pillar
-  checks.
+  all six probe groups (the five plan-pinned probes plus a
+  brent-bracket robustness probe added during red-team fixup) and
+  the analytic single-pillar checks.
 
-### Notes
+### Known limitations
 
-- The diagonal-only IFT is a conscious scope choice. A full
-  off-diagonal Jacobian would need a triangular back-substitution
-  through the cumulative-PV chain (par-swap residuals depend on
-  all earlier pillars). That extension is deferred to a future PR
-  if a downstream consumer needs full sensitivities.
+- **Diagonal-only sensitivity.** A full off-diagonal Jacobian
+  would need a triangular back-substitution through the
+  cumulative-PV chain (par-swap residuals depend on all earlier
+  pillars). Deferred to a future PR if a downstream consumer needs
+  full sensitivities.
+- **Brent bracket** `[-0.5, 2.0]` on `solve_pillar_rate`. Inputs
+  whose implied zero exceeds this range (e.g. a deposit at simple
+  rate > ~640% on a 1y tenor) return NaN, which now propagates
+  observably through the gradient. Widening the bracket was
+  attempted and reverted: at f32 precision, brent's `1e-7` abs
+  tolerance is already at the ULP floor, and a wider bracket
+  noticeably degraded the FD-vs-IFT agreement on the existing
+  pillar tests.
+- **No input validation.** `Instrument` constructors and the
+  gradient kernel accept negative tenors, prices > 1, negative
+  prices, etc., and silently compute the analytic formula. This
+  is by design (the kernel is correct on whatever F(z; x) you
+  pass it), but callers feeding stale or typo'd market quotes
+  will not get a vendor-side sanity check.
+- **FD precision floor in the test gate is config-specific.** The
+  "2% IFT-FD@1e-4" tolerance in the FD step-size probe is scoped
+  to the test's specific instrument (2y zero_coupon at p=0.9).
+  Longer-tenor par-swaps have a worse FD noise knee. The IFT
+  itself is exact to f32; the tolerance budget exists only to
+  absorb FD artifact.
 
 ## [0.10.0] — unreleased
 

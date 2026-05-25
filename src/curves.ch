@@ -243,7 +243,8 @@ def bootstrap_grad_at_solution(instruments: List[Instrument]) -> List[f32] = {
     cum_pv_so_far = state.3
     r_new = solve_pillar_rate(inst, ts_so_far, rs_so_far)
     t_new = instrument_tenor(inst)
-    g_new = bootstrap_grad_diagonal(inst, r_new, cum_pv_so_far)
+    g_raw = bootstrap_grad_diagonal(inst, r_new, cum_pv_so_far)
+    g_new = if eq(r_new, r_new) then g_raw else div(cast(0.0, f32), cast(0.0, f32))
     df_new = exp(neg(mul(r_new, t_new)))
     (append(ts_so_far, t_new), append(rs_so_far, r_new), append(grads_so_far, g_new), add(cum_pv_so_far, df_new))
   }, init, instruments)
