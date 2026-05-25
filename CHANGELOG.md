@@ -6,6 +6,10 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Dependency cascade: moved the package and CI/release toolchain to
+  `chelis 0.7.18`, `nautilus 0.7.17`, and `coral 0.7.16`.
+  Shoals remains on its own `0.10.0` package version.
+
 ## [0.10.0] — unreleased
 
 Milestone B PR-1: forward multi-instrument bootstrap. Two-PR
@@ -158,9 +162,10 @@ discipline.
 ### Toolchain bump
 
 reef.toml: `compiler` =0.7.11 → =0.7.16 (matches nautilus 0.7.16
-and coral 0.7.15 pins; chelis 0.7.17 and 0.7.18 are released but
-the dep cascade hasn't moved past 0.7.16 yet). `nautilus` 0.7.13 →
-0.7.16. `coral` 0.7.13 → 0.7.15.
+and coral 0.7.15 pins at the time of the Milestone A change).
+`nautilus` 0.7.13 → 0.7.16. `coral` 0.7.13 → 0.7.15. A follow-up
+dependency cascade in `[Unreleased]` moves the active package pins to
+chelis 0.7.18 / nautilus 0.7.17 / coral 0.7.16.
 
 ### AD verification status
 
@@ -194,9 +199,8 @@ the dep cascade hasn't moved past 0.7.16 yet). `nautilus` 0.7.13 →
   v0.8.1 tactical renames (`Shoals.Calendar` → `Shoals.HolidayCal`,
   `Shoals.Calibration` → `Shoals.ModelFit`) remain in effect
   because the dep cascade (nautilus 0.7.16, coral 0.7.15) still
-  pins compiler `=0.7.16`. Rename revert queued for the next
-  cascade pass once nautilus/coral release versions pinning past
-  0.7.16. Function-level renames (`date_roll_*`, `md_bar_*`,
+  pinned compiler `=0.7.16` at that point. Function-level renames
+  (`date_roll_*`, `md_bar_*`,
   `vs_*`, new `hc_*` and `dist_mvn_*`) are per-rule §7.1 lint
   compliance and stay regardless.
 

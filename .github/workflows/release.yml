@@ -10,12 +10,12 @@ permissions:
   contents: write
 
 env:
-  CHELIS_VERSION: 0.7.11
-  CHELIS_TAG: v0.7.11
-  NAUTILUS_TAG: v0.7.13
-  CORAL_TAG: v0.7.13
+  CHELIS_VERSION: 0.7.18
+  CHELIS_TAG: v0.7.18
+  NAUTILUS_TAG: v0.7.17
+  CORAL_TAG: v0.7.16
   PACKAGE_NAME: shoals
-  PACKAGE_VERSION: 0.0.1
+  PACKAGE_VERSION: 0.10.0
 
 jobs:
   build-reef-assets:

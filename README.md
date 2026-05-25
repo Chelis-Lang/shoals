@@ -6,8 +6,9 @@ Ships as a reef package under the `Shoals` module prefix.
 
 ## Status
 
-v0.9.0 (unreleased). M0-M9 milestone sweep complete + Milestone A
-(foundations cleanup). Full slice:
+v0.10.0 (unreleased). M0-M9 milestone sweep complete + Milestone A
+(foundations cleanup) + Milestone B PR-1 (forward multi-instrument
+bootstrap). Full slice:
 M0 baseline + M1 foundations (Date, Calendar, Tenor, MarketData,
 Distributions) + M2 yield-curve sensitivity ops
 (parallel/key-rate/twist/butterfly shifts, log-linear and
@@ -68,7 +69,7 @@ ground-truth oracles that `Shoals.Pricing`, `Shoals.Risk`, and
 `properties/` ships function bodies for the canonical finance
 properties (put-call parity, call-bounded-by-spot, finite-difference
 delta/vega smoke, MC-reproducibility, bull/butterfly-spread
-no-arbitrage). Status: mixed. The compiler v0.7.16 does not yet
+no-arbitrage). Status: mixed. The compiler v0.7.18 does not yet
 parse `@property` annotations and ships no `chelis fuzz` subcommand;
 the property bodies are written as plain `def name(...) -> bool`
 ready to flip to `@property` when the tool ships. See
@@ -83,20 +84,19 @@ that adds grad-derived Greek properties re-evaluates.
 
 ## Toolchain
 
-Pinned to `chelis v0.7.16` in `reef.toml`:
+Pinned to `chelis v0.7.18` in `reef.toml`:
 
 ```toml
 [package]
-compiler = "=0.7.16"
+compiler = "=0.7.18"
 ```
 
 Dependencies resolve via the local Reef registry (`~/.chelis/reef/`):
 
 * `chelis-std` 0.3.0 — standard library
-* `nautilus`   0.7.16 — distributions, special functions, stats,
+* `nautilus`   0.7.17 — distributions, special functions, stats,
   interpolation
-* `coral`      0.7.15 — dataframe runtime (transitively required for
-  the same `nautilus` minor version)
+* `coral`      0.7.16 — dataframe runtime used by the finance stack
 
 ## Build
 
@@ -138,7 +138,7 @@ agreement at 100K paths. **Currently not runnable on the chelis host
 evaluator** — 100K-path MC simulation in the interpreted host
 evaluator does not complete in reasonable wall-clock (>30 min and not
 terminating, measured 2026-05-01 on AMD Ryzen AI Max+ 395 under
-chelis 0.7.6; not re-measured under 0.7.11 at M0). The gate becomes
+chelis 0.7.6; not re-measured under 0.7.18). The gate becomes
 practical once Shoals can compile to native code via `chelis build`
 AOT; until then the spec rigor at 100K paths is deferred. See
 `chelis/spec/upstream-bugs/host-eval-perf-mc-rigor.md`.
@@ -159,7 +159,7 @@ The `chelis lint --check` step blocks on any blocking nomenclature
 violation per `crates/chelis-lint/` rules; advisory warnings are
 non-blocking.
 
-Runtime gate expected success condition: all tests pass at v0.9.0 (201 baseline through M0-M9 + Milestone A delta: tenor +8, date +11, holidaycal +11, distributions +9, volsurface +7 SABR, rng +7). This covers pricing correctness,
+Runtime gate expected success condition: all tests pass at v0.10.0 (M0-M9 + Milestone A plus Milestone B PR-1 bootstrap coverage). This covers pricing correctness,
 finite-difference Greeks (in-unit-range and matches-N(d1) checks), MC
 convergence (20K paths, 2 % tolerance) and reproducibility, parametric
 and historical VaR/CVaR, yield-curve interpolation and bootstrap
@@ -178,7 +178,7 @@ discipline milestone in `docs/plan-quant-surface.md`.
 The v0.7.6 testing cutover timing is recorded in
 `docs/testing_cutover_0.7.6.json`: node-local `--jobs auto` ran 48
 tests in 1:04.89; serial `--jobs 1` ran the same suite in 1:25.44.
-(Not re-measured under 0.7.11 at M0.)
+(Not re-measured under 0.7.18.)
 
 Phase oracle: the Chelis-monorepo-side
 `cargo test -p chelis-cli --test phase3l_shoals_oracle phase3l_shoals_oracle -- --ignored --exact --nocapture`
@@ -186,9 +186,9 @@ is a manual gate and is not exercised from this repo. The Shoals
 default PR scope includes `chelis reef build` and the node-local
 runtime suite; the monorepo oracle remains a separate manual gate.
 
-## Known limitations in v0.9.0
+## Known limitations in v0.10.0
 
-1. **`@property` is design-only.** Compiler v0.7.11 does not parse
+1. **`@property` is design-only.** Compiler v0.7.18 does not parse
    the annotation; the property bodies are plain `def`s that flip to
    `@property` when `chelis fuzz` ships. See above.
 2. **`chelis manifest` is design-only.** The MC reproducibility
@@ -200,13 +200,12 @@ runtime suite; the monorepo oracle remains a separate manual gate.
    `chelis test tests/ --timeout 120 --jobs auto`. The 100 000-path
    / 1 % spec-rigor tier lives at `manual-gates/mc_rigorous.ch` and
    is invoked explicitly (see "Manual rigor gate" above).
-4. **Single-curve bootstrap only.** `bootstrap_zero_from_par`
-   handles the integer-year-spaced case (one coupon per pillar). The
-   multi-instrument bootstrap (deposits + FRAs + futures + swaps)
-   with implicit-differentiation gradient through the joint solve is
-   an M2-continuation candidate per `docs/plan-quant-surface.md`.
+4. **Bootstrap gradient deferred.** Multi-instrument forward
+   bootstrap is present in `bootstrap_multi`; the
+   implicit-differentiation gradient through the joint solve is
+   deferred to Milestone B PR-2.
 5. **`erfc` direct routing.** Per Chelis architecture, special
-   functions live in `Nautilus.Special`. As of `nautilus 0.7.16`
+   functions live in `Nautilus.Special`. As of `nautilus 0.7.17`
    Shoals routes Black-Scholes through `Nautilus.Special.erfc`
    directly (computing `0.5 * erfc(-x / sqrt(2))` for the standard
    normal CDF), bypassing the higher-level distribution wrapper. No
@@ -220,8 +219,8 @@ following the chelis-reef v0.4.1 multi-source-roots fix
 (`6b58030 feat(reef): multi-source-roots — additional_sources in reef.toml;
 bump v0.4.1`). The reef.toml declares
 `additional_sources = ["properties", "references"]`. v0.1.0 carries the
-canonical layout forward and pins chelis 0.7.11, nautilus 0.7.16, and
-coral 0.7.15. (References to the pre-reset v0.7.x numbering point at
+canonical layout forward. The current package pins chelis 0.7.18,
+nautilus 0.7.17, and coral 0.7.16. (References to the pre-reset v0.7.x numbering point at
 the historical version track and remain valid as release-history
 records; current planning lives on Shoals's own track per
 `docs/plan-quant-surface.md`.)
@@ -234,7 +233,7 @@ exposes `chelis.check(...)` and `chelis.eval(source, bindings)` to
 Python. The pre-reset v0.1.0-alpha release verified a Shoals-shaped
 program round-trips through that surface; the program shape is
 unchanged at v0.1.0, the verification remains valid, and re-running
-it under chelis 0.7.11 is a follow-up verification task.
+it under chelis 0.7.18 is a follow-up verification task.
 
 Setup (one-time):
 
