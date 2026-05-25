@@ -49,7 +49,7 @@ work packets, suggested agent-team allocation, acceptance criteria
   is `composed` (not `unproven-primitive` or `unsupported`).
 - **Native testing discipline.** Default per-PR gate is
   `chelis fmt --check && chelis reef build && chelis test tests/
-  --timeout 120 --jobs auto`. Heavier oracles (multi-curve bootstrap,
+  --timeout 180 --jobs auto`. Heavier oracles (multi-curve bootstrap,
   Heston QE, XVA smoke) run as manual gates at milestone exits via
   scripts under `scripts/manual_gates/`.
 - **Manual-gate pattern.** Each named gate

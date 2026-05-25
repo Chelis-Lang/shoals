@@ -105,10 +105,10 @@ Dependencies resolve via the local Reef registry (`~/.chelis/reef/`):
 chelis reef build
 
 # run the in-tree runtime test suite explicitly
-chelis test tests/ --timeout 120 --jobs auto
+chelis test tests/ --timeout 180 --jobs auto
 
 # serial debugging fallback
-chelis test tests/ --timeout 120 --jobs 1
+chelis test tests/ --timeout 180 --jobs 1
 
 # canonical-formatter parseability gate (single file at a time today)
 chelis fmt --check src/pricing.ch
@@ -119,7 +119,7 @@ over the directory in Python. See `.github/workflows/ci.yml` and
 `scripts/run_local_gate.py`.
 
 The default test tier uses 20 000 Monte-Carlo paths and 2 % tolerance
-for convergence assertions. The longer `--timeout 120` is required
+for convergence assertions. The longer `--timeout 180` is required
 because the host evaluator runs the 20K MC sample loop in ~60 s. It is
 part of the default PR gate.
 
@@ -151,7 +151,7 @@ gate, not part of every PR push.
 Default PR/repo-local gate: `scripts/run_local_gate.py` and CI run
 `chelis fmt --check` over repository `.ch` sources,
 `chelis lint --check src/ properties/ references/ tests/ manual-gates/`,
-`chelis reef build`, and `chelis test tests/ --timeout 120 --jobs auto`.
+`chelis reef build`, and `chelis test tests/ --timeout 180 --jobs auto`.
 `chelis reef build` is the compiler-owned package oracle: it resolves
 the Reef manifest, lowers the package, and rejects stale source or
 dependency wiring; the runtime lane exercises the finance invariants.
@@ -197,7 +197,7 @@ runtime suite; the monorepo oracle remains a separate manual gate.
    for CI is a Chelis-side follow-up.
 3. **MC convergence rigor is split by tier.** The default 20 000-path
    test uses 2 % tolerance and runs in CI through
-   `chelis test tests/ --timeout 120 --jobs auto`. The 100 000-path
+   `chelis test tests/ --timeout 180 --jobs auto`. The 100 000-path
    / 1 % spec-rigor tier lives at `manual-gates/mc_rigorous.ch` and
    is invoked explicitly (see "Manual rigor gate" above).
 4. **Single-curve bootstrap only.** `bootstrap_zero_from_par`
