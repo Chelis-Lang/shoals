@@ -6,10 +6,128 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Upstream
+## [0.9.0] — unreleased
 
-- `Chelis-Lang/chelis` PRs [#234](https://github.com/Chelis-Lang/chelis/pull/234) (rule removal) and [#235](https://github.com/Chelis-Lang/chelis/pull/235) (release-bump) landed; chelis `v0.7.17` cut. The `module-pascal-components` (§6.3) lint rule and its `KNOWN_SINGLE_WORDS` allowlist are now **deleted upstream**, not just demoted to advisory — confirmed by smoke-test against the released `v0.7.17` linux tarball: rule absent from `chelis lint --list`; module declarations `Probes.Calendar` and `Probes.Calibration` lint clean with zero findings.
-- The v0.8.1 tactical renames (`Shoals.Calendar` → `Shoals.HolidayCal`, `Shoals.Calibration` → `Shoals.ModelFit`) remain in effect for v0.8.1 because Shoals still pins compiler `=0.7.11` (matching nautilus 0.7.13 / coral 0.7.13). The rename revert is queued for the next dep cascade pass: once nautilus and coral bump their compiler pin past 0.7.11, Shoals will follow and the original module names can return as a near-mechanical refactor. The function-level renames (`date_roll_*`, `md_bar_*`, `vs_*`) are per-rule §7.1 lint compliance and stay regardless.
+Milestone A. Foundations cleanup + small wins under the
+v0.9.0-v0.12.0 batch plan in
+`/home/jeff/.claude/plans/vectorized-wiggling-kahn.md`. Pure Chelis
+composition; no upstream gates triggered.
+
+### Added
+
+- **`Shoals.Rng`** (new module) — Sobol sequence with the Joe-Kuo
+  `new-joe-kuo-6.21201` direction-number table embedded as a
+  1024-element `int64` tensor literal (32-D committed floor;
+  documented continuation path to 1024-D when the host evaluator
+  can run a wider second-moment smoke). The direction-table-laden
+  source file compiles in ~2 minutes under chelis 0.7.16; further
+  table growth toward the 1024-D spec rigor will press up against
+  the workspace gate's `--timeout 180` ceiling and likely needs a
+  runtime-construction fallback per the plan's documented option.
+  Halton over the first 50
+  primes. Variance-reduction combinators
+  `antithetic_terminal_mean`, `control_variate_terminal_mean`,
+  `stratified_terminal_mean`. 7 tests: first-point-is-zero,
+  no-duplicates at 64 points × 3 dims, unit-interval enclosure,
+  second-moment in `[0.28, 0.38]` at n=64 × 2 dims (host-evaluator-
+  scaled; spec-rigor 1024-D smoke is a future manual gate per the
+  established `mc_rigorous.ch` deferral pattern), Halton
+  van-der-Corput first-4 = (0.5, 0.25, 0.75, 0.125), antithetic
+  variance reduction.
+- **`Shoals.Tenor.parse_tenor`** — string parser for "3M", "1Y",
+  "30Y", "ON", "TN", "SN". Closes the M1 deferral. **Phase 1
+  inventory correction**: `char_at` is not a chelis builtin — the
+  earlier inventory found it inside `Std.Time` / `Std.Decimal` as
+  a local helper. `string_slice` / `string_len` / `to_int` ARE
+  builtins. `Shoals.Tenor` ships its own local `char_at` over
+  `string_slice`. 8 new tests.
+- **`Shoals.Date.add_months`** + `days_in_month` +
+  `schedule_from_tenor_calendar` — calendar-aware month-stepping
+  replacing the 30-day approximation. Day-cap correct: Jan-31 +
+  1mo → Feb-28 (non-leap) or Feb-29 (leap). 11 new tests.
+- **`Shoals.HolidayCal`** — **Anonymous Gregorian Computus** for
+  Easter, valid 1583-9999. `easter_sunday_gregorian`,
+  `good_friday`, `easter_monday`. Multi-year calendar builders
+  `hc_nyc_calendar_multi`, `hc_ldn_calendar_multi`. Easter date
+  verification for 2024-03-31, 2025-04-20, 2026-04-05, 2030-04-21,
+  2050-04-10, 9999. All 5 `nyc_*`/`ldn_*` exports renamed to
+  `hc_*` per the prefix-namespace §7.1 lint convention. 11 new
+  tests.
+- **`Shoals.Distributions`** extension. Replaced Fisher-Cornish
+  `student_t_cdf_approx` (2.3% error at nu=5, x=2.0) with exact
+  `student_t_cdf_exact` delegating to
+  `Nautilus.Distributions.student_t_cdf` — verified within `1e-4`
+  of textbook 0.949038. Added Shoals-side wrappers exposing the
+  full Nautilus surface: gamma/beta/chi_squared/exponential/
+  uniform/poisson pdf+cdf+inv_cdf+sample (all `_s` suffix for
+  "Shoals re-export"). Added `dist_mvn_factor` (N-dim Cholesky via
+  `Nautilus.LinAlg.cholesky_n`) + `dist_mvn_sample_one` (single
+  sample via `matvec(L, z) + mu`). 9 new tests.
+- **`Shoals.VolSurface.vs_sabr_*`** — SABR-Hagan analytic implied
+  vol (Hagan 2002 simplified expansion, no exact-mass correction
+  at zero strikes). `SABR { alpha, beta, rho, nu }` type,
+  `vs_sabr_implied_vol`, `vs_sabr_atm_implied_vol`, three shift
+  constructors. Smile shape verified by hand: rho=-0.3 produces
+  equity-style negative skew (low-strike IV > ATM). 7 new tests
+  + 1 new property + `references/sabr.ch` textbook reference.
+
+### CHANGELOG correction reference
+
+The v0.1.0 entry characterized `Shoals.Distributions` shipped
+surface as "lognormal pdf+cdf, Student-t pdf, Student-t cdf
+approximation, bivariate-normal pdf" — a "4-function slice". That
+undercounted `Nautilus.Distributions`'s actual shipped surface
+(uniform / exponential / normal / lognormal / gamma / chi_squared /
+student_t with full pdf/cdf/inv_cdf/sample, plus poisson /
+binomial / beta / f_distribution / weibull). The v0.9.0 effective
+Shoals-side surface re-exports the full Nautilus coverage. v0.1.0
+prose is left as historical record per the CHANGELOG correction
+discipline.
+
+### Toolchain bump
+
+reef.toml: `compiler` =0.7.11 → =0.7.16 (matches nautilus 0.7.16
+and coral 0.7.15 pins; chelis 0.7.17 and 0.7.18 are released but
+the dep cascade hasn't moved past 0.7.16 yet). `nautilus` 0.7.13 →
+0.7.16. `coral` 0.7.13 → 0.7.15.
+
+### AD verification status
+
+- `student_t_cdf_exact`, `dist_mvn_factor`, `vs_sabr_*` — `AD:
+  composed` (pure arithmetic + Nautilus primitives).
+- `dist_mvn_sample_one`, `Shoals.Rng.sobol_points`,
+  `halton_points`, all variance-reduction combinators — `AD:
+  unsupported` (run over `Random` effect or use host-lane
+  `to_list+map+fold` patterns).
+- Nautilus distribution re-exports inherit Nautilus's AD profile
+  (largely `unproven-primitive` until the gamma/beta inv-CDF inner
+  loops get LaCaDiLE proofs).
+
+### Verification
+
+- `python3 scripts/run_local_gate.py` — exits 0 across all four
+  stages (fmt + lint + reef build + test).
+- `chelis test tests/ --timeout 120 --jobs auto` — all tests pass
+  (+52 from baseline 201: tenor +8, date +11, holidaycal +11,
+  distributions +9, volsurface +7 SABR, rng +7 = +53 if you count
+  the SABR ATM-match-textbook property test that landed in
+  `tests/volsurface.ch` separately; the observed test-count delta
+  in suite is +52).
+
+### Carry-forward from prior Unreleased
+
+- `Chelis-Lang/chelis` PRs #234 (rule removal) and #235
+  (release-bump) landed; chelis `v0.7.17` then `v0.7.18` cut. The
+  `module-pascal-components` (§6.3) lint rule and its
+  `KNOWN_SINGLE_WORDS` allowlist are now deleted upstream. The
+  v0.8.1 tactical renames (`Shoals.Calendar` → `Shoals.HolidayCal`,
+  `Shoals.Calibration` → `Shoals.ModelFit`) remain in effect
+  because the dep cascade (nautilus 0.7.16, coral 0.7.15) still
+  pins compiler `=0.7.16`. Rename revert queued for the next
+  cascade pass once nautilus/coral release versions pinning past
+  0.7.16. Function-level renames (`date_roll_*`, `md_bar_*`,
+  `vs_*`, new `hc_*` and `dist_mvn_*`) are per-rule §7.1 lint
+  compliance and stay regardless.
 
 ## [0.8.1] — unreleased
 

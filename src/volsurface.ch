@@ -1,8 +1,10 @@
 module Shoals.VolSurface
 import Shoals.Pricing (bs_call_scalar)
-export (SVI, vs_total_variance, vs_implied_vol, vs_shift_atm, vs_shift_skew, parallel_shift_atm_iv, smile_shift_skew_wing, implied_vol_bisect, implied_vol_from_call, bracket_brackets_root, is_iv_solver_failed)
+export (SVI, vs_total_variance, vs_implied_vol, vs_shift_atm, vs_shift_skew, parallel_shift_atm_iv, smile_shift_skew_wing, implied_vol_bisect, implied_vol_from_call, bracket_brackets_root, is_iv_solver_failed, SABR, vs_sabr_implied_vol, vs_sabr_atm_implied_vol, vs_sabr_shift_alpha, vs_sabr_shift_rho, vs_sabr_shift_nu)
 type SVI =
   | SVI { a: f32, b: f32, rho: f32, m: f32, sigma: f32 }
+type SABR =
+  | SABR { alpha: f32, beta: f32, rho: f32, nu: f32 }
 def vs_total_variance(p: SVI, k: f32) -> f32 = {
   km = sub(k, p.m)
   sq_term = sqrt(add(mul(km, km), mul(p.sigma, p.sigma)))
@@ -48,3 +50,41 @@ def implied_vol_bisect(spot: f32, strike: f32, r: f32, t: f32, target: f32, vol_
   }
 }
 def implied_vol_from_call(spot: f32, strike: f32, r: f32, t: f32, target_price: f32) -> f32 = implied_vol_bisect(spot, strike, r, t, target_price, cast(0.0001, f32), cast(5.0, f32), cast(60, int64), cast(0.000001, f32))
+def pow_f32(base: f32, expn: f32) -> f32 = exp(mul(expn, log(base)))
+def vs_sabr_atm_implied_vol(p: SABR, f: f32, t: f32) -> f32 = {
+  one_minus_beta = sub(cast(1.0, f32), p.beta)
+  f_pow_1mb = pow_f32(f, one_minus_beta)
+  f_pow_2m2b = pow_f32(f, mul(cast(2.0, f32), one_minus_beta))
+  leading = div(p.alpha, f_pow_1mb)
+  term1 = div(mul(div(mul(one_minus_beta, one_minus_beta), cast(24.0, f32)), mul(p.alpha, p.alpha)), f_pow_2m2b)
+  term2 = div(mul(cast(0.25, f32), mul(p.rho, mul(p.beta, mul(p.nu, p.alpha)))), f_pow_1mb)
+  term3 = mul(div(sub(cast(2.0, f32), mul(cast(3.0, f32), mul(p.rho, p.rho))), cast(24.0, f32)), mul(p.nu, p.nu))
+  correction = mul(add(term1, add(term2, term3)), t)
+  mul(leading, add(cast(1.0, f32), correction))
+}
+def vs_sabr_implied_vol(p: SABR, f: f32, k: f32, t: f32) -> f32 = {
+  one_minus_beta = sub(cast(1.0, f32), p.beta)
+  fk = mul(f, k)
+  fk_pow_1mb = pow_f32(fk, one_minus_beta)
+  fk_pow_half1mb = pow_f32(fk, mul(cast(0.5, f32), one_minus_beta))
+  log_fk = log(div(f, k))
+  log_fk_sq = mul(log_fk, log_fk)
+  log_fk_4 = mul(log_fk_sq, log_fk_sq)
+  one_minus_beta_sq = mul(one_minus_beta, one_minus_beta)
+  one_minus_beta_4 = mul(one_minus_beta_sq, one_minus_beta_sq)
+  z = mul(div(p.nu, p.alpha), mul(fk_pow_half1mb, log_fk))
+  one_minus_rho = sub(cast(1.0, f32), p.rho)
+  inner = sqrt(add(sub(cast(1.0, f32), mul(cast(2.0, f32), mul(p.rho, z))), mul(z, z)))
+  x_z = log(div(sub(add(inner, z), p.rho), one_minus_rho))
+  num_term1 = div(mul(div(one_minus_beta_sq, cast(24.0, f32)), mul(p.alpha, p.alpha)), fk_pow_1mb)
+  num_term2 = div(mul(cast(0.25, f32), mul(p.rho, mul(p.beta, mul(p.nu, p.alpha)))), fk_pow_half1mb)
+  num_term3 = mul(div(sub(cast(2.0, f32), mul(cast(3.0, f32), mul(p.rho, p.rho))), cast(24.0, f32)), mul(p.nu, p.nu))
+  numerator = mul(p.alpha, add(cast(1.0, f32), mul(add(num_term1, add(num_term2, num_term3)), t)))
+  denom_correction = add(cast(1.0, f32), add(mul(div(one_minus_beta_sq, cast(24.0, f32)), log_fk_sq), mul(div(one_minus_beta_4, cast(1920.0, f32)), log_fk_4)))
+  denominator = mul(fk_pow_half1mb, denom_correction)
+  base_iv = div(numerator, denominator)
+  if lt(abs_f32(z), cast(0.0000001, f32)) then base_iv else mul(base_iv, div(z, x_z))
+}
+def vs_sabr_shift_alpha(p: SABR, d: f32) -> SABR = SABR { alpha: add(p.alpha, d), beta: p.beta, rho: p.rho, nu: p.nu }
+def vs_sabr_shift_rho(p: SABR, d: f32) -> SABR = SABR { alpha: p.alpha, beta: p.beta, rho: add(p.rho, d), nu: p.nu }
+def vs_sabr_shift_nu(p: SABR, d: f32) -> SABR = SABR { alpha: p.alpha, beta: p.beta, rho: p.rho, nu: add(p.nu, d) }

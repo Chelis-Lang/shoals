@@ -176,17 +176,27 @@ can incorporate it later.
 
 **Tag:** `FN+V` (functional surface ships; verified-AD label per export gates on AdjointTyping theorem upstream).
 **Spec sections:** §2.1, §2.2, §2.3, §2.4, §2.5, §2.6.
-**Status (as landed):** first-ship slice complete at v0.1.0. Date,
-Calendar, Tenor (programmatic constructors only — string parser
-deferred pending `Std.String` import resolution), MarketData record
-types, and a 4-function Distributions slice (lognormal pdf+cdf,
-Student-t pdf+cdf approximation, bivariate-normal pdf) landed and
-green: 96/96 tests pass. The Joe-Kuo Sobol direction-number table
-(M1.2) and the remaining 7 univariate distribution families (full
-M1.1) are explicit M1-continuation items per the CHANGELOG; the
-v0.1.0 surface is the smallest credible foundation slice for M2 to
-build on. See CHANGELOG `## [0.1.0]` for the full slice / deferral
-breakdown.
+**Status (as landed):** initial v0.1.0 slice + Milestone A
+continuation at v0.9.0. Initial: Date, Calendar (renamed
+`HolidayCal` in v0.8.1), Tenor programmatic constructors,
+MarketData, 4-function Distributions. **v0.9.0 (Milestone A in
+`/home/jeff/.claude/plans/vectorized-wiggling-kahn.md`)**:
+- `Shoals.Rng` shipped (Sobol with Joe-Kuo direction-number table
+  at 32-D committed floor; Halton 50-D; variance-reduction
+  combinators).
+- `Shoals.Tenor.parse_tenor` shipped — Phase 1 correction noted
+  `char_at` is a local helper not a builtin; `Shoals.Tenor` ships
+  its own.
+- `Shoals.Date.add_months` + `schedule_from_tenor_calendar` ship
+  calendar-aware month-stepping with Jan-31 day-cap correctness.
+- `Shoals.HolidayCal` extended with Computus Easter (valid
+  1583-9999) + multi-year calendar builders.
+- `Shoals.Distributions` re-exports the full Nautilus surface
+  (gamma/beta/chi_squared/exponential/uniform/poisson) + N-dim
+  Cholesky-based multivariate normal + exact `student_t_cdf`
+  (replaces the v0.1.0 Fisher-Cornish approximation). v0.9.0
+  CHANGELOG carries the v0.1.0 correction reference.
+See CHANGELOG `## [0.9.0]` for the full v0.9.0 breakdown.
 
 **Work packets (parallelizable):**
 
@@ -258,14 +268,19 @@ lint script are explicit follow-ups per the CHANGELOG.
 
 **Tag:** `FN` (functional ships; M3.4 Dupire local vol cannot be differentiated through until upstream higher-order AD lands).
 **Spec sections:** §2.8.
-**Status (as landed):** first-ship slice complete at v0.3.0. SVI
-parameterization (5 params), ATM / skew / parallel / smile shifts,
-implied-vol-from-Black-Scholes solver via bisection (60 iterations,
-1e-6 tolerance; round-trips to 1e-3). 123/123 tests pass. Deferred to
-M3-continuation: SABR Hagan analytic (uses Bessel-like functions
-that want a Nautilus.Special extension), Dupire local volatility
-(blocked on upstream higher-order AD per spec §3.4), cubic-in-
-log-moneyness × time interpolation.
+**Status (as landed):** v0.3.0 SVI slice + v0.9.0 SABR-Hagan
+extension (Milestone A). SVI parameterization (5 params),
+ATM / skew / parallel / smile shifts, implied-vol-from-Black-Scholes
+solver via bisection (60 iterations, 1e-6 tolerance; round-trips to
+1e-3). **v0.9.0**: SABR-Hagan analytic implied vol (Hagan 2002
+simplified expansion) — `vs_sabr_implied_vol`,
+`vs_sabr_atm_implied_vol`, three shift constructors. Smile shape
+verified by hand: rho=-0.3 produces equity-style negative skew.
+Bessel functions intentionally not used (simplified Hagan formula
+doesn't need them; exact-mass correction at zero strikes via Lewis
+2009 is a future continuation that would). Still deferred:
+Dupire local volatility (blocked on upstream higher-order AD per
+spec §3.4), cubic-in-log-moneyness × time interpolation.
 
 **Work packets:**
 
