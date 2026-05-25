@@ -6,6 +6,11 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Upstream
+
+- `Chelis-Lang/chelis` PRs [#234](https://github.com/Chelis-Lang/chelis/pull/234) (rule removal) and [#235](https://github.com/Chelis-Lang/chelis/pull/235) (release-bump) landed; chelis `v0.7.17` cut. The `module-pascal-components` (§6.3) lint rule and its `KNOWN_SINGLE_WORDS` allowlist are now **deleted upstream**, not just demoted to advisory — confirmed by smoke-test against the released `v0.7.17` linux tarball: rule absent from `chelis lint --list`; module declarations `Probes.Calendar` and `Probes.Calibration` lint clean with zero findings.
+- The v0.8.1 tactical renames (`Shoals.Calendar` → `Shoals.HolidayCal`, `Shoals.Calibration` → `Shoals.ModelFit`) remain in effect for v0.8.1 because Shoals still pins compiler `=0.7.11` (matching nautilus 0.7.13 / coral 0.7.13). The rename revert is queued for the next dep cascade pass: once nautilus and coral bump their compiler pin past 0.7.11, Shoals will follow and the original module names can return as a near-mechanical refactor. The function-level renames (`date_roll_*`, `md_bar_*`, `vs_*`) are per-rule §7.1 lint compliance and stay regardless.
+
 ## [0.8.1] — unreleased
 
 Lint-clean pass. Surface and behavior unchanged; only style /
