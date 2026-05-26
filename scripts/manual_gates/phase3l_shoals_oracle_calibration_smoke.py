@@ -19,7 +19,7 @@ garbage fails. JSON records which OR branch triggered.
 
 LM hyperparameters (both cases): theta0=[0.3,0.5,0.0,0.3],
 lo=[0.01,0.01,-0.99,0.01], hi=[2.0,1.0,0.99,5.0], lambda0=0.01,
-tol=1e-6, max_iters=200, fd_eps=1e-4.
+tol=1e-6, max_iters=MAX_ITERS, fd_eps=FD_EPS (see constants below for current host-evaluator-scoped values).
 
 Mechanics: write a `.ch` file to `.gate-tmp/`, run
 `chelis test --json`, and parse extractions from `got X` payloads

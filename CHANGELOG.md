@@ -52,7 +52,7 @@ SABR calibration smoke gate. Closes spec §M8 calibration block.
 
 ### Scope notes
 
-- **Spec §M8 pinned `0.5%` rel-IV for the well-conditioned case;
+- **Plan §M8 (`docs/plan-quant-surface.md`) pinned `0.5%` rel-IV for the well-conditioned case;
   the shipped gate relaxes to `5%`.** Empirical floor on the
   host evaluator at `max_iters=80` with warm-start θ0 near truth
   is `max_rel_iv_err ≈ 3.18%`. The 5% acceptance is a 10x-
