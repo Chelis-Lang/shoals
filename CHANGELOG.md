@@ -133,6 +133,49 @@ alongside the existing Carr-Madan Heston path).
   at the host evaluator. The verified-AD or compiled-evaluator
   pipeline would shorten this dramatically; the structural
   scheme is unchanged.
+- **LSM regression uses `solve_3x3` with the upstream
+  `1e-30` singularity threshold.** At clustered ITM-path
+  states (low σ, short T regimes), the `XᵀX` moment matrix
+  can be nearly rank-1 without tripping the upstream guard.
+  The current LSM tests use σ=0.2-0.3 with reasonable
+  spread; the latent risk is documented as a follow-up.
+- **`lsm_american_put`'s `paths_template` is shape-only**
+  (only `numel` is read; path contents discarded). Ergonomic
+  wart from the path-sharing approach.
+
+### Red-team fixups (applied before merge)
+
+Red-team against commit `09c5a13` returned `FAIL` with one
+CRITICAL + one HIGH + two MEDIUM + two LOW findings. All
+CRITICAL + HIGH addressed before merge:
+
+- **CRITICAL — `tr_crr_*`, `tr_tian_*`, `tr_trinomial_*`
+  produced NaN at σ → 0.** At `σ < ~1e-3`, the up/down
+  factors `u = exp(σ√dt)` and `d = exp(-σ√dt)` collapse
+  toward 1 in f32 and `u - d` underflows to 0; the
+  risk-neutral probability `p = (growth - d) / (u - d)`
+  becomes Inf/NaN and propagates through the backward
+  induction. JR escaped the trap because it hard-codes
+  `p = 1/2`. Fix: each public tree function now checks
+  `σ < tr_sigma_floor()` (1e-3) and dispatches to a
+  deterministic limit (`tr_deterministic_call/put`,
+  returning `max(S₀e^(-qT) - Ke^(-rT), 0)` for call,
+  symmetric for put). Locked in by
+  `test_tr_low_sigma_returns_deterministic_intrinsic` which
+  exercises CRR / Tian / Trinomial at σ=1e-7 and asserts no
+  NaN + matches deterministic intrinsic.
+- **HIGH — three exported tree functions had zero test
+  coverage**: `tr_tian_european_put`, `tr_jr_european_put`,
+  `tr_trinomial_american_put`. Added three tests:
+  `test_tr_tian_european_put_call_parity`,
+  `test_tr_jr_european_put_call_parity`,
+  `test_tr_trinomial_american_put_ge_european`. Final test
+  count for `tests/trees.ch`: 11 (was 7).
+- The two MEDIUM and two LOW findings are documented in
+  Known Limitations above (LSM regression singularity,
+  σ→0 silent on the CHANGELOG before this fixup, `lsm_*
+  paths_template` shape-only, Lewis normalization
+  shortcut).
 
 ## [0.13.0] — unreleased
 

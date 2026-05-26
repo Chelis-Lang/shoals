@@ -11,6 +11,17 @@ def tr_i0() -> int64 = cast(0, int64)
 def tr_i1() -> int64 = cast(1, int64)
 def tr_i2() -> int64 = cast(2, int64)
 def tr_max(a: f32, b: f32) -> f32 = if gt(a, b) then a else b
+def tr_sigma_floor() -> f32 = cast(0.001, f32)
+def tr_deterministic_call(s0: f32, k: f32, r: f32, q: f32, t: f32) -> f32 = {
+  fwd = mul(s0, exp(mul(neg(q), t)))
+  disc_k = mul(k, exp(mul(neg(r), t)))
+  tr_max(sub(fwd, disc_k), tr_zero())
+}
+def tr_deterministic_put(s0: f32, k: f32, r: f32, q: f32, t: f32) -> f32 = {
+  fwd = mul(s0, exp(mul(neg(q), t)))
+  disc_k = mul(k, exp(mul(neg(r), t)))
+  tr_max(sub(disc_k, fwd), tr_zero())
+}
 def tr_pow_ud(log_u: f32, log_d: f32, j: int64, n: int64) -> f32 = exp(add(mul(cast(j, f32), log_u), mul(cast(sub(n, j), f32), log_d)))
 def tr_binom_terminal_call(s0: f32, k: f32, log_u: f32, log_d: f32, n: int64) -> List[f32] = {
   idxs = range(tr_i0(), add(n, tr_i1()))
@@ -114,17 +125,17 @@ def tr_binom_european_put_generic(s0: f32, k: f32, log_u: f32, log_d: f32, p: f3
   }, terminal, step_idxs)
   index(final_vs, tr_i0())
 }
-def tr_crr_european_call(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = {
+def tr_crr_european_call(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = if lt(sigma, tr_sigma_floor()) then tr_deterministic_call(s0, k, r, q, t) else {
   dt = div(t, cast(n_steps, f32))
   params = tr_crr_params(r, q, sigma, dt)
   tr_binom_european_call_generic(s0, k, params.0, params.1, params.2, params.3, n_steps)
 }
-def tr_crr_european_put(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = {
+def tr_crr_european_put(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = if lt(sigma, tr_sigma_floor()) then tr_deterministic_put(s0, k, r, q, t) else {
   dt = div(t, cast(n_steps, f32))
   params = tr_crr_params(r, q, sigma, dt)
   tr_binom_european_put_generic(s0, k, params.0, params.1, params.2, params.3, n_steps)
 }
-def tr_crr_american_call(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = {
+def tr_crr_american_call(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = if lt(sigma, tr_sigma_floor()) then tr_deterministic_call(s0, k, r, q, t) else {
   dt = div(t, cast(n_steps, f32))
   params = tr_crr_params(r, q, sigma, dt)
   log_u = params.0
@@ -139,7 +150,7 @@ def tr_crr_american_call(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_
   }, terminal, step_idxs)
   index(final_vs, tr_i0())
 }
-def tr_crr_american_put(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = {
+def tr_crr_american_put(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = if lt(sigma, tr_sigma_floor()) then tr_deterministic_put(s0, k, r, q, t) else {
   dt = div(t, cast(n_steps, f32))
   params = tr_crr_params(r, q, sigma, dt)
   log_u = params.0
@@ -154,22 +165,22 @@ def tr_crr_american_put(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_s
   }, terminal, step_idxs)
   index(final_vs, tr_i0())
 }
-def tr_tian_european_call(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = {
+def tr_tian_european_call(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = if lt(sigma, tr_sigma_floor()) then tr_deterministic_call(s0, k, r, q, t) else {
   dt = div(t, cast(n_steps, f32))
   params = tr_tian_params(r, q, sigma, dt)
   tr_binom_european_call_generic(s0, k, params.0, params.1, params.2, params.3, n_steps)
 }
-def tr_tian_european_put(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = {
+def tr_tian_european_put(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = if lt(sigma, tr_sigma_floor()) then tr_deterministic_put(s0, k, r, q, t) else {
   dt = div(t, cast(n_steps, f32))
   params = tr_tian_params(r, q, sigma, dt)
   tr_binom_european_put_generic(s0, k, params.0, params.1, params.2, params.3, n_steps)
 }
-def tr_jr_european_call(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = {
+def tr_jr_european_call(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = if lt(sigma, tr_sigma_floor()) then tr_deterministic_call(s0, k, r, q, t) else {
   dt = div(t, cast(n_steps, f32))
   params = tr_jr_params(r, q, sigma, dt)
   tr_binom_european_call_generic(s0, k, params.0, params.1, params.2, params.3, n_steps)
 }
-def tr_jr_european_put(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = {
+def tr_jr_european_put(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = if lt(sigma, tr_sigma_floor()) then tr_deterministic_put(s0, k, r, q, t) else {
   dt = div(t, cast(n_steps, f32))
   params = tr_jr_params(r, q, sigma, dt)
   tr_binom_european_put_generic(s0, k, params.0, params.1, params.2, params.3, n_steps)
@@ -234,7 +245,7 @@ def tr_tri_back_american_put(vs: List[f32], i_to: int64, s0: f32, k: f32, log_u:
     tr_max(exer, cont)
   }, new_idxs)
 }
-def tr_trinomial_european_call(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = {
+def tr_trinomial_european_call(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = if lt(sigma, tr_sigma_floor()) then tr_deterministic_call(s0, k, r, q, t) else {
   dt = div(t, cast(n_steps, f32))
   params = tr_tri_params(r, q, sigma, dt)
   log_u = params.0
@@ -250,7 +261,7 @@ def tr_trinomial_european_call(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f
   }, terminal, step_idxs)
   index(final_vs, tr_i0())
 }
-def tr_trinomial_american_put(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = {
+def tr_trinomial_american_put(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: int64) -> f32 = if lt(sigma, tr_sigma_floor()) then tr_deterministic_put(s0, k, r, q, t) else {
   dt = div(t, cast(n_steps, f32))
   params = tr_tri_params(r, q, sigma, dt)
   log_u = params.0

@@ -109,3 +109,38 @@ def test_crr_put_call_parity_european() -> unit ! { Test } = {
   diff = tr_abs(sub(lhs, rhs))
   assert_true(lt(diff, cast(0.005, f32)), "European put-call parity holds on the CRR tree: P_call - P_put = S0 - K*exp(-r*T) within 0.005 at n_steps=200 (no-arbitrage tautology in a recombining binomial)")
 }
+def test_tr_tian_european_put_call_parity() -> unit ! { Test } = {
+  call_p = tr_tian_european_call(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.2, f32), cast(1.0, f32), cast(200, int64))
+  put_p = tr_tian_european_put(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.2, f32), cast(1.0, f32), cast(200, int64))
+  parity = sub(call_p, put_p)
+  expected = sub(cast(100.0, f32), mul(cast(100.0, f32), exp(neg(cast(0.05, f32)))))
+  diff = sub(parity, expected)
+  abs_diff = if lt(diff, cast(0.0, f32)) then neg(diff) else diff
+  assert_true(lt(abs_diff, cast(0.01, f32)), "Tian put-call parity at ATM")
+}
+def test_tr_jr_european_put_call_parity() -> unit ! { Test } = {
+  call_p = tr_jr_european_call(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.2, f32), cast(1.0, f32), cast(200, int64))
+  put_p = tr_jr_european_put(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.2, f32), cast(1.0, f32), cast(200, int64))
+  parity = sub(call_p, put_p)
+  expected = sub(cast(100.0, f32), mul(cast(100.0, f32), exp(neg(cast(0.05, f32)))))
+  diff = sub(parity, expected)
+  abs_diff = if lt(diff, cast(0.0, f32)) then neg(diff) else diff
+  assert_true(lt(abs_diff, cast(0.01, f32)), "JR put-call parity at ATM")
+}
+def test_tr_trinomial_american_put_ge_european() -> unit ! { Test } = {
+  am_p = tr_trinomial_american_put(cast(100.0, f32), cast(110.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.3, f32), cast(1.0, f32), cast(100, int64))
+  eu_p = tr_trinomial_european_call(cast(100.0, f32), cast(110.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.3, f32), cast(1.0, f32), cast(100, int64))
+  _ = assert_true(gt(am_p, cast(0.0, f32)), "trinomial American put positive")
+  assert_true(gte(am_p, cast(5.0, f32)), "trinomial American put >= reasonable lower bound")
+}
+def test_tr_low_sigma_returns_deterministic_intrinsic() -> unit ! { Test } = {
+  call_low = tr_crr_european_call(cast(100.0, f32), cast(90.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.0000001, f32), cast(1.0, f32), cast(100, int64))
+  expected = sub(cast(100.0, f32), mul(cast(90.0, f32), exp(neg(cast(0.05, f32)))))
+  diff = sub(call_low, expected)
+  abs_diff = if lt(diff, cast(0.0, f32)) then neg(diff) else diff
+  _ = assert_true(lt(abs_diff, cast(0.001, f32)), "CRR at sigma=1e-7 returns deterministic intrinsic (no NaN)")
+  tian_low = tr_tian_european_call(cast(100.0, f32), cast(90.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.0000001, f32), cast(1.0, f32), cast(100, int64))
+  _ = assert_true(eq(tian_low, tian_low), "Tian at sigma=1e-7 is not NaN")
+  tri_low = tr_trinomial_european_call(cast(100.0, f32), cast(90.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.0000001, f32), cast(1.0, f32), cast(100, int64))
+  assert_true(eq(tri_low, tri_low), "Trinomial at sigma=1e-7 is not NaN")
+}
