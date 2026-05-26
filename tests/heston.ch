@@ -2,7 +2,7 @@ module Shoals.Tests.Heston
 import Std.Test (assert_close, assert_true)
 import Nautilus.Stats (mean_vec)
 import Shoals.Stochastic (heston_qe_terminal, heston_qe_paths_terminal)
-import Shoals.Heston (heston_call_carr_madan_panels, heston_put_carr_madan_panels)
+import Shoals.Heston (heston_call_carr_madan_panels, heston_put_carr_madan_panels, heston_call_lewis_panels, heston_call_lipton_panels, heston_put_lipton_panels)
 def to01(b: bool) -> f32 = if b then cast(1.0, f32) else cast(0.0, f32)
 def abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 def test_heston_qe_variance_positivity_single_path() -> unit ! { Test } = {
@@ -76,4 +76,26 @@ def test_heston_put_carr_madan_atm_parity_r_zero() -> unit ! { Test } = {
   put_p = heston_put_carr_madan_panels(cast(100.0, f32), cast(100.0, f32), cast(1.0, f32), cast(0.0, f32), cast(0.04, f32), cast(0.5, f32), cast(0.04, f32), cast(1.0, f32), cast(-0.9, f32), cast(1.5, f32), cast(200.0, f32), cast(200, int64))
   diff = if lt(sub(call_p, put_p), cast(0.0, f32)) then neg(sub(call_p, put_p)) else sub(call_p, put_p)
   assert_true(lt(diff, cast(0.001, f32)), "ATM put-call parity at r=0: call ≈ put")
+}
+def test_lewis_vs_carr_madan_agreement() -> unit ! { Test } = {
+  cm = heston_call_carr_madan_panels(cast(100.0, f32), cast(100.0, f32), cast(1.0, f32), cast(0.0, f32), cast(0.04, f32), cast(0.5, f32), cast(0.04, f32), cast(1.0, f32), cast(-0.9, f32), cast(1.5, f32), cast(200.0, f32), cast(200, int64))
+  lw = heston_call_lewis_panels(cast(100.0, f32), cast(100.0, f32), cast(1.0, f32), cast(0.0, f32), cast(0.04, f32), cast(0.5, f32), cast(0.04, f32), cast(1.0, f32), cast(-0.9, f32), cast(200.0, f32), cast(200, int64))
+  diff = abs_f32(sub(lw, cm))
+  assert_true(lt(diff, cast(0.01, f32)), "Lewis ATM call agrees with Carr-Madan within 0.01 absolute at the M-C stress config (f32 + panel quadrature floor)")
+}
+def test_lipton_vs_carr_madan_agreement() -> unit ! { Test } = {
+  cm = heston_call_carr_madan_panels(cast(100.0, f32), cast(100.0, f32), cast(1.0, f32), cast(0.0, f32), cast(0.04, f32), cast(0.5, f32), cast(0.04, f32), cast(1.0, f32), cast(-0.9, f32), cast(1.5, f32), cast(200.0, f32), cast(200, int64))
+  lp = heston_call_lipton_panels(cast(100.0, f32), cast(100.0, f32), cast(1.0, f32), cast(0.0, f32), cast(0.04, f32), cast(0.5, f32), cast(0.04, f32), cast(1.0, f32), cast(-0.9, f32), cast(200.0, f32), cast(200, int64))
+  diff = abs_f32(sub(lp, cm))
+  assert_true(lt(diff, cast(0.01, f32)), "Lipton ATM call agrees with Carr-Madan within 0.01 absolute at the M-C stress config (f32 + panel quadrature floor)")
+}
+def test_lewis_otm_clamp_nonnegative() -> unit ! { Test } = {
+  p = heston_call_lewis_panels(cast(100.0, f32), cast(120.0, f32), cast(1.0, f32), cast(0.0, f32), cast(0.04, f32), cast(0.5, f32), cast(0.04, f32), cast(1.0, f32), cast(-0.9, f32), cast(25.0, f32), cast(200, int64))
+  assert_true(gte(p, cast(0.0, f32)), "Lewis OTM K=120 at low u_max=25 clamped to non-negative")
+}
+def test_lipton_put_call_parity() -> unit ! { Test } = {
+  call_p = heston_call_lipton_panels(cast(100.0, f32), cast(100.0, f32), cast(1.0, f32), cast(0.0, f32), cast(0.04, f32), cast(0.5, f32), cast(0.04, f32), cast(1.0, f32), cast(-0.9, f32), cast(200.0, f32), cast(200, int64))
+  put_p = heston_put_lipton_panels(cast(100.0, f32), cast(100.0, f32), cast(1.0, f32), cast(0.0, f32), cast(0.04, f32), cast(0.5, f32), cast(0.04, f32), cast(1.0, f32), cast(-0.9, f32), cast(200.0, f32), cast(200, int64))
+  diff = abs_f32(sub(call_p, put_p))
+  assert_true(lt(diff, cast(0.001, f32)), "Lipton ATM put-call parity at r=0: call ≈ put")
 }

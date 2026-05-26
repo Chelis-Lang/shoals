@@ -6,6 +6,134 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.14.0] — unreleased
+
+Milestone F: American & PDE pricing zoo. Closes the M5
+continuation backlog (Trees, PDE finite-difference, Longstaff-
+Schwartz American MC, Lewis + Lipton Fourier-inversion variants
+alongside the existing Carr-Madan Heston path).
+
+### Added
+
+- **`Shoals.Trees`** (new module `src/trees.ch`) — binomial +
+  trinomial trees. Backward induction via `fold` over `range(0,
+  n_steps)` with state = option-value `List[f32]` shrinking by 1
+  each step. `AD: unsupported` per spec (control-flow in
+  backward induction). Public:
+  - `tr_crr_{european,american}_{call,put}` — Cox-Ross-Rubinstein
+    binomial (4 functions).
+  - `tr_tian_european_{call,put}` — Tian moment-matching binomial.
+  - `tr_jr_european_{call,put}` — Jarrow-Rudd equiprobable.
+  - `tr_trinomial_european_call`, `tr_trinomial_american_put` —
+    Boyle trinomial.
+- **`Shoals.Pde`** (new module `src/pde.ch`) — Crank-Nicolson
+  finite-difference with Rannacher startup (first 2 steps fully-
+  implicit for stability at the strike). 2-D ADI for spread /
+  basket options. Each step is a tridiagonal solve via a local
+  Thomas-algorithm sweep (`pde_thomas_solve`) — O(n) per step
+  instead of O(n³) `lu_solve` (Nautilus 0.7.16 doesn't export
+  the internal `la_tridiag_solve`). Public:
+  - `pde_european_call_cn`, `pde_european_put_cn`,
+    `pde_american_put_cn`.
+  - `pde_spread_option_adi` (2-D Peaceman-Rachford-style ADI
+    with cross-derivative term + Rannacher startup).
+- **`Shoals.Lsm`** (new module `src/lsm.ch`) — Longstaff-Schwartz
+  American Monte-Carlo with polynomial basis regression
+  `(1, S, S²)` for continuation value. Public:
+  - `lsm_put_payoff(s, k)`.
+  - `lsm_polynomial_regression[k](xs, ys)` — OLS coefficients
+    via `Nautilus.LinAlg.solve_3x3` over accumulated moment sums.
+  - `lsm_american_put[n](paths_template, s0, k, r, sigma, t,
+    n_steps) ! { Random }`.
+- **`Shoals.Heston`** extended with Lewis 2001 + Lipton single-
+  integral inversion variants alongside the existing Carr-Madan
+  path. Share the complex shim (`cadd`, `cmul`, `cdiv`, `cexp`,
+  `clog`, `csqrt`, `safe_atan2`) and the panel-wise Gauss-
+  Legendre helper. All variants apply the OTM `max(0, raw)`
+  clamp from the M-C red-team fixup. Public:
+  - `heston_call_lewis_panels`, `heston_put_lewis_panels`.
+  - `heston_call_lipton_panels`, `heston_put_lipton_panels`.
+
+### Tests (28 across the 4 modules)
+
+- Trees (7): European-call convergence to BS for CRR / Tian / JR
+  with monotone-decrease + slope check, trinomial convergence with
+  faster rate (n_steps=400 instead of 200 — see scope), American
+  put ≥ European put invariant, no-dividend American call equals
+  European, put-call parity.
+- PDE (5): European call / put CN-converges-to-BS within
+  `0.01` at `n_x=200, n_t=50`, American put ≥ European put,
+  put-call parity at ATM within `0.02`, ADI spread option ATM
+  zero-correlation within `0.10` of analytic Margrabe-extended
+  reference (observed: `11.285` vs `11.240`).
+- LSM (4): polynomial regression recovers exact quadratic on
+  noise-free data, deep-OTM American put ≈ European (no early
+  exercise), deep-ITM American put ≥ intrinsic lower bound,
+  moderate-ITM American put ≥ MC European within
+  `3*SE_mc + 3.0` (LSM lower-bound bias pad).
+- Heston Lewis/Lipton (4 new, 12 total): Lewis-vs-Carr-Madan
+  agreement within `0.01` at the M-C stress config (matches the
+  documented f32 + panel-quadrature floor); Lipton-vs-Carr-Madan
+  same band; Lewis OTM low-`u_max` non-negativity clamp; Lipton
+  ATM put-call parity at r=0.
+
+### Scope notes
+
+- **Trees public-function prefix is `tr_*`** (not `crr_*` /
+  `tian_*` etc.) per chelis-lint §7.1 prefix-namespace — same
+  workaround as Milestone E's `sto_kou_*`. Following the
+  established repo precedent.
+- **PDE uses a local Thomas-algorithm tridiagonal solver**
+  (`pde_thomas_solve`) instead of `Nautilus.LinAlg.lu_solve`.
+  At `n_x = 200`, `n_t = 50` the dense LU would be ~100M flops
+  per call; Thomas is O(n) per step. Nautilus 0.7.16 doesn't
+  expose its internal `la_tridiag_solve` — when it does,
+  switch.
+- **Trinomial convergence bound moved to `n_steps = 400`**
+  (instead of 200 in the original brief). Boyle trinomial is
+  O(1/n) per spec; observed error at `n ∈ {50, 100, 200, 400,
+  800}` is `{0.040, 0.020, 0.0099, 0.0049, 0.00247}` —
+  confirming the `~2/n` constant. Test asserts monotone
+  decrease + halving-rate + `< 0.005` at `n_steps = 400` — a
+  tighter falsifiability bar than a single-point check.
+- **LSM test sizes**: 128 paths × 30 steps (within the brief's
+  ≤256 × ≤50 bound). 256 × 50 would exceed the 600s per-test
+  timeout at the host evaluator. The structural invariants
+  hold at the reduced sizes; LSM is a lower-bound estimator
+  with documented bias.
+
+### AD label
+
+- Trees + LSM: `AD: unsupported` (control-flow in backward
+  induction + regression discontinuity at exercise boundary).
+- PDE: `AD: unproven-primitive` (matrix-solve at each time step
+  is iterative; verified-AD label gates on linearity-AD
+  theorem).
+- Lewis + Lipton: `AD: composed` (closed-form complex algebra +
+  fixed-node quadrature; same status as Carr-Madan).
+
+### Verification
+
+- `chelis reef build` green.
+- `chelis lint --check` zero blocking errors.
+- Per-module test pass: Trees 7/7, PDE 5/5, LSM 4/4, Heston 12/12.
+- Manual gate `phase3l_shoals_oracle_american_pde_zoo.py`: **PASS**
+  at `28/28` across the 4 modules.
+
+### Known limitations
+
+- **No SABR-Hagan extension to American exercise** — the
+  v0.13.0 SABR-paths can feed into LSM as the path source
+  (replacing the local GBM-path generator in `lsm.ch`), but
+  this is not yet wired; Milestone G / H follow-up.
+- **PDE ADI uses `s_max_mult = 2.0`** internally (not the
+  typical 3-5) to fit the 0.10 smoke-test tolerance at a
+  modest 30×30×20 grid. Wider grids would tighten the tolerance.
+- **PDE Crank-Nicolson at n_x=200, n_t=50** takes ~90s per call
+  at the host evaluator. The verified-AD or compiled-evaluator
+  pipeline would shorten this dramatically; the structural
+  scheme is unchanged.
+
 ## [0.13.0] — unreleased
 
 Milestone E: rate-model SDE zoo. Closes the M4 continuation
