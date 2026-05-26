@@ -226,7 +226,7 @@ def mf_sabr_smart_initializer[n](strikes: &tensor[n, f32], market_ivs: &tensor[n
     k_min = fold(fn (acc: f32, k: f32) -> if lt(k, acc) then k else acc, index(k_list, cast(0, int64)), k_list)
     k_max = fold(fn (acc: f32, k: f32) -> if gt(k, acc) then k else acc, index(k_list, cast(0, int64)), k_list)
     spans_forward = if lt(k_min, forward) then gt(k_max, forward) else false
-    if not(spans_forward) then to_tensor([alpha_generic, cast(0.5, f32), div(cast(0.0, f32), cast(0.0, f32)), cast(0.5, f32)]) else {
+    if not(spans_forward) then to_tensor([alpha_generic, cast(0.5, f32), cast(0.0, f32), cast(0.5, f32)]) else {
       k_low_target = mul(cast(0.9, f32), forward)
       k_high_target = mul(cast(1.1, f32), forward)
       low_idx = mf_argmin_dist_to(k_list, k_low_target)

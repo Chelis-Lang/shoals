@@ -43,8 +43,15 @@ M-D "cold-start trapped at ρ ≈ -0.007" known limitation.
   stationary point at moderate-skew inputs.
   - β fixed at 0.5 (industry convention).
   - α₀ from ATM IV: `α₀ = atm_iv * sqrt(F)`.
-  - ρ₀ from 25Δ-RR: `ρ₀ = clip(0.5 * RR / atm_iv, [-0.9, 0.9])`.
-  - ν₀ from 25Δ-BF: `ν₀ = clip(2.0 * BF / atm_iv, [0.1, 3.0])`.
+  - ρ₀ from a 10%-moneyness wing-vs-ATM risk-reversal proxy:
+    `RR = IV(K=1.1·F) − IV(K=0.9·F)`; `ρ₀ = clip(0.5 * RR /
+    atm_iv, [-0.9, 0.9])`. **Note**: literature typically uses
+    25Δ-RR which is IV- and T-dependent; the ±10%-moneyness
+    proxy is fixed-K and easier to compute, and is sign-correct
+    by construction.
+  - ν₀ from a 10%-moneyness butterfly proxy: `BF = IV(K=1.1·F) +
+    IV(K=0.9·F) − 2·atm_iv`; `ν₀ = clip(2.0 * BF / atm_iv,
+    [0.1, 3.0])`. Same caveat re: 25Δ vs fixed-K.
   - Multi-start sweeps ρ over `{-0.7, -0.3, 0, 0.3, 0.7}` and
     returns a (5, 4) candidate-θ tensor.
 
@@ -112,6 +119,41 @@ the verified-AD pipeline.
   init helper is shipped and tested; integrating it into the
   M-D gate to verify the spec-pinned `max_rel_iv_err < 2%`
   cold-start improvement is a Milestone H follow-up.
+- **Smart-init on a strike grid that does NOT span the
+  forward** (all-OTM-call or all-OTM-put) returns ρ₀ = 0
+  (generic fallback) rather than computing a wing-skew proxy.
+  Callers that need a smart-init for OTM-only data must
+  supply additional data or use `mf_sabr_multi_start_initializer`.
+- **Cubic-in-log-moneyness interpolation extrapolates as a
+  constant** (Nautilus `spline_eval` falls back to nearest-
+  edge `first_y`/`last_y` outside the grid). The "better wing
+  behavior than linear-in-K" claim above is **within-grid**;
+  outside the grid, both linear and cubic interpolators
+  degrade to constant extrapolation.
+- **`du_local_vol_sentinel` is a NaN materialized via
+  `div(0, 0)`** — assumes IEEE 754 NaN semantics under the
+  host evaluator. A future backend that traps or canonicalizes
+  0/0 differently would need to substitute a dedicated NaN
+  primitive.
+
+### Red-team fixups (applied before merge)
+
+Red-team against the v0.15.0 base returned PASS with 2 MEDIUM
++ 2 LOW findings:
+
+- **MEDIUM — `mf_sabr_smart_initializer` silently returned NaN
+  on out-of-spread strike grids.** Fixed: the
+  `not(spans_forward)` fallback now returns `ρ₀ = 0.0` (not
+  NaN), matching the n<3 fallback branch.
+- **MEDIUM — 25Δ-RR/BF mislabel in CHANGELOG.** The
+  implementation uses ±10%-moneyness, not 25Δ strikes.
+  Documentation corrected in the Added section above; the
+  Known Limitations now explicitly notes the proxy
+  relationship.
+- **LOW — cubic interp extrapolation behavior** documented in
+  Known Limitations.
+- **LOW — IEEE-754 NaN dependence in sentinel** documented in
+  Known Limitations.
 
 ## [0.14.0] — unreleased
 
