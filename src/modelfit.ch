@@ -1,6 +1,6 @@
 module Shoals.ModelFit
 import Nautilus.LinAlg (la_vec_add, la_vec_sub, scale_vec, inner_product, cg_solve, matvec)
-export (weighted_squared_residuals, vega_weighted_squared_residuals, weighted_absolute_residuals, clamp_to_bounds, lm_bounded_step_scalar, sse_loss, clamp_vec, weighted_sse, lm_bounded_nparam, multi_target_fit, active_set_mask)
+export (weighted_squared_residuals, vega_weighted_squared_residuals, weighted_absolute_residuals, clamp_to_bounds, lm_bounded_step_scalar, sse_loss, clamp_vec, weighted_sse, lm_bounded_nparam, multi_target_fit, active_set_mask, mf_sabr_smart_initializer, mf_sabr_multi_start_initializer)
 def clamp_to_bounds(x: f32, lo: f32, hi: f32) -> f32 = if lt(x, lo) then lo else if gt(x, hi) then hi else x
 def mf_elementwise_mul[n](a: &tensor[n, f32], b: &tensor[n, f32]) -> tensor[n, f32] = to_tensor(map(fn (pair: (f32, f32)) -> mul(pair.0, pair.1), zip(to_list(a), to_list(b))))
 def mf_basis_vec[n](k: int64, s: f32, template: &tensor[n, f32]) -> tensor[n, f32] = {
@@ -199,3 +199,59 @@ def lm_bounded_nparam[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[
   (theta_final, sse_final, iters_final, converged_final, mask)
 }
 def multi_target_fit[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32], features: &tensor[m, f32], observed: &tensor[m, f32], weights: &tensor[m, f32], theta0: tensor[n, f32], lo: &tensor[n, f32], hi: &tensor[n, f32], lambda0: f32, tol: f32, max_iters: int64, fd_eps: f32) -> (tensor[n, f32], f32, int64, bool, tensor[n, f32]) = lm_bounded_nparam(model, features, observed, weights, theta0, lo, hi, lambda0, tol, max_iters, fd_eps)
+def mf_abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
+def mf_argmin_dist_to(values: List[f32], target: f32) -> int64 = {
+  zero_i = cast(0, int64)
+  n_len = len(values)
+  idxs = range(zero_i, n_len)
+  init = (zero_i, mf_abs_f32(sub(index(values, zero_i), target)))
+  final = fold(fn (state: (int64, f32), i: int64) -> {
+    best_i = state.0
+    best_d = state.1
+    d_i = mf_abs_f32(sub(index(values, i), target))
+    if lt(d_i, best_d) then (i, d_i) else (best_i, best_d)
+  }, init, idxs)
+  final.0
+}
+def mf_sabr_smart_initializer[n](strikes: &tensor[n, f32], market_ivs: &tensor[n, f32], forward: f32, t: f32) -> tensor[4, f32] = {
+  k_list = to_list(strikes)
+  iv_list = to_list(market_ivs)
+  n_strikes = len(k_list)
+  sqrt_f = sqrt(forward)
+  atm_idx = mf_argmin_dist_to(k_list, forward)
+  atm_iv = index(iv_list, atm_idx)
+  alpha_generic = mul(atm_iv, sqrt_f)
+  generic = to_tensor([alpha_generic, cast(0.5, f32), cast(0.0, f32), cast(0.5, f32)])
+  if lt(n_strikes, cast(3, int64)) then generic else {
+    k_min = fold(fn (acc: f32, k: f32) -> if lt(k, acc) then k else acc, index(k_list, cast(0, int64)), k_list)
+    k_max = fold(fn (acc: f32, k: f32) -> if gt(k, acc) then k else acc, index(k_list, cast(0, int64)), k_list)
+    spans_forward = if lt(k_min, forward) then gt(k_max, forward) else false
+    if not(spans_forward) then to_tensor([alpha_generic, cast(0.5, f32), div(cast(0.0, f32), cast(0.0, f32)), cast(0.5, f32)]) else {
+      k_low_target = mul(cast(0.9, f32), forward)
+      k_high_target = mul(cast(1.1, f32), forward)
+      low_idx = mf_argmin_dist_to(k_list, k_low_target)
+      high_idx = mf_argmin_dist_to(k_list, k_high_target)
+      iv_low = index(iv_list, low_idx)
+      iv_high = index(iv_list, high_idx)
+      rr = sub(iv_high, iv_low)
+      bf = sub(add(iv_high, iv_low), mul(cast(2.0, f32), atm_iv))
+      safe_atm = if lt(mf_abs_f32(atm_iv), cast(0.000001, f32)) then cast(0.000001, f32) else atm_iv
+      rho_raw = mul(cast(0.5, f32), div(rr, safe_atm))
+      rho_0 = clamp_to_bounds(rho_raw, cast(-0.9, f32), cast(0.9, f32))
+      nu_raw = mul(cast(2.0, f32), div(bf, safe_atm))
+      nu_0 = clamp_to_bounds(nu_raw, cast(0.1, f32), cast(3.0, f32))
+      alpha_0 = mul(atm_iv, sqrt_f)
+      to_tensor([alpha_0, cast(0.5, f32), rho_0, nu_0])
+    }
+  }
+}
+def mf_sabr_multi_start_initializer[n](strikes: &tensor[n, f32], market_ivs: &tensor[n, f32], forward: f32, t: f32) -> tensor[5, 4, f32] = {
+  base = mf_sabr_smart_initializer(strikes, market_ivs, forward, t)
+  base_l = to_list(base)
+  alpha_0 = index(base_l, cast(0, int64))
+  beta_0 = index(base_l, cast(1, int64))
+  nu_0 = index(base_l, cast(3, int64))
+  rho_grid = [cast(-0.7, f32), cast(-0.3, f32), cast(0.0, f32), cast(0.3, f32), cast(0.7, f32)]
+  flat = fold(fn (acc: List[f32], r: f32) -> append(append(append(append(acc, alpha_0), beta_0), r), nu_0), [], rho_grid)
+  reshape(to_tensor(flat), [cast(5, int64), cast(4, int64)])
+}
