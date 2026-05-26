@@ -102,7 +102,9 @@ SABR calibration smoke gate. Closes spec §M8 calibration block.
   `0.5%` target without changes to `lm_bounded_nparam` itself.
 - **Cold-start convergence is unreliable.** A θ0 far from the
   true SABR basin (e.g. `ρ0 = 0`) gets trapped at a stationary
-  point; the LM converges to `ρ ≈ -0.1` and stays there. A
+  point; the LM never moves ρ meaningfully off its initial
+  value (cold-start probe with `ρ0 = 0` ends at
+  `ρ ≈ -0.007`, max_rel_iv_err ≈ 14%). A
   multi-start wrapper or a smart-initializer module would
   address this; deferred.
 - **FD Jacobian step `fd_eps = 0.01`** is a compromise between
