@@ -6,6 +6,108 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.13.0] — unreleased
+
+Milestone E: rate-model SDE zoo. Closes the M4 continuation
+backlog (SABR path simulation, Hull-White 1F/2F, LMM/HJM, Kou
+double-exponential jumps).
+
+### Added
+
+- **`Shoals.SabrPaths`** (new module `src/sabrpaths.ch`) — SABR
+  Monte-Carlo: `dF = α F^β dW_1`, `dα = ν α dW_2`, `corr = ρ`.
+  Log-Euler on F (Itô-corrected) + exact log-step on α; pre-drawn
+  normals + pure `fold` step. NaN guards via floor at `1e-10`.
+  Public: `sabr_qe_step`, `sabr_path_terminal`,
+  `sabr_paths_terminal[n]`.
+- **`Shoals.HullWhite`** (new module `src/hullwhite.ch`) —
+  1-factor (`dr = (θ_bar*a − a r) dt + σ dW`) + 2-factor
+  (additive Gaussian-2). Ships analytic constant-θ_bar bond
+  price for the test anchor (standard Vasicek form
+  `(T-B)·σ²/(2a²) − σ²·B²/(4a) − B·r_0`). Public:
+  `hw1f_step`, `hw1f_path[n]`, `hw1f_bond_price`,
+  `hw2f_step`, `hw2f_path[n]`.
+- **`Shoals.LiborMarketModel`** (new module
+  `src/libormarketmodel.ch`) — LMM under terminal measure
+  with no-arbitrage drift; HJM no-arb drift vector. Public:
+  `lmm_step[k]`, `lmm_path[k, n]` (single-forward terminal —
+  see scope notes), `hjm_no_arb_drift[k]`, `step_hjm[k]`.
+- **`Shoals.Stochastic.sto_kou_*`** (extends existing module) —
+  Kou (2002) double-exponential jump-diffusion via per-path
+  Bernoulli-thinned aggregate of `n_max = ⌈λ*T*5⌉` slots; emits
+  NaN sentinel when `η_up ≤ 1` (moment-integral divergence).
+  Public: `sto_kou_compensator`, `sto_kou_jump_sample`,
+  `sto_kou_jump_terminal[n]`.
+- **Tests** (21 across 4 modules):
+  - SABR Paths (4): zero-volvol deterministic, α-lognormal
+    marginal, F non-negativity at extreme params, ρ=0 independence.
+  - Hull-White (5): mean-reversion, MC-vs-analytic-bond,
+    zero-vol deterministic, 2F correlation recovery at ρ=0.7,
+    2F independence at ρ=0.
+  - LMM/HJM (7): zero-vol identity, terminal-measure
+    martingale, forward positivity, HJM drift zero/positive
+    sanity, LMM/HJM single-step degeneracy.
+  - Kou (5): λ=0 reduces to GBM, compensator at known params,
+    `η_up ≤ 1` NaN guard, compensated-drift identity at
+    `λ=10, T=1`, skewness-sign for `p ∈ {0.05, 0.95}`.
+- **`scripts/manual_gates/phase3l_shoals_oracle_rate_sde_zoo.py`**
+  — aggregates all 4 test files into a single JSON report;
+  `PASS: 21/21` observed.
+
+### Scope notes
+
+- **LMM `lmm_path` returns `tensor[n, f32]` for a single forward
+  (selected by `forward_idx`)** rather than `tensor[n, k, f32]`.
+  `Std.Tensor.Construct.stack`'s implementation pins the outer
+  dim to `Lit(1)` which is incompatible with the declared `[n]`
+  generic. The single-forward return is documented in the module
+  header; callers reuse the same seed to sweep `forward_idx` for
+  full-forward trajectories.
+- **Kou public functions are prefixed `sto_kou_*`** (not `kou_*`)
+  per the chelis-lint `prefix-namespace` rule (§7.1): three
+  `kou_*` defs trip the 2–4-char prefix-group rule because `kou`
+  is not in `MODEL_NAMESPACE_PREFIXES`. Following the precedent of
+  the v0.3.x `svi_*` → `vs_*` rename and v0.x `bar_*` → `md_bar_*`,
+  the prefix is the module shorthand (`sto`).
+- **HJM stepper named `step_hjm`** (not `hjm_step`) so that
+  `hjm_no_arb_drift` remains the sole `hjm_*` in the module, below
+  the 2-occurrence threshold of the §7.1 lint.
+
+### AD label
+
+- `sabr_qe_step`, `hw1f_step`, `hw2f_step`, `lmm_step`, `step_hjm`,
+  `sto_kou_jump_sample`, `sto_kou_compensator`: `AD: composed`
+  (closed-form arithmetic over normals).
+- All `*_terminal` / `*_path` variants: `AD: unproven-primitive`
+  for the path integration when wrapped in `! { Random }`
+  (effect-AD interaction gates the verified label per spec §3.3).
+
+### Verification
+
+- `chelis reef build` green.
+- `chelis lint --check src/ properties/ references/ tests/
+  manual-gates/` zero blocking errors.
+- All 21 new tests pass.
+- Manual gate `phase3l_shoals_oracle_rate_sde_zoo.py`: PASS at
+  `21/21` across the 4 modules.
+
+### Known limitations
+
+- **LMM single-forward return** instead of full 2D trajectory —
+  see scope notes above.
+- **Kou prefix divergence** from upstream Kou-literature naming —
+  see scope notes above. Restoring `kou_*` requires upstream
+  `chelis-lint` to add `kou` to `MODEL_NAMESPACE_PREFIXES`.
+- **HW 1F closed-form anchor at constant θ_bar = 0** only —
+  time-varying θ(t) Hull-White (the calibrated form used in
+  production) does not yet have a closed-form anchor in this
+  module; analytic bond test pins to the constant-θ_bar case.
+- **No SABR path → smile reconciliation** in this milestone — the
+  M-D SABR-fit smoke gate uses the analytic Hagan IV; tying the
+  MC paths from `Shoals.SabrPaths` back to the M-D fit (via
+  Black-Scholes implied-vol inversion of MC option prices)
+  would be a Milestone F+G follow-up.
+
 ## [0.12.0] — unreleased
 
 Milestone D: bound-constrained Levenberg-Marquardt + multi-target

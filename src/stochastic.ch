@@ -1,6 +1,6 @@
 module Shoals.Stochastic
-import Nautilus.Distributions (normal_sample, uniform_sample)
-export (gbm_path, gbm_terminal, gbm_paths_antithetic_terminal_mean, merton_jump_terminal, merton_compensated_drift, correlated_gbm_terminal_2d, cholesky_2x2_lower, heston_qe_step, heston_qe_terminal, heston_qe_paths_terminal)
+import Nautilus.Distributions (normal_sample, uniform_sample, exponential_sample)
+export (gbm_path, gbm_terminal, gbm_paths_antithetic_terminal_mean, merton_jump_terminal, merton_compensated_drift, correlated_gbm_terminal_2d, cholesky_2x2_lower, heston_qe_step, heston_qe_terminal, heston_qe_paths_terminal, sto_kou_compensator, sto_kou_jump_sample, sto_kou_jump_terminal)
 def gbm_path[n](template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) -> tensor[n, f32] ! { Random } = {
   z = normal_sample(template, cast(0.0, f32), cast(1.0, f32))
   n_i = numel(copy(z))
@@ -192,4 +192,54 @@ def heston_qe_paths_terminal[n](paths_template: tensor[n, f32], s0: f32, v0: f32
   v_t = to_tensor(map(fn (r: (f32, f32, f32)) -> r.1, results))
   min_v = to_tensor(map(fn (r: (f32, f32, f32)) -> r.2, results))
   (s_t, v_t, min_v)
+}
+def sto_kou_compensator(p: f32, eta_up: f32, eta_dn: f32) -> f32 = {
+  one = cast(1.0, f32)
+  if lte(eta_up, one) then div(sub(cast(0.0, f32), cast(0.0, f32)), cast(0.0, f32)) else {
+    up_term = mul(p, div(eta_up, sub(eta_up, one)))
+    dn_term = mul(sub(one, p), div(eta_dn, add(eta_dn, one)))
+    sub(add(up_term, dn_term), one)
+  }
+}
+def sto_kou_jump_sample(p: f32, eta_up: f32, eta_dn: f32, u_branch: f32, e_size: f32) -> f32 = { if lt(u_branch, p) then div(e_size, eta_up) else neg(div(e_size, eta_dn)) }
+def sto_kou_jump_terminal[n](paths_template: tensor[n, f32], jumps_template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> tensor[n, f32] ! { Random } = {
+  _ = jumps_template
+  n_paths = numel(copy(paths_template))
+  expected_jumps_f = mul(lambda_jump, t)
+  n_max_raw = cast(add(mul(expected_jumps_f, cast(5.0, f32)), cast(1.0, f32)), int64)
+  n_max = if lt(n_max_raw, cast(1, int64)) then cast(1, int64) else n_max_raw
+  total = mul(n_paths, n_max)
+  big_template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), total)))
+  z_diff = normal_sample(copy(paths_template), cast(0.0, f32), cast(1.0, f32))
+  u_branch_t = uniform_sample(copy(big_template), cast(0.0, f32), cast(1.0, f32))
+  u_thin_t = uniform_sample(copy(big_template), cast(0.0, f32), cast(1.0, f32))
+  e_size_t = exponential_sample(big_template, cast(1.0, f32))
+  z_diff_l = to_list(z_diff)
+  u_branch_l = to_list(u_branch_t)
+  u_thin_l = to_list(u_thin_t)
+  e_size_l = to_list(e_size_t)
+  n_max_f = cast(n_max, f32)
+  thin_prob = div(expected_jumps_f, n_max_f)
+  zeta = sto_kou_compensator(p, eta_up, eta_dn)
+  half_sigma_sq = mul(cast(0.5, f32), mul(sigma, sigma))
+  drift = mul(sub(sub(mu, half_sigma_sq), mul(lambda_jump, zeta)), t)
+  vol_sqrt_t = mul(sigma, sqrt(t))
+  log_s0 = log(s0)
+  path_idxs = range(cast(0, int64), n_paths)
+  to_tensor(map(fn (path_i: int64) -> {
+    base = mul(path_i, n_max)
+    slot_idxs = range(cast(0, int64), n_max)
+    jump_sum = fold(fn (acc: f32, j: int64) -> {
+      k = add(base, j)
+      u_b = index(u_branch_l, k)
+      u_t = index(u_thin_l, k)
+      e_s = index(e_size_l, k)
+      jump_val = sto_kou_jump_sample(p, eta_up, eta_dn, u_b, e_s)
+      contrib = if lt(u_t, thin_prob) then jump_val else cast(0.0, f32)
+      add(acc, contrib)
+    }, cast(0.0, f32), slot_idxs)
+    z_i = index(z_diff_l, path_i)
+    log_diffuse = add(drift, mul(vol_sqrt_t, z_i))
+    exp(add(log_s0, add(log_diffuse, jump_sum)))
+  }, path_idxs))
 }
