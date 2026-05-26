@@ -9,3 +9,6 @@ reef.lock
 __pycache__/
 *.py[cod]
 .gate-tmp/
+
+# Claude Code runtime artifacts
+.claude/scheduled_tasks.lock
