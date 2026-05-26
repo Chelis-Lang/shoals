@@ -231,14 +231,16 @@ See CHANGELOG `## [0.9.0]` for the full v0.9.0 breakdown.
 
 **Tag:** `FN+V` (functional surface ships; verified-AD label gates on AdjointTyping theorem AND linearity-AD interaction theorem for bucket-shape returns).
 **Spec sections:** §2.7.
-**Status (as landed):** first-ship slice complete at v0.2.0. Curve
-operations (parallel/key-rate/twist/butterfly shifts, scale), curve
-kind discriminator (OIS / IBOR / SOFR / SONIA / ESTR / Custom),
-log-linear and Nelson-Siegel-Svensson interpolation all landed.
-112/112 tests pass. Multi-instrument bootstrap (deposits + FRAs +
-futures + swaps with IFT gradient through the joint solve, M2.4a +
-M2.4b), cross-currency basis curves, and the M2.5 AD-doc-convention
-lint script are explicit follow-ups per the CHANGELOG.
+**Status (as landed):** first-ship slice at v0.2.0; M2.4a (forward
+bootstrap) closed at v0.10.0 (Milestone B PR-1); M2.4b (IFT gradient)
+closed at v0.10.1 (Milestone B PR-2). M2.4b ships per-pillar diagonal
+sensitivity only — full off-diagonal Jacobian deferred per the
+v0.10.1 Known Limitations. Curve operations
+(parallel/key-rate/twist/butterfly shifts, scale), curve kind
+discriminator (OIS / IBOR / SOFR / SONIA / ESTR / Custom), log-linear
+and Nelson-Siegel-Svensson interpolation all landed in the v0.2.0
+slice. Cross-currency basis curves and the M2.5 AD-doc-convention
+lint script remain follow-ups.
 
 **Work packets:**
 
@@ -309,13 +311,15 @@ spec §3.4), cubic-in-log-moneyness × time interpolation.
 
 **Tag:** `FN+V` (functional ships; verified-AD label gates on effect-AD interaction theorem for any process exercised through MC).
 **Spec sections:** §2.9.
-**Status (as landed):** first-ship slice complete at v0.4.0. Merton
-jump-diffusion with compensated drift (aggregate-jump Gaussian
-approximation) and 2-asset correlated GBM via a hand-rolled 2x2
-Cholesky helper. 137/137 tests pass. Heston QE (M4.1 with the pinned
-Feller-violation stress config), SABR path simulation (M4.2),
-Hull-White 1F/2F (M4.4), LMM (M4.5), HJM (M4.6), and Kou
-double-exponential jumps are explicit M4-continuation items.
+**Status (as landed):** first-ship slice at v0.4.0; M4.1 (Heston QE)
+closed at v0.11.0 (Milestone C) — Andersen 2007 quadratic-exponential
+variance discretization with the pinned Feller-violation stress
+config, batched `heston_qe_paths_terminal[n]` driver, variance
+non-negativity verified at the manual gate. The v0.4.0 slice carried
+Merton jump-diffusion with compensated drift and 2-asset correlated
+GBM via a hand-rolled 2x2 Cholesky helper. SABR path simulation
+(M4.2), Hull-White 1F/2F (M4.4), LMM (M4.5), HJM (M4.6), and Kou
+double-exponential jumps remain M4-continuation items.
 
 **Process-pricer AD pairing matrix (spec-pinned in §3.3) governs what each process expects from the pricer side; M5 obeys the same matrix.**
 
@@ -346,13 +350,14 @@ double-exponential jumps are explicit M4-continuation items.
 
 **Tag:** `FN` (functional ships; verified-AD label gates on multiple upstream theorems per pricer family — see matrix in §3.3).
 **Spec sections:** §2.10.
-**Status (as landed):** first-ship closed-form slice complete at
-v0.5.0. Bachelier (normal-underlying), Black (forward-priced),
-Garman-Kohlhagen (FX), Margrabe (exchange option) all landed with
-put-call parity and BS-reduction identity checks. 148/148 tests
-pass. Tree methods (M5.2), PDE methods (M5.3), Longstaff-Schwartz
-(M5.4), and Fourier methods (M5.5) are explicit M5-continuation
-items per the CHANGELOG.
+**Status (as landed):** first-ship closed-form slice at v0.5.0; M5.5
+(Fourier methods, Carr-Madan branch) closed at v0.11.0 (Milestone C)
+— Heston characteristic function via Albrecher "little Heston trap"
+form + inline complex shim + panel-wise Gauss-Legendre quadrature.
+The v0.5.0 slice carried Bachelier, Black, Garman-Kohlhagen, and
+Margrabe with put-call parity and BS-reduction identity checks.
+Tree methods (M5.2), PDE methods (M5.3), Longstaff-Schwartz (M5.4),
+and the Lewis / Lipton variants of M5.5 remain M5-continuation items.
 
 **Work packets (parallelizable across pricer families):**
 
@@ -454,12 +459,18 @@ explicit M7-continuation items per the CHANGELOG.
 
 **Tag:** `FN+V` (functional ships; verified-AD label gates on AdjointTyping and on the underlying pricers' status).
 **Spec sections:** §2.13.
-**Status (as landed):** first-ship slice complete at v0.8.0.
-Weighted-LS / WL1 / vega-weighted residuals, SSE loss,
-single-parameter bound-clamped LM step. 201/201 tests pass. BFGS
-with bounds, SQP, multi-target combinator, sequential pipeline, and
-full vectorized LM are explicit M8-continuation items per the
-CHANGELOG.
+**Status (as landed):** first-ship slice at v0.8.0; M8.2 (vectorized
+LM + multi-target SABR-fit smoke gate) closed at v0.12.0
+(Milestone D) — standalone `lm_bounded_nparam` with bound projection,
+Marquardt-scaled damping, weighted residuals, diagnostic 5-tuple
+return; `multi_target_fit` alias; SABR smoke gate with warm-start
+well-conditioned case + OR-shaped failure-diagnostic ill-conditioned
+case. Host-evaluator floor ~3% rel-IV; spec's 0.5% target gates on
+verified-AD per the v0.12.0 Known Limitations. The v0.8.0 slice
+carried weighted-LS / WL1 / vega-weighted residuals, SSE loss, and a
+single-parameter bound-clamped LM step. BFGS with bounds, SQP,
+sequential pipeline, smart-initialization for SABR cold-start, and
+KKT-aware Greeks through the LM remain M8-continuation items.
 
 **Work packets:**
 
