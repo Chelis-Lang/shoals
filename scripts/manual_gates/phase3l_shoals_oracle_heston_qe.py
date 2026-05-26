@@ -121,7 +121,11 @@ def _subst(template: str) -> str:
 
 
 def _write_and_run(program: str) -> tuple[int, str, str]:
-    gate_dir = REPO_ROOT / "tests"
+    # Use a private sibling directory rather than tests/ so the suite's
+    # `chelis test tests/` discovery never picks up our deliberate-failure
+    # extraction stubs. Falls back gracefully if the dir does not exist.
+    gate_dir = REPO_ROOT / ".gate-tmp"
+    gate_dir.mkdir(exist_ok=True)
     with tempfile.NamedTemporaryFile(
         "w", dir=gate_dir, prefix="gate_heston_oracle_", suffix=".ch", delete=False
     ) as f:
@@ -177,15 +181,17 @@ def _passed(json_stdout: str, test_name: str) -> bool:
 
 def probe_truncation_sweep() -> dict:
     sweep_u_max = [10.0, 25.0, 50.0, 100.0, 200.0]
+    moneyness = [("atm_k100", K), ("otm_k120", 120.0)]
     body_parts = []
-    for u in sweep_u_max:
-        tag = f"truncation_u{int(u)}"
-        body_parts.append(
-            f"def test_{tag}() -> unit ! {{ Test }} = {{\n"
-            f"  p = heston_call_carr_madan_panels(cast(S0, f32), cast(K, f32), cast(T_YEARS, f32), cast(R, f32), cast(V0, f32), cast(KAPPA, f32), cast(THETA, f32), cast(SIGMA, f32), cast(RHO, f32), cast(ALPHA, f32), cast({u}, f32), cast(N_PANELS_BASE, int64))\n"
-            f"  assert_close(p, cast(-12345.0, f32), cast(0.001, f32), \"capture_{tag}\")\n"
-            f"}}"
-        )
+    for m_tag, k_val in moneyness:
+        for u in sweep_u_max:
+            tag = f"truncation_{m_tag}_u{int(u)}"
+            body_parts.append(
+                f"def test_{tag}() -> unit ! {{ Test }} = {{\n"
+                f"  p = heston_call_carr_madan_panels(cast(S0, f32), cast({k_val}, f32), cast(T_YEARS, f32), cast(R, f32), cast(V0, f32), cast(KAPPA, f32), cast(THETA, f32), cast(SIGMA, f32), cast(RHO, f32), cast(ALPHA, f32), cast({u}, f32), cast(N_PANELS_BASE, int64))\n"
+                f"  assert_close(p, cast(-12345.0, f32), cast(0.001, f32), \"capture_{tag}\")\n"
+                f"}}"
+            )
     program = _subst(
         "module Shoals.Tests.GateHestonTruncation\n"
         "import Std.Test (assert_close)\n"
@@ -194,28 +200,44 @@ def probe_truncation_sweep() -> dict:
         + "\n"
     )
     code, out, err = _write_and_run(program)
-    prices: dict[float, float] = {}
+    atm_prices: dict[float, float] = {}
+    otm_prices: dict[float, float] = {}
     for u in sweep_u_max:
-        tag = f"test_truncation_u{int(u)}"
-        v = _parse_got(out, tag)
-        if v is not None:
-            prices[u] = v
+        v_atm = _parse_got(out, f"test_truncation_atm_k100_u{int(u)}")
+        if v_atm is not None:
+            atm_prices[u] = v_atm
+        v_otm = _parse_got(out, f"test_truncation_otm_k120_u{int(u)}")
+        if v_otm is not None:
+            otm_prices[u] = v_otm
 
     pairs = [(25.0, 50.0), (50.0, 100.0), (100.0, 200.0)]
-    deltas = {}
+    deltas_atm = {}
+    deltas_otm = {}
     for lo, hi in pairs:
-        if lo in prices and hi in prices:
-            deltas[f"u={lo}->{hi}"] = abs(prices[hi] - prices[lo])
+        if lo in atm_prices and hi in atm_prices:
+            deltas_atm[f"u={lo}->{hi}"] = abs(atm_prices[hi] - atm_prices[lo])
+        if lo in otm_prices and hi in otm_prices:
+            deltas_otm[f"u={lo}->{hi}"] = abs(otm_prices[hi] - otm_prices[lo])
     chosen = None
     for lo, hi in pairs:
-        if lo in prices and hi in prices and abs(prices[hi] - prices[lo]) < 1e-2:
+        if (
+            lo in atm_prices
+            and hi in atm_prices
+            and abs(atm_prices[hi] - atm_prices[lo]) < 1e-2
+            and lo in otm_prices
+            and hi in otm_prices
+            and abs(otm_prices[hi] - otm_prices[lo]) < 1e-2
+        ):
             chosen = hi if chosen is None else min(chosen, hi)
-    if chosen is None and prices:
-        chosen = max(prices.keys())
+    if chosen is None and atm_prices:
+        chosen = max(atm_prices.keys())
     return {
-        "sweep_prices": {f"u_max={u}": prices.get(u) for u in sweep_u_max},
-        "sweep_deltas": deltas,
+        "sweep_prices_atm_k100": {f"u_max={u}": atm_prices.get(u) for u in sweep_u_max},
+        "sweep_prices_otm_k120": {f"u_max={u}": otm_prices.get(u) for u in sweep_u_max},
+        "sweep_deltas_atm": deltas_atm,
+        "sweep_deltas_otm": deltas_otm,
         "chosen_u_max": chosen,
+        "otm_clamped_to_zero_count": sum(1 for p in otm_prices.values() if p == 0.0),
         "criterion": (
             "smallest u_max where |P(u_max) - P(u_max_prev_double)| < 1e-2 "
             "(relaxed from spec §2.9's 1e-5: at f32 with panel-wise Gauss-Legendre "

@@ -141,6 +141,27 @@ coverage and §2.10 Heston-pricing block.
 
 - **Truncation 1e-5 deferred to verified-AD pipeline.** See
   scope notes above.
+- **OTM convergence is slower than ATM and may require a higher
+  `u_max`.** Red-team probe at K=120 (OTM) found the raw
+  Carr-Madan integral can return slightly *negative* values at
+  low `u_max ≤ 25` (observed ~−0.03 before the clamp), caused by
+  oscillatory cancellation in panel-wise Gauss-Legendre. The
+  pricer therefore explicitly **clamps the call and put outputs
+  to `max(0, raw_price)`** — callers will never see a negative
+  no-arbitrage-violating value, but should be aware that
+  `u_max = 25` is unsafe for OTM strikes and the manual gate's
+  full ATM + OTM sweep should be re-run when picking
+  production-side `u_max` for a new strike regime.
+- **`σ_volvol → 0` precision floor at ~`1e-2`.** Empirically, the
+  Heston char-fn evaluated at small vol-of-vol agrees with the
+  Black-Scholes call within ~0.5% for `σ_volvol ≥ 1e-2`, drifts
+  by ~30% at `σ_volvol = 1e-3`, and degenerates entirely
+  (98% error) at `σ_volvol = 1e-6`. The Albrecher form's
+  `(a - d) / (a + d)` ratio and the `1 / σ²` factor both blow up
+  in the limit; the limiting formula is the Black-Scholes
+  characteristic function and is not invoked here. Production
+  use should keep `σ_volvol ≥ 1e-2`; for the BS limit, call
+  `Shoals.Pricing.bs_call_scalar` directly.
 - **No off-the-shelf option Greek for the Heston char-fn pricer.**
   The pricer composes through closed-form complex algebra and
   fixed-node quadrature, so chain-rule AD should yield delta /
@@ -152,6 +173,41 @@ coverage and §2.10 Heston-pricing block.
 - **Panel-wise Gauss-Legendre is hand-rolled** in
   `src/heston.ch::gauss_legendre_panels`. If Nautilus adds a
   panel-quadrature adapter, switch to it.
+- **Spec §2.10 also names Lewis / Lipton Fourier inversion.**
+  Only Carr-Madan shipped in this milestone. Lewis / Lipton
+  variants are deferred (they share the same complex shim and
+  char-fn, so adding them is mostly residue-side algebra).
+
+### Red-team fixups (applied before merge)
+
+The red-team pass at commit `a239e7c` surfaced two HIGH issues
+(silent-negative OTM Carr-Madan output; under-disclosed
+`σ_volvol → 0` precision floor) and two MEDIUM issues
+(OTM-specific convergence not in the gate; manual gate's
+intentional-failure temp files lived in `tests/` and could collide
+with the suite). All four were addressed before merge:
+
+- `heston_call_carr_madan*` and `heston_put_carr_madan_panels`
+  now clamp the raw quadrature output via
+  `if gt(raw, 0) then raw else 0`. Documented in Known
+  limitations above.
+- `σ_volvol → 0` precision floor at ~`1e-2` is documented in
+  Known limitations with the empirical sweep numbers.
+- The manual gate now sweeps both ATM (K=100) and OTM (K=120)
+  truncation, requiring both to converge below `1e-2` between
+  doublings before a `u_max` is selected.
+- The manual gate writes its intentional-failure extraction stubs
+  to `.gate-tmp/` (gitignored) rather than `tests/`, so a crashed
+  gate run no longer leaves orphan tests that contaminate the
+  next `chelis test tests/` invocation.
+
+Two new tests in `tests/heston.ch` lock in the fixups:
+- `test_heston_charfn_otm_low_u_max_clamps_nonnegative` (verifies
+  K=120 / u_max=25 returns `≥ 0` post-clamp).
+- `test_heston_put_carr_madan_atm_parity_r_zero` (verifies ATM
+  call ≈ put at `r=0`).
+
+Final shipped test count: 8 / 8 pass in `tests/heston.ch`.
 
 ## [0.10.1] — unreleased
 

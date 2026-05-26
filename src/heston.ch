@@ -81,7 +81,8 @@ def heston_call_carr_madan(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32,
   }
   integral_value = gauss_legendre_10(integrand, cast(0.0, f32), u_max)
   exp_neg_alpha_lnk = exp(neg(mul(alpha, log_k)))
-  div(mul(exp_neg_alpha_lnk, integral_value), heston_pi_const())
+  raw_price = div(mul(exp_neg_alpha_lnk, integral_value), heston_pi_const())
+  if gt(raw_price, cast(0.0, f32)) then raw_price else cast(0.0, f32)
 }
 def gauss_legendre_panels(f: f32 -> f32, a: f32, b: f32, n_panels: int64) -> f32 = {
   panel_width = div(sub(b, a), cast(n_panels, f32))
@@ -111,10 +112,12 @@ def heston_call_carr_madan_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kapp
   }
   integral_value = gauss_legendre_panels(integrand, cast(0.0, f32), u_max, n_panels)
   exp_neg_alpha_lnk = exp(neg(mul(alpha, log_k)))
-  div(mul(exp_neg_alpha_lnk, integral_value), heston_pi_const())
+  raw_price = div(mul(exp_neg_alpha_lnk, integral_value), heston_pi_const())
+  if gt(raw_price, cast(0.0, f32)) then raw_price else cast(0.0, f32)
 }
 def heston_put_carr_madan_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, alpha: f32, u_max: f32, n_panels: int64) -> f32 = {
   call_price = heston_call_carr_madan_panels(s0, k, t, r, v0, kappa, theta, sigma, rho, alpha, u_max, n_panels)
   exp_neg_rt = exp(neg(mul(r, t)))
-  sub(add(call_price, mul(k, exp_neg_rt)), s0)
+  raw_put = sub(add(call_price, mul(k, exp_neg_rt)), s0)
+  if gt(raw_put, cast(0.0, f32)) then raw_put else cast(0.0, f32)
 }
