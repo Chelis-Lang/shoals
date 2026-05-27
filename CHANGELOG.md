@@ -6,6 +6,132 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.17.0] — unreleased
+
+Milestone I: XVA expansion. Closes the M7 continuation backlog
+with five new XVA pieces shipped via 4 parallel agents.
+
+### Added
+
+- **`Shoals.Cds`** (new module `src/cds.ch`) — credit default swap
+  pricing + hazard-curve bootstrap:
+  - `HazardCurve[n] = | HazardCurve { times: tensor[n, f32],
+    hazards: tensor[n, f32] }` — piecewise-constant hazard rate
+    term structure.
+  - `hazard_curve_from_pillars`, `cds_survival_from_hazards`,
+    `cds_premium_leg_value`, `cds_protection_leg_value`,
+    `cds_pv` — CDS valuation functions.
+  - `cds_bootstrap_hazards[n]` — bootstrap piecewise hazards
+    from market CDS spreads via sequential pillar-wise brent
+    root-find (matches `Shoals.Curves.bootstrap_multi` pattern).
+- **`Shoals.Xva` extensions** (additive — existing exports
+  preserved):
+  - `xva_cva_stochastic_hazard` — CVA with HazardCurve input
+    (replaces constant hazard). Piecewise integration over
+    pillars.
+  - `fva(time_grid, epe, funding_spread, discount_rate)` —
+    Burgard-Kjaer FVA, trapezoidal DF-weighted integral.
+  - `kva(time_grid, ead, cost_of_capital,
+    regulatory_capital_weight, discount_rate)` — Green-Kenyon
+    KVA, exact linearity in `regulatory_capital_weight`.
+  - `xva_cva_wwr_constant_hazard` — Gaussian-copula
+    wrong-way-risk CVA: `X_D = -ρ*Z_E + sqrt(1-ρ²)*Z_D`,
+    correlated default-time + log-normal exposure shock.
+    Reduces to `cva_constant_hazard` at ρ=0 within `3*SE_mc`;
+    ρ>0 strictly increases CVA (sign-of-effect verified).
+  - `xva_cva_stochastic_recovery` — recovery sampled from
+    `Beta(α, β)` via gamma-ratio identity (Nautilus ships
+    `gamma_sample` but no `beta_sample`).
+- **`Shoals.Csa`** (new module `src/csa.ch`) — collateral
+  netting:
+  - `csa_collateralized_exposure(exposure, threshold, mta,
+    independent_amount, haircut) -> f32` — single-step
+    collateral logic (TH/MTA/IA/haircut).
+  - `csa_collateralized_exposure_path[n]` — batched per-step
+    netting over an exposure path.
+
+### Tests (24 across 6 test files)
+
+- `tests/cds.ch` (4): par-spread-zero-PV (10bp tolerance,
+  discretization-aware), bootstrap recovers constant hazard
+  within 1bp, bootstrap recovers piecewise hazards within 5bp,
+  survival probability monotone-decreasing in t.
+- `tests/xva_stochastic_hazard.ch` (3): constant hazard reduces
+  to `cva_constant_hazard` within 1bp, increasing hazard
+  produces higher CVA (concavity), zero recovery → LGD-full.
+- `tests/xva_fva_kva.ch` (6): FVA zero-spread, monotone-in-
+  spread, monotone-in-horizon; KVA zero-cost, monotone-in-
+  capital-weight, exact linearity (doubling weight doubles KVA).
+- `tests/xva_wwr.ch` (4): ρ=0 reduces to baseline CVA within
+  3*SE_mc (16 batches × 256 paths), ρ=0.7 strictly larger
+  CVA, ρ=-0.5 strictly smaller (right-way risk), ρ=0.99 finite.
+- `tests/csa.ch` (4): below-threshold passes through,
+  above-threshold-MTA-satisfied collateralizes, MTA blocks
+  small transfers, monotone-in-threshold.
+- `tests/xva_stochastic_recovery.ch` (3): concentrated
+  `Beta(50, 50)` matches deterministic R=0.5 within 3*SE_mc,
+  uniform `Beta(1, 1)` mean ≈ 0.5, zero hazard → zero CVA.
+
+### Manual gate
+
+`scripts/manual_gates/phase3l_shoals_oracle_xva_expansion.py`
+aggregates all 6 test files into a single JSON verdict.
+**PASS at 24/24** observed.
+
+### Scope notes
+
+- **`cva_*` public-function renames**: §7.1 prefix-namespace
+  lint blocks 2+ `cva_*` defs in `Shoals.Xva`. The new
+  functions therefore ship as `xva_cva_stochastic_hazard`,
+  `xva_cva_stochastic_recovery`, and `xva_cva_wwr_constant_
+  hazard` (module-shorthand prefix). The existing
+  `cva_constant_hazard` retains its name as a singleton.
+- **WWR exposure shock log-normal with `η_E = 0.5`**: hardcoded
+  in `xva_wwr_exposure_shock`. Configurable in a future PR if a
+  caller needs to tune the exposure-shock magnitude.
+- **CDS protection-leg inner discretization is monthly**
+  (12/yr) regardless of premium frequency, to keep the
+  default-probability integral fine without the caller having
+  to specify it.
+- **`xva_cva_stochastic_hazard` DF convention is right-endpoint
+  `DF(t_i)`** (not midpoint), matching `cva_constant_hazard`
+  so the reduction-to-constant test is exact within float
+  precision.
+
+### AD label
+
+- `Shoals.Cds.*`: `AD: composed` (closed-form arithmetic over
+  hazard pillars + brent root-find in `cds_bootstrap_hazards`,
+  which inherits the brent precision floor).
+- `fva`, `kva`: `AD: composed`.
+- `xva_cva_stochastic_hazard`, `xva_cva_stochastic_recovery`,
+  `xva_cva_wwr_constant_hazard`: `AD: unproven-primitive` for
+  the MC portion (effect-AD interaction), `AD: composed` for
+  the integrand.
+- `Shoals.Csa.*`: `AD: composed` (conditional collateral
+  logic, no iteration).
+
+### Verification
+
+- `chelis reef build` green.
+- `chelis lint --check` zero blocking errors.
+- All 24 new tests pass.
+- Manual gate
+  `phase3l_shoals_oracle_xva_expansion.py`: **PASS** at 24/24.
+
+### Known limitations
+
+- **`xva_cva_wwr_constant_hazard` only supports constant
+  hazard**. A `xva_cva_wwr_stochastic_hazard` variant
+  combining HazardCurve + WWR is a natural follow-up.
+- **WWR exposure-shock magnitude `η_E = 0.5` hardcoded** —
+  see Scope notes.
+- **Beta sampling uses gamma-ratio identity** (`X / (X+Y)`
+  with `X ~ Gamma(α, 1), Y ~ Gamma(β, 1)`). If Nautilus
+  later ships `beta_sample`, switch.
+- **CDS protection-leg inner discretization fixed at
+  monthly** — see Scope notes.
+
 ## [0.16.0] — unreleased
 
 Milestone H: Calibration II — bound-constrained BFGS, full
