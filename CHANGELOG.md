@@ -86,10 +86,17 @@ aggregates all 4 test files into a single JSON verdict.
   the M-A literal-tensor direction-number table at native
   Sobol quality; dims 32-1023 fall back to
   `halton_value(point_idx, prime_table[d_idx mod 50])`. Each
-  dim is deterministic and in `[0, 1)` but dims sharing a
-  prime (modulo 50) are correlated. Real Sobol Joe-Kuo at
-  1024-D requires the full `~10KB` direction-number table
-  or programmatic generation from primitive polynomials.
+  dim is deterministic and in `[0, 1)` but **dims sharing
+  a prime (modulo 50) produce bit-identical sequences** —
+  e.g. dim 32 ≡ dim 82 ≡ dim 132 ≡ ... A user trusting "1024-D
+  coverage" for high-dimensional MC will silently get at most
+  **82 unique sequences** (32 native Sobol + 50 fallback
+  Halton streams) across the 1024 nominal dimensions. Real
+  Sobol Joe-Kuo at 1024-D requires the full `~10KB` direction-
+  number table or programmatic generation from primitive
+  polynomials; until then, callers needing more than 32
+  uncorrelated streams should `assert d_idx < 32` in their
+  own code.
 - **Cross-currency basis bootstrap is a pass-through**: the
   `bootstrap_basis_curve` API accepts market-quoted basis
   spreads and stores them verbatim. A true basis-swap-quote
@@ -131,9 +138,44 @@ aggregates all 4 test files into a single JSON verdict.
 - **Sobol 1024-D fallback** — see Scope notes. Promoting to
   true Joe-Kuo Sobol for dims 32-1023 is deferred.
 - **Cross-currency basis bootstrap is pass-through**, not a
-  true basis-swap bootstrap — see Scope notes.
+  true basis-swap bootstrap — see Scope notes. The `domestic`
+  parameter is currently unused; it's retained in the
+  signature so a future full bootstrap can drop in without
+  breaking callers.
 - **HKG Lunar New Year limited to 2025-2030 lookup** — see
-  Scope notes.
+  Scope notes. `hc_hkg_is_holiday` now returns false for
+  years outside `[2025, 2030]` (previously silently returned
+  true for Jan 1-3 via the LNY fallback). Same applies to
+  `hc_lunar_new_year_first` which now returns `(-1, -1, -1)`
+  as an out-of-range sentinel.
+
+### Red-team fixups (applied before merge)
+
+Red-team against v0.19.0 base returned PASS WITH FINDINGS:
+1 HIGH (Sobol fallback CHANGELOG honesty) + 2 MEDIUM (basis-
+bootstrap API + HKG silent out-of-range). All three addressed
+before merge:
+
+- **HIGH — Sobol "correlated" → "identical".** The CHANGELOG
+  Scope notes said dims sharing a prime are "correlated";
+  they are actually **bit-identical** (e.g. dim 32 ≡ dim 82).
+  Tightened the wording to call out the alias and pin the
+  practical bound at ~82 unique sequences across 1024 nominal
+  dims.
+- **MEDIUM — `bootstrap_basis_curve` `domestic` param unused.**
+  Documented in the Known Limitations above. The parameter
+  stays in the signature so callers don't have to switch
+  signatures when the true bootstrap lands.
+- **MEDIUM — HKG silently returned true on Jan 1 for years
+  2031+.** Fix: `hc_lunar_new_year_first` returns
+  `(-1, -1, -1)` for years outside `[2025, 2030]`, and
+  `hc_hkg_is_holiday` short-circuits to `false` when
+  `hc_hkg_lookup_year_supported(year)` is false. This
+  surfaces the lookup-out-of-range case as a clean "not
+  observed" rather than a silently-wrong Jan-1 collapse.
+
+Final M-K: 22 exports (5 basis + 4 RNG + 8 holidaycal + 5
+pricingextended), 19 tests, build green, lint clean.
 
 ## Final post-batch state (v0.13.0 → v0.19.0)
 
