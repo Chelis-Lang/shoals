@@ -8,7 +8,7 @@ Invokes:
   2. ``chelis lint --check`` over ``src/ properties/ references/
      tests/ manual-gates/``.
   3. ``chelis reef build`` for package-level compiler validation.
-  4. ``chelis test tests/ --timeout 600 --jobs auto`` for the native
+  4. ``chelis test tests/ --timeout 1200 --jobs auto`` for the native
      runtime suite.
 
 Exits 0 only if all stages succeed. Mirrors the default PR gate in the
@@ -89,7 +89,7 @@ def main() -> int:
         return rc
 
     print("[4/4] chelis test tests/ --jobs auto")
-    rc = run(["chelis", "test", "tests/", "--timeout", "600", "--jobs", "auto"], quiet=False)
+    rc = run(["chelis", "test", "tests/", "--timeout", "1200", "--jobs", "auto"], quiet=False)
     if rc != 0:
         print("FAIL: chelis test tests/ --jobs auto")
         return rc

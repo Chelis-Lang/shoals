@@ -23,3 +23,7 @@ def test_csa_monotone_in_threshold() -> unit ! { Test } = {
   sum_high = fold(fn (a: f32, x: f32) -> add(a, x), cast(0.0, f32), el_high)
   assert_true(gt(sum_high, sum_low), "increasing threshold -> increasing effective exposure (more uncollateralized)")
 }
+def test_csa_negative_exposure_clipped_to_zero() -> unit ! { Test } = {
+  out = csa_collateralized_exposure(cast(-50.0, f32), cast(100.0, f32), cast(10.0, f32), cast(0.0, f32), cast(0.0, f32))
+  assert_close(out, cast(0.0, f32), cast(0.0001, f32), "negative exposure (we owe counterparty) yields zero collateralized exposure")
+}

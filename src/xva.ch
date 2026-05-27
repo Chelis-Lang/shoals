@@ -2,7 +2,7 @@ module Shoals.Xva
 import Nautilus.Distributions (gamma_sample, normal_sample, normal_cdf)
 import Nautilus.Interpolation (linear_interp_sorted)
 import Shoals.Cds (HazardCurve, cds_survival_from_hazards)
-export (survival_probability_constant_hazard, default_probability_in_interval, expected_positive_exposure, expected_negative_exposure, netted_exposure_2_deals, cva_constant_hazard, dva_constant_hazard, discount_factor_constant_rate, fva, kva, xva_cva_stochastic_recovery, xva_cva_wwr_constant_hazard, xva_cva_stochastic_hazard)
+export (survival_probability_constant_hazard, default_probability_in_interval, expected_positive_exposure, expected_negative_exposure, netted_exposure_2_deals, cva_constant_hazard, dva_constant_hazard, discount_factor_constant_rate, fva, kva, xva_cva_wwr_constant_hazard, xva_cva_stochastic_hazard)
 def survival_probability_constant_hazard(hazard: f32, t: f32) -> f32 = exp(neg(mul(hazard, t)))
 def default_probability_in_interval(hazard: f32, t_start: f32, t_end: f32) -> f32 = sub(survival_probability_constant_hazard(hazard, t_start), survival_probability_constant_hazard(hazard, t_end))
 def discount_factor_constant_rate(r: f32, t: f32) -> f32 = exp(neg(mul(r, t)))

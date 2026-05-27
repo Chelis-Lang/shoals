@@ -39,9 +39,16 @@ with five new XVA pieces shipped via 4 parallel agents.
     correlated default-time + log-normal exposure shock.
     Reduces to `cva_constant_hazard` at ρ=0 within `3*SE_mc`;
     ρ>0 strictly increases CVA (sign-of-effect verified).
-  - `xva_cva_stochastic_recovery` — recovery sampled from
-    `Beta(α, β)` via gamma-ratio identity (Nautilus ships
-    `gamma_sample` but no `beta_sample`).
+  - `xva_cva_stochastic_recovery` (**deferred — see Known
+    limitations**): recovery sampled from `Beta(α, β)` via
+    gamma-ratio identity. **Pulled from public exports**
+    pending an upstream fix to `Nautilus.Distributions.
+    gamma_sample` (red-team CRITICAL: the upstream Marsaglia–
+    Tsang implementation discards its random draws via a
+    `fold (fn (acc, x) -> acc, ...)` reducer that returns
+    `0` deterministically, making the MC statistically
+    inert). Body retained in source for re-enable once
+    upstream is fixed; export line removed.
 - **`Shoals.Csa`** (new module `src/csa.ch`) — collateral
   netting:
   - `csa_collateralized_exposure(exposure, threshold, mta,
@@ -121,16 +128,60 @@ aggregates all 6 test files into a single JSON verdict.
 
 ### Known limitations
 
+- **`xva_cva_stochastic_recovery` deferred (upstream-blocked).**
+  Implementation exists in `src/xva.ch` but is NOT exported
+  pending a fix to `Nautilus.Distributions.gamma_sample_ge1_try`
+  whose Marsaglia–Tsang draw extraction is degenerate (the
+  `fold(fn (acc, x) -> acc, zero, list)` reducer returns 0
+  regardless of the draws, making the per-path Beta sample
+  deterministic). When the upstream defect is fixed, add
+  `xva_cva_stochastic_recovery` back to the `export` line in
+  `src/xva.ch` and restore `tests/xva_stochastic_recovery.ch`
+  with falsifying tests (use Beta(2, 5) so a constant fallback
+  to R=0.5 would FAIL the mean check, not pass it).
 - **`xva_cva_wwr_constant_hazard` only supports constant
   hazard**. A `xva_cva_wwr_stochastic_hazard` variant
   combining HazardCurve + WWR is a natural follow-up.
 - **WWR exposure-shock magnitude `η_E = 0.5` hardcoded** —
   see Scope notes.
-- **Beta sampling uses gamma-ratio identity** (`X / (X+Y)`
-  with `X ~ Gamma(α, 1), Y ~ Gamma(β, 1)`). If Nautilus
-  later ships `beta_sample`, switch.
+- **WWR ρ=0 reduction-to-constant-hazard is structurally
+  biased on a discrete grid** — WWR uses continuous-time
+  default samples + linearly-interpolated EPE; baseline
+  uses right-endpoint discretization. They agree in the
+  continuum limit; the 3*SE_mc test band absorbs the
+  discrete-grid bias.
 - **CDS protection-leg inner discretization fixed at
   monthly** — see Scope notes.
+
+### Red-team fixups (applied before merge)
+
+Red-team against v0.17.0 base returned CONDITIONAL PASS with
+one CRITICAL + one MEDIUM + two LOW findings:
+
+- **CRITICAL — `xva_cva_stochastic_recovery` statistically
+  inert via upstream gamma_sample bug.** Pulled from public
+  exports + deleted `tests/xva_stochastic_recovery.ch` (the
+  3 tests passed vacuously because Beta(50, 50) and Beta(1,
+  1) both collapse to R=0.5 under the upstream-broken
+  constant-gamma fallback). Documented in Known limitations
+  above.
+- **MEDIUM — CSA accepts negative exposure with no clip.**
+  `csa_collateralized_exposure` now clips `exposure < 0` to
+  `0` at function entry (a counterparty owing the bank doesn't
+  contribute to CVA). Locked in by
+  `test_csa_negative_exposure_clipped_to_zero`. Test count
+  for `tests/csa.ch`: 4 → 5.
+- **LOW — `CLAUDE.md` chelis-version drift**: already
+  addressed in the v0.9.0 cleanup (`AGENTS.md` rewrote the
+  Toolchain section to be reef.toml-driven; CLAUDE.md
+  symlinks to it).
+- **LOW — WWR ρ=0 reduction structural bias**: documented in
+  Known Limitations above.
+
+Final M-I exports: 13 (was 14 — `xva_cva_stochastic_recovery`
+pulled). Final M-I test count: 22 (was 24 — 3 from
+xva_stochastic_recovery removed + 1 csa-negative-exposure
+added = net 22).
 
 ## [0.16.0] — unreleased
 
