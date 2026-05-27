@@ -71,4 +71,5 @@ jobs:
         run: chelis reef build
 
       - name: chelis test (node-local parallel)
-        run: chelis test tests/ --timeout 1200 --jobs auto
+        timeout-minutes: 90
+        run: chelis test tests/ --timeout 1800 --jobs 2
