@@ -7,18 +7,29 @@ on:
     branches: [main, shoals-grad]
   workflow_dispatch:
 
-env:
-  CHELIS_TAG: v0.7.11
-  CHELIS_VERSION: 0.7.11
-  NAUTILUS_TAG: v0.7.13
-  CORAL_TAG: v0.7.13
-
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Extract versions from reef.toml
+        run: |
+          set -euo pipefail
+          CHELIS_VERSION=$(grep -oP '^compiler\s*=\s*"=\K[0-9]+\.[0-9]+\.[0-9]+' reef.toml)
+          NAUTILUS_VERSION=$(grep -A0 '^nautilus' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          CORAL_VERSION=$(grep -A0 '^coral' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ -z "$CHELIS_VERSION" ] || [ -z "$NAUTILUS_VERSION" ] || [ -z "$CORAL_VERSION" ]; then
+            echo "Failed to parse one or more versions from reef.toml" >&2
+            cat reef.toml >&2
+            exit 1
+          fi
+          echo "CHELIS_VERSION=$CHELIS_VERSION" >> "$GITHUB_ENV"
+          echo "CHELIS_TAG=v$CHELIS_VERSION"     >> "$GITHUB_ENV"
+          echo "NAUTILUS_TAG=v$NAUTILUS_VERSION" >> "$GITHUB_ENV"
+          echo "CORAL_TAG=v$CORAL_VERSION"       >> "$GITHUB_ENV"
+          echo "Detected: chelis=$CHELIS_VERSION nautilus=$NAUTILUS_VERSION coral=$CORAL_VERSION"
 
       - name: Download pinned chelis toolchain
         env:
