@@ -1,7 +1,7 @@
 module Shoals.Curves
 import Nautilus.Interpolation (linear_interp_sorted, spline_eval)
 import Nautilus.Roots (brent)
-export (CurveKind, YieldCurve, yield_curve_from_pillars, yield_curve_tagged, curve_kind, ois, ibor, sofr, sonia, estr, custom_curve, rate_at, spline_rate_at, log_linear_rate_at, nss_rate, discount_factor, bootstrap_zero_from_par, parallel_shift, key_rate_shift, twist, butterfly, scale_rates, Instrument, deposit, zero_coupon, cur_par_swap, instrument_tenor, instrument_market_price_or_rate, bootstrap_multi, bootstrap_multi_curve, bootstrap_residual_at_pillar, bootstrap_grad_diagonal, bootstrap_grad_at_solution, fd_bump_pillar_rate)
+export (CurveKind, YieldCurve, yield_curve_from_pillars, yield_curve_tagged, curve_kind, ois, ibor, sofr, sonia, estr, custom_curve, rate_at, spline_rate_at, log_linear_rate_at, nss_rate, discount_factor, bootstrap_zero_from_par, parallel_shift, key_rate_shift, twist, butterfly, scale_rates, Instrument, deposit, zero_coupon, cur_par_swap, instrument_tenor, instrument_market_price_or_rate, bootstrap_multi, bootstrap_multi_curve, bootstrap_residual_at_pillar, bootstrap_grad_diagonal, bootstrap_grad_at_solution, fd_bump_pillar_rate, instrument_validate, bootstrap_grad_full_jacobian)
 type CurveKind =
   | Ois
   | Ibor
@@ -249,4 +249,77 @@ def bootstrap_grad_at_solution(instruments: List[Instrument]) -> List[f32] = {
     (append(ts_so_far, t_new), append(rs_so_far, r_new), append(grads_so_far, g_new), add(cum_pv_so_far, df_new))
   }, init, instruments)
   out.2
+}
+def instrument_validate(inst: Instrument) -> bool = {
+  match inst with {
+    | Deposit { tenor: t, rate: r } => if lte(t, cast(0.0, f32)) then false else if lte(r, cast(-1.0, f32)) then false else true
+    | ZeroCoupon { tenor: t, price: p } => if lte(t, cast(0.0, f32)) then false else if lte(p, cast(0.0, f32)) then false else if gt(p, cast(1.0, f32)) then false else true
+    | ParSwap { tenor: t, par_rate: _ } => if lte(t, cast(0.0, f32)) then false else true
+  }
+}
+def cur_all_instruments_valid(instruments: List[Instrument]) -> bool = fold(fn (acc: bool, inst: Instrument) -> if acc then instrument_validate(inst) else false, true, instruments)
+def cur_l_row_for_pillar(inst: Instrument, t_i: f32, z_i: f32, times_so_far: List[f32], rates_so_far: List[f32]) -> List[f32] = {
+  match inst with {
+    | Deposit { tenor: _, rate: _ } => map(fn (t_k: f32) -> cast(0.0, f32), times_so_far)
+    | ZeroCoupon { tenor: _, price: _ } => map(fn (t_k: f32) -> cast(0.0, f32), times_so_far)
+    | ParSwap { tenor: _, par_rate: r } => {
+    denom = neg(mul(t_i, mul(add(cast(1.0, f32), r), exp(neg(mul(z_i, t_i))))))
+    pairs = zip(times_so_far, rates_so_far)
+    map(fn (e: (f32, f32)) -> {
+      t_k = e.0
+      z_k = e.1
+      numer = mul(r, neg(mul(t_k, exp(neg(mul(z_k, t_k))))))
+      div(numer, denom)
+    }, pairs)
+  }
+  }
+}
+def cur_dot_l_j(l_row: List[f32], j_prev_col: List[f32]) -> f32 = {
+  pairs = zip(l_row, j_prev_col)
+  fold(fn (acc: f32, e: (f32, f32)) -> add(acc, mul(e.0, e.1)), cast(0.0, f32), pairs)
+}
+def cur_jacobian_row(diag_i: f32, l_row: List[f32], j_prev_rows: List[List[f32]], m_len: int64, i_pos: int64) -> List[f32] = {
+  col_idxs = range(cast(0, int64), m_len)
+  map(fn (j: int64) -> {
+    j_prev_col = map(fn (row: List[f32]) -> index(row, j), j_prev_rows)
+    correction = cur_dot_l_j(l_row, j_prev_col)
+    d_ij = if eq(j, i_pos) then diag_i else cast(0.0, f32)
+    sub(d_ij, correction)
+  }, col_idxs)
+}
+def cur_nan_jacobian[m](paths_template: &tensor[m, f32]) -> tensor[m, m, f32] = {
+  m_len = len(to_list(paths_template))
+  nan_val = div(cast(0.0, f32), cast(0.0, f32))
+  total = mul(m_len, m_len)
+  idxs = range(cast(0, int64), total)
+  flat = map(fn (k: int64) -> nan_val, idxs)
+  reshape(to_tensor(flat), [m_len, m_len])
+}
+def cur_full_jacobian_rows(instruments: List[Instrument], m_len: int64) -> List[List[f32]] = {
+  init = ([], [], cast(0.0, f32), [], cast(0, int64))
+  out = fold(fn (state: (List[f32], List[f32], f32, List[List[f32]], int64), inst: Instrument) -> {
+    ts_so_far = state.0
+    rs_so_far = state.1
+    cum_pv_so_far = state.2
+    rows_so_far = state.3
+    i_pos = state.4
+    r_new = solve_pillar_rate(inst, ts_so_far, rs_so_far)
+    t_new = instrument_tenor(inst)
+    diag_raw = bootstrap_grad_diagonal(inst, r_new, cum_pv_so_far)
+    diag_i = if eq(r_new, r_new) then diag_raw else div(cast(0.0, f32), cast(0.0, f32))
+    l_row = cur_l_row_for_pillar(inst, t_new, r_new, ts_so_far, rs_so_far)
+    row_i = cur_jacobian_row(diag_i, l_row, rows_so_far, m_len, i_pos)
+    df_new = exp(neg(mul(r_new, t_new)))
+    (append(ts_so_far, t_new), append(rs_so_far, r_new), add(cum_pv_so_far, df_new), append(rows_so_far, row_i), add(i_pos, cast(1, int64)))
+  }, init, instruments)
+  out.3
+}
+def bootstrap_grad_full_jacobian[m](paths_template: &tensor[m, f32], instruments: List[Instrument]) -> tensor[m, m, f32] = {
+  m_len = len(to_list(paths_template))
+  insts_len = len(instruments)
+  if neq(insts_len, m_len) then cur_nan_jacobian(paths_template) else if cur_all_instruments_valid(instruments) then {
+    rows = cur_full_jacobian_rows(instruments, m_len)
+    flat = fold(fn (acc: List[f32], row: List[f32]) -> fold(fn (a: List[f32], v: f32) -> append(a, v), acc, row), [], rows)
+    reshape(to_tensor(flat), [m_len, m_len])
+  } else cur_nan_jacobian(paths_template)
 }
