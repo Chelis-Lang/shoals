@@ -77,3 +77,105 @@ def joint_calendar(left: Calendar, right: Calendar) -> Calendar = {
   }
   }
 }
+export (hc_tyo_holidays_year, hc_syd_holidays_year, hc_fra_holidays_year, hc_hkg_holidays_year, hc_tyo_is_holiday, hc_syd_is_holiday, hc_fra_is_holiday, hc_hkg_is_holiday)
+def hc_dow_to_int(d: Date) -> int64 = {
+  match day_of_week(d) with {
+    | Monday => cast(0, int64)
+    | Tuesday => cast(1, int64)
+    | Wednesday => cast(2, int64)
+    | Thursday => cast(3, int64)
+    | Friday => cast(4, int64)
+    | Saturday => cast(5, int64)
+    | Sunday => cast(6, int64)
+  }
+}
+def hc_nth_weekday_of_month(year: int64, month: int64, target_dow: int64, n: int64) -> Date = {
+  first = date(year, month, cast(1, int64))
+  first_dow = hc_dow_to_int(first)
+  offset_to_target = mod(add(sub(target_dow, first_dow), cast(7, int64)), cast(7, int64))
+  base = add_days(first, offset_to_target)
+  add_days(base, mul(sub(n, cast(1, int64)), cast(7, int64)))
+}
+def hc_observed_mon_if_weekend(d: Date) -> Date = {
+  wd = hc_dow_to_int(d)
+  if eq(wd, cast(5, int64)) then add_days(d, cast(2, int64)) else if eq(wd, cast(6, int64)) then add_days(d, cast(1, int64)) else d
+}
+def hc_triple(d: Date) -> (int64, int64, int64) = (d.year, d.month, d.day)
+def hc_triple_eq(a: (int64, int64, int64), y: int64, m: int64, d: int64) -> bool = and(eq(a.0, y), and(eq(a.1, m), eq(a.2, d)))
+def hc_list_contains_triple(xs: List[(int64, int64, int64)], y: int64, m: int64, d: int64) -> bool = fold(fn (acc: bool, t: (int64, int64, int64)) -> or(acc, hc_triple_eq(t, y, m, d)), false, xs)
+def hc_vernal_equinox_day(year: int64) -> int64 = { if eq(year, cast(2025, int64)) then cast(20, int64) else if eq(year, cast(2026, int64)) then cast(20, int64) else if eq(year, cast(2027, int64)) then cast(21, int64) else if eq(year, cast(2028, int64)) then cast(20, int64) else if eq(year, cast(2029, int64)) then cast(20, int64) else if eq(year, cast(2030, int64)) then cast(20, int64) else cast(20, int64) }
+def hc_autumnal_equinox_day(year: int64) -> int64 = { if eq(year, cast(2025, int64)) then cast(23, int64) else if eq(year, cast(2026, int64)) then cast(23, int64) else if eq(year, cast(2027, int64)) then cast(23, int64) else if eq(year, cast(2028, int64)) then cast(22, int64) else if eq(year, cast(2029, int64)) then cast(23, int64) else if eq(year, cast(2030, int64)) then cast(23, int64) else cast(23, int64) }
+def hc_tyo_holidays_year(year: int64) -> List[(int64, int64, int64)] = {
+  jan_1 = (year, cast(1, int64), cast(1, int64))
+  coming_of_age = hc_triple(hc_nth_weekday_of_month(year, cast(1, int64), cast(0, int64), cast(2, int64)))
+  national_foundation = (year, cast(2, int64), cast(11, int64))
+  emperor_birthday = (year, cast(2, int64), cast(23, int64))
+  vernal_eq = (year, cast(3, int64), hc_vernal_equinox_day(year))
+  showa_day = (year, cast(4, int64), cast(29, int64))
+  constitution = (year, cast(5, int64), cast(3, int64))
+  greenery = (year, cast(5, int64), cast(4, int64))
+  childrens = (year, cast(5, int64), cast(5, int64))
+  marine = hc_triple(hc_nth_weekday_of_month(year, cast(7, int64), cast(0, int64), cast(3, int64)))
+  mountain = (year, cast(8, int64), cast(11, int64))
+  respect_aged = hc_triple(hc_nth_weekday_of_month(year, cast(9, int64), cast(0, int64), cast(3, int64)))
+  autumnal_eq = (year, cast(9, int64), hc_autumnal_equinox_day(year))
+  sports = hc_triple(hc_nth_weekday_of_month(year, cast(10, int64), cast(0, int64), cast(2, int64)))
+  culture = (year, cast(11, int64), cast(3, int64))
+  labor_thanks = (year, cast(11, int64), cast(23, int64))
+  [jan_1, coming_of_age, national_foundation, emperor_birthday, vernal_eq, showa_day, constitution, greenery, childrens, marine, mountain, respect_aged, autumnal_eq, sports, culture, labor_thanks]
+}
+def hc_syd_holidays_year(year: int64) -> List[(int64, int64, int64)] = {
+  new_year = hc_triple(hc_observed_mon_if_weekend(date(year, cast(1, int64), cast(1, int64))))
+  australia = hc_triple(hc_observed_mon_if_weekend(date(year, cast(1, int64), cast(26, int64))))
+  good_fri = hc_triple(good_friday(year))
+  east_mon = hc_triple(easter_monday(year))
+  anzac = (year, cast(4, int64), cast(25, int64))
+  queens = hc_triple(hc_nth_weekday_of_month(year, cast(6, int64), cast(0, int64), cast(2, int64)))
+  bank_hol = hc_triple(hc_nth_weekday_of_month(year, cast(8, int64), cast(0, int64), cast(1, int64)))
+  labour = hc_triple(hc_nth_weekday_of_month(year, cast(10, int64), cast(0, int64), cast(1, int64)))
+  christmas = hc_triple(hc_observed_mon_if_weekend(date(year, cast(12, int64), cast(25, int64))))
+  boxing = hc_triple(hc_observed_mon_if_weekend(date(year, cast(12, int64), cast(26, int64))))
+  [new_year, australia, good_fri, east_mon, anzac, queens, bank_hol, labour, christmas, boxing]
+}
+def hc_fra_holidays_year(year: int64) -> List[(int64, int64, int64)] = {
+  new_year = (year, cast(1, int64), cast(1, int64))
+  good_fri = hc_triple(good_friday(year))
+  east_mon = hc_triple(easter_monday(year))
+  labour = (year, cast(5, int64), cast(1, int64))
+  ascension = hc_triple(add_days(easter_sunday_gregorian(year), cast(39, int64)))
+  whit_mon = hc_triple(add_days(easter_sunday_gregorian(year), cast(50, int64)))
+  unity = (year, cast(10, int64), cast(3, int64))
+  christmas = (year, cast(12, int64), cast(25, int64))
+  boxing = (year, cast(12, int64), cast(26, int64))
+  [new_year, good_fri, east_mon, labour, ascension, whit_mon, unity, christmas, boxing]
+}
+def hc_lunar_new_year_first(year: int64) -> (int64, int64, int64) = { if eq(year, cast(2025, int64)) then (cast(2025, int64), cast(1, int64), cast(29, int64)) else if eq(year, cast(2026, int64)) then (cast(2026, int64), cast(2, int64), cast(17, int64)) else if eq(year, cast(2027, int64)) then (cast(2027, int64), cast(2, int64), cast(6, int64)) else if eq(year, cast(2028, int64)) then (cast(2028, int64), cast(1, int64), cast(26, int64)) else if eq(year, cast(2029, int64)) then (cast(2029, int64), cast(2, int64), cast(13, int64)) else if eq(year, cast(2030, int64)) then (cast(2030, int64), cast(2, int64), cast(3, int64)) else (year, cast(1, int64), cast(1, int64)) }
+def hc_ching_ming(year: int64) -> (int64, int64, int64) = { if eq(year, cast(2025, int64)) then (cast(2025, int64), cast(4, int64), cast(4, int64)) else if eq(year, cast(2026, int64)) then (cast(2026, int64), cast(4, int64), cast(5, int64)) else if eq(year, cast(2027, int64)) then (cast(2027, int64), cast(4, int64), cast(5, int64)) else if eq(year, cast(2028, int64)) then (cast(2028, int64), cast(4, int64), cast(4, int64)) else if eq(year, cast(2029, int64)) then (cast(2029, int64), cast(4, int64), cast(4, int64)) else if eq(year, cast(2030, int64)) then (cast(2030, int64), cast(4, int64), cast(5, int64)) else (year, cast(4, int64), cast(5, int64)) }
+def hc_buddha_birthday(year: int64) -> (int64, int64, int64) = { if eq(year, cast(2025, int64)) then (cast(2025, int64), cast(5, int64), cast(5, int64)) else if eq(year, cast(2026, int64)) then (cast(2026, int64), cast(5, int64), cast(24, int64)) else if eq(year, cast(2027, int64)) then (cast(2027, int64), cast(5, int64), cast(13, int64)) else if eq(year, cast(2028, int64)) then (cast(2028, int64), cast(5, int64), cast(2, int64)) else if eq(year, cast(2029, int64)) then (cast(2029, int64), cast(5, int64), cast(20, int64)) else if eq(year, cast(2030, int64)) then (cast(2030, int64), cast(5, int64), cast(9, int64)) else (year, cast(5, int64), cast(8, int64)) }
+def hc_dragon_boat(year: int64) -> (int64, int64, int64) = { if eq(year, cast(2025, int64)) then (cast(2025, int64), cast(5, int64), cast(31, int64)) else if eq(year, cast(2026, int64)) then (cast(2026, int64), cast(6, int64), cast(19, int64)) else if eq(year, cast(2027, int64)) then (cast(2027, int64), cast(6, int64), cast(9, int64)) else if eq(year, cast(2028, int64)) then (cast(2028, int64), cast(5, int64), cast(28, int64)) else if eq(year, cast(2029, int64)) then (cast(2029, int64), cast(6, int64), cast(16, int64)) else if eq(year, cast(2030, int64)) then (cast(2030, int64), cast(6, int64), cast(5, int64)) else (year, cast(6, int64), cast(1, int64)) }
+def hc_mid_autumn_day_after(year: int64) -> (int64, int64, int64) = { if eq(year, cast(2025, int64)) then (cast(2025, int64), cast(10, int64), cast(7, int64)) else if eq(year, cast(2026, int64)) then (cast(2026, int64), cast(9, int64), cast(26, int64)) else if eq(year, cast(2027, int64)) then (cast(2027, int64), cast(9, int64), cast(16, int64)) else if eq(year, cast(2028, int64)) then (cast(2028, int64), cast(10, int64), cast(4, int64)) else if eq(year, cast(2029, int64)) then (cast(2029, int64), cast(9, int64), cast(23, int64)) else if eq(year, cast(2030, int64)) then (cast(2030, int64), cast(9, int64), cast(13, int64)) else (year, cast(9, int64), cast(15, int64)) }
+def hc_chung_yeung(year: int64) -> (int64, int64, int64) = { if eq(year, cast(2025, int64)) then (cast(2025, int64), cast(10, int64), cast(29, int64)) else if eq(year, cast(2026, int64)) then (cast(2026, int64), cast(10, int64), cast(18, int64)) else if eq(year, cast(2027, int64)) then (cast(2027, int64), cast(10, int64), cast(8, int64)) else if eq(year, cast(2028, int64)) then (cast(2028, int64), cast(10, int64), cast(26, int64)) else if eq(year, cast(2029, int64)) then (cast(2029, int64), cast(10, int64), cast(16, int64)) else if eq(year, cast(2030, int64)) then (cast(2030, int64), cast(10, int64), cast(5, int64)) else (year, cast(10, int64), cast(1, int64)) }
+def hc_triple_add_days(t: (int64, int64, int64), n: int64) -> (int64, int64, int64) = hc_triple(add_days(date(t.0, t.1, t.2), n))
+def hc_hkg_holidays_year(year: int64) -> List[(int64, int64, int64)] = {
+  new_year = (year, cast(1, int64), cast(1, int64))
+  lny_1 = hc_lunar_new_year_first(year)
+  lny_2 = hc_triple_add_days(lny_1, cast(1, int64))
+  lny_3 = hc_triple_add_days(lny_1, cast(2, int64))
+  good_fri = hc_triple(good_friday(year))
+  east_mon = hc_triple(easter_monday(year))
+  ching_ming = hc_ching_ming(year)
+  labour = (year, cast(5, int64), cast(1, int64))
+  buddha = hc_buddha_birthday(year)
+  dragon = hc_dragon_boat(year)
+  hksar = (year, cast(7, int64), cast(1, int64))
+  mid_autumn = hc_mid_autumn_day_after(year)
+  national = (year, cast(10, int64), cast(1, int64))
+  chung_yeung = hc_chung_yeung(year)
+  christmas = (year, cast(12, int64), cast(25, int64))
+  boxing = (year, cast(12, int64), cast(26, int64))
+  [new_year, lny_1, lny_2, lny_3, good_fri, east_mon, ching_ming, labour, buddha, dragon, hksar, mid_autumn, national, chung_yeung, christmas, boxing]
+}
+def hc_tyo_is_holiday(y: int64, m: int64, d: int64) -> bool = hc_list_contains_triple(hc_tyo_holidays_year(y), y, m, d)
+def hc_syd_is_holiday(y: int64, m: int64, d: int64) -> bool = hc_list_contains_triple(hc_syd_holidays_year(y), y, m, d)
+def hc_fra_is_holiday(y: int64, m: int64, d: int64) -> bool = hc_list_contains_triple(hc_fra_holidays_year(y), y, m, d)
+def hc_hkg_is_holiday(y: int64, m: int64, d: int64) -> bool = hc_list_contains_triple(hc_hkg_holidays_year(y), y, m, d)
