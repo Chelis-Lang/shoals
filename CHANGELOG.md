@@ -20,10 +20,13 @@ blocked on bucket-sensitivities / linearity-AD).
   Returns `(LR_cc, reject_at_5pct)` with critical value
   `χ²(2)₀.₉₅ ≈ 5.991`. Detects clustered exceptions that
   Kupiec POF alone misses.
-- **`Shoals.RiskExt.re_acerbi_szekely_es_z1`**, **`_z2`**, **`_z3`**
-  — Acerbi-Szekely 2014 ES backtests. All three sign-aligned:
-  negative Z → ES under-forecasting (see Scope notes for sign
-  convention).
+- **`Shoals.RiskExt.re_acerbi_szekely_es_z1`** and **`_z2`** —
+  Acerbi-Szekely 2014 ES backtests. Z1 is exception-conditional
+  (mean ratio over exception days); Z2 normalizes by `n·α`
+  (the unconditional form). Both sign-flipped: negative Z → ES
+  under-forecasting (see Scope notes). **Z3 deferred** — a
+  bit-identical clone of Z1 in the v0.18.0 base; pulled per
+  red-team finding, see Red-team fixups below.
 - **`Shoals.RiskExt.re_frtb_ima_zone_at_day`** — maps a
   250-day exception count to a Basel III FRTB-IMA traffic-
   light zone: `≤ 4 → Green (0)`, `5–9 → Yellow (1)`,
@@ -32,11 +35,11 @@ blocked on bucket-sensitivities / linearity-AD).
   `tensor[n - 249, int64]` of zone codes via rolling 250-day
   window.
 
-### Tests (12 across 2 files)
+### Tests (11 across 2 files)
 
-- `tests/riskext_backtest.ch` (7): clustered exceptions reject
+- `tests/riskext_backtest.ch` (6): clustered exceptions reject
   CC at 5%, evenly-spaced don't reject, no-exception finite/
-  non-negative LR, Z1/Z2/Z3 negative-on-under-forecast, Z1
+  non-negative LR, Z1/Z2 negative-on-under-forecast, Z1
   near-zero on perfect forecast.
 - `tests/riskext_frtb_zone.ch` (5): boundary mapping at
   `k ∈ {0, 4, 5, 9, 10, 15}`, rolling all-Green, threshold-5
@@ -81,12 +84,48 @@ aggregates both test files into a single JSON verdict.
 
 ### Known limitations
 
-- **Z3 uses empirical-rank proxy**, not the textbook
-  `F(loss)^-1 / es` form (no analytic loss CDF).
+- **Acerbi-Szekely Z3 deferred** — the base v0.18.0 shipped a
+  Z3 that was algebraically identical to Z1 (red-team caught
+  the duplication). Pulled from public exports + retired the
+  test. Implementing a genuine rank-based Z3 (Acerbi-Szekely
+  2014 §3.3, which uses the empirical CDF of losses ordered
+  in descending magnitude) requires either a true loss-CDF
+  estimator or a sorted-rank algorithm; deferred to a future
+  PR.
 - **Sensitivity-based VaR / FRTB-SBA** remains deferred —
   gates on bucket-sensitivities returning
   `Curve[Differentiable]` / `Surface[Differentiable]` which
   gates on linearity-AD.
+
+### Red-team fixups (applied before merge)
+
+Red-team against v0.18.0 base returned CONDITIONAL PASS with 1
+HIGH + 1 MEDIUM + 2 LOW:
+
+- **HIGH — `re_acerbi_szekely_es_z3` was a bit-identical clone
+  of Z1.** The implementation `1 - mean_ratio / mean_excep`
+  algebraically simplifies to `1 - sum_ratio / n_excep`, the
+  same formula as Z1. CHANGELOG falsely claimed Z3 was "rank-
+  based / empirical-rank proxy" but no rank operation was
+  present. Fix: pulled `re_acerbi_szekely_es_z3` from public
+  exports + deleted `test_acerbi_szekely_z3_underforecast_
+  negative`. Z3 is now a Known Limitation (see above).
+- **MEDIUM — `test_christoffersen_no_exceptions_no_reject`
+  misnamed**: the function body asserts only finiteness +
+  non-negativity, not `not(reject)` (the case actually rejects
+  because zero exceptions is also a miscalibration signal at
+  α=0.05, n=250). Renamed to
+  `test_christoffersen_no_exceptions_finite_lr`. CHANGELOG
+  Scope notes already documented the correct behavior.
+- **LOW — unused `alpha` on Z1/Z3** already documented.
+- **LOW — local gate full-suite runtime** is a pre-existing
+  issue (the cumulative test corpus from M-A through M-J
+  exceeds the gate's wall-clock target under `--jobs auto`
+  contention). Not introduced by M-J. The M-J manual gate
+  remains the authoritative milestone check.
+
+Final M-J: 5 exports (was 6, Z3 pulled), 11 tests (was 12,
+Z3 test removed).
 
 ## [0.17.0] — unreleased
 

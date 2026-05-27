@@ -1,7 +1,7 @@
 module Shoals.RiskExt
 import Nautilus.Stats (quantile_vec, mean_vec)
 import Shoals.Risk (historical_var, historical_cvar)
-export (mc_var, mc_expected_shortfall, expected_shortfall_frtb_975, scenario_pnl_grid, kupiec_pof_statistic_simple, re_frtb_ima_zone_at_day, re_frtb_ima_zone_rolling, re_christoffersen_cc, re_acerbi_szekely_es_z1, re_acerbi_szekely_es_z2, re_acerbi_szekely_es_z3)
+export (mc_var, mc_expected_shortfall, expected_shortfall_frtb_975, scenario_pnl_grid, kupiec_pof_statistic_simple, re_frtb_ima_zone_at_day, re_frtb_ima_zone_rolling, re_christoffersen_cc, re_acerbi_szekely_es_z1, re_acerbi_szekely_es_z2)
 def mc_var[n](losses: tensor[n, f32], confidence: f32) -> f32 = historical_var(losses, confidence)
 def mc_expected_shortfall[n](losses: tensor[n, f32], confidence: f32) -> f32 = historical_cvar(losses, confidence)
 def expected_shortfall_frtb_975[n](losses: tensor[n, f32]) -> f32 = mc_expected_shortfall(losses, cast(0.975, f32))
