@@ -6,6 +6,158 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.19.0] — unreleased
+
+Milestone K: closures push — cross-currency basis curves, Sobol
+1024-D runtime construction, international holiday tables
+(TYO/SYD/FRA/HKG), and Margrabe-Stulz + digital options. Closes
+the M2 / M1 / M3 / M5 small-wins backlog. **Final milestone of
+the v0.13.0 → v0.19.0 7-milestone push.**
+
+### Added
+
+- **`Shoals.Curves.CurveBasis[n]`** + helpers:
+  - `curve_basis_from_pillars[n](times, spreads) -> CurveBasis[n]`.
+  - `basis_spread_at[n](basis, t) -> f32` — linear interp.
+  - `discount_factor_with_basis[n, m](domestic, basis, t) -> f32`
+    — `exp(-(r_dom(t) + spread(t)) * t)`.
+  - `bootstrap_basis_curve[n, k](domestic, basis_quotes_times,
+    basis_quotes_spreads) -> CurveBasis[n]` — first-cut
+    pass-through of quotes; full basis-swap bootstrap is a
+    future PR.
+- **`Shoals.Rng.sobol_dim_runtime[n]`** +
+  **`sobol_point_runtime_at`** — 1024-D coverage with Sobol
+  Joe-Kuo native quality for dims 0-31 and a documented
+  Halton-on-cycled-primes fallback for dims 32-1023 (see Scope
+  notes). Promoting dims 32-1023 to true Joe-Kuo Sobol is
+  future work (embedding the ~10KB direction-number table or
+  generating from the primitive-polynomial recurrence).
+- **`Shoals.HolidayCal`** extension — international calendars:
+  - **TYO** (Tokyo): 16 holidays/year incl. Happy Monday days
+    and equinox lookups for 2025-2030.
+  - **SYD** (Sydney): 10 holidays/year with Mon-substitution
+    helper for New Year, Australia Day, Christmas, Boxing.
+  - **FRA** (Frankfurt): 9 holidays/year, Easter family via
+    existing `easter_sunday_gregorian` + 39/50-day offsets.
+  - **HKG** (Hong Kong): 16 holidays/year incl. 3-day Lunar
+    New Year + 6-year lookups for Ching Ming, Buddha's
+    Birthday, Dragon Boat, Mid-Autumn day-after, Chung Yeung.
+  - Public API: `hc_{tyo,syd,fra,hkg}_holidays_year` and
+    `hc_{tyo,syd,fra,hkg}_is_holiday` (8 functions; `hc_`
+    prefix per §7.1 — bare-city prefixes failed the lint).
+- **`Shoals.PricingExtended`** extension — closed-form
+  derivatives:
+  - `pe_margrabe_stulz(s1, s2, sigma1, sigma2, rho, q1, q2, t)`
+    — exchange option with dividend yields; reduces to
+    plain Margrabe at `q1 = q2 = 0`.
+  - `pe_asset_or_nothing_call/put` — digital options paying
+    `S_T` if in-the-money.
+  - `pe_cash_or_nothing_call/put` — digital options paying `$1`
+    if in-the-money. Decomposition identity
+    `BS_call = asset_or_nothing_call - K * cash_or_nothing_call`.
+
+### Tests (19 across 4 files)
+
+- `tests/curves_basis.ch` (5): zero-spread → domestic DF,
+  positive-spread → lower DF, triangle parity within `1e-4`,
+  inter-pillar linear interp, bootstrap pass-through.
+- `tests/rng_sobol_1024.ch` (5): dim 0 = van der Corput base 2,
+  dim 512 second-moment in `[0.30, 0.36]`, dim 1023 returns
+  finite values in `[0, 1)`, per-point and per-dim APIs agree,
+  max-dim accessors return 1024 / 32.
+- `tests/holidaycal_intl.ch` (5): TYO Coming-of-Age Day
+  2026-01-12, SYD Australia Day 2025-01-27 (observed),
+  FRA Tag der Deutschen Einheit 2025-10-03, HKG Lunar New
+  Year 2025-01-29, calendars-disagree-on-Christmas-Eve
+  invariant.
+- `tests/pricingextended_closedforms.ch` (4): Margrabe-Stulz
+  zero-yield reduction, yield lowers price, BS decomposition
+  identity, cash-digital put-call parity at r=0.
+
+### Manual gate
+
+`scripts/manual_gates/phase3l_shoals_oracle_closures.py`
+aggregates all 4 test files into a single JSON verdict.
+**PASS at 19/19** observed.
+
+### Scope notes
+
+- **Sobol 1024-D fallback for dims 32-1023**: dims 0-31 use
+  the M-A literal-tensor direction-number table at native
+  Sobol quality; dims 32-1023 fall back to
+  `halton_value(point_idx, prime_table[d_idx mod 50])`. Each
+  dim is deterministic and in `[0, 1)` but dims sharing a
+  prime (modulo 50) are correlated. Real Sobol Joe-Kuo at
+  1024-D requires the full `~10KB` direction-number table
+  or programmatic generation from primitive polynomials.
+- **Cross-currency basis bootstrap is a pass-through**: the
+  `bootstrap_basis_curve` API accepts market-quoted basis
+  spreads and stores them verbatim. A true basis-swap-quote
+  → basis-curve bootstrap (à la `bootstrap_multi` for IBOR
+  curves) is a future PR.
+- **HKG Lunar New Year** uses a 6-year (2025-2030) lookup
+  table for the Gregorian dates of Chinese-calendar holidays
+  — these aren't trivially formulaic from the Gregorian
+  date. Extending to other years requires growing the
+  lookup or wiring in a Chinese-calendar conversion library
+  (deferred).
+- **HKG/SYD calendars don't yet observe substitution rules
+  for Christmas / Boxing when they fall on a weekend** beyond
+  the minimal Mon-substitution helper used for SYD.
+
+### AD label
+
+- All new `Shoals.Curves.CurveBasis` defs: `AD: composed`
+  (closed-form interpolation + algebraic discount-factor
+  product).
+- `pe_margrabe_stulz`, `pe_*_or_nothing_*`: `AD: composed`
+  (closed-form Black-Scholes-like formulas).
+- `Shoals.HolidayCal.hc_*_*`: `AD: unsupported` (boolean +
+  integer-date output; discrete-domain).
+- `Shoals.Rng.sobol_*_runtime`: `AD: unproven-primitive`
+  (the runtime construction is a non-AD pseudo-random
+  source; gradient w.r.t. point_idx isn't meaningful).
+
+### Verification
+
+- `chelis reef build` green.
+- `chelis lint --check` zero blocking errors.
+- 19/19 tests pass.
+- Manual gate
+  `phase3l_shoals_oracle_closures.py`: **PASS** at 19/19.
+
+### Known limitations
+
+- **Sobol 1024-D fallback** — see Scope notes. Promoting to
+  true Joe-Kuo Sobol for dims 32-1023 is deferred.
+- **Cross-currency basis bootstrap is pass-through**, not a
+  true basis-swap bootstrap — see Scope notes.
+- **HKG Lunar New Year limited to 2025-2030 lookup** — see
+  Scope notes.
+
+## Final post-batch state (v0.13.0 → v0.19.0)
+
+Seven milestones (E through K) shipped on `shoals-grad` in
+this push. Cumulative additions:
+
+- **15 new src modules / module extensions** (`sabrpaths`,
+  `hullwhite`, `libormarketmodel`, `stochastic` extensions for
+  Kou, `trees`, `pde`, `lsm`, `heston` ext for Lewis/Lipton,
+  `dupire`, `modelfit` ext for BFGS + sequential pipeline +
+  SABR-init, `curves` ext for full IFT + basis, `cds`, `csa`,
+  `xva` ext for FVA/KVA/WWR, `riskext` ext for backtest suite,
+  `rng` ext for Sobol 1024-D, `holidaycal` ext for intl
+  calendars, `pricingextended` ext for Margrabe-Stulz +
+  digitals).
+- **~135 new tests** across 7 milestones (M-E 21 + M-F 32 +
+  M-G 9 + M-H 18 + M-I 22 + M-J 11 + M-K 19 + minor fixup
+  additions).
+- **7 new manual gates** under `scripts/manual_gates/`.
+- **Zero outstanding lint findings**.
+- **Each milestone wrapped with /red-team**, all PASS or
+  CONDITIONAL PASS with documented fixups applied before
+  merge.
+
 ## [0.18.0] — unreleased
 
 Milestone J: risk-reporting backtest suite. Closes the M9

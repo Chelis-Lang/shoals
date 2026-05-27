@@ -1,7 +1,7 @@
 module Shoals.Curves
 import Nautilus.Interpolation (linear_interp_sorted, spline_eval)
 import Nautilus.Roots (brent)
-export (CurveKind, YieldCurve, yield_curve_from_pillars, yield_curve_tagged, curve_kind, ois, ibor, sofr, sonia, estr, custom_curve, rate_at, spline_rate_at, log_linear_rate_at, nss_rate, discount_factor, bootstrap_zero_from_par, parallel_shift, key_rate_shift, twist, butterfly, scale_rates, Instrument, deposit, zero_coupon, cur_par_swap, instrument_tenor, instrument_market_price_or_rate, bootstrap_multi, bootstrap_multi_curve, bootstrap_residual_at_pillar, bootstrap_grad_diagonal, bootstrap_grad_at_solution, fd_bump_pillar_rate, instrument_validate, bootstrap_grad_full_jacobian)
+export (CurveKind, YieldCurve, yield_curve_from_pillars, yield_curve_tagged, curve_kind, ois, ibor, sofr, sonia, estr, custom_curve, rate_at, spline_rate_at, log_linear_rate_at, nss_rate, discount_factor, bootstrap_zero_from_par, parallel_shift, key_rate_shift, twist, butterfly, scale_rates, Instrument, deposit, zero_coupon, cur_par_swap, instrument_tenor, instrument_market_price_or_rate, bootstrap_multi, bootstrap_multi_curve, bootstrap_residual_at_pillar, bootstrap_grad_diagonal, bootstrap_grad_at_solution, fd_bump_pillar_rate, instrument_validate, bootstrap_grad_full_jacobian, CurveBasis, curve_basis_from_pillars, basis_spread_at, discount_factor_with_basis, bootstrap_basis_curve)
 type CurveKind =
   | Ois
   | Ibor
@@ -323,3 +323,17 @@ def bootstrap_grad_full_jacobian[m](paths_template: &tensor[m, f32], instruments
     reshape(to_tensor(flat), [m_len, m_len])
   } else cur_nan_jacobian(paths_template)
 }
+type CurveBasis[n] =
+  | CurveBasis { times: tensor[n, f32], spreads: tensor[n, f32] }
+def curve_basis_from_pillars[n](times: tensor[n, f32], spreads: tensor[n, f32]) -> CurveBasis[n] = CurveBasis { times: times, spreads: spreads }
+def basis_spread_at[n](basis: CurveBasis[n], t: f32) -> f32 = {
+  match basis with {
+    | CurveBasis { times: ts, spreads: ss } => linear_interp_sorted(ts, ss, t)
+  }
+}
+def discount_factor_with_basis[n, m](domestic: YieldCurve[n], basis: CurveBasis[m], t: f32) -> f32 = {
+  r_dom = rate_at(domestic, t)
+  s = basis_spread_at(basis, t)
+  exp(neg(mul(add(r_dom, s), t)))
+}
+def bootstrap_basis_curve[n, k](domestic: YieldCurve[k], basis_quotes_times: tensor[n, f32], basis_quotes_spreads: tensor[n, f32]) -> CurveBasis[n] = CurveBasis { times: basis_quotes_times, spreads: basis_quotes_spreads }
