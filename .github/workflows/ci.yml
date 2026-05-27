@@ -70,6 +70,26 @@ jobs:
       - name: chelis reef build
         run: chelis reef build
 
-      - name: chelis test (node-local parallel)
-        timeout-minutes: 90
-        run: chelis test tests/ --timeout 1800 --jobs 2
+      - name: Partition tests into two batches
+        run: |
+          set -euo pipefail
+          mkdir -p tests-batch-a tests-batch-b
+          i=0
+          for f in tests/*.ch; do
+            if [ $((i % 2)) -eq 0 ]; then
+              cp "$f" "tests-batch-a/$(basename "$f")"
+            else
+              cp "$f" "tests-batch-b/$(basename "$f")"
+            fi
+            i=$((i+1))
+          done
+          echo "Batch A: $(ls tests-batch-a/ | wc -l) files"
+          echo "Batch B: $(ls tests-batch-b/ | wc -l) files"
+
+      - name: chelis test — batch A
+        timeout-minutes: 30
+        run: chelis test tests-batch-a/ --timeout 1200 --jobs auto
+
+      - name: chelis test — batch B
+        timeout-minutes: 30
+        run: chelis test tests-batch-b/ --timeout 1200 --jobs auto
