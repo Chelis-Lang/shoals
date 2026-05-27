@@ -70,13 +70,29 @@ jobs:
       - name: chelis reef build
         run: chelis reef build
 
-      - name: chelis test (node-local parallel, line-buffered + heartbeat)
-        timeout-minutes: 60
+      - name: chelis test (per-file isolation)
+        timeout-minutes: 90
         run: |
           set -uo pipefail
-          ( while true; do printf '[heartbeat %s]\n' "$(date -u +%H:%M:%S)"; sleep 30; done ) &
-          HB_PID=$!
-          trap "kill $HB_PID 2>/dev/null || true" EXIT
-          stdbuf -oL -eL chelis test tests/ --timeout 1200 --jobs auto --json
-          rc=$?
-          exit $rc
+          failed=0
+          for f in tests/*.ch; do
+            echo "::group::$f"
+            start=$(date -u +%s)
+            timeout --foreground --kill-after=15s 900 \
+              stdbuf -oL chelis test "$f" --timeout 600 --jobs 1
+            rc=$?
+            end=$(date -u +%s)
+            echo "::endgroup::"
+            elapsed=$((end - start))
+            if [ $rc -ne 0 ]; then
+              failed=$((failed + 1))
+              echo "::error file=$f::exit=$rc elapsed=${elapsed}s"
+            else
+              echo "::notice file=$f::pass elapsed=${elapsed}s"
+            fi
+          done
+          if [ $failed -gt 0 ]; then
+            echo "TOTAL FAILED FILES: $failed" >&2
+            exit 1
+          fi
+          echo "All test files passed."
