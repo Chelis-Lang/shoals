@@ -6,6 +6,88 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.18.0] — unreleased
+
+Milestone J: risk-reporting backtest suite. Closes the M9
+continuation backlog (sensitivity-based VaR remains upstream-
+blocked on bucket-sensitivities / linearity-AD).
+
+### Added
+
+- **`Shoals.RiskExt.re_christoffersen_cc`** — Christoffersen
+  1998 conditional-coverage test combining Kupiec POF (LR_uc)
+  with a first-order Markov serial-independence test (LR_ind).
+  Returns `(LR_cc, reject_at_5pct)` with critical value
+  `χ²(2)₀.₉₅ ≈ 5.991`. Detects clustered exceptions that
+  Kupiec POF alone misses.
+- **`Shoals.RiskExt.re_acerbi_szekely_es_z1`**, **`_z2`**, **`_z3`**
+  — Acerbi-Szekely 2014 ES backtests. All three sign-aligned:
+  negative Z → ES under-forecasting (see Scope notes for sign
+  convention).
+- **`Shoals.RiskExt.re_frtb_ima_zone_at_day`** — maps a
+  250-day exception count to a Basel III FRTB-IMA traffic-
+  light zone: `≤ 4 → Green (0)`, `5–9 → Yellow (1)`,
+  `≥ 10 → Red (2)`.
+- **`Shoals.RiskExt.re_frtb_ima_zone_rolling`** — produces a
+  `tensor[n - 249, int64]` of zone codes via rolling 250-day
+  window.
+
+### Tests (12 across 2 files)
+
+- `tests/riskext_backtest.ch` (7): clustered exceptions reject
+  CC at 5%, evenly-spaced don't reject, no-exception finite/
+  non-negative LR, Z1/Z2/Z3 negative-on-under-forecast, Z1
+  near-zero on perfect forecast.
+- `tests/riskext_frtb_zone.ch` (5): boundary mapping at
+  `k ∈ {0, 4, 5, 9, 10, 15}`, rolling all-Green, threshold-5
+  Yellow, threshold-10 Red, window-slide invariant on 251
+  days.
+
+### Manual gate
+
+`scripts/manual_gates/phase3l_shoals_oracle_risk_backtest_suite.py`
+aggregates both test files into a single JSON verdict.
+**PASS at 12/12** observed.
+
+### Scope notes
+
+- **Acerbi-Szekely Z sign convention flipped**: the literature
+  defines `Z = mean[I·loss/ES] / α - 1` (positive for
+  under-forecasting). The shipped implementation returns
+  `1 - mean[ratio]` so all three Z statistics share a single
+  NEGATIVE-on-under-forecast convention. Don't compare raw
+  values against textbook tables without re-checking sign.
+- **No-exception Christoffersen LR is not zero-reject**:
+  `n=250, α=0.05`, zero exceptions yields `LR_uc ≈ 25.65 > 5.99`
+  (rejecting because zero exceptions is also a miscalibration
+  signal). The corresponding test asserts finiteness + non-
+  negativity instead of `reject=false`.
+- **`re_acerbi_szekely_es_z1` and `_z3` accept an `alpha`
+  parameter that is unused** — kept for API uniformity with
+  Z2 (which uses it for `n·α` normalization).
+
+### AD label
+
+- All 6 new defs: `AD: composed` for numerical ops; gradient
+  w.r.t. the loss series isn't meaningful (control-flow on
+  threshold comparison).
+
+### Verification
+
+- `chelis reef build` green.
+- `chelis lint --check` zero blocking errors.
+- 12/12 tests pass.
+- Manual gate: **PASS** at 12/12.
+
+### Known limitations
+
+- **Z3 uses empirical-rank proxy**, not the textbook
+  `F(loss)^-1 / es` form (no analytic loss CDF).
+- **Sensitivity-based VaR / FRTB-SBA** remains deferred —
+  gates on bucket-sensitivities returning
+  `Curve[Differentiable]` / `Surface[Differentiable]` which
+  gates on linearity-AD.
+
 ## [0.17.0] — unreleased
 
 Milestone I: XVA expansion. Closes the M7 continuation backlog
