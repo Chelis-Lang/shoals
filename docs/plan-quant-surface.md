@@ -177,10 +177,10 @@ can incorporate it later.
 **Tag:** `FN+V` (functional surface ships; verified-AD label per export gates on AdjointTyping theorem upstream).
 **Spec sections:** §2.1, §2.2, §2.3, §2.4, §2.5, §2.6.
 **Status (as landed):** initial v0.1.0 slice + Milestone A
-continuation at v0.9.0. Initial: Date, Calendar (renamed
-`HolidayCal` in v0.8.1), Tenor programmatic constructors,
-MarketData, 4-function Distributions. **v0.9.0 (Milestone A in
-`/home/jeff/.claude/plans/vectorized-wiggling-kahn.md`)**:
+continuation at v0.9.0 + Milestone K closures at v0.19.0. Initial:
+Date, Calendar (renamed `HolidayCal` in v0.8.1), Tenor programmatic
+constructors, MarketData, 4-function Distributions. **v0.9.0
+(Milestone A in `/home/jeff/.claude/plans/vectorized-wiggling-kahn.md`)**:
 - `Shoals.Rng` shipped (Sobol with Joe-Kuo direction-number table
   at 32-D committed floor; Halton 50-D; variance-reduction
   combinators).
@@ -196,7 +196,20 @@ MarketData, 4-function Distributions. **v0.9.0 (Milestone A in
   Cholesky-based multivariate normal + exact `student_t_cdf`
   (replaces the v0.1.0 Fisher-Cornish approximation). v0.9.0
   CHANGELOG carries the v0.1.0 correction reference.
-See CHANGELOG `## [0.9.0]` for the full v0.9.0 breakdown.
+**v0.19.0 (Milestone K)**:
+- `Shoals.Rng` Sobol 1024-D nominal coverage via runtime
+  construction (`sobol_dim_runtime`, `sobol_point_runtime_at`);
+  native Joe-Kuo quality for dims 0-31, prime-modulo Halton
+  fallback for dims 32-1023 (the fallback yields ~50 unique
+  sequences across the nominal 992 fallback dims — documented
+  honestly in the CHANGELOG; full Joe-Kuo 1024-D remains a
+  workspace-gate-budget follow-up).
+- `Shoals.HolidayCal` TYO / SYD / FRA / HKG tables landed (closes
+  the M1.4 calendar enumeration). HKG Lunar New Year covered
+  2025-2030 with a year-range guard that returns `false` outside
+  the supported range.
+See CHANGELOG `## [0.9.0]` and `## [0.19.0]` for the full
+breakdowns.
 
 **Work packets (parallelizable):**
 
@@ -233,14 +246,20 @@ See CHANGELOG `## [0.9.0]` for the full v0.9.0 breakdown.
 **Spec sections:** §2.7.
 **Status (as landed):** first-ship slice at v0.2.0; M2.4a (forward
 bootstrap) closed at v0.10.0 (Milestone B PR-1); M2.4b (IFT gradient)
-closed at v0.10.1 (Milestone B PR-2). M2.4b ships per-pillar diagonal
-sensitivity only — full off-diagonal Jacobian deferred per the
-v0.10.1 Known Limitations. Curve operations
+closed at v0.10.1 (Milestone B PR-2); full off-diagonal IFT Jacobian
+closed at v0.16.0 (Milestone H) via `bootstrap_grad_full_jacobian`
+threading triangular forward-substitution through the cumulative-PV
+chain. Instrument-constructor input validation
+(`instrument_validate`) also landed at v0.16.0, closing the
+v0.10.1 input-validation known limitation. Curve operations
 (parallel/key-rate/twist/butterfly shifts, scale), curve kind
 discriminator (OIS / IBOR / SOFR / SONIA / ESTR / Custom), log-linear
 and Nelson-Siegel-Svensson interpolation all landed in the v0.2.0
-slice. Cross-currency basis curves and the M2.5 AD-doc-convention
-lint script remain follow-ups.
+slice. Cross-currency basis-curve type (`CurveBasis[n]` +
+`basis_spread_at` + `discount_factor_with_basis`) landed at v0.19.0
+(Milestone K) as a closure; the basis-curve bootstrap is currently
+a pass-through (basis-swap-quote → basis-curve full solve deferred).
+The M2.5 AD-doc-convention lint script remains a follow-up.
 
 **Work packets:**
 
@@ -271,18 +290,22 @@ lint script remain follow-ups.
 **Tag:** `FN` (functional ships; M3.4 Dupire local vol cannot be differentiated through until upstream higher-order AD lands).
 **Spec sections:** §2.8.
 **Status (as landed):** v0.3.0 SVI slice + v0.9.0 SABR-Hagan
-extension (Milestone A). SVI parameterization (5 params),
-ATM / skew / parallel / smile shifts, implied-vol-from-Black-Scholes
-solver via bisection (60 iterations, 1e-6 tolerance; round-trips to
-1e-3). **v0.9.0**: SABR-Hagan analytic implied vol (Hagan 2002
-simplified expansion) — `vs_sabr_implied_vol`,
+extension (Milestone A) + v0.15.0 Dupire functional + cubic-in-log-
+moneyness × time interpolation (Milestone G). SVI parameterization
+(5 params), ATM / skew / parallel / smile shifts, implied-vol-from-
+Black-Scholes solver via bisection (60 iterations, 1e-6 tolerance;
+round-trips to 1e-3). **v0.9.0**: SABR-Hagan analytic implied vol
+(Hagan 2002 simplified expansion) — `vs_sabr_implied_vol`,
 `vs_sabr_atm_implied_vol`, three shift constructors. Smile shape
 verified by hand: rho=-0.3 produces equity-style negative skew.
 Bessel functions intentionally not used (simplified Hagan formula
 doesn't need them; exact-mass correction at zero strikes via Lewis
-2009 is a future continuation that would). Still deferred:
-Dupire local volatility (blocked on upstream higher-order AD per
-spec §3.4), cubic-in-log-moneyness × time interpolation.
+2009 is a future continuation that would). **v0.15.0**:
+`Shoals.Dupire.dupire_local_vol` evaluates the Dupire formula on a
+parametric IV-surface closure (functional only — differentiation
+through Dupire remains upstream-blocked on higher-order AD per spec
+§3.4); cubic-in-log-moneyness × time interpolation in
+`Shoals.VolSurface`.
 
 **Work packets:**
 
@@ -312,14 +335,23 @@ spec §3.4), cubic-in-log-moneyness × time interpolation.
 **Tag:** `FN+V` (functional ships; verified-AD label gates on effect-AD interaction theorem for any process exercised through MC).
 **Spec sections:** §2.9.
 **Status (as landed):** first-ship slice at v0.4.0; M4.1 (Heston QE)
-closed at v0.11.0 (Milestone C) — Andersen 2007 quadratic-exponential
-variance discretization with the pinned Feller-violation stress
-config, batched `heston_qe_paths_terminal[n]` driver, variance
-non-negativity verified at the manual gate. The v0.4.0 slice carried
-Merton jump-diffusion with compensated drift and 2-asset correlated
-GBM via a hand-rolled 2x2 Cholesky helper. SABR path simulation
-(M4.2), Hull-White 1F/2F (M4.4), LMM (M4.5), HJM (M4.6), and Kou
-double-exponential jumps remain M4-continuation items.
+closed at v0.11.0 (Milestone C); M4.2 (SABR paths), M4.3 (Kou
+double-exponential jumps), M4.4 (Hull-White 1F+2F + analytic Vasicek
+bond), M4.5 (Libor Market Model), and M4.6 (HJM) all closed at
+v0.13.0 (Milestone E). The v0.4.0 slice carried Merton jump-diffusion
+with compensated drift and 2-asset correlated GBM via a hand-rolled
+2x2 Cholesky helper. **v0.11.0**: Andersen 2007 QE variance
+discretization with the pinned Feller-violation stress config,
+batched `heston_qe_paths_terminal[n]` driver, variance non-negativity
+verified at the manual gate. **v0.13.0** Milestone-E surface:
+`Shoals.SabrPaths.sabr_qe_paths_terminal[n]` Euler-Maruyama on the
+joint SABR process with reflection, `Shoals.HullWhite.hw1f_path[n]` /
+`hw2f_path[n]` + closed-form `hw1f_bond_price` (constant-θ_bar
+anchor), `Shoals.LiborMarketModel` LMM with shifted-lognormal drift
++ HJM no-arb drift step, `Shoals.Stochastic.sto_kou_*` Kou double-
+exponential jump terminal + compensator. LMM ships single-forward
+return only pending a 3D-tensor `Std.Tensor.stack` outer-dim-pin
+resolution.
 
 **Process-pricer AD pairing matrix (spec-pinned in §3.3) governs what each process expects from the pricer side; M5 obeys the same matrix.**
 
@@ -350,14 +382,27 @@ double-exponential jumps remain M4-continuation items.
 
 **Tag:** `FN` (functional ships; verified-AD label gates on multiple upstream theorems per pricer family — see matrix in §3.3).
 **Spec sections:** §2.10.
-**Status (as landed):** first-ship closed-form slice at v0.5.0; M5.5
-(Fourier methods, Carr-Madan branch) closed at v0.11.0 (Milestone C)
-— Heston characteristic function via Albrecher "little Heston trap"
-form + inline complex shim + panel-wise Gauss-Legendre quadrature.
-The v0.5.0 slice carried Bachelier, Black, Garman-Kohlhagen, and
-Margrabe with put-call parity and BS-reduction identity checks.
-Tree methods (M5.2), PDE methods (M5.3), Longstaff-Schwartz (M5.4),
-and the Lewis / Lipton variants of M5.5 remain M5-continuation items.
+**Status (as landed):** first-ship closed-form slice at v0.5.0;
+M5.5 Carr-Madan closed at v0.11.0 (Milestone C); M5.2 (trees),
+M5.3 (PDE), M5.4 (LSM), and the M5.5 Lewis + Lipton variants all
+closed at v0.14.0 (Milestone F); M5.1 closure pieces (Margrabe-Stulz
++ digital closed-forms) landed at v0.19.0 (Milestone K). The v0.5.0
+slice carried Bachelier, Black, Garman-Kohlhagen, and Margrabe with
+put-call parity and BS-reduction identity checks. **v0.14.0**:
+`Shoals.Trees` (CRR/Tian/JR binomial + Boyle trinomial) with
+`tr_sigma_floor` degenerate-σ-limit guard; `Shoals.Pde` (Crank-
+Nicolson with Rannacher first-two-step smoothing + 2-D ADI via a
+local Thomas tridiagonal solver); `Shoals.Lsm` (Longstaff-Schwartz
+American MC with constant/S/S² polynomial basis); `Shoals.Heston`
+Lewis 2001 + Lipton single-integral inversion alongside the
+existing Carr-Madan path. **v0.19.0**:
+`Shoals.PricingExtended.pe_margrabe_stulz` (Stulz extension at
+non-zero dividend yield) + `pe_asset_or_nothing_{call,put}` +
+`pe_cash_or_nothing_{call,put}` digital options. Per the M-F
+known limitations, LSM at the host evaluator is scoped to ≤256
+paths × ≤50 steps; tree pricers below σ < 1e-3 dispatch to a
+deterministic intrinsic shortcut (not a true degenerate-tree
+recurrence).
 
 **Work packets (parallelizable across pricer families):**
 
@@ -426,13 +471,27 @@ through `grad`.
 
 **Tag:** `FN` shipping; verified-AD label gates on effect-AD AND (for portfolios with exercise decisions) control-flow AD.
 **Spec sections:** §2.12.
-**Status (as landed):** first-ship core slice complete at v0.7.0.
-Constant-hazard survival / default probability, constant-rate
-discount factor, EPE/ENE aggregators, pointwise 2-deal netting, CVA
-and DVA aggregators over a discrete time grid. 179/179 tests pass.
-Stochastic hazard / term-structured CDS bootstrap, FVA, KVA,
-wrong-way risk, multi-CSA netting, and stochastic recovery are
-explicit M7-continuation items per the CHANGELOG.
+**Status (as landed):** first-ship core slice complete at v0.7.0;
+M7-continuation closures landed at v0.17.0 (Milestone I) — CDS
+bootstrap, stochastic-hazard CVA, FVA, KVA, wrong-way risk CVA, and
+multi-CSA netting. The v0.7.0 slice carried constant-hazard
+survival / default probability, constant-rate discount factor,
+EPE/ENE aggregators, pointwise 2-deal netting, and CVA / DVA
+aggregators over a discrete time grid. **v0.17.0**: `Shoals.Cds`
+(HazardCurve[n] type + per-pillar CDS-spread bootstrap via brent
+on the protection-leg ↔ premium-leg residual);
+`Shoals.Xva.xva_cva_stochastic_hazard` evaluating
+`Q(t) = exp(−∫₀ᵗ h(u) du)` via piecewise-constant integration over
+hazard pillars; `Shoals.Xva.fva` + `xva.kva` additive valuation
+adjustments; `Shoals.Xva.xva_cva_wwr_constant_hazard` Gaussian-
+copula WWR; `Shoals.Csa.multi_csa_netting` with TH/MTA/IA/haircut
+and negative-exposure clip. Known limitations: WWR is constant-
+hazard only (stochastic-hazard variant deferred); CDS protection-
+leg uses fixed monthly inner discretization regardless of premium
+frequency. **`xva_cva_stochastic_recovery` pulled** from public
+exports at v0.17.0 pending an upstream fix to
+`Nautilus.Distributions.gamma_sample_ge1_try` (the scalar-extract
+fold-reducer returns 0 deterministically, making the MC inert).
 
 **Work packets:**
 
@@ -461,16 +520,25 @@ explicit M7-continuation items per the CHANGELOG.
 **Spec sections:** §2.13.
 **Status (as landed):** first-ship slice at v0.8.0; M8.2 (vectorized
 LM + multi-target SABR-fit smoke gate) closed at v0.12.0
-(Milestone D) — standalone `lm_bounded_nparam` with bound projection,
-Marquardt-scaled damping, weighted residuals, diagnostic 5-tuple
-return; `multi_target_fit` alias; SABR smoke gate with warm-start
-well-conditioned case + OR-shaped failure-diagnostic ill-conditioned
-case. Host-evaluator floor ~3% rel-IV; spec's 0.5% target gates on
+(Milestone D); SABR smart-initialization (closing the v0.12.0
+cold-start known limitation) closed at v0.15.0 (Milestone G); BFGS
+with bounds + sequential pipeline closed at v0.16.0 (Milestone H).
+Host-evaluator floor ~3% rel-IV; spec's 0.5% target still gates on
 verified-AD per the v0.12.0 Known Limitations. The v0.8.0 slice
 carried weighted-LS / WL1 / vega-weighted residuals, SSE loss, and a
-single-parameter bound-clamped LM step. BFGS with bounds, SQP,
-sequential pipeline, smart-initialization for SABR cold-start, and
-KKT-aware Greeks through the LM remain M8-continuation items.
+single-parameter bound-clamped LM step. **v0.12.0**: standalone
+`lm_bounded_nparam` with bound projection, Marquardt-scaled damping,
+weighted residuals, diagnostic 5-tuple return; `multi_target_fit`
+alias. **v0.15.0**: `mf_sabr_smart_initializer` heuristic-based
+initial-guess (α₀ from ATM IV, ρ₀ from ±10%-moneyness skew, ν₀
+from butterfly) + `mf_sabr_multi_start_initializer` 5-grid fallback,
+closing the M-D cold-start trapped-basin failure. **v0.16.0**:
+`bfgs_bounded_nparam` BFGS quasi-Newton with bound projection +
+Armijo backtracking + descend-guarded convergence flag;
+`sequential_pipeline_2stage` + `sequential_pipeline_2stage_gradient`
+FD-chain gradient through curves → SABR. SQP, KKT-aware Greeks
+through the LM, and per-stage IFT composition (vs the current
+FD-bump pipeline gradient) remain M8-continuation items.
 
 **Work packets:**
 
@@ -500,14 +568,21 @@ KKT-aware Greeks through the LM remain M8-continuation items.
 
 **Tag:** `FN` (functional ships; verified-AD label gates on effect-AD for any MC-based VaR / ES).
 **Spec sections:** §2.14.
-**Status (as landed):** first-ship slice complete at v0.8.0. MC VaR
-/ ES (alias to historical quantile / tail-mean on MC-simulated
-losses), FRTB-IMA 97.5% ES helper, linear scenario PnL grid,
-Kupiec POF backtest statistic. 201/201 tests pass.
-Christoffersen CC, Acerbi-Szekely ES backtest, sensitivity-based
-VaR (gates on M6.3 bucket sensitivities), and the 250-day FRTB-IMA
-zone classifier are explicit M9-continuation items per the
-CHANGELOG.
+**Status (as landed):** first-ship slice complete at v0.8.0;
+Christoffersen CC, Acerbi-Szekely ES backtest, and the 250-day
+FRTB-IMA zone classifier all closed at v0.18.0 (Milestone J). The
+v0.8.0 slice carried MC VaR / ES (alias to historical quantile /
+tail-mean on MC-simulated losses), FRTB-IMA 97.5% ES helper, linear
+scenario PnL grid, and Kupiec POF backtest statistic. **v0.18.0**:
+`Shoals.RiskExt.re_christoffersen_cc` (unconditional-coverage Kupiec
+combined with serial-independence test on exception clustering);
+`re_acerbi_szekely_es_z1` + `re_acerbi_szekely_es_z2` (Acerbi-Szekely
+2014 statistics — Z3 was pulled per red-team finding that the
+implementation algebraically equalled Z1; a real rank-based Z3 is
+a future continuation); `re_frtb_ima_zone_at_day` +
+`re_frtb_ima_zone_rolling` for 250-day rolling Green/Yellow/Red
+classification. Sensitivity-based VaR (M9.5) remains upstream-
+blocked on M6.3 bucket sensitivities (linearity-AD theorem).
 
 **Work packets:**
 
