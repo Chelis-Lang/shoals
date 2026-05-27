@@ -130,3 +130,12 @@ def test_full_jacobian_returns_nan_for_invalid_input() -> unit ! { Test } = {
   is_nan = if eq(v0, v0) then false else true
   assert_true(is_nan, "invalid instrument list yields a sentinel-NaN Jacobian (caller can test eq(v, v))")
 }
+def test_instrument_validate_zc_price_boundary() -> unit ! { Test } = {
+  _ = assert_true(instrument_validate(zero_coupon(cast(1.0, f32), cast(1.0, f32))), "ZC at exactly price=1.0 is accepted (z=0 is in brent bracket)")
+  _ = assert_true(not(instrument_validate(zero_coupon(cast(1.0, f32), cast(1.0001, f32)))), "ZC at price>1 is rejected")
+  assert_true(instrument_validate(zero_coupon(cast(1.0, f32), cast(0.001, f32))), "ZC at very small positive price is accepted")
+}
+def test_instrument_validate_deposit_rate_boundary() -> unit ! { Test } = {
+  _ = assert_true(not(instrument_validate(deposit(cast(1.0, f32), cast(-1.0, f32)))), "Deposit at r=-1 rejected (boundary)")
+  assert_true(instrument_validate(deposit(cast(1.0, f32), cast(-0.999, f32))), "Deposit at r=-0.999 accepted")
+}

@@ -118,7 +118,14 @@ aggregates all three test files into a single JSON verdict.
   default; matches scipy.optimize). On pathologically non-
   monotone surfaces, the line search returns the smallest
   `α = 0.5²⁰ ≈ 1e-6` step and the iteration continues; not a
-  divergence, just slow convergence.
+  divergence, just slow convergence. The convergence flag is
+  now guarded by `descended = sse_new < sse` so a line-search
+  exhaustion doesn't silently report `converged = true` (see
+  Red-team fixups below).
+- **Par-swap residual uses `τ = 1` per coupon period** —
+  Shoals convention since v0.10 (annual periodicity). The IFT
+  off-diagonal derivation inherits this. Sub-annual swap
+  schedules require a future generalization.
 - **Pipeline gradient via full FD bump costs `m1 + 1`
   pipeline evaluations.** For larger `m1` (many market inputs)
   this becomes expensive at the host evaluator. A composed
@@ -128,6 +135,31 @@ aggregates all three test files into a single JSON verdict.
   `[-0.5, 2.0]`** — inputs whose implied zero exceeds the
   bracket produce NaN sentinels (same behavior as
   `bootstrap_grad_at_solution`).
+
+### Red-team fixups (applied before merge)
+
+Red-team against v0.16.0 base returned PASS with 2 MEDIUM + 2
+LOW. Both MEDIUMs addressed:
+
+- **MEDIUM-1 — BFGS could falsely report `converged=true`
+  after line-search exhaustion.** When 20 backtracks exhausted
+  with `sse_try > sse_curr`, the small `|sse - sse_new|` was
+  treated as convergence. Fix: gate `sse_conv` on
+  `descended = lt(sse_new, sse)`; an uphill step never
+  counts toward convergence. Existing `test_bfgs_converged_
+  flag_easy_problem` still PASS — the fix is monotonicity-
+  preserving.
+- **MEDIUM-2 — `instrument_validate` boundary tests missing.**
+  Added 2 tests: `test_instrument_validate_zc_price_boundary`
+  (price=1.0 accepted, price=1.0001 rejected, price=0.001
+  accepted) and `test_instrument_validate_deposit_rate_
+  boundary` (r=-1 rejected, r=-0.999 accepted).
+- **LOW (self-referential pipeline-gradient test)** and **LOW
+  (par-swap τ=1 convention)** documented in Known
+  Limitations above; no code change.
+
+Final test count: 18 (M-H total) = 5 BFGS + 10 IFT-full + 3
+pipeline.
 
 ## [0.15.0] — unreleased
 

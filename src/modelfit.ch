@@ -354,7 +354,8 @@ def mf_bfgs_rec[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32
     grad_conv = lt(grad_norm, mul(tol, scale_ref))
     rel_drop = if eq(sse, cast(0.0, f32)) then cast(0.0, f32) else div(sub(sse, sse_new), sse)
     abs_rel_drop = if lt(rel_drop, cast(0.0, f32)) then neg(rel_drop) else rel_drop
-    sse_conv = lt(abs_rel_drop, tol)
+    descended = lt(sse_new, sse)
+    sse_conv = if descended then lt(abs_rel_drop, tol) else false
     now_converged = if grad_conv then true else sse_conv
     if now_converged then {
       _ = drop(g_new)
