@@ -34,10 +34,10 @@ GATE_NAME = "phase3l_shoals_oracle_american_pde_zoo"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 TEST_FILES = [
-    ("trees", "tests/trees.ch"),
-    ("pde", "tests/pde.ch"),
-    ("lsm", "tests/lsm.ch"),
-    ("heston_fourier", "tests/heston.ch"),
+    ("trees", "tests-manual/trees.ch"),
+    ("pde", "tests-manual/pde.ch"),
+    ("lsm", "tests-manual/lsm.ch"),
+    ("heston_fourier", "tests-manual/heston.ch"),
 ]
 
 

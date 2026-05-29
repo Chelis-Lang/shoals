@@ -20,8 +20,8 @@ export (hw1f_step, hw1f_path, hw1f_bond_price, hw2f_step, hw2f_path)
    a factor-of-two/sign typo relative to the SDE we simulate; we use
    the form that is consistent with hw1f_step / hw1f_path so the MC
    discount-factor mean and the analytic bond price agree to leading
-   order. The MC-vs-analytic test in tests/hull_white.ch verifies the
-   match to within 3 standard errors.
+   order. The MC-vs-analytic test in tests-manual/hull_white.ch verifies
+   the match to within 3 standard errors.
 
    Hull-White 2-factor (additive Gaussian-2, Brigo-Mercurio form):
      dx_t = -a * x_t dt + sigma_1 * dW_1

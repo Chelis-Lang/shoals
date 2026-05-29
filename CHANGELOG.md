@@ -6,6 +6,28 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Test layout: split fast unit tests from heavy benchmarks.** The
+  per-PR CI runner (`ubuntu-latest`, 4 vCPU) repeatedly SIGTERMed
+  (`exit 143`) on the full `chelis test tests/` invocation once the
+  v0.13.0–v0.19.0 push added the Monte-Carlo / PDE / Fourier /
+  optimization-benchmark suites. Those files run fine locally
+  (`scripts/run_local_gate.py`) but overrun the runner's wall-clock
+  ceiling. Moved the 11 heaviest files to a new `tests-manual/`
+  directory that CI does **not** glob:
+  `sabrpaths`, `modelfit_pipeline`, `trees`, `stochastic_kou`,
+  `pde`, `heston`, `xva_wwr`, `hull_white`, `rng`, `lsm`,
+  `modelfit_bfgs`. They remain fully covered: the milestone
+  manual-gate scripts run them by explicit path, and
+  `scripts/run_local_gate.py` gained a stage-5 `chelis test
+  tests-manual/`. CI still fmt-checks and lint-checks `tests-manual/`;
+  it just doesn't execute it. `tests/` keeps the 36 fast unit tests.
+- A likely upstream bug surfaced while diagnosing this: `chelis test`
+  kills its own process with SIGTERM and emits no per-test
+  failure record when a long-running test exceeds an implicit ceiling
+  that is stricter than `--timeout`. Candidate for an upstream filing.
+
 ## [0.19.0] — unreleased
 
 Milestone K: closures push — cross-currency basis curves, Sobol

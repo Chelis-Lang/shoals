@@ -59,40 +59,22 @@ jobs:
       - name: chelis fmt --check
         run: |
           set -euo pipefail
-          for f in src/*.ch properties/*.ch references/*.ch tests/*.ch; do
+          for f in src/*.ch properties/*.ch references/*.ch tests/*.ch tests-manual/*.ch; do
             [ -e "$f" ] || continue
             chelis fmt --check "$f"
           done
 
       - name: chelis lint --check
-        run: chelis lint --check src/ properties/ references/ tests/ manual-gates/
+        run: chelis lint --check src/ properties/ references/ tests/ tests-manual/ manual-gates/
 
       - name: chelis reef build
         run: chelis reef build
 
-      - name: chelis test (per-file isolation)
-        timeout-minutes: 90
-        run: |
-          set -uo pipefail
-          failed=0
-          for f in tests/*.ch; do
-            echo "::group::$f"
-            start=$(date -u +%s)
-            timeout --foreground --kill-after=15s 900 \
-              stdbuf -oL chelis test "$f" --timeout 600 --jobs 1
-            rc=$?
-            end=$(date -u +%s)
-            echo "::endgroup::"
-            elapsed=$((end - start))
-            if [ $rc -ne 0 ]; then
-              failed=$((failed + 1))
-              echo "::error file=$f::exit=$rc elapsed=${elapsed}s"
-            else
-              echo "::notice file=$f::pass elapsed=${elapsed}s"
-            fi
-          done
-          if [ $failed -gt 0 ]; then
-            echo "TOTAL FAILED FILES: $failed" >&2
-            exit 1
-          fi
-          echo "All test files passed."
+      # CI runs only the fast unit suite in tests/. The heavy MC / PDE /
+      # Fourier / optimization-benchmark files live in tests-manual/ and are
+      # exercised by the milestone manual-gate scripts + the local gate
+      # (scripts/run_local_gate.py stage 5), not here — they overrun the
+      # ubuntu-latest runner's wall-clock ceiling.
+      - name: chelis test (tests/ fast unit suite)
+        timeout-minutes: 30
+        run: chelis test tests/ --timeout 1200 --jobs auto

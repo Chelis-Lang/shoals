@@ -4,7 +4,7 @@
 Aggregates the three new pieces into a single PASS/FAIL verdict:
 
 - `Shoals.ModelFit.bfgs_bounded_nparam` — quasi-Newton optimizer
-  with bounds + diagnostics (5 tests in `tests/modelfit_bfgs.ch`).
+  with bounds + diagnostics (5 tests in `tests-manual/modelfit_bfgs.ch`).
 - `Shoals.Curves.bootstrap_grad_full_jacobian` + `instrument_validate`
   — full off-diagonal IFT Jacobian via triangular forward-substitution
   + input validation on `Instrument` constructors (8 tests in
@@ -12,7 +12,7 @@ Aggregates the three new pieces into a single PASS/FAIL verdict:
 - `Shoals.ModelFit.sequential_pipeline_2stage` +
   `sequential_pipeline_2stage_gradient` — chain curves → SABR/etc
   with IFT-threaded gradient via full-pipeline FD bump (3 tests in
-  `tests/modelfit_pipeline.ch`).
+  `tests-manual/modelfit_pipeline.ch`).
 
 Per-test acceptance lives in the .ch files. Gate re-runs all three,
 emits per-module pass/fail + total.
@@ -31,9 +31,9 @@ GATE_NAME = "phase3l_shoals_oracle_calibration_ii"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 TEST_FILES = [
-    ("bfgs", "tests/modelfit_bfgs.ch"),
+    ("bfgs", "tests-manual/modelfit_bfgs.ch"),
     ("full_jacobian", "tests/curves_bootstrap_ift_full.ch"),
-    ("sequential_pipeline", "tests/modelfit_pipeline.ch"),
+    ("sequential_pipeline", "tests-manual/modelfit_pipeline.ch"),
 ]
 
 
