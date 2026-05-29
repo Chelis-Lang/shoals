@@ -31,7 +31,9 @@ TEST_FILES = [
     ("xva_fva_kva", "tests/xva_fva_kva.ch"),
     ("xva_wwr", "tests-manual/xva_wwr_heavy.ch"),
     ("csa", "tests/csa.ch"),
-    ("xva_stochastic_recovery", "tests/xva_stochastic_recovery.ch"),
+    # xva_stochastic_recovery was pulled in M-I (upstream Nautilus
+    # gamma_sample bug makes the MC statistically inert); its test file
+    # was deleted, so it is intentionally absent from this gate.
 ]
 
 
