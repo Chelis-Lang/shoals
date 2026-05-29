@@ -1,6 +1,6 @@
 module Shoals.Tests.Trees
 import Std.Test (assert_true)
-import Shoals.Trees (tr_crr_european_call, tr_crr_european_put, tr_crr_american_call, tr_crr_american_put, tr_tian_european_call, tr_tian_european_put, tr_jr_european_call, tr_jr_european_put)
+import Shoals.Trees (tr_crr_european_call, tr_crr_european_put, tr_crr_american_call, tr_crr_american_put, tr_tian_european_call, tr_tian_european_put, tr_jr_european_call, tr_jr_european_put, tr_trinomial_european_call)
 def tr_abs(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 def test_crr_put_call_parity_european() -> unit ! { Test } = {
   s0 = cast(100.0, f32)
@@ -54,5 +54,10 @@ def test_crr_american_put_ge_european() -> unit ! { Test } = {
 def test_crr_low_sigma_returns_deterministic_intrinsic() -> unit ! { Test } = {
   call_low = tr_crr_european_call(cast(100.0, f32), cast(90.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.0000001, f32), cast(1.0, f32), cast(5, int64))
   expected = sub(cast(100.0, f32), mul(cast(90.0, f32), exp(neg(cast(0.05, f32)))))
-  assert_true(lt(tr_abs(sub(call_low, expected)), cast(0.001, f32)), "CRR at sigma=1e-7 returns deterministic forward intrinsic S0 - K*exp(-rT) (sigma-floor guard, no NaN)")
+  tian_low = tr_tian_european_call(cast(100.0, f32), cast(90.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.0000001, f32), cast(1.0, f32), cast(5, int64))
+  tri_low = tr_trinomial_european_call(cast(100.0, f32), cast(90.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.0000001, f32), cast(1.0, f32), cast(5, int64))
+  crr_ok = lt(tr_abs(sub(call_low, expected)), cast(0.001, f32))
+  tian_ok = eq(tian_low, tian_low)
+  tri_ok = eq(tri_low, tri_low)
+  assert_true(and(crr_ok, and(tian_ok, tri_ok)), "CRR/Tian/Trinomial at sigma=1e-7 hit the deterministic sigma-floor guard with no NaN: CRR returns forward intrinsic S0-K*exp(-rT), Tian and Trinomial are finite (eq(x,x))")
 }
