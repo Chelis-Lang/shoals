@@ -8,6 +8,13 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Toolchain bump to chelis 0.7.19.** `reef.toml` moves
+  `compiler =0.7.16 → =0.7.19`, `nautilus 0.7.16 → 0.7.18`,
+  `coral 0.7.15 → 0.7.17`; `chelis-std` stays `0.3.0`. nautilus 0.7.18
+  and coral 0.7.17 are released pinning compiler `=0.7.19`, so this is a
+  follow-the-cascade bump, not a unilateral compiler lead. CI/release
+  workflows derive versions from `reef.toml` (no workflow edits);
+  `reef.lock` is gitignored and regenerated per build.
 - **Test layout: split fast unit tests from heavy benchmarks.** The
   per-PR CI runner (`ubuntu-latest`, 4 vCPU) repeatedly SIGTERMed
   (`exit 143`) on the full `chelis test tests/` invocation once the
