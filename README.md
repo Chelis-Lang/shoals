@@ -6,7 +6,7 @@ Ships as a reef package under the `Shoals` module prefix.
 
 ## Status
 
-v0.9.0 (unreleased). M0-M9 milestone sweep complete + Milestone A
+v0.19.1. M0-M9 milestone sweep complete + Milestone A
 (foundations cleanup). Full slice:
 M0 baseline + M1 foundations (Date, Calendar, Tenor, MarketData,
 Distributions) + M2 yield-curve sensitivity ops
@@ -68,7 +68,7 @@ ground-truth oracles that `Shoals.Pricing`, `Shoals.Risk`, and
 `properties/` ships function bodies for the canonical finance
 properties (put-call parity, call-bounded-by-spot, finite-difference
 delta/vega smoke, MC-reproducibility, bull/butterfly-spread
-no-arbitrage). Status: mixed. The compiler v0.7.19 does not yet
+no-arbitrage). Status: mixed. The compiler v0.7.20 does not yet
 parse `@property` annotations and ships no `chelis fuzz` subcommand;
 the property bodies are written as plain `def name(...) -> bool`
 ready to flip to `@property` when the tool ships. See
@@ -83,19 +83,19 @@ that adds grad-derived Greek properties re-evaluates.
 
 ## Toolchain
 
-Pinned to `chelis v0.7.19` in `reef.toml`:
+Pinned to `chelis v0.7.20` in `reef.toml`:
 
 ```toml
 [package]
-compiler = "=0.7.19"
+compiler = "=0.7.20"
 ```
 
 Dependencies resolve via the local Reef registry (`~/.chelis/reef/`):
 
 * `chelis-std` 0.3.0 — standard library
-* `nautilus`   0.7.18 — distributions, special functions, stats,
+* `nautilus`   0.7.19 — distributions, special functions, stats,
   interpolation
-* `coral`      0.7.17 — dataframe runtime (transitively required for
+* `coral`      0.7.18 — dataframe runtime (transitively required for
   the same `nautilus` minor version)
 
 ## Build
@@ -206,7 +206,7 @@ runtime suite; the monorepo oracle remains a separate manual gate.
    with implicit-differentiation gradient through the joint solve is
    an M2-continuation candidate per `docs/plan-quant-surface.md`.
 5. **`erfc` direct routing.** Per Chelis architecture, special
-   functions live in `Nautilus.Special`. As of `nautilus 0.7.18`
+   functions live in `Nautilus.Special`. As of `nautilus 0.7.19`
    Shoals routes Black-Scholes through `Nautilus.Special.erfc`
    directly (computing `0.5 * erfc(-x / sqrt(2))` for the standard
    normal CDF), bypassing the higher-level distribution wrapper. No
@@ -220,8 +220,8 @@ following the chelis-reef v0.4.1 multi-source-roots fix
 (`6b58030 feat(reef): multi-source-roots — additional_sources in reef.toml;
 bump v0.4.1`). The reef.toml declares
 `additional_sources = ["properties", "references"]`. v0.1.0 carries the
-canonical layout forward and pins chelis 0.7.19, nautilus 0.7.18, and
-coral 0.7.17. (References to the pre-reset v0.7.x numbering point at
+canonical layout forward and pins chelis 0.7.20, nautilus 0.7.19, and
+coral 0.7.18. (References to the pre-reset v0.7.x numbering point at
 the historical version track and remain valid as release-history
 records; current planning lives on Shoals's own track per
 `docs/plan-quant-surface.md`.)

@@ -6,12 +6,14 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-05-29
+
 ### Changed
 
-- **Toolchain bump to chelis 0.7.19.** `reef.toml` moves
-  `compiler =0.7.16 → =0.7.19`, `nautilus 0.7.16 → 0.7.18`,
-  `coral 0.7.15 → 0.7.17`; `chelis-std` stays `0.3.0`. nautilus 0.7.18
-  and coral 0.7.17 are released pinning compiler `=0.7.19`, so this is a
+- **Toolchain bump to chelis 0.7.20.** `reef.toml` moves
+  `compiler =0.7.16 → =0.7.20`, `nautilus 0.7.16 → 0.7.19`,
+  `coral 0.7.15 → 0.7.18`; `chelis-std` stays `0.3.0`. nautilus 0.7.19
+  and coral 0.7.18 are released pinning compiler `=0.7.20`, so this is a
   follow-the-cascade bump, not a unilateral compiler lead. CI/release
   workflows derive versions from `reef.toml` (no workflow edits);
   `reef.lock` is gitignored and regenerated per build.
@@ -64,7 +66,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
     nightly `chelis test tests-manual/` already amortizes the compile
     across all heavy files in one invocation.
 
-## [0.19.0] — unreleased
+## [0.19.0] — 2026-05-27
 
 Milestone K: closures push — cross-currency basis curves, Sobol
 1024-D runtime construction, international holiday tables
