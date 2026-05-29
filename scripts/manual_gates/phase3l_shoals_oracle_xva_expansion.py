@@ -29,7 +29,7 @@ TEST_FILES = [
     ("cds", "tests/cds.ch"),
     ("xva_stochastic_hazard", "tests/xva_stochastic_hazard.ch"),
     ("xva_fva_kva", "tests/xva_fva_kva.ch"),
-    ("xva_wwr", "tests-manual/xva_wwr.ch"),
+    ("xva_wwr", "tests-manual/xva_wwr_heavy.ch"),
     ("csa", "tests/csa.ch"),
     ("xva_stochastic_recovery", "tests/xva_stochastic_recovery.ch"),
 ]

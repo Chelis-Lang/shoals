@@ -1,0 +1,88 @@
+name: nightly
+
+# The heavy validation suite. Per-PR CI (ci.yml) runs only the fast
+# deterministic unit tests in tests/. The Monte-Carlo / PDE / Fourier /
+# optimization-benchmark files live in tests-manual/ and the milestone
+# acceptance oracles live in scripts/manual_gates/ — both overrun the
+# per-PR runner's wall-clock budget, so they run here on a schedule
+# (and on demand) instead. Toolchain versions are derived from reef.toml,
+# same as ci.yml.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 06:00 UTC daily
+  workflow_dispatch:
+
+jobs:
+  heavy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract versions from reef.toml
+        run: |
+          set -euo pipefail
+          CHELIS_VERSION=$(grep -oP '^compiler\s*=\s*"=\K[0-9]+\.[0-9]+\.[0-9]+' reef.toml)
+          NAUTILUS_VERSION=$(grep -A0 '^nautilus' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          CORAL_VERSION=$(grep -A0 '^coral' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ -z "$CHELIS_VERSION" ] || [ -z "$NAUTILUS_VERSION" ] || [ -z "$CORAL_VERSION" ]; then
+            echo "Failed to parse one or more versions from reef.toml" >&2
+            cat reef.toml >&2
+            exit 1
+          fi
+          echo "CHELIS_VERSION=$CHELIS_VERSION" >> "$GITHUB_ENV"
+          echo "CHELIS_TAG=v$CHELIS_VERSION"     >> "$GITHUB_ENV"
+          echo "NAUTILUS_TAG=v$NAUTILUS_VERSION" >> "$GITHUB_ENV"
+          echo "CORAL_TAG=v$CORAL_VERSION"       >> "$GITHUB_ENV"
+          echo "Detected: chelis=$CHELIS_VERSION nautilus=$NAUTILUS_VERSION coral=$CORAL_VERSION"
+
+      - name: Download pinned chelis toolchain
+        env:
+          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+        run: |
+          gh release download "$CHELIS_TAG" \
+            --repo Chelis-Lang/chelis \
+            --pattern "chelis-${CHELIS_TAG}-linux-x86_64.tar.gz" \
+            --dir /tmp/chelis-toolchain
+          tar -xzf "/tmp/chelis-toolchain/chelis-${CHELIS_TAG}-linux-x86_64.tar.gz" \
+            -C /tmp/chelis-toolchain
+          echo "/tmp/chelis-toolchain/chelis-${CHELIS_TAG}-linux-x86_64/bin" >> "$GITHUB_PATH"
+
+      - name: Verify toolchain version
+        run: test "$(chelis --version)" = "chelis ${CHELIS_VERSION}"
+
+      - name: Install released dependencies
+        timeout-minutes: 5
+        env:
+          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+        run: |
+          set -euo pipefail
+          chelis reef install --from-github "Chelis-Lang/nautilus@${NAUTILUS_TAG}"
+          chelis reef install --from-github "Chelis-Lang/coral@${CORAL_TAG}"
+
+      - name: chelis reef build
+        run: chelis reef build
+
+      # One compile, all heavy files: the whole tests-manual/ directory runs
+      # in a single invocation.
+      - name: chelis test (tests-manual/ heavy suite)
+        timeout-minutes: 90
+        run: chelis test tests-manual/ --timeout 1800 --jobs auto
+
+      - name: milestone manual gates
+        timeout-minutes: 60
+        run: |
+          set -uo pipefail
+          failed=0
+          for gate in scripts/manual_gates/phase3l_shoals_oracle_*.py; do
+            echo "::group::$gate"
+            python3 "$gate" || { failed=$((failed + 1)); echo "::error file=$gate::manual gate failed"; }
+            echo "::endgroup::"
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "$failed manual gate(s) failed" >&2
+            exit 1
+          fi
+          echo "All manual gates passed."

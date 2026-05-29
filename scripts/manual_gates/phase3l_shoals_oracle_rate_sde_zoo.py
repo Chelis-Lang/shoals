@@ -34,10 +34,10 @@ GATE_NAME = "phase3l_shoals_oracle_rate_sde_zoo"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 TEST_FILES = [
-    ("sabrpaths", "tests-manual/sabrpaths.ch"),
-    ("hullwhite", "tests-manual/hull_white.ch"),
+    ("sabrpaths", "tests-manual/sabrpaths_heavy.ch"),
+    ("hullwhite", "tests-manual/hull_white_heavy.ch"),
     ("libormarketmodel", "tests/libormarketmodel.ch"),
-    ("stochastic_kou", "tests-manual/stochastic_kou.ch"),
+    ("stochastic_kou", "tests-manual/stochastic_kou_heavy.ch"),
 ]
 
 

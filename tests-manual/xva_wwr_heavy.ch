@@ -1,4 +1,4 @@
-module Shoals.Tests.XvaWwr
+module Shoals.Tests.XvaWwrHeavy
 import Std.Test (assert_close, assert_true)
 import Nautilus.Stats (mean_vec, std_vec)
 import Shoals.Xva (cva_constant_hazard, xva_cva_wwr_constant_hazard)

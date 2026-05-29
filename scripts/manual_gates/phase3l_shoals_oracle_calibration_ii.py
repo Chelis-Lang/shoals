@@ -31,9 +31,9 @@ GATE_NAME = "phase3l_shoals_oracle_calibration_ii"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 TEST_FILES = [
-    ("bfgs", "tests-manual/modelfit_bfgs.ch"),
+    ("bfgs", "tests-manual/modelfit_bfgs_heavy.ch"),
     ("full_jacobian", "tests/curves_bootstrap_ift_full.ch"),
-    ("sequential_pipeline", "tests-manual/modelfit_pipeline.ch"),
+    ("sequential_pipeline", "tests-manual/modelfit_pipeline_heavy.ch"),
 ]
 
 

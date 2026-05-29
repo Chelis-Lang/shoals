@@ -1,4 +1,4 @@
-module Shoals.Tests.Rng
+module Shoals.Tests.RngHeavy
 import Std.Test (assert_close)
 import Nautilus.Distributions (normal_sample)
 import Nautilus.Stats (variance_vec)

@@ -1,4 +1,4 @@
-module Shoals.Tests.SabrPaths
+module Shoals.Tests.SabrpathsHeavy
 import Std.Test (assert_true)
 import Nautilus.Stats (mean_vec, correlation_scalar)
 import Shoals.SabrPaths (sabr_paths_terminal)

@@ -34,6 +34,35 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   kills its own process with SIGTERM and emits no per-test
   failure record when a long-running test exceeds an implicit ceiling
   that is stricter than `--timeout`. Candidate for an upstream filing.
+- **Test redesign + nightly split (nautilus-style).** Restructured
+  testing along the discipline the upstream `nautilus` repo uses:
+  per-PR CI runs only fast deterministic unit tests; heavy
+  reference/statistical validation runs on a schedule.
+  - **`tests/` (CI):** added cheap deterministic smokes that exercise
+    non-iterative code paths — `pde.ch` (exact Thomas tridiagonal
+    solves), `lsm.ch` (polynomial-regression recovery), `rng.ch`
+    (Sobol first-point values). These hit closed-form / O(n) paths,
+    not fold-heavy kernels.
+  - **`tests-manual/` (nightly):** the heavy files were renamed to
+    `*_heavy.ch` with distinct module names (e.g.
+    `Shoals.Tests.TreesHeavy`) so a single lint pass over both dirs
+    sees no duplicate modules. The deterministic-but-still-kernel-bound
+    smokes for trees / heston / hull_white / modelfit_bfgs /
+    modelfit_pipeline (tautologies, parity, degenerate limits at small
+    configs) also live here: on the host evaluator even an n=5 tree
+    backward-induction or a 32-panel Fourier inversion costs seconds,
+    so they are too slow for the per-PR gate but cheap enough to keep
+    in nightly.
+  - **`.github/workflows/nightly.yml`** (new): `cron 0 6 * * *` +
+    `workflow_dispatch`, reef.toml-derived toolchain, runs
+    `chelis test tests-manual/` (one compile, all heavy files) then the
+    milestone manual-gate scripts.
+  - Manual-gate scripts repointed to the renamed `*_heavy.ch` files.
+    Per-gate batching of `chelis test` invocations was investigated but
+    is not feasible: `chelis test` accepts a single PATH only, and the
+    gates' files don't share a directory or filter substring — the
+    nightly `chelis test tests-manual/` already amortizes the compile
+    across all heavy files in one invocation.
 
 ## [0.19.0] — unreleased
 

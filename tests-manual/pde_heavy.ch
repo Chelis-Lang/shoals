@@ -1,4 +1,4 @@
-module Shoals.Tests.Pde
+module Shoals.Tests.PdeHeavy
 import Std.Test (assert_close, assert_true)
 import Shoals.Pde (pde_european_call_cn, pde_european_put_cn, pde_american_put_cn, pde_spread_option_adi)
 import Shoals.Pricing (bs_call_scalar, bs_put_scalar)

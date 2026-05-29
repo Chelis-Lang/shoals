@@ -1,4 +1,4 @@
-module Shoals.Tests.StochasticKou
+module Shoals.Tests.StochasticKouHeavy
 import Std.Test (assert_close, assert_true)
 import Nautilus.Stats (mean_vec, std_vec, skewness_vec)
 import Shoals.Stochastic (sto_kou_compensator, sto_kou_jump_terminal)

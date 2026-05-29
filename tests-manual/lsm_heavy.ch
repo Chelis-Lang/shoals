@@ -1,4 +1,4 @@
-module Shoals.Tests.Lsm
+module Shoals.Tests.LsmHeavy
 import Std.Test (assert_true)
 import Shoals.Lsm (lsm_polynomial_regression, lsm_american_put)
 import Shoals.Pricing (bs_put_scalar)
