@@ -1,0 +1,88 @@
+# Dates and day counts
+
+Module: `Shoals.Date`.
+
+This module computes year fractions under the standard day-count
+conventions, detects weekends, rolls a date to a business day under the
+following / modified-following / preceding rules, and generates a schedule
+of dates stepped by a number of months. The date type itself comes from
+`Std.Time`, constructed with `date(year, month, day)`.
+
+## Day-count conventions
+
+```chelis
+type DayCount =
+  | Act360
+  | Act365
+  | ThirtyThreeSixty
+  | ActAct
+
+def year_fraction(start: Date, end: Date, convention: DayCount) -> f32
+```
+
+`year_fraction` returns the year fraction between two dates under the chosen
+convention. `Act360` divides actual days by 360, `Act365` divides by 365,
+`ThirtyThreeSixty` is the 30/360 bond-basis count, and `ActAct` divides
+actual days by 365.25. From `tests/date.ch`:
+
+```chelis
+start = date(cast(2025, int64), cast(1, int64), cast(1, int64))
+end = date(cast(2026, int64), cast(1, int64), cast(1, int64))
+yf = year_fraction(start, end, Act365)  // yf == 1.0
+
+half = year_fraction(
+  date(cast(2025, int64), cast(1, int64), cast(15, int64)),
+  date(cast(2025, int64), cast(7, int64), cast(15, int64)),
+  ThirtyThreeSixty
+)  // half == 0.5
+```
+
+## Weekends and business-day rolling
+
+```chelis
+def is_weekend(d: Date) -> bool
+def date_roll_following(d: Date, weekend_only: bool) -> Date
+def date_roll_modified_following(d: Date, weekend_only: bool) -> Date
+def date_roll_preceding(d: Date, weekend_only: bool) -> Date
+def add_business_days(d: Date, n: int64, weekend_only: bool) -> Date
+```
+
+`is_weekend` reports whether a date falls on Saturday or Sunday.
+`date_roll_following` advances a weekend date forward to the next weekday,
+`date_roll_preceding` retreats it to the previous weekday, and
+`date_roll_modified_following` rolls forward unless that crosses into the
+next month, in which case it rolls back. `add_business_days` steps forward
+`n` days, skipping weekends. From `tests/date.ch`, a Saturday rolls to the
+following Monday:
+
+```chelis
+sat = date(cast(2025, int64), cast(1, int64), cast(4, int64))
+rolled = date_roll_following(sat, true)
+// rolled is Monday 2025-01-06
+```
+
+The `weekend_only` flag indicates that only weekends are skipped; this
+module does not consult a holiday list. To roll against holidays as well,
+combine it with the [holiday calendars](calendars.md).
+
+## Schedule generation
+
+```chelis
+def schedule_from_tenor(start: Date, end: Date, step_months: int64) -> List[Date]
+```
+
+`schedule_from_tenor` returns a list of dates from `start`, stepped by
+`step_months` months, up to and including the last stop at or before `end`.
+The first entry is the start date and the schedule is strictly increasing.
+From `tests/date.ch`, a quarterly schedule across 2025 has five stops:
+
+```chelis
+dates = schedule_from_tenor(
+  date(cast(2025, int64), cast(1, int64), cast(1, int64)),
+  date(cast(2025, int64), cast(12, int64), cast(31, int64)),
+  cast(3, int64)
+)
+// len(dates) == 5
+```
+
+Months are treated as a fixed thirty-day step in this schedule generator.

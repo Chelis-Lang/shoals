@@ -1,0 +1,78 @@
+# Introduction
+
+Shoals is a quantitative-finance library for the
+[Chelis](https://github.com/Chelis-Lang/chelis) programming language. It
+ships as a reef package under the `Shoals` module prefix and gives you
+closed-form option pricers, Greeks, Monte Carlo engines, yield-curve and
+volatility-surface tooling, risk measures, date and calendar arithmetic,
+an order book, and a small set of finance-specific distributions.
+
+The library is written entirely in Chelis. Numerical primitives that are
+not finance-specific (the normal distribution, special functions,
+statistics, interpolation) come from the upstream `Nautilus` library, and
+the standard date type comes from `Std.Time`. Shoals layers the finance
+semantics on top: Black-Scholes, the FX and forward pricers, SVI vol
+surfaces, sensitivity operators on curves, XVA aggregators, and so on.
+
+## What is in the box
+
+The functional surface is organized into modules, each documented in its
+own chapter:
+
+- **Pricing.** Black-Scholes call and put, vectorized price tensors, and a
+  Monte Carlo engine driven by the `Random` effect.
+- **Greeks.** Finite-difference first- and second-order Greeks, analytic
+  Greek references for cross-checking, and pathwise / likelihood-ratio
+  estimators for the digital payoff family.
+- **Extended pricers.** Bachelier (normal underlying), Black (forward), 
+  Garman-Kohlhagen (FX), and Margrabe (exchange).
+- **Volatility surface.** SVI total-variance parameterization, implied
+  vol, surface shifts, and a bisection implied-vol solver.
+- **Stochastic processes.** Geometric Brownian motion paths and terminals,
+  antithetic variates, Merton jump-diffusion, and correlated two-asset GBM.
+- **Risk.** Parametric and historical value-at-risk and conditional VaR.
+- **Extended risk.** Monte Carlo VaR and expected shortfall, an FRTB-IMA
+  expected-shortfall helper, a scenario PnL grid, and the Kupiec
+  proportion-of-failures backtest statistic.
+- **Yield curves.** Linear, spline, log-linear, and Nelson-Siegel-Svensson
+  interpolation, discount factors, a single-curve par bootstrap, curve-kind
+  metadata, and sensitivity operators.
+- **Dates, calendars, tenors.** Day-count conventions, business-day
+  rolling, holiday calendars, and tenor arithmetic.
+- **Market data.** Quote, bar, and snapshot record types.
+- **Order book.** A price-priority limit order book with best bid and ask,
+  spread, and volume-weighted average price.
+- **Distributions.** Lognormal, Student-t, and bivariate-normal densities.
+- **Calibration.** Weighted residuals, sum-of-squared-errors loss, and a
+  bound-clamped Levenberg-Marquardt step.
+- **XVA.** Constant-hazard survival, exposure aggregation, netting, and CVA
+  and DVA over a time grid.
+- **Currency-tagged money.** Runtime-tagged `Money` with same-currency
+  arithmetic.
+
+## Verification
+
+Shoals carries two extra top-level directories of code that exist to keep
+the library honest:
+
+- `references/` holds textbook-formula implementations of the same
+  quantities the optimized library computes (Black-Scholes, its Greeks,
+  Vasicek, historical VaR, vanilla Monte Carlo, the distributions, and the
+  day-count conventions). These are the oracles.
+- `properties/` holds the finance invariants the library is expected to
+  satisfy (put-call parity, a call bounded by spot, finite-difference Greek
+  agreement, Monte Carlo reproducibility, no-arbitrage spread checks, and
+  the textbook-agreement checks).
+
+The [Reference oracles](references.md) and
+[Property specifications](properties.md) chapters describe both. The
+[Scope and limitations](scope.md) chapter is the honest account of where
+the surface stops.
+
+## How to read this book
+
+Start with [Getting started](getting-started.md) for the build commands and
+a first pricing call, then read
+[Working with tensors and effects](conventions.md) to understand the small
+number of Chelis idioms the examples lean on. After that the module
+chapters stand on their own and can be read in any order.
