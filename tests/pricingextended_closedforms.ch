@@ -1,0 +1,51 @@
+module Shoals.Tests.PricingextendedClosedforms
+import Std.Test (assert_close, assert_true)
+import Shoals.Pricing (bs_call_scalar)
+import Shoals.PricingExtended (margrabe_exchange_call, pe_margrabe_stulz, pe_asset_or_nothing_call, pe_cash_or_nothing_call, pe_cash_or_nothing_put)
+def test_margrabe_stulz_zero_yield_reduces_to_margrabe() -> unit ! { Test } = {
+  s1 = cast(100.0, f32)
+  s2 = cast(95.0, f32)
+  sigma1 = cast(0.25, f32)
+  sigma2 = cast(0.3, f32)
+  rho = cast(0.4, f32)
+  t = cast(1.0, f32)
+  stulz = pe_margrabe_stulz(s1, s2, sigma1, sigma2, rho, cast(0.0, f32), cast(0.0, f32), t)
+  plain = margrabe_exchange_call(s1, s2, sigma1, sigma2, rho, t)
+  assert_close(stulz, plain, cast(0.00001, f32), "Margrabe-Stulz with q1=q2=0 reduces to plain Margrabe")
+}
+def test_margrabe_stulz_yield_lowers_price() -> unit ! { Test } = {
+  s1 = cast(100.0, f32)
+  s2 = cast(100.0, f32)
+  sigma1 = cast(0.2, f32)
+  sigma2 = cast(0.25, f32)
+  rho = cast(0.3, f32)
+  t = cast(1.0, f32)
+  with_yield = pe_margrabe_stulz(s1, s2, sigma1, sigma2, rho, cast(0.05, f32), cast(0.0, f32), t)
+  no_yield = pe_margrabe_stulz(s1, s2, sigma1, sigma2, rho, cast(0.0, f32), cast(0.0, f32), t)
+  assert_true(lt(with_yield, no_yield), "q1>0 with q2=0 lowers Margrabe-Stulz price relative to q1=q2=0")
+}
+def test_digital_decomposition_identity() -> unit ! { Test } = {
+  s = cast(100.0, f32)
+  k = cast(100.0, f32)
+  r = cast(0.05, f32)
+  sigma = cast(0.2, f32)
+  t = cast(1.0, f32)
+  bs = bs_call_scalar(s, k, r, sigma, t)
+  aon = pe_asset_or_nothing_call(s, k, r, cast(0.0, f32), sigma, t)
+  con = pe_cash_or_nothing_call(s, k, r, cast(0.0, f32), sigma, t)
+  decomposed = sub(aon, mul(k, con))
+  assert_close(bs, decomposed, cast(0.0001, f32), "BS call == asset_or_nothing_call - K * cash_or_nothing_call")
+}
+def test_cash_digital_put_call_parity() -> unit ! { Test } = {
+  s = cast(100.0, f32)
+  k = cast(100.0, f32)
+  r = cast(0.0, f32)
+  q = cast(0.0, f32)
+  sigma = cast(0.2, f32)
+  t = cast(1.0, f32)
+  c = pe_cash_or_nothing_call(s, k, r, q, sigma, t)
+  p = pe_cash_or_nothing_put(s, k, r, q, sigma, t)
+  total = add(c, p)
+  expected = exp(neg(mul(r, t)))
+  assert_close(total, expected, cast(0.00001, f32), "cash_call + cash_put == exp(-r*T) at r=0,q=0")
+}

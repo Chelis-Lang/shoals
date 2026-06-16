@@ -60,9 +60,9 @@ A non-zero exit code or a missing `PASS` line indicates regression.
 
 ## Pinned versions
 
-- `chelis-python` from chelis monorepo at `0.7.11` or compatible.
+- `chelis-python` from chelis monorepo at `0.7.19` or compatible.
   (Last functional verification was under chelis 0.7.6; re-verifying
-  under 0.7.11 is an M1+ task per `docs/plan-quant-surface.md`.)
+  under 0.7.19 is an M1+ task per `docs/plan-quant-surface.md`.)
 - `numpy` (any reasonably recent release; the harness uses only
   `np.array(..., dtype=np.float32)`).
 

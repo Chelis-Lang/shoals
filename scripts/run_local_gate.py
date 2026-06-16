@@ -4,15 +4,22 @@
 Invokes:
 
   1. ``chelis fmt --check`` over every ``.ch`` file in
-     ``src/``, ``properties/``, ``references/``, ``tests/``.
+     ``src/``, ``properties/``, ``references/``, ``tests/``,
+     ``tests-manual/``.
   2. ``chelis lint --check`` over ``src/ properties/ references/
-     tests/ manual-gates/``.
+     tests/ tests-manual/ manual-gates/``.
   3. ``chelis reef build`` for package-level compiler validation.
-  4. ``chelis test tests/ --timeout 120 --jobs auto`` for the native
-     runtime suite.
+  4. ``chelis test tests/ --timeout 1200 --jobs auto`` for the native
+     fast-unit suite (this is what CI runs).
+  5. ``chelis test tests-manual/ --timeout 1200 --jobs auto`` for the
+     heavy MC / PDE / Fourier / optimization-benchmark suite that is
+     too slow for the per-PR CI runner. CI does NOT run this stage;
+     the milestone manual-gate scripts under ``scripts/manual_gates/``
+     exercise these files by explicit path.
 
-Exits 0 only if all stages succeed. Mirrors the default PR gate in the
-GitHub Actions workflow under ``.github/workflows/ci.yml``.
+Exits 0 only if all stages succeed. Stages 1-4 mirror the default PR
+gate in the GitHub Actions workflow under ``.github/workflows/ci.yml``;
+stage 5 is local-only.
 
 Usage:
 
@@ -54,9 +61,10 @@ def main() -> int:
         + sorted((REPO_ROOT / "properties").glob("*.ch"))
         + sorted((REPO_ROOT / "references").glob("*.ch"))
         + sorted((REPO_ROOT / "tests").glob("*.ch"))
+        + sorted((REPO_ROOT / "tests-manual").glob("*.ch"))
     )
 
-    print("[1/4] chelis fmt --check")
+    print("[1/5] chelis fmt --check")
     for path in fmt_files:
         rel = path.relative_to(REPO_ROOT)
         rc = run(["chelis", "fmt", "--check", str(rel)], quiet=quiet)
@@ -64,7 +72,7 @@ def main() -> int:
             print(f"FAIL: chelis fmt --check {rel}")
             return rc
 
-    print("[2/4] chelis lint --check")
+    print("[2/5] chelis lint --check")
     rc = run(
         [
             "chelis",
@@ -74,6 +82,7 @@ def main() -> int:
             "properties/",
             "references/",
             "tests/",
+            "tests-manual/",
             "manual-gates/",
         ],
         quiet=False,
@@ -82,16 +91,22 @@ def main() -> int:
         print("FAIL: chelis lint --check")
         return rc
 
-    print("[3/4] chelis reef build")
+    print("[3/5] chelis reef build")
     rc = run(["chelis", "reef", "build"], quiet=False)
     if rc != 0:
         print("FAIL: chelis reef build")
         return rc
 
-    print("[4/4] chelis test tests/ --jobs auto")
-    rc = run(["chelis", "test", "tests/", "--timeout", "120", "--jobs", "auto"], quiet=False)
+    print("[4/5] chelis test tests/ --jobs auto")
+    rc = run(["chelis", "test", "tests/", "--timeout", "1200", "--jobs", "auto"], quiet=False)
     if rc != 0:
         print("FAIL: chelis test tests/ --jobs auto")
+        return rc
+
+    print("[5/5] chelis test tests-manual/ --jobs auto")
+    rc = run(["chelis", "test", "tests-manual/", "--timeout", "1200", "--jobs", "auto"], quiet=False)
+    if rc != 0:
+        print("FAIL: chelis test tests-manual/ --jobs auto")
         return rc
 
     print("OK: shoals local gate green")
