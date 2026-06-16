@@ -1,0 +1,63 @@
+module Shoals.Tests.Dupire
+import Std.Test (assert_close, assert_true)
+import Shoals.Dupire (du_local_vol_from_iv_surface, du_cubic_log_moneyness_interp, du_is_local_vol_sentinel, du_forward)
+def du_abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
+def du_const_iv() -> f32 -> f32 -> f32 = fn (k: f32, t: f32) -> cast(0.2, f32)
+def du_smile_iv() -> f32 -> f32 -> f32 = fn (k: f32, t: f32) -> add(cast(0.2, f32), mul(cast(0.1, f32), mul(k, k)))
+def test_dupire_flat_iv_gives_flat_local_vol() -> unit ! { Test } = {
+  iv_fn = du_const_iv()
+  s0 = cast(100.0, f32)
+  r = cast(0.03, f32)
+  q = cast(0.0, f32)
+  k_q = cast(100.0, f32)
+  t_q = cast(1.0, f32)
+  sig_loc = du_local_vol_from_iv_surface(iv_fn, s0, r, q, k_q, t_q, cast(0.5, f32), cast(0.05, f32))
+  assert_close(sig_loc, cast(0.2, f32), cast(0.01, f32), "flat IV surface (sigma=0.2) yields flat Dupire local vol within FD precision")
+}
+def test_dupire_atm_smile_curvature_sign() -> unit ! { Test } = {
+  iv_fn = du_smile_iv()
+  s0 = cast(100.0, f32)
+  r = cast(0.02, f32)
+  q = cast(0.01, f32)
+  k_q = cast(100.0, f32)
+  t_q = cast(0.5, f32)
+  sig_loc = du_local_vol_from_iv_surface(iv_fn, s0, r, q, k_q, t_q, cast(0.5, f32), cast(0.05, f32))
+  is_valid = not(du_is_local_vol_sentinel(sig_loc))
+  is_positive = gt(sig_loc, cast(0.0, f32))
+  is_finite_upper = lt(sig_loc, cast(2.0, f32))
+  assert_true(and(and(is_valid, is_positive), is_finite_upper), "ATM smile IV(k,T)=0.2+0.1k^2 yields finite-positive Dupire sigma_loc (bracketed (0, 2))")
+}
+def test_dupire_at_zero_volvol_equals_input_iv() -> unit ! { Test } = {
+  iv_fn = du_const_iv()
+  s0 = cast(100.0, f32)
+  r = cast(0.05, f32)
+  q = cast(0.02, f32)
+  k_q = cast(95.0, f32)
+  t_q = cast(0.75, f32)
+  sig_loc = du_local_vol_from_iv_surface(iv_fn, s0, r, q, k_q, t_q, cast(0.5, f32), cast(0.05, f32))
+  assert_close(sig_loc, cast(0.2, f32), cast(0.015, f32), "strictly-flat IV surface: Dupire sigma_loc(K,T) equals input IV (consistency check) at OTM (K=95, T=0.75, q=2%)")
+}
+def test_cubic_log_moneyness_monotonic_input_preserves_monotonicity() -> unit ! { Test } = {
+  strikes = to_tensor(map(fn (i: int64) -> add(cast(80.0, f32), mul(cast(i, f32), cast(10.0, f32))), range(cast(0, int64), cast(5, int64))))
+  times = to_tensor(map(fn (i: int64) -> add(cast(0.25, f32), mul(cast(i, f32), cast(0.25, f32))), range(cast(0, int64), cast(3, int64))))
+  iv_per_strike = fn (k: f32) -> sub(cast(0.35, f32), mul(cast(0.001, f32), sub(k, cast(80.0, f32))))
+  flat_idx = range(cast(0, int64), cast(15, int64))
+  iv_flat = to_tensor(map(fn (idx: int64) -> {
+    i_col = mod(idx, cast(5, int64))
+    k_at_i = add(cast(80.0, f32), mul(cast(i_col, f32), cast(10.0, f32)))
+    iv_per_strike(k_at_i)
+  }, flat_idx))
+  iv_grid_2d = reshape(iv_flat, [cast(3, int64), cast(5, int64)])
+  forward = cast(100.0, f32)
+  k_q1 = cast(85.0, f32)
+  k_q2 = cast(105.0, f32)
+  t_q = cast(0.5, f32)
+  iv1 = du_cubic_log_moneyness_interp(copy(strikes), copy(times), copy(iv_grid_2d), forward, k_q1, t_q)
+  iv2 = du_cubic_log_moneyness_interp(copy(strikes), copy(times), copy(iv_grid_2d), forward, k_q2, t_q)
+  iv_at_grid = du_cubic_log_moneyness_interp(strikes, times, iv_grid_2d, forward, cast(90.0, f32), t_q)
+  monotone_ok = gt(iv1, iv2)
+  expected_at_90 = iv_per_strike(cast(90.0, f32))
+  diff = du_abs_f32(sub(iv_at_grid, expected_at_90))
+  exact_recovery = lt(diff, cast(0.001, f32))
+  assert_true(and(monotone_ok, exact_recovery), "monotone-decreasing-in-K input is preserved under cubic-in-log-moneyness interp (iv(K=85) > iv(K=105)); K_query at grid point K=90 recovers grid value")
+}

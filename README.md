@@ -6,7 +6,9 @@ Ships as a reef package under the `Shoals` module prefix.
 
 ## Status
 
-v0.8.2. M0-M9 milestone sweep complete. Full slice:
+v0.20.0. M0-M9 milestone sweep complete + Milestone A
+(foundations cleanup) + the FlukeBall currency-tag slice, unioned
+into a single line. Full slice:
 M0 baseline + M1 foundations (Date, Calendar, Tenor, MarketData,
 Distributions) + M2 yield-curve sensitivity ops
 (parallel/key-rate/twist/butterfly shifts, log-linear and
@@ -44,12 +46,13 @@ calibration, and advanced risk — is specified in
 | `Shoals.Curves` | Linear / cubic-spline / log-linear / Nelson-Siegel-Svensson yield-curve interpolation; discount factors; single-curve par-bond bootstrap; curve-kind metadata (OIS/IBOR/SOFR/SONIA/ESTR/Custom); sensitivity ops (parallel/key-rate/twist/butterfly shifts, scale) | alpha |
 | `Shoals.Stochastic` | GBM path generation (log-Euler), terminal draws, antithetic-variates terminal-mean estimator; Merton lognormal jump-diffusion (compensated drift, aggregate-jump Gaussian approximation); 2-asset correlated GBM via 2x2 Cholesky | alpha |
 | `Shoals.Orderbook` | Limit order book (price-priority sorted lists), best bid/ask, bid-ask spread, VWAP, side quantities | alpha |
-| `Shoals.Date` | Day-count conventions (Act360/Act365/30/360/ActAct), year-fraction, weekend detection, business-day rolling (following/modified-following/preceding), tenor-stepped schedule generation | alpha |
-| `Shoals.HolidayCal` | NYC + LDN 2025 holiday tables, joint-calendar combinator, business-day predicate | alpha |
-| `Shoals.Tenor` | Programmatic `Tenor { count, unit }` constructors (`days_n`, `weeks_n`, `months_n`, `years_n`, `overnight`, `tomorrow_next`, `spot_next`), `tenor_apply` to advance a date; string parsing deferred | alpha |
+| `Shoals.Date` | Day-count conventions (Act360/Act365/30/360/ActAct), year-fraction, weekend detection, business-day rolling (following/modified-following/preceding), tenor-stepped schedule generation, calendar-aware `add_months` with day-cap correctness, `days_in_month`, `schedule_from_tenor_calendar` | alpha |
+| `Shoals.HolidayCal` | NYC + LDN holiday tables (2025 hardcoded + algorithmic via Computus for 1583-9999); Good Friday + Easter Monday derived; multi-year calendar builders; joint-calendar combinator; business-day predicate | alpha |
+| `Shoals.Rng` | Sobol low-discrepancy (Joe-Kuo direction-number table, 32-D committed floor); Halton (first 50 primes); variance-reduction combinators (antithetic, control-variate, stratified) | alpha |
+| `Shoals.Tenor` | Programmatic `Tenor { count, unit }` constructors (`days_n`, `weeks_n`, `months_n`, `years_n`, `overnight`, `tomorrow_next`, `spot_next`), `tenor_apply` to advance a date; string parser `parse_tenor` for "3M"/"1Y"/"30Y"/"ON"/"TN"/"SN" | alpha |
 | `Shoals.MarketData` | `Quote`, `Bar`, `Snapshot` record types with constructors / accessors / linear-scan lookup | alpha |
-| `Shoals.Distributions` | Lognormal pdf + cdf (composed over Nautilus normal), Student-t pdf (composed over `Nautilus.Special.log_gamma`), Student-t cdf approximation, bivariate-normal pdf | alpha |
-| `Shoals.VolSurface` | SVI 5-parameter total-variance + implied-vol; ATM/skew/parallel/smile shifts; implied-vol-from-call bisection solver over Black-Scholes | alpha |
+| `Shoals.Distributions` | Lognormal pdf+cdf; Student-t pdf + exact cdf (delegates to Nautilus) + Fisher-Cornish approximation kept for back-compat; bivariate-normal pdf; Shoals-side re-exports of Nautilus's gamma/beta/chi_squared/exponential/uniform/poisson pdf+cdf+inv_cdf+sample surface; N-dim Cholesky multivariate-normal sampler (`dist_mvn_factor` + `dist_mvn_sample_one`) | alpha |
+| `Shoals.VolSurface` | SVI 5-parameter total-variance + implied-vol; ATM/skew/parallel/smile shifts; implied-vol-from-call bisection solver over Black-Scholes; SABR 4-parameter analytic implied-vol via Hagan 2002 simplified expansion (`vs_sabr_implied_vol`, `vs_sabr_atm_implied_vol`, shift constructors) | alpha |
 | `Shoals.PricingExtended` | Bachelier (normal-underlying) call/put; Black (forward-priced) call/put; Garman-Kohlhagen (FX) call/put; Margrabe exchange-option call with degenerate-vol intrinsic guard | alpha |
 | `Shoals.Greeks` | First-order FD Greeks (delta/vega/rho/theta, call+put); second-order FD (gamma/vanna/volga); analytic-Greek references for FD cross-check; pathwise-smooth and likelihood-ratio dispatchers for the digital-option payoff family | alpha |
 | `Shoals.Xva` | Constant-hazard survival / default probability; constant-rate discount factor; expected positive / negative exposure aggregators; pointwise 2-deal netting; CVA + DVA aggregators over a discrete time grid | alpha |
@@ -69,7 +72,7 @@ ground-truth oracles that `Shoals.Pricing`, `Shoals.Risk`, and
 `properties/` ships function bodies for the canonical finance
 properties (put-call parity, call-bounded-by-spot, finite-difference
 delta/vega smoke, MC-reproducibility, bull/butterfly-spread
-no-arbitrage). Status: mixed. The compiler v0.7.16 does not yet
+no-arbitrage). Status: mixed. The compiler v0.7.26 does not yet
 parse `@property` annotations and ships no `chelis fuzz` subcommand;
 the property bodies are written as plain `def name(...) -> bool`
 ready to flip to `@property` when the tool ships. See
@@ -84,19 +87,20 @@ that adds grad-derived Greek properties re-evaluates.
 
 ## Toolchain
 
-Pinned to `chelis v0.7.16` in `reef.toml`:
+Pinned to `chelis v0.7.26` in `reef.toml`:
 
 ```toml
 [package]
-compiler = "=0.7.16"
+compiler = "=0.7.26"
 ```
 
 Dependencies resolve via the local Reef registry (`~/.chelis/reef/`):
 
-* `chelis-std` 0.3.0 — standard library
-* `nautilus`   0.7.16 — distributions, special functions, stats,
+* `chelis-std` 0.4.0 — standard library
+* `nautilus`   0.7.25 — distributions, special functions, stats,
   interpolation
-* `coral`      0.7.15 — dataframe runtime
+* `coral`      0.7.24 — dataframe runtime (transitively required for
+  the same `nautilus` minor version)
 
 ## Build
 
@@ -159,7 +163,12 @@ The `chelis lint --check` step blocks on any blocking nomenclature
 violation per `crates/chelis-lint/` rules; advisory warnings are
 non-blocking.
 
-Runtime gate expected success condition: all 207 tests pass at v0.8.2 (48 baseline + 48 in M1 + 3 in M1 red-team fix-up + 13 in M2 + 11 in M3 + 5 in M3 red-team fix-up + 9 in M4 SDE slice + 11 in M5 closed-form pricers + 17 in M6 Greeks + 14 in M7 XVA + 13 in M8 calibration + 9 in M9 extended risk + 6 currency-tag tests). This covers pricing correctness,
+Runtime gate expected success condition: the fast `tests/` unit
+suite passes at v0.20.0. The suite unions the M0-M9 + Milestone A
+SDE/PDE/XVA coverage with the FlukeBall currency-tag tests; the
+heavy MC / PDE / Fourier / optimization files live in
+`tests-manual/` and are exercised by the milestone manual-gate
+scripts, not per-PR CI. This covers pricing correctness,
 finite-difference Greeks (in-unit-range and matches-N(d1) checks), MC
 convergence (20K paths, 2 % tolerance) and reproducibility, parametric
 and historical VaR/CVaR, yield-curve interpolation and bootstrap
@@ -186,9 +195,9 @@ is a manual gate and is not exercised from this repo. The Shoals
 default PR scope includes `chelis reef build` and the node-local
 runtime suite; the monorepo oracle remains a separate manual gate.
 
-## Known limitations in v0.8.2
+## Known limitations in v0.20.0
 
-1. **`@property` is design-only.** Compiler v0.7.16 does not parse
+1. **`@property` is design-only.** Compiler v0.7.26 does not parse
    the annotation; the property bodies are plain `def`s that flip to
    `@property` when `chelis fuzz` ships. See above.
 2. **`chelis manifest` is design-only.** The MC reproducibility
@@ -206,7 +215,7 @@ runtime suite; the monorepo oracle remains a separate manual gate.
    with implicit-differentiation gradient through the joint solve is
    an M2-continuation candidate per `docs/plan-quant-surface.md`.
 5. **`erfc` direct routing.** Per Chelis architecture, special
-   functions live in `Nautilus.Special`. As of `nautilus 0.7.16`
+   functions live in `Nautilus.Special`. As of `nautilus 0.7.25`
    Shoals routes Black-Scholes through `Nautilus.Special.erfc`
    directly (computing `0.5 * erfc(-x / sqrt(2))` for the standard
    normal CDF), bypassing the higher-level distribution wrapper. No
@@ -220,8 +229,8 @@ following the chelis-reef v0.4.1 multi-source-roots fix
 (`6b58030 feat(reef): multi-source-roots — additional_sources in reef.toml;
 bump v0.4.1`). The reef.toml declares
 `additional_sources = ["properties", "references"]`. v0.1.0 carries the
-canonical layout forward and pins chelis 0.7.16, nautilus 0.7.16, and
-coral 0.7.15. (References to the pre-reset v0.7.x numbering point at
+canonical layout forward and pins chelis 0.7.26, nautilus 0.7.25, and
+coral 0.7.24. (References to the pre-reset v0.7.x numbering point at
 the historical version track and remain valid as release-history
 records; current planning lives on Shoals's own track per
 `docs/plan-quant-surface.md`.)
@@ -234,7 +243,7 @@ exposes `chelis.check(...)` and `chelis.eval(source, bindings)` to
 Python. The pre-reset v0.1.0-alpha release verified a Shoals-shaped
 program round-trips through that surface; the program shape is
 unchanged at v0.1.0, the verification remains valid, and re-running
-it under chelis 0.7.16 is a follow-up verification task.
+it under chelis 0.7.26 is a follow-up verification task.
 
 Setup (one-time):
 

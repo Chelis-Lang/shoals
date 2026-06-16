@@ -1,7 +1,7 @@
 module Shoals.Tests.MarketData
 import Std.Test (assert_close, assert_true, assert_eq_bool)
 import Std.Time (date)
-import Shoals.MarketData (Side, Quote, Bar, Snapshot, quote, bar, snapshot, quote_side, quote_value, md_bar_open, md_bar_high, md_bar_low, md_bar_close, md_bar_volume, snapshot_lookup)
+import Shoals.MarketData (Side, Bid, Ask, Mid, Last, Quote, Bar, Snapshot, quote, bar, snapshot, quote_side, quote_value, md_bar_open, md_bar_high, md_bar_low, md_bar_close, md_bar_volume, snapshot_lookup)
 def test_quote_construct_and_read() -> unit ! { Test } = {
   d = date(cast(2025, int64), cast(6, int64), cast(15, int64))
   q = quote(Bid, cast(100.5, f32), d)

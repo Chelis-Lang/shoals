@@ -1,6 +1,6 @@
 module Shoals.Tests.CurvesOps
 import Std.Test (assert_close, assert_true)
-import Shoals.Curves (YieldCurve, yield_curve_from_pillars, yield_curve_tagged, curve_kind, rate_at, parallel_shift, key_rate_shift, twist, butterfly, scale_rates, ois, sofr, sonia, log_linear_rate_at, nss_rate, custom_curve)
+import Shoals.Curves (YieldCurve, Ois, Ibor, Sofr, Sonia, Estr, Custom, yield_curve_from_pillars, yield_curve_tagged, curve_kind, rate_at, parallel_shift, key_rate_shift, twist, butterfly, scale_rates, ois, sofr, sonia, log_linear_rate_at, nss_rate, custom_curve)
 def base_curve() -> YieldCurve[3] = yield_curve_from_pillars(to_tensor([cast(1.0, f32), cast(2.0, f32), cast(3.0, f32)]), to_tensor([cast(0.03, f32), cast(0.04, f32), cast(0.045, f32)]))
 def test_parallel_shift_lifts_all_pillars() -> unit ! { Test } = {
   shifted = parallel_shift(base_curve(), cast(0.001, f32))
