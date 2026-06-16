@@ -1,6 +1,6 @@
 module Shoals.Tests.CurvesBootstrap
 import Std.Test (assert_close, assert_true)
-import Shoals.Curves (Instrument, deposit, zero_coupon, cur_par_swap, instrument_tenor, instrument_market_price_or_rate, bootstrap_residual_at_pillar, bootstrap_multi, bootstrap_multi_curve)
+import Shoals.Curves (Instrument, YieldCurve, deposit, zero_coupon, cur_par_swap, instrument_tenor, instrument_market_price_or_rate, bootstrap_residual_at_pillar, bootstrap_multi, bootstrap_multi_curve)
 def abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 def test_deposit_instrument_tenor() -> unit ! { Test } = {
   d = deposit(cast(0.25, f32), cast(0.04, f32))

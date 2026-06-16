@@ -1,6 +1,6 @@
 module Shoals.Tests.CurrencyTag
 import Std.Test (assert_close, assert_true)
-import Shoals.CurrencyTag (Currency, usd, gbp, eur, money_value, money_currency, money_non_negative, money_non_negative_value, money_non_negative_currency, convert, money_add, money_sub)
+import Shoals.CurrencyTag (Currency, USD, GBP, EUR, usd, gbp, eur, money_value, money_currency, money_non_negative, money_non_negative_value, money_non_negative_currency, convert, money_add, money_sub)
 def is_usd(c: Currency) -> bool = {
   match c with {
     | USD => true

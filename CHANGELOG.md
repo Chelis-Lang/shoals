@@ -37,15 +37,33 @@ Reconciliation + cascade release.
 ### Migrations
 
 - **chelis #317 — explicit cross-module constructor imports.**
-  `import Mod (Type, ...)` now must name the constructors a module
-  uses; `UnknownConstructor` no longer resolves implicitly.
-- **chelis #370 / §4.4.1 — return-position dimension rigidity.**
-  Return-position dim parameters are rigid and must remain
-  distinct; dim-polymorphic tensor signatures were re-declared
-  honestly where the checker flagged them.
-- **chelis #353 — builtin-shadowing rejection.** A top-level
-  `def`/`sig` named like a builtin is now a hard error; affected
-  bindings were renamed.
+  `import Mod (Type, ...)` no longer brings an imported enum's data
+  constructors into scope implicitly; each importing module must name
+  the constructors it uses. Expanded the import lists in every module
+  that pattern-matches or constructs a cross-module enum's
+  constructors: `src/date.ch` and `src/holidaycal.ch`
+  (`Std.Time` day-of-week `Monday`..`Sunday`), `properties/date.ch`
+  and `tests/date.ch` (`Shoals.Date` `DayCount` —
+  `Act360`/`Act365`/`ThirtyThreeSixty`/`ActAct`),
+  `tests/currencytag.ch` (`Shoals.CurrencyTag` `Currency` —
+  `USD`/`GBP`/`EUR`), `tests/curves_bootstrap.ch`,
+  `tests/curves_bootstrap_ift_full.ch` and `tests/curves_ops.ch`
+  (`Shoals.Curves` `YieldCurve`/`Instrument`/`CurveKind`
+  constructors), `tests/marketdata.ch` (`Shoals.MarketData` `Side` —
+  `Bid`/`Ask`/`Mid`/`Last`), and `tests/tenor.ch`
+  (`Shoals.Tenor` `TenorUnit` — `Day`..`SpotNext`). No glob/`..`
+  import form exists and re-export does not lift constructors, so
+  each importing module names them explicitly.
+
+The 0.7.16→0.7.26 span also carries chelis #370 / §4.4.1
+return-position dimension rigidity and chelis #353 builtin-shadowing
+rejection. Neither surfaced in the shoals corpus on this cascade: the
+build and the `tests/` suite are clean with the #317 import
+expansions alone — no `DimensionMismatch` return-dim diagnostics and
+no top-level `def`/`sig` shadowing a builtin — so no #370/#353 source
+edits were required. The 0.7.26 #397 rank-monomorphization regression
+also did not fire; shoals uses no chained-`expand` rank-1→rank-N
+broadcast.
 
 ## [0.19.1] - 2026-05-29
 

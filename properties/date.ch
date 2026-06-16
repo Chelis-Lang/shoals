@@ -1,6 +1,6 @@
 module Shoals.Properties.Date
 import Std.Time (Date, date_lt, date_lte)
-import Shoals.Date (DayCount, year_fraction, schedule_from_tenor, schedule_from_tenor_calendar, date_roll_following, is_weekend, add_months)
+import Shoals.Date (DayCount, Act360, Act365, ThirtyThreeSixty, ActAct, year_fraction, schedule_from_tenor, schedule_from_tenor_calendar, date_roll_following, is_weekend, add_months)
 import Shoals.References.Date (year_fraction_act_360_textbook, year_fraction_act_365_textbook, year_fraction_thirty_360_textbook, year_fraction_act_act_textbook)
 export (year_fraction_matches_textbook, schedule_monotone_increasing, date_roll_following_idempotent_on_weekday, add_months_then_neg_is_identity, schedule_calendar_monotone_increasing)
 def abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x

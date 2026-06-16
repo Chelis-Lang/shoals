@@ -1,6 +1,6 @@
 module Shoals.Tests.CurvesBootstrapIftFull
 import Std.Test (assert_close, assert_true)
-import Shoals.Curves (Instrument, deposit, zero_coupon, cur_par_swap, bootstrap_multi, bootstrap_grad_at_solution, bootstrap_grad_full_jacobian, instrument_validate)
+import Shoals.Curves (Instrument, Deposit, ZeroCoupon, ParSwap, deposit, zero_coupon, cur_par_swap, bootstrap_multi, bootstrap_grad_at_solution, bootstrap_grad_full_jacobian, instrument_validate)
 def cbif_abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 def cbif_rel_err(a: f32, b: f32) -> f32 = {
   denom = if lt(cbif_abs_f32(b), cast(0.000001, f32)) then cast(0.000001, f32) else cbif_abs_f32(b)

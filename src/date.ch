@@ -1,5 +1,5 @@
 module Shoals.Date
-import Std.Time (Date, date, try_date, is_leap_year, add_days, days_between, day_of_week, DayOfWeek)
+import Std.Time (Date, date, try_date, is_leap_year, add_days, days_between, day_of_week, DayOfWeek, Saturday, Sunday)
 export (DayCount, year_fraction, add_business_days, is_weekend, date_roll_following, date_roll_modified_following, date_roll_preceding, schedule_from_tenor, add_months, days_in_month, schedule_from_tenor_calendar)
 type DayCount =
   | Act360

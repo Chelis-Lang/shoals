@@ -1,7 +1,7 @@
 module Shoals.Tests.Date
 import Std.Test (assert_close)
 import Std.Time (Date, date, days_between, date_lte)
-import Shoals.Date (DayCount, year_fraction, is_weekend, date_roll_following, schedule_from_tenor, add_months, days_in_month, schedule_from_tenor_calendar)
+import Shoals.Date (DayCount, Act360, Act365, ThirtyThreeSixty, year_fraction, is_weekend, date_roll_following, schedule_from_tenor, add_months, days_in_month, schedule_from_tenor_calendar)
 def to01(b: bool) -> f32 = if b then cast(1.0, f32) else cast(0.0, f32)
 def test_act_360_one_year() -> unit ! { Test } = {
   start = date(cast(2025, int64), cast(1, int64), cast(1, int64))

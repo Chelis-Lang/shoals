@@ -1,7 +1,7 @@
 module Shoals.Tests.Tenor
 import Std.Test (assert_eq_int, assert_true)
 import Std.Time (date, days_between)
-import Shoals.Tenor (Tenor, TenorUnit, tenor, tenor_to_days, tenor_apply, days_per_unit, overnight, tomorrow_next, spot_next, days_n, weeks_n, months_n, years_n, parse_tenor)
+import Shoals.Tenor (Tenor, TenorUnit, Day, Week, Month, Year, Overnight, TomorrowNext, SpotNext, tenor, tenor_to_days, tenor_apply, days_per_unit, overnight, tomorrow_next, spot_next, days_n, weeks_n, months_n, years_n, parse_tenor)
 def test_days_per_unit_day() -> unit ! { Test } = assert_eq_int(days_per_unit(Day), cast(1, int64), "Day = 1")
 def test_days_per_unit_week() -> unit ! { Test } = assert_eq_int(days_per_unit(Week), cast(7, int64), "Week = 7")
 def test_days_per_unit_month_approx() -> unit ! { Test } = assert_eq_int(days_per_unit(Month), cast(30, int64), "Month ~ 30 (alpha)")
