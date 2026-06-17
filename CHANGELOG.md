@@ -6,6 +6,25 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-06-17
+
+Mechanical toolchain re-cascade. No API change.
+
+### Changed
+
+- **Toolchain cascade to chelis 0.7.27.** `reef.toml` moves
+  `compiler =0.7.26 → =0.7.27`, `nautilus 0.7.25 → 0.7.26`, and
+  `coral 0.7.24 → 0.7.25`; `chelis-std` stays `0.4.0`. The package
+  version moves `0.20.0 → 0.20.1`, a patch bump matching the
+  patch-only compiler retarget. chelis 0.7.27 = 0.7.26 plus the single
+  #399 eval-demangle fix, which targets cross-module ADT evaluation;
+  shoals (finance: no NN, no prove, no cross-module ADT eval) is
+  unaffected, so the bump is pin-only. Both CI workflows continue to
+  derive every version pin dynamically from `reef.toml`, so no
+  workflow edits were required. `chelis fmt --check`, `chelis lint
+  --check`, `chelis reef build`, and the fast `tests/` unit suite all
+  pass unchanged under the new toolchain.
+
 ## [0.20.0] - 2026-06-16
 
 Reconciliation + cascade release.
