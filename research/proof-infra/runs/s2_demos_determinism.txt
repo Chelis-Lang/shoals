@@ -1,0 +1,10 @@
+# S2 determinism: two full fuzz-only runs at seed 0, samples 500
+# compiler: chelis 0.7.27
+## run A == run B ?
+IDENTICAL
+
+## single-model (--only call_le_spot) twice:
+IDENTICAL
+{"counterexample":{"disc":9.160563349675634,"k":1.7235925748802128,"nd1":6.564762635013903,"nd2":9.112791344185254,"s":-5.632259313290806},"kind":"property","name":"call_le_spot","samples":4,"seed":0,"shrink_steps":0,"source":{"file":"demos/businesswrong.ch","kind":"surf"},"status":"failed"}
+{"kind":"property","name":"call_le_spot_fixed","samples":500,"seed":0,"source":{"file":"demos/businesswrong.ch","kind":"surf"},"status":"passed"}
+{"errors":0,"failed":1,"kind":"summary","obligations":0,"passed":1,"total":2,"unsupported":0}

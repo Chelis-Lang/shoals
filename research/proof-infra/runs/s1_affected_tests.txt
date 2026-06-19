@@ -1,0 +1,7 @@
+=== consolidated affected-test record (chelis 0.7.27) ===
+tests/pricing.ch : {"summary":{"passed":8,"failed":0}}
+tests/pricingextended.ch : {"summary":{"passed":11,"failed":0}}
+tests/pricingextended_closedforms.ch : {"summary":{"passed":4,"failed":0}}
+tests/volsurface.ch : {"summary":{"passed":23,"failed":0}}
+tests/dupire.ch : {"summary":{"passed":4,"failed":0}}
+tests/greeks.ch : {"summary":{"passed":17,"failed":0}}

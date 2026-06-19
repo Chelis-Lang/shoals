@@ -1,0 +1,8 @@
+# S2 fmt/lint clean status for demos/businesswrong.ch
+# compiler: chelis 0.7.27
+
+## chelis fmt --check demos/businesswrong.ch
+exit=0
+
+## chelis lint --check demos/businesswrong.ch
+exit=0

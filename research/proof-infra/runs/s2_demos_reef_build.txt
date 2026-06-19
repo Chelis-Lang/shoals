@@ -1,0 +1,8 @@
+# S2 reef build with new demos/ source root
+# compiler: chelis 0.7.27
+# reef.toml additional_sources now: additional_sources = ["properties", "references", "demos"]
+
+Built shoals 0.20.1
+Shell: /home/jeff/Documents/scratch/shoals/dist/shoals-0.20.1.chb
+Archive: /home/jeff/Documents/scratch/shoals/dist/shoals-0.20.1.tar.zst
+BUILD_EXIT=0

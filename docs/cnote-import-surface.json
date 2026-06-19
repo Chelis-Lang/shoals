@@ -1,0 +1,51 @@
+{
+  "schema": "shoals.cnote-import-surface/v1",
+  "purpose": "Frozen import surface that C Note vendors and resolves in its no-network sandbox. Pinned so C Note builds against a stable contract while Shoals internals evolve.",
+  "pins": {
+    "chelis": "0.7.27",
+    "shoals": "0.20.1"
+  },
+  "scope_note": "Ungated graduation surface (current pin). The SMT composite derivatives-property corpus (parity/upper-bound/delta-bounds as proven-modulo-a-fuzz-validated-contract) lands at the re-pin and is not part of this freeze.",
+  "pricing": {
+    "module": "Shoals.Pricing",
+    "normal_cdf": "one A&S 7.1.26 erf in f64 (same coefficients as Nautilus.Special.erf); the f32 entry points downcast the f64 body and every Greek is the AD derivative of that displayed price",
+    "exports": [
+      {"id": "bs_call_scalar", "sig": "(s,k,r,sigma,t: f32) -> f32", "role": "price-scalar"},
+      {"id": "bs_put_scalar", "sig": "(s,k,r,sigma,t: f32) -> f32", "role": "price-scalar"},
+      {"id": "call_prices", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "price-vector"},
+      {"id": "put_prices", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "price-vector"},
+      {"id": "call_total", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> f32", "role": "price-reduce"},
+      {"id": "put_total", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> f32", "role": "price-reduce"},
+      {"id": "deltas_call", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-firstorder", "greek": "delta"},
+      {"id": "deltas_put", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-firstorder", "greek": "delta"},
+      {"id": "vegas_call", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-firstorder", "greek": "vega"},
+      {"id": "rhos_call", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-firstorder", "greek": "rho"},
+      {"id": "thetas_call", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-firstorder", "greek": "theta"},
+      {"id": "mc_call_price", "sig": "[n](template: tensor[n,f32], s0,k,r,sigma,t: f32) -> f32 ! { Random }", "role": "price-mc"}
+    ],
+    "greek_validation": "AD-derived first-order Greeks, oracle-validated (analytic + shipped FD + sign-fold) by scripts/oracle_greeks_gate.py. Validated via the manual gate, not in-suite Std.Test assertions, on chelis 0.7.27 (rank-0 grad assertion lands at the re-pin). Gamma/volga/vanna (second order) land at the re-pin."
+  },
+  "demos": {
+    "module": "Shoals.Demos.Businesswrong",
+    "tier": "fuzz",
+    "pairs": [
+      {"wrong": "discount_le_one", "control": "discount_le_one_fixed", "error": "discount factor above 1 (negative implied rate)"},
+      {"wrong": "variance_nonneg", "control": "variance_nonneg_fixed", "error": "negative variance (Feller violation)"},
+      {"wrong": "call_le_spot", "control": "call_le_spot_fixed", "error": "call priced above spot (static arbitrage)"}
+    ],
+    "run": "chelis prove demos/businesswrong.ch --tier fuzz-only --samples 500 --seed 0 --json"
+  },
+  "properties": [
+    {"module": "Shoals.Properties.Pricing", "ids": ["put_call_parity_holds", "call_price_nonneg", "put_price_nonneg", "call_bounded_by_spot", "matches_textbook_reference", "matches_textbook_reference_put", "mc_matches_textbook_mc_reference"]},
+    {"module": "Shoals.Properties.Greeks", "ids": ["fd_delta_in_unit_range_for_call", "fd_delta_matches_analytic", "vega_nonneg"]},
+    {"module": "Shoals.Properties.NoArbitrage", "ids": ["bull_spread_nonneg", "butterfly_nonneg"]}
+  ],
+  "dependency_tree": {
+    "shoals": "0.20.1",
+    "dependencies": [
+      {"name": "chelis-std", "version": "0.4.0", "source": "bundled", "archive_sha256": "370515a1dd08f728600bb9a569219b687b39851f13fc4d58401befa4aac1bc62"},
+      {"name": "coral", "version": "0.7.25", "source": "github://Chelis-Lang/coral@v0.7.25", "archive_sha256": "2e22302077de918ae240f63f824af9746b7b46dcd976266cb0e7ba46991fa314"},
+      {"name": "nautilus", "version": "0.7.26", "source": "github://Chelis-Lang/nautilus@v0.7.26", "archive_sha256": "681acfba94b4dae31700b0ea68a6472b776ee150cf6537baff07072de6251de2"}
+    ]
+  }
+}

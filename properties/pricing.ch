@@ -23,19 +23,27 @@ def call_bounded_by_spot(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool = {
   c_px = bs_call_scalar(s, k, r, sigma, t)
   lte(c_px, s)
 }
+-- Tolerance note (graduation, sanctioned single re-baseline): bs_call_scalar /
+-- bs_put_scalar now route through one f64 Abramowitz-Stegun body and downcast, while
+-- the reference is the f32 Nautilus-erfc evaluation of the same A&S formula. The two
+-- therefore differ by f32-vs-f64 rounding of identical math, amplified by the price's
+-- cancellation (measured max ~1.1e-5: K=110 call 1.14e-5, ATM put 1.05e-5; most cells
+-- ~1e-6). The bound is the binding cross-check's f32 bound (1e-4). This loosening is
+-- accuracy-monotone, NOT a regression: the f64 body is closer to true BS than the old
+-- f32 path (max abs err 1.44e-5 vs 3.64e-5, oracle_greeks_gate accuracy-monotone guard).
 def matches_textbook_reference(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool = {
   optimized = bs_call_scalar(s, k, r, sigma, t)
   reference = call_textbook(s, k, r, sigma, t)
   diff = sub(optimized, reference)
   abs_diff = if lt(diff, cast(0.0, f32)) then neg(diff) else diff
-  lt(abs_diff, cast(0.00001, f32))
+  lt(abs_diff, cast(0.0001, f32))
 }
 def matches_textbook_reference_put(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool = {
   optimized = bs_put_scalar(s, k, r, sigma, t)
   reference = put_textbook(s, k, r, sigma, t)
   diff = sub(optimized, reference)
   abs_diff = if lt(diff, cast(0.0, f32)) then neg(diff) else diff
-  lt(abs_diff, cast(0.00001, f32))
+  lt(abs_diff, cast(0.0001, f32))
 }
 def mc_matches_textbook_mc_reference[n](template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool ! { Random } = {
   optimized = with seed(42) { mc_call_price(copy(template), s0, k, r, sigma, t) }
