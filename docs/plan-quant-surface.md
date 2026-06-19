@@ -48,10 +48,10 @@ work packets, suggested agent-team allocation, acceptance criteria
   oracle in `phase3l_shoals_oracle_*` is green AND the AD profile
   is `composed` (not `unproven-primitive` or `unsupported`).
 - **Native testing discipline.** Default per-PR gate is
-  `chelis fmt --check && chelis reef build && chelis test tests/
-  --timeout 180 --jobs auto`. Heavier oracles (multi-curve bootstrap,
-  Heston QE, XVA smoke) run as manual gates at milestone exits via
-  scripts under `scripts/manual_gates/`.
+  `chelis fmt --check`, `chelis lint --check`, `chelis reef build`, and
+  `chelis test tests/ --timeout 1200 --jobs auto`. Heavier oracles
+  (multi-curve bootstrap, Heston QE, XVA smoke) run as manual gates at
+  milestone exits via scripts under `scripts/manual_gates/`.
 - **Manual-gate pattern.** Each named gate
   (`phase3l_shoals_oracle_*`) is a python script under
   `scripts/manual_gates/<gate_name>.py` that drives `chelis` from

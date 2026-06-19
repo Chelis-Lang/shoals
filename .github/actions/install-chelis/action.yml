@@ -10,10 +10,10 @@ description: >-
 
 inputs:
   chelis-tag:
-    description: Chelis release tag, e.g. v0.7.27.
+    description: Chelis release tag, e.g. v0.8.0.
     required: true
   chelis-version:
-    description: Bare version for the `chelis --version` assertion, e.g. 0.7.27.
+    description: Bare version for the `chelis --version` assertion, e.g. 0.8.0.
     required: true
   platform:
     description: Toolchain platform slug (linux-x86_64 or darwin-arm64).
