@@ -1,0 +1,81 @@
+name: Install Chelis toolchain
+description: >-
+  Restore (or download) the pinned Chelis toolchain tarball from a
+  per-tag actions/cache, put its bin/ on PATH, verify the version, and
+  optionally restore the local reef registry (~/.chelis/reef) from a
+  cache keyed on the installed dependency tags. Replaces the inline
+  `gh release download` + `tar` + reef-install blocks duplicated across
+  CI jobs so each leg stops re-downloading the toolchain and re-fetching
+  reef deps on every run.
+
+inputs:
+  chelis-tag:
+    description: Chelis release tag, e.g. v0.8.0.
+    required: true
+  chelis-version:
+    description: Bare version for the `chelis --version` assertion, e.g. 0.8.0.
+    required: true
+  platform:
+    description: Toolchain platform slug (linux-x86_64 or darwin-arm64).
+    required: false
+    default: linux-x86_64
+  gh-token:
+    description: Token with contents:read on Chelis-Lang/chelis (for the cache-miss download).
+    required: true
+  reef-cache-key:
+    description: >-
+      Optional cache key fragment uniquely identifying the set of reef
+      dependency tags this job installs (e.g. "nautilus-v1.2.3").
+      When set, ~/.chelis/reef is restored/saved under this key and the
+      `reef-cache-hit` output reports whether a populated registry was
+      restored, so the caller can skip its `reef install` steps.
+    required: false
+    default: ""
+
+outputs:
+  reef-cache-hit:
+    description: "'true' when the reef registry cache was restored (caller may skip reef install)."
+    value: ${{ steps.reef-cache.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Restore cached chelis toolchain
+      id: toolchain-cache
+      uses: actions/cache@v4
+      with:
+        path: /tmp/chelis-toolchain
+        key: chelis-toolchain-${{ inputs.chelis-tag }}-${{ inputs.platform }}
+
+    - name: Download chelis toolchain (cache miss)
+      if: steps.toolchain-cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.gh-token }}
+      run: |
+        set -euo pipefail
+        rm -rf /tmp/chelis-toolchain
+        gh release download "${{ inputs.chelis-tag }}" \
+          --repo Chelis-Lang/chelis \
+          --pattern "chelis-${{ inputs.chelis-tag }}-${{ inputs.platform }}.tar.gz" \
+          --dir /tmp/chelis-toolchain
+        tar -xzf "/tmp/chelis-toolchain/chelis-${{ inputs.chelis-tag }}-${{ inputs.platform }}.tar.gz" \
+          -C /tmp/chelis-toolchain
+
+    - name: Put chelis on PATH
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "/tmp/chelis-toolchain/chelis-${{ inputs.chelis-tag }}-${{ inputs.platform }}/bin" >> "$GITHUB_PATH"
+
+    - name: Verify toolchain version
+      shell: bash
+      run: test "$(chelis --version)" = "chelis ${{ inputs.chelis-version }}"
+
+    - name: Restore cached reef registry
+      id: reef-cache
+      if: inputs.reef-cache-key != ''
+      uses: actions/cache@v4
+      with:
+        path: ~/.chelis/reef
+        key: chelis-reef-${{ inputs.platform }}-${{ inputs.reef-cache-key }}

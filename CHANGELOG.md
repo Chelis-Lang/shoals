@@ -6,6 +6,20 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.20.2] - 2026-06-19
+
+Mechanical toolchain re-cascade. No API change.
+
+### Changed
+
+- **Toolchain cascade to chelis 0.8.0.** `reef.toml` moves
+  `compiler =0.7.27 -> =0.8.0`, `nautilus 0.7.26 -> 0.7.27`, and
+  `coral 0.7.25 -> 0.7.26`; `chelis-std` stays `0.4.0`. The package
+  version moves `0.20.1 -> 0.20.2`, a patch bump for the released
+  compiler/dependency cascade. CI, nightly, and release workflows
+  continue to derive toolchain and dependency pins from `reef.toml`;
+  only documentation/examples that named the old pins needed refresh.
+
 ## [0.20.1] - 2026-06-17
 
 Mechanical toolchain re-cascade. No API change.
