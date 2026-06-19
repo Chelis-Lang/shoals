@@ -96,18 +96,23 @@ jobs:
       - name: chelis reef build
         run: chelis reef build
 
-      # One heavy file per matrix leg. --jobs auto gives no intra-file
-      # parallelism here (it parallelizes across files, and a leg has one
-      # file), so the heaviest single test sets the floor. On the 2-vCPU
-      # ubuntu-latest runner the slowest individual tests — the modelfit
-      # pipeline FD-bump (~12 serial 2-stage LM solves) and the 256-path
-      # SABR correlation MC — run past 600s, so the per-test budget is 1500s
-      # (the whole monolith previously used 1800s without a per-test timeout;
-      # 1500s keeps margin under the 40-min step ceiling). These tests cannot
-      # be shrunk without weakening their numerical/statistical oracle.
+      # One heavy file per matrix leg. `--jobs` controls cross-FILE worker
+      # parallelism, so with a single file it buys no speedup — but `--jobs
+      # auto` still forks worker processes that add CPU/memory pressure on the
+      # 2-vCPU ubuntu-latest runner. That pressure twice killed the heaviest
+      # leg with a runner-level death ("lost communication ... starves it for
+      # CPU/Memory"), so pin `--jobs 1` to run in-process with no extra
+      # workers; the tests in a file already run serially regardless.
+      #
+      # The slowest individual tests — the modelfit pipeline FD-bump (~12
+      # serial 2-stage LM solves) and the 256-path SABR correlation MC — run
+      # past 600s on 2 vCPUs, so the per-test budget is 1500s (the whole
+      # monolith previously used 1800s without a per-test timeout; 1500s keeps
+      # margin under the step ceiling). These tests cannot be shrunk without
+      # weakening their numerical/statistical oracle.
       - name: chelis test (tests-manual/${{ matrix.file }}.ch)
-        timeout-minutes: 40
-        run: chelis test "tests-manual/${{ matrix.file }}.ch" --timeout 1500 --jobs auto
+        timeout-minutes: 45
+        run: chelis test "tests-manual/${{ matrix.file }}.ch" --timeout 1500 --jobs 1
 
   # The milestone acceptance oracles (scripts/manual_gates/phase3l_*). They
   # were previously never reached because the single heavy step was killed
