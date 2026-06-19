@@ -2,9 +2,9 @@ name: ci
 
 on:
   push:
-    branches: [main, shoals-grad]
+    branches: [main]
   pull_request:
-    branches: [main, shoals-grad]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
