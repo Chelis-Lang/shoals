@@ -37,7 +37,10 @@ jobs:
           - hull_white_heavy
           - lsm_heavy
           - modelfit_bfgs
-          - modelfit_bfgs_heavy
+          # modelfit_bfgs_heavy excluded pending chelis#408: its BFGS path
+          # (mf_bfgs_rec Rosenbrock 500-iter + FD Jacobian + CG) kills the
+          # 2-vCPU GitHub runner ~4min in (shutdown/lost-communication, no
+          # output). Passes locally; re-add this leg when chelis#408 is fixed.
           - modelfit_pipeline
           - modelfit_pipeline_heavy
           - pde_heavy
