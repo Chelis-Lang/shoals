@@ -1,0 +1,19 @@
+### STEP 0: grad through the erf / normal-CDF path (decisive feasibility gate)
+# erf and n_cdf are LIBRARY functions of differentiable primitives + masked-if;
+# grad differentiates them. Values agree with analytic derivatives to the A&S floor.
+
+grad(erf64)(0.5)  [analytic 2/sqrt(pi)*exp(-0.25)=0.8787825789]
+$ chelis eval grad((fn (x: f64) -> (fn (x: f64) ->
+  (fn (ax: f64) ->
+    if lt(ax, cast(0.00001, f64)) ...
+tensor(shape=[], data=[0.8787826714097311])
+
+grad(n_cdf64)(0.5) [analytic phi(0.5)=0.3520653268]
+$ chelis eval grad((fn (x: f64) -> (fn (z: f64) ->
+  mul(cast(0.5, f64), sub(cast(1.0, f64), (fn (x: f64...
+tensor(shape=[], data=[0.35206586375096893])
+
+grad(grad(x^3))(2) [analytic 6x=12] -- second-order AD works
+$ chelis eval grad((fn (x: f64) -> grad((fn (y: f64) -> mul(y, mul(y, y))), wrt=y)(x)), wrt=x)(cast(2.0,...
+tensor(shape=[], data=[12.0])
+

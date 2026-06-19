@@ -1,0 +1,13 @@
+### Package-level Greek pattern: grad(named bs_call, wrt=P)(all args explicit)
+# This is EXACTLY what src/greeks.ch uses (no capture). Values match the validated grid.
+
+ad_delta_call (grad bs_call wrt=s): 0.6368358223564237   
+ad_vega_call (grad bs_call wrt=sg): 37.52387193312261   
+ad_rho_call (grad bs_call wrt=r): 53.233006820207294   
+ad_dCdt_call (grad bs_call wrt=t): 6.414037534322624   
+
+# theta = -dCdt = +6.41... -> -6.41
+# NOTE: grad scalar outputs are rank-0 tensors at runtime; they compute correctly
+# but cannot be packed via to_tensor or asserted via Std.Test scalar-bool asserts.
+# Demonstrated failure (the value 0.6368358223564237 is the CORRECT delta):
+  error: to_tensor expects numeric or bool list elements, got Tensor(RuntimeTensorValue { value: TensorValue { data: [0.6368358223564237], shape: [] }, precision: F64 })

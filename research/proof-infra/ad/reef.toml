@@ -1,0 +1,10 @@
+[package]
+name = "proof_infra_ad"
+version = "0.1.0"
+compiler = "=0.7.27"
+module_prefix = "ProofInfraAd"
+additional_sources = []
+
+[dependencies]
+nautilus = { version = "0.7.26" }
+

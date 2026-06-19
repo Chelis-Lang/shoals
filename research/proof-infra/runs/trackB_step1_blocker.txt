@@ -1,0 +1,7 @@
+### STEP 1 blocker: grad over to_list/map/to_tensor host-lane combinator
+$ chelis eval 'grad(fn xv -> sum(to_tensor(map(square, to_list(copy(xv)))))) ...'
+error: host runtime could not lower `grad(...)` for evaluation: `sum` axis 0 is out of range for an operand of rank 0 (valid axes are 0..0 or -0..-1) at source span `surf:131..132`
+
+### CONTRAST: identical math, pure tensor lane (no to_list/map) -- grad OK
+$ chelis eval 'grad(fn xv -> sum(mul(xv, xv)))(...)'
+tensor(shape=[3], data=[2.0, 4.0, 6.0])

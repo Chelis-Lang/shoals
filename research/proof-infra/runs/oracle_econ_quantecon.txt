@@ -1,0 +1,81 @@
+QuantEcon empirical oracle for Track C SMT-proven invariants
+numpy float64 eps = 2.220e-16
+
+=== 1. Markov chains (quantecon.MarkovChain) ===
+[PASS] markov_stationary_nonneg
+        oracle=quantecon.MarkovChain.stationary_distributions (7 chains)  measured=-0.000e+00  tol=2.220e-13
+        note: most-negative stationary entry; invariant: entries >= 0
+[PASS] markov_stationary_sums_to_1
+        oracle=quantecon.MarkovChain.stationary_distributions  measured=1.110e-16  tol=1.110e-14
+        note: max |sum(pi) - 1|; invariant: total mass = 1
+[PASS] markov_fixed_point
+        oracle=quantecon.MarkovChain.stationary_distributions  measured=1.110e-16  tol=2.220e-13
+        note: max ||pi @ P - pi||_inf; invariant: stationary dist is a fixed point
+[PASS] markov_simplex_preservation
+        oracle=quantecon chain, 20000 random simplex points  measured=-0.000e+00  tol=2.220e-15
+        note: min image entry (nonneg); convex combo of nonnegs stays >= 0
+[PASS] markov_simplex_preservation_sum
+        oracle=quantecon chain, 20000 random simplex points  measured=4.441e-16  tol=1.110e-14
+        note: max |sum(x@P) - 1|; total mass preserved
+
+=== 2. Bellman operator (finite MDP value iteration) ===
+[PASS] bellman_monotonicity
+        oracle=hand-rolled finite MDP (row-stochastic P), 2000 ordered pairs x betas  measured=0.000e+00  tol=1.000e-12
+        note: max (TV-TW) over V<=W; invariant: TV<=TW
+[PASS] bellman_contraction_modulus
+        oracle=hand-rolled finite MDP, 2000 random pairs x betas  measured=0.000e+00  tol=1.000e-12
+        note: max (ratio - beta); invariant: contraction ratio <= beta
+
+--- value iteration convergence (per-beta contraction trace) ---
+  beta=0.50  guarded ||bP y||/||y|| max=0.500000 (<= beta? yes)  | naive succ-diff max=0.500014  | VI residual=9.903e-13 (bound 1.000e-12)
+  beta=0.80  guarded ||bP y||/||y|| max=0.800000 (<= beta? yes)  | naive succ-diff max=0.800118  | VI residual=3.623e-12 (bound 4.000e-12)
+  beta=0.90  guarded ||bP y||/||y|| max=0.900000 (<= beta? yes)  | naive succ-diff max=0.900265  | VI residual=8.922e-12 (bound 9.000e-12)
+  beta=0.95  guarded ||bP y||/||y|| max=0.950000 (<= beta? yes)  | naive succ-diff max=0.951754  | VI residual=1.826e-11 (bound 1.900e-11)
+  beta=0.99  guarded ||bP y||/||y|| max=0.990000 (<= beta? yes)  | naive succ-diff max=1.000000  | VI residual=9.742e-11 (bound 9.900e-11)
+[PASS] bellman_vi_iter_contraction
+        oracle=value-iteration iterate-difference contraction ||bP y||/||y|| (5-state)  measured=3.331e-16  tol=1.000e-09
+        note: max over iters/betas of (ratio - beta) for the faithful estimate; each VI step contracts by <= beta. (Naive succ-diff ratio excess = 1.000e-02, a float64 cancellation artifact, not an invariant violation -- see RESULTS methodology note.)
+[PASS] bellman_vi_convergence
+        oracle=value iteration vs closed-form (I-beta P)^-1 r, normalized by stop-rule bound  measured=9.914e-01  tol=1.000e+00
+        note: ||V_VI - V*||_inf / (delta_stop*beta/(1-beta)); VI converges to the Bellman fixed point within its a-priori stopping-rule bound
+
+--- quantecon.DiscreteDP cross-check ---
+[PASS] bellman_quantecon_discretedp
+        oracle=quantecon.markov.DiscreteDP value_iteration vs closed form  measured=4.707e-13  tol=1.009e-09
+        note: ||DiscreteDP.v - V*||_inf; QE's own VI lands at the fixed point
+
+=== 3. Gordon growth (p = d/(r-g), r>g) ===
+[PASS] gordon_positivity
+        oracle=parameter sweep r in [.02,.20], r-g in [.001,.10], d in [.1,100] (96000 points)  measured=0.000e+00  tol=0.000e+00
+        note: min price over sweep = 1.0000e+00; invariant: p>0 for d>0,r>g
+[PASS] gordon_monotonicity
+        oracle=Gordon price vs dividend, r,g fixed, over the sweep  measured=0.000e+00  tol=1.000e-12
+        note: max monotonicity violation (p decreasing in d); invariant: p nondecreasing in d
+
+--- present value of finite nonneg dividend streams ---
+[PASS] pv_positivity
+        oracle=20000 random (beta in [0,1], 8 nonneg dividends)  measured=0.000e+00  tol=0.000e+00
+        note: min PV = 5.9605e-03; invariant: PV of nonneg stream >= 0
+[PASS] pv_monotonicity
+        oracle=20000 random streams with e >= d  measured=0.000e+00  tol=1.000e-09
+        note: max (PV(d)-PV(e)) for e>=d; invariant: PV monotone in dividends
+
+======================================================================
+SUMMARY
+  [PASS] markov_stationary_nonneg         measured=-0.000e+00 tol=2.220e-13
+  [PASS] markov_stationary_sums_to_1      measured=1.110e-16 tol=1.110e-14
+  [PASS] markov_fixed_point               measured=1.110e-16 tol=2.220e-13
+  [PASS] markov_simplex_preservation      measured=-0.000e+00 tol=2.220e-15
+  [PASS] markov_simplex_preservation_sum  measured=4.441e-16 tol=1.110e-14
+  [PASS] bellman_monotonicity             measured=0.000e+00 tol=1.000e-12
+  [PASS] bellman_contraction_modulus      measured=0.000e+00 tol=1.000e-12
+  [PASS] bellman_vi_iter_contraction      measured=3.331e-16 tol=1.000e-09
+  [PASS] bellman_vi_convergence           measured=9.914e-01 tol=1.000e+00
+  [PASS] bellman_quantecon_discretedp     measured=4.707e-13 tol=1.009e-09
+  [PASS] gordon_positivity                measured=0.000e+00 tol=0.000e+00
+  [PASS] gordon_monotonicity              measured=0.000e+00 tol=1.000e-12
+  [PASS] pv_positivity                    measured=0.000e+00 tol=0.000e+00
+  [PASS] pv_monotonicity                  measured=0.000e+00 tol=1.000e-09
+
+14 PASS, 0 FAIL
+{"task": "econ_oracle", "n_pass": 14, "n_fail": 0, "results": [{"check": "markov_stationary_nonneg", "oracle": "quantecon.MarkovChain.stationary_distributions (7 chains)", "measured": -0.0, "tol": 2.220446049250313e-13, "verdict": "PASS", "note": "most-negative stationary entry; invariant: entries >= 0"}, {"check": "markov_stationary_sums_to_1", "oracle": "quantecon.MarkovChain.stationary_distributions", "measured": 1.1102230246251565e-16, "tol": 1.1102230246251565e-14, "verdict": "PASS", "note": "max |sum(pi) - 1|; invariant: total mass = 1"}, {"check": "markov_fixed_point", "oracle": "quantecon.MarkovChain.stationary_distributions", "measured": 1.1102230246251565e-16, "tol": 2.220446049250313e-13, "verdict": "PASS", "note": "max ||pi @ P - pi||_inf; invariant: stationary dist is a fixed point"}, {"check": "markov_simplex_preservation", "oracle": "quantecon chain, 20000 random simplex points", "measured": -0.0, "tol": 2.220446049250313e-15, "verdict": "PASS", "note": "min image entry (nonneg); convex combo of nonnegs stays >= 0"}, {"check": "markov_simplex_preservation_sum", "oracle": "quantecon chain, 20000 random simplex points", "measured": 4.440892098500626e-16, "tol": 1.1102230246251565e-14, "verdict": "PASS", "note": "max |sum(x@P) - 1|; total mass preserved"}, {"check": "bellman_monotonicity", "oracle": "hand-rolled finite MDP (row-stochastic P), 2000 ordered pairs x betas", "measured": 0.0, "tol": 1e-12, "verdict": "PASS", "note": "max (TV-TW) over V<=W; invariant: TV<=TW"}, {"check": "bellman_contraction_modulus", "oracle": "hand-rolled finite MDP, 2000 random pairs x betas", "measured": 0.0, "tol": 1e-12, "verdict": "PASS", "note": "max (ratio - beta); invariant: contraction ratio <= beta"}, {"check": "bellman_vi_iter_contraction", "oracle": "value-iteration iterate-difference contraction ||bP y||/||y|| (5-state)", "measured": 3.3306690738754696e-16, "tol": 1e-09, "verdict": "PASS", "note": "max over iters/betas of (ratio - beta) for the faithful estimate; each VI step contracts by <= beta. (Naive succ-diff ratio excess = 1.000e-02, a float64 cancellation artifact, not an invariant violation -- see RESULTS methodology note.)"}, {"check": "bellman_vi_convergence", "oracle": "value iteration vs closed-form (I-beta P)^-1 r, normalized by stop-rule bound", "measured": 0.9913551461219563, "tol": 1.0, "verdict": "PASS", "note": "||V_VI - V*||_inf / (delta_stop*beta/(1-beta)); VI converges to the Bellman fixed point within its a-priori stopping-rule bound"}, {"check": "bellman_quantecon_discretedp", "oracle": "quantecon.markov.DiscreteDP value_iteration vs closed form", "measured": 4.707345624410664e-13, "tol": 1.0090000000000001e-09, "verdict": "PASS", "note": "||DiscreteDP.v - V*||_inf; QE's own VI lands at the fixed point"}, {"check": "gordon_positivity", "oracle": "parameter sweep r in [.02,.20], r-g in [.001,.10], d in [.1,100] (96000 points)", "measured": 0.0, "tol": 0.0, "verdict": "PASS", "note": "min price over sweep = 1.0000e+00; invariant: p>0 for d>0,r>g"}, {"check": "gordon_monotonicity", "oracle": "Gordon price vs dividend, r,g fixed, over the sweep", "measured": 0.0, "tol": 1e-12, "verdict": "PASS", "note": "max monotonicity violation (p decreasing in d); invariant: p nondecreasing in d"}, {"check": "pv_positivity", "oracle": "20000 random (beta in [0,1], 8 nonneg dividends)", "measured": 0.0, "tol": 0.0, "verdict": "PASS", "note": "min PV = 5.9605e-03; invariant: PV of nonneg stream >= 0"}, {"check": "pv_monotonicity", "oracle": "20000 random streams with e >= d", "measured": 0.0, "tol": 1e-09, "verdict": "PASS", "note": "max (PV(d)-PV(e)) for e>=d; invariant: PV monotone in dividends"}]}

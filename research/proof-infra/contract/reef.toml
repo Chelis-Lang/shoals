@@ -1,0 +1,9 @@
+[package]
+name = "proof-infra-contract"
+version = "0.1.0"
+compiler = "=0.7.27"
+module_prefix = "ProofInfraContract"
+
+[dependencies]
+nautilus = { version = "0.7.26" }
+chelis-std = { version = "0.4.0" }

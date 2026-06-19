@@ -1,0 +1,4 @@
+{"file":"tests/contract_test.ch","test":"test_n_cdf_range_grid","status":"pass"}
+{"file":"tests/contract_test.ch","test":"test_n_cdf_reflection_grid","status":"pass"}
+{"file":"tests/contract_test.ch","test":"test_disc_range_grid","status":"pass"}
+{"summary":{"passed":3,"failed":0}}
