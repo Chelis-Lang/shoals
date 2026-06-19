@@ -20,10 +20,10 @@ reference oracles:
 
 ```sh
 # run the runtime test suite
-chelis test tests/ --timeout 180 --jobs auto
+chelis test tests/ --timeout 1200 --jobs auto
 
 # serial run, useful when debugging a single failure
-chelis test tests/ --timeout 180 --jobs 1
+chelis test tests/ --timeout 1200 --jobs 1
 ```
 
 The formatter checks one file per invocation:
@@ -34,7 +34,8 @@ chelis fmt --check src/pricing.ch
 
 The local acceptance gate at `scripts/run_local_gate.py` runs the formatter
 check over the `.ch` sources, the linter, `chelis reef build`, and the
-runtime suite. Continuous integration runs the same steps.
+runtime suites. Continuous integration runs the same default steps but leaves
+the heavy `tests-manual/` suite to the nightly/manual lanes.
 
 ## A first price
 
