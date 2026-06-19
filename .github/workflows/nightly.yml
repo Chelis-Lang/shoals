@@ -117,12 +117,12 @@ jobs:
       # monolith previously used 1800s without a per-test timeout). These tests
       # cannot be shrunk without weakening their numerical/statistical oracle.
       #
-      # Step ceiling 45 min: a heavy leg builds + tests in ~7-23 min, and the
+      # Step ceiling 30 min: a heavy leg builds + tests in ~7-23 min, and the
       # 1500s (25-min) per-test timeout is the real guard against a wedged run,
-      # so 45 covers build + the longest test with headroom. A rare overrun
+      # so 30 covers build + the longest test with headroom. A rare overrun
       # surfaces via the report job rather than being masked by a huge ceiling.
       - name: chelis test (tests-manual/${{ matrix.file }}.ch)
-        timeout-minutes: 45
+        timeout-minutes: 30
         run: chelis test "tests-manual/${{ matrix.file }}.ch" --timeout 1500 --jobs 1
 
   # Surface a nightly failure as a tracking issue (opens on failure, closes
