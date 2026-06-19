@@ -110,11 +110,16 @@ jobs:
       # The slowest individual tests — the modelfit pipeline FD-bump (~12
       # serial 2-stage LM solves) and the 256-path SABR correlation MC — run
       # past 600s on 2 vCPUs, so the per-test budget is 1500s (the whole
-      # monolith previously used 1800s without a per-test timeout; 1500s keeps
-      # margin under the step ceiling). These tests cannot be shrunk without
-      # weakening their numerical/statistical oracle.
+      # monolith previously used 1800s without a per-test timeout). These tests
+      # cannot be shrunk without weakening their numerical/statistical oracle.
+      #
+      # The step ceiling is a generous 90 min: a heavy leg builds + tests in
+      # ~7-23 min normally, but a CPU-starved 2-vCPU runner (observed when this
+      # nightly is dispatched alongside other org CI) can stretch that 3x. On a
+      # weekly job a high ceiling is nearly free and only bites a truly-hung
+      # test; the 1500s per-test timeout is the real guard against a wedged run.
       - name: chelis test (tests-manual/${{ matrix.file }}.ch)
-        timeout-minutes: 45
+        timeout-minutes: 90
         run: chelis test "tests-manual/${{ matrix.file }}.ch" --timeout 1500 --jobs 1
 
   # The milestone acceptance oracles (scripts/manual_gates/phase3l_*). They
@@ -172,8 +177,14 @@ jobs:
       - name: chelis reef build
         run: chelis reef build
 
+      # 90-min ceiling: the 11 phase3l oracle scripts each spawn a fresh
+      # `chelis test` that recompiles the chelis-std + nautilus + coral graph,
+      # so the job is recompile-bound. On a quiet runner it fits well under an
+      # hour, but a CPU-starved 2-vCPU runner (seen when this nightly shares the
+      # org runner pool with other CI) can stretch a single script past 60 min.
+      # Weekly cadence makes the generous ceiling cheap.
       - name: milestone manual gates
-        timeout-minutes: 60
+        timeout-minutes: 90
         run: |
           set -uo pipefail
           failed=0
