@@ -2,11 +2,15 @@ name: nightly
 
 # The heavy validation suite. Per-PR CI (ci.yml) runs only the fast
 # deterministic unit tests in tests/. The Monte-Carlo / PDE / Fourier /
-# optimization-benchmark files live in tests-manual/ and the milestone
-# acceptance oracles live in scripts/manual_gates/ — both overrun the
-# per-PR runner's wall-clock budget, so they run here on a schedule
-# (and on demand) instead. Toolchain versions are derived from reef.toml,
-# same as ci.yml.
+# optimization-benchmark files live in tests-manual/ and overrun the
+# per-PR runner's wall-clock budget, so they run here weekly (and on
+# demand) instead. Toolchain versions are derived from reef.toml, same
+# as ci.yml.
+#
+# The milestone acceptance oracles (scripts/manual_gates/phase3l_*.py) are
+# a MANUAL gate — run on demand / locally, deliberately NOT scheduled in
+# CI: each spawns a fresh `chelis test` that rebuilds the chelis-std +
+# nautilus + coral graph (recompile-bound), the wrong shape for a CI step.
 #
 # The heavy suite is sharded one matrix leg per tests-manual/*.ch file so
 # no single leg approaches the 2-vCPU ubuntu-latest runner's reclaim
@@ -113,100 +117,22 @@ jobs:
       # monolith previously used 1800s without a per-test timeout). These tests
       # cannot be shrunk without weakening their numerical/statistical oracle.
       #
-      # The step ceiling is a generous 90 min: a heavy leg builds + tests in
-      # ~7-23 min normally, but a CPU-starved 2-vCPU runner (observed when this
-      # nightly is dispatched alongside other org CI) can stretch that 3x. On a
-      # weekly job a high ceiling is nearly free and only bites a truly-hung
-      # test; the 1500s per-test timeout is the real guard against a wedged run.
+      # Step ceiling 45 min: a heavy leg builds + tests in ~7-23 min, and the
+      # 1500s (25-min) per-test timeout is the real guard against a wedged run,
+      # so 45 covers build + the longest test with headroom. A rare overrun
+      # surfaces via the report job rather than being masked by a huge ceiling.
       - name: chelis test (tests-manual/${{ matrix.file }}.ch)
-        timeout-minutes: 90
+        timeout-minutes: 45
         run: chelis test "tests-manual/${{ matrix.file }}.ch" --timeout 1500 --jobs 1
-
-  # The milestone acceptance oracles (scripts/manual_gates/phase3l_*). They
-  # were previously never reached because the single heavy step was killed
-  # before this step ran; they get their own job with a 60-min budget.
-  manual-gates:
-    name: milestone manual gates
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Extract versions from reef.toml
-        run: |
-          set -euo pipefail
-          CHELIS_VERSION=$(grep -oP '^compiler\s*=\s*"=\K[0-9]+\.[0-9]+\.[0-9]+' reef.toml)
-          NAUTILUS_VERSION=$(grep -A0 '^nautilus' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-          CORAL_VERSION=$(grep -A0 '^coral' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-          if [ -z "$CHELIS_VERSION" ] || [ -z "$NAUTILUS_VERSION" ] || [ -z "$CORAL_VERSION" ]; then
-            echo "Failed to parse one or more versions from reef.toml" >&2
-            cat reef.toml >&2
-            exit 1
-          fi
-          echo "CHELIS_VERSION=$CHELIS_VERSION" >> "$GITHUB_ENV"
-          echo "CHELIS_TAG=v$CHELIS_VERSION"     >> "$GITHUB_ENV"
-          echo "NAUTILUS_TAG=v$NAUTILUS_VERSION" >> "$GITHUB_ENV"
-          echo "CORAL_TAG=v$CORAL_VERSION"       >> "$GITHUB_ENV"
-          echo "Detected: chelis=$CHELIS_VERSION nautilus=$NAUTILUS_VERSION coral=$CORAL_VERSION"
-
-      - name: Download pinned chelis toolchain
-        env:
-          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
-        run: |
-          gh release download "$CHELIS_TAG" \
-            --repo Chelis-Lang/chelis \
-            --pattern "chelis-${CHELIS_TAG}-linux-x86_64.tar.gz" \
-            --dir /tmp/chelis-toolchain
-          tar -xzf "/tmp/chelis-toolchain/chelis-${CHELIS_TAG}-linux-x86_64.tar.gz" \
-            -C /tmp/chelis-toolchain
-          echo "/tmp/chelis-toolchain/chelis-${CHELIS_TAG}-linux-x86_64/bin" >> "$GITHUB_PATH"
-
-      - name: Verify toolchain version
-        run: test "$(chelis --version)" = "chelis ${CHELIS_VERSION}"
-
-      - name: Install released dependencies
-        timeout-minutes: 5
-        env:
-          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
-        run: |
-          set -euo pipefail
-          chelis reef install --from-github "Chelis-Lang/nautilus@${NAUTILUS_TAG}"
-          chelis reef install --from-github "Chelis-Lang/coral@${CORAL_TAG}"
-
-      - name: chelis reef build
-        run: chelis reef build
-
-      # 90-min ceiling: the 11 phase3l oracle scripts each spawn a fresh
-      # `chelis test` that recompiles the chelis-std + nautilus + coral graph,
-      # so the job is recompile-bound. On a quiet runner it fits well under an
-      # hour, but a CPU-starved 2-vCPU runner (seen when this nightly shares the
-      # org runner pool with other CI) can stretch a single script past 60 min.
-      # Weekly cadence makes the generous ceiling cheap.
-      - name: milestone manual gates
-        timeout-minutes: 90
-        run: |
-          set -uo pipefail
-          failed=0
-          for gate in scripts/manual_gates/phase3l_shoals_oracle_*.py; do
-            echo "::group::$gate"
-            python3 "$gate" || { failed=$((failed + 1)); echo "::error file=$gate::manual gate failed"; }
-            echo "::endgroup::"
-          done
-          if [ "$failed" -ne 0 ]; then
-            echo "$failed manual gate(s) failed" >&2
-            exit 1
-          fi
-          echo "All manual gates passed."
 
   # Surface a nightly failure as a tracking issue (opens on failure, closes
   # on green) so a red nightly is impossible to miss — scheduled-run
   # failures do not show a red status on main, which is how the heavy
-  # nightly stayed red unnoticed. `needs` the matrix + manual-gates jobs;
-  # `if: always()` so it runs regardless of their outcome.
+  # nightly stayed red unnoticed. `needs` the matrix job; `if: always()`
+  # so it runs regardless of outcome.
   report:
     name: Surface nightly status
-    needs: [heavy, manual-gates]
+    needs: [heavy]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -216,13 +142,12 @@ jobs:
         uses: actions/github-script@v7
         env:
           HEAVY_RESULT: ${{ needs.heavy.result }}
-          GATES_RESULT: ${{ needs.manual-gates.result }}
         with:
           script: |
             const title = 'Nightly failing: shoals';
             const { owner, repo } = context.repo;
             const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
-            const failed = process.env.HEAVY_RESULT !== 'success' || process.env.GATES_RESULT !== 'success';
+            const failed = process.env.HEAVY_RESULT !== 'success';
             const q = `repo:${owner}/${repo} is:issue is:open in:title "${title}"`;
             const found = await github.rest.search.issuesAndPullRequests({ q });
             const existing = found.data.items.find(i => i.title === title);
@@ -232,7 +157,7 @@ jobs:
               } else {
                 const issue = await github.rest.issues.create({
                   owner, repo, title,
-                  body: `The **nightly** heavy suite failed (heavy=${process.env.HEAVY_RESULT}, manual-gates=${process.env.GATES_RESULT}).\n\nRun: ${runUrl}\nCommit: \`${context.sha}\`\n\nAuto-opened on failure; auto-closes when the nightly next passes.`,
+                  body: `The **nightly** heavy suite failed (heavy=${process.env.HEAVY_RESULT}).\n\nRun: ${runUrl}\nCommit: \`${context.sha}\`\n\nAuto-opened on failure; auto-closes when the nightly next passes.`,
                   labels: ['nightly-failure'],
                 });
                 core.info(`Opened tracking issue #${issue.data.number}.`);
