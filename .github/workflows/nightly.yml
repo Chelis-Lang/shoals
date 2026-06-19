@@ -27,6 +27,11 @@ jobs:
   heavy:
     name: heavy ${{ matrix.file }}
     runs-on: ubuntu-latest
+    # Mute ONLY the modelfit_bfgs_heavy leg pending chelis#408 (its BFGS path
+    # kills the 2-vCPU runner ~4min in). Every other leg remains a hard gate.
+    # continue-on-error keeps the leg running so a future chelis#408 fix
+    # surfaces automatically instead of the coverage being silently dropped.
+    continue-on-error: ${{ matrix.file == 'modelfit_bfgs_heavy' }}
     strategy:
       fail-fast: false
       matrix:
@@ -37,10 +42,15 @@ jobs:
           - hull_white_heavy
           - lsm_heavy
           - modelfit_bfgs
-          # modelfit_bfgs_heavy excluded pending chelis#408: its BFGS path
-          # (mf_bfgs_rec Rosenbrock 500-iter + FD Jacobian + CG) kills the
-          # 2-vCPU GitHub runner ~4min in (shutdown/lost-communication, no
-          # output). Passes locally; re-add this leg when chelis#408 is fixed.
+          # modelfit_bfgs_heavy runs but is MUTED via continue-on-error below
+          # (see the `heavy` job's continue-on-error key) pending chelis#408:
+          # its BFGS path (mf_bfgs_rec Rosenbrock 500-iter + FD Jacobian + CG)
+          # kills the 2-vCPU GitHub runner ~4min in (shutdown / lost-
+          # communication, exit 143, no output). Passes locally in ~3min. The
+          # leg is kept in the matrix so that when chelis#408 is fixed its
+          # success surfaces automatically; until then its failure does not
+          # fail the nightly. Remove the continue-on-error key when #408 lands.
+          - modelfit_bfgs_heavy
           - modelfit_pipeline
           - modelfit_pipeline_heavy
           - pde_heavy
