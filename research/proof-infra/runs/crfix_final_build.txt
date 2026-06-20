@@ -1,0 +1,5 @@
+=== reef build (final) ===
+Built shoals 0.20.2
+Shell: /home/jeff/Documents/scratch/shoals/dist/shoals-0.20.2.chb
+Archive: /home/jeff/Documents/scratch/shoals/dist/shoals-0.20.2.tar.zst
+EXIT=0

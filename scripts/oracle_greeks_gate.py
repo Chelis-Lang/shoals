@@ -14,8 +14,15 @@ erf's odd reflection is exercised):
      SAME Abramowitz-Stegun 7.1.26 erf the package body uses, so the comparison
      isolates the AD chain rule, not erf accuracy.
   2. The shipped finite-difference Greeks in ``Shoals.Greeks`` (``fd_delta_call``
-     etc.): same body, different derivative method, so AD and FD must agree
-     within FD truncation error.
+     etc.) INDEPENDENTLY CORROBORATE the closed-form ground truth: the assertion
+     subject is ``ground_truth`` vs ``fd_*`` (not AD vs FD), bounded by an
+     a-priori Richardson truncation band derived from the step ``h`` and f32
+     precision alone (see ``fd_apriori_band``). Because the band never uses the
+     measured AD-vs-FD or gt-vs-FD gap, it can actually fail if the closed-form
+     ground truth is wrong -- it is not the old self-widening ``3*|gt-fd|`` form,
+     which the primary AD-vs-ground-truth gate already rendered vacuous via the
+     triangle inequality. The primary gate (#1's ``ground_truth``) is what
+     constrains AD itself; this corroborates the ground truth that gate uses.
   3. BINDING CROSS-CHECK: the f64-downcast price (``call_prices``) equals the
      erfc-based reference price (``Shoals.References.BlackScholes.call_textbook``,
      which goes through Nautilus.Special.erfc) within an f32-precision bound.
@@ -26,23 +33,27 @@ erf's odd reflection is exercised):
   validated against (a) the exact f64 SECOND derivative of the DISPLAYED A&S price
   (primary, tight: this is the correctness invariant -- gamma is the second
   derivative of the displayed price), (b) the true-BS second-order closed forms
-  (secondary, agree up to A&S model error), and (c) tuned CENTRAL finite
-  differences of the DISPLAYED f64 price with a per-Greek step (secondary, agree
-  up to FD truncation; gamma's tuned step makes its FD bound the tightest so gamma
-  sits near that bound). A negative-d1 sign-fold point is included.
+  (secondary, agree up to A&S model error), and (c) an INDEPENDENT corroboration of
+  the closed-form 2nd-derivative ground truth by tuned CENTRAL finite differences of
+  the DISPLAYED f64 price (subject is ground_truth vs FD, bounded by an a-priori
+  Richardson band from the step alone -- ``so_fd_apriori_band``). A negative-d1
+  sign-fold point is included.
 
   ACCURACY-MONOTONE guard: the new f64-body reference error vs analytic-true must
   be <= the old f32-erfc path's error (no illegitimate tolerance re-baseline).
 
 All numeric agreement is established by ``chelis test --json``: this script
-emits ONE generated ``tests/`` file whose assertions encode the references and
-precision-derived tolerances, runs it once (the package compiles in one pass),
-and reads per-assertion pass/fail. A passing assertion certifies
-|package - reference| < tol, where every tol is DERIVED from f32 precision and
-FD truncation, never a fixed percent (see ``tol_*`` below). The JSON report
-states each derived tolerance so the bound is auditable.
+emits ONE generated test file under ``.gate-tmp/`` (gitignored, never under
+``tests/``, so a failing run cannot leave an artifact the wholesale tests/ CI
+scan picks up), runs it once (the package compiles in one pass), and reads
+per-assertion pass/fail. The generated file is unlinked on every exit path. A
+passing assertion certifies |package - reference| < tol, where every tol is
+DERIVED from f32 precision and FD truncation, never a fixed percent (see
+``tol_*`` / ``*_apriori_band`` below). The JSON report states each derived
+tolerance so the bound is auditable.
 
-Exit 0 on pass, nonzero on fail. A JSON summary is printed to stdout.
+Exit 0 on pass (or SKIP when the configured chelis is missing/pre-0.8.0),
+nonzero on fail. A JSON summary is printed to stdout.
 """
 
 from __future__ import annotations
@@ -55,11 +66,17 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CHELIS = os.environ.get(
-    "CHELIS_BIN",
-    str(Path.home() / ".local/share/chelis/0.7.27/bin/chelis"),
-)
-GEN_TEST = REPO_ROOT / "tests" / "_oracle_greeks_gate_generated.ch"
+# Binary resolution mirrors the composite gate
+# (scripts/manual_gates/phase3l_shoals_oracle_composite_corpus.py): default to a
+# bare ``chelis`` on PATH so the gate works on a clean box, and let either
+# CHELIS_BIN or CHELIS_PROVE_BIN override it. No hardcoded version-pinned path --
+# reef.toml is the single source of truth for the compiler pin (CLAUDE.md).
+CHELIS = os.environ.get("CHELIS_BIN") or os.environ.get("CHELIS_PROVE_BIN") or "chelis"
+# The generated test lives under .gate-tmp/ (gitignored), never under tests/, so a
+# failing run cannot leave an artifact that the wholesale tests/ CI scan picks up.
+# .gate-tmp/ still compiles with full package context (chelis test <path> resolves
+# imports against the package regardless of the file's directory).
+GEN_TEST = REPO_ROOT / ".gate-tmp" / "_oracle_greeks_gate_generated.ch"
 TEST_TIMEOUT_S = int(os.environ.get("ORACLE_GATE_TIMEOUT_S", "600"))
 
 # --------------------------------------------------------------------------
@@ -319,13 +336,25 @@ def fd_second_order(s, k, r, sg, t, ncdf):
         return call_price(ss, kk, rr, vv, tt, ncdf)
     h_s = 1e-2 * s          # spot step ~1% of S: gamma curvature out of S-scale price
     h_v = 5e-3              # vol step: volga/vanna second differences well-conditioned
-    gamma = (c(s + h_s, k, r, sg, t) - 2 * c(s, k, r, sg, t) + c(s - h_s, k, r, sg, t)) / (h_s * h_s)
-    volga = (c(s, k, r, sg + h_v, t) - 2 * c(s, k, r, sg, t) + c(s, k, r, sg - h_v, t)) / (h_v * h_v)
 
-    def delta(sig):
-        return (c(s + h_s, k, r, sig, t) - c(s - h_s, k, r, sig, t)) / (2 * h_s)
-    vanna = (delta(sg + h_v) - delta(sg - h_v)) / (2 * h_v)
-    return {"gamma": gamma, "volga": volga, "vanna": vanna,
+    def fd_gamma(hs):
+        return (c(s + hs, k, r, sg, t) - 2 * c(s, k, r, sg, t) + c(s - hs, k, r, sg, t)) / (hs * hs)
+
+    def fd_volga(hv):
+        return (c(s, k, r, sg + hv, t) - 2 * c(s, k, r, sg, t) + c(s, k, r, sg - hv, t)) / (hv * hv)
+
+    def fd_vanna(hs, hv):
+        def delta(sig):
+            return (c(s + hs, k, r, sig, t) - c(s - hs, k, r, sig, t)) / (2 * hs)
+        return (delta(sg + hv) - delta(sg - hv)) / (2 * hv)
+
+    # FD at the tuned step and at 2x the step: the 2x value feeds the a-priori
+    # Richardson truncation band, independent of the closed-form ground truth.
+    fd_h = {"gamma": fd_gamma(h_s), "volga": fd_volga(h_v),
+            "vanna": fd_vanna(h_s, h_v)}
+    fd_2h = {"gamma": fd_gamma(2 * h_s), "volga": fd_volga(2 * h_v),
+             "vanna": fd_vanna(2 * h_s, 2 * h_v)}
+    return {**fd_h, "fd2h": fd_2h,
             "steps": {"h_s": h_s, "h_v": h_v}}
 
 
@@ -341,12 +370,28 @@ def fd_greeks(s, k, r, sg, t, ncdf):
     hs = 1e-2 * s
     hv, hr = 1e-2, 1e-2
     ht = min(1e-2, 0.25 * t)
-    delta = (c(s + hs, k, r, sg, t) - c(s - hs, k, r, sg, t)) / (2 * hs)
-    vega = (c(s, k, r, sg + hv, t) - c(s, k, r, sg - hv, t)) / (2 * hv)
-    rho = (c(s, k, r + hr, sg, t) - c(s, k, r - hr, sg, t)) / (2 * hr)
-    # Shoals.Greeks fd_theta_call uses (dn - up)/(2h) i.e. -dC/dt
-    theta = (c(s, k, r, sg, t - ht) - c(s, k, r, sg, t + ht)) / (2 * ht)
-    return {"delta": delta, "vega": vega, "rho": rho, "theta": theta,
+
+    def cdiff_delta(h):
+        return (c(s + h, k, r, sg, t) - c(s - h, k, r, sg, t)) / (2 * h)
+
+    def cdiff_vega(h):
+        return (c(s, k, r, sg + h, t) - c(s, k, r, sg - h, t)) / (2 * h)
+
+    def cdiff_rho(h):
+        return (c(s, k, r + h, sg, t) - c(s, k, r - h, sg, t)) / (2 * h)
+
+    def cdiff_theta(h):
+        # Shoals.Greeks fd_theta_call uses (dn - up)/(2h) i.e. -dC/dt
+        return (c(s, k, r, sg, t - h) - c(s, k, r, sg, t + h)) / (2 * h)
+
+    # FD at the shipped step h and at 2h: the 2h value feeds the a-priori
+    # Richardson truncation band (|fd(h)-fd(2h)| ~= 3x the O(h^2) truncation of
+    # the central difference), which is independent of any closed-form value.
+    fd_h = {"delta": cdiff_delta(hs), "vega": cdiff_vega(hv),
+            "rho": cdiff_rho(hr), "theta": cdiff_theta(ht)}
+    fd_2h = {"delta": cdiff_delta(2 * hs), "vega": cdiff_vega(2 * hv),
+             "rho": cdiff_rho(2 * hr), "theta": cdiff_theta(2 * ht)}
+    return {**fd_h, "fd2h": fd_2h,
             "steps": {"delta": hs, "vega": hv, "rho": hr, "theta": ht}}
 
 
@@ -379,14 +424,21 @@ def tol_ad_vs_analytic(model_err: float, v: float) -> float:
     return 2.0 * model_err + max(8.0 * EPS_F32 * abs(v), 3e-6)
 
 
-def tol_ad_vs_fd(trunc_err: float, s: float, h: float, v: float) -> float:
-    """SECONDARY. AD vs the SHIPPED coarse-step fd_*. Differ by the FD truncation
-    at the shipped step h, predicted in-script as |exact_analytic - fd(h)|
-    (trunc_err), plus the f32 quotient-rounding band ~ eps_f32 * price_scale / h
-    of the shipped f32 FD. Tolerance = 3x trunc + band + floor. Tracks the real
-    per-cell FD error; the primary ground-truth gate keeps AD itself tight."""
-    f32_fd_band = 4.0 * EPS_F32 * max(abs(s), 1.0) / h
-    return 3.0 * trunc_err + f32_fd_band + max(8.0 * EPS_F32 * abs(v), 3e-6)
+def fd_apriori_band(fd_h: float, fd_2h: float, price_scale: float, h: float) -> float:
+    """A-PRIORI finite-difference truncation band for a central difference,
+    derived from the step h and f32 precision ALONE -- it does NOT depend on the
+    closed-form ground truth or on any measured gt-vs-fd / AD-vs-fd gap. The
+    central difference has O(h^2) truncation E(h); Richardson gives
+    E(h) ~= |fd(h) - fd(2h)| / 3, so 2*|fd(h)-fd(2h)| safely upper-bounds E(h)
+    (factor 6 over the leading-order estimate). The roundoff floor
+    ~ eps_f32 * price_scale / h is the f32 quotient-rounding of the shipped FD,
+    again a function of precision and h only. Because the band is built from
+    {fd(h), fd(2h), h, eps_f32} and never from the ground truth, the corroboration
+    |ground_truth - fd(h)| <= band can genuinely FAIL if the closed-form ground
+    truth is wrong -- it is not auto-satisfied by the triangle inequality."""
+    richardson = 2.0 * abs(fd_h - fd_2h)
+    roundoff = 8.0 * EPS_F32 * max(abs(price_scale), 1.0) / h
+    return richardson + roundoff + 3e-7
 
 
 def tol_binding(price: float) -> float:
@@ -428,13 +480,20 @@ def tol_so_vs_analytic(greek: str, model_err: float, v: float) -> float:
     return 2.0 * model_err + tol_so_vs_groundtruth(greek, v)
 
 
-def tol_so_vs_fd(greek: str, trunc_err: float, v: float) -> float:
-    """SECONDARY. Nested-grad Greek vs the tuned CENTRAL FD of the DISPLAYED f64
-    price. Differ by the FD O(h^2) truncation at the tuned step, predicted in-script
-    as |ground_truth - fd| (trunc_err), plus the primary band. f64 FD here so there
-    is no f32 quotient band -- truncation dominates. Gamma's tuned step makes its
-    truncation the smallest, so the gamma FD bound is the tightest of the three."""
-    return 3.0 * trunc_err + tol_so_vs_groundtruth(greek, v)
+def so_fd_apriori_band(fd_h: float, fd_2h: float, value_scale: float, h: float) -> float:
+    """A-PRIORI second-order finite-difference truncation band, derived from the
+    tuned step h and f64 precision ALONE -- NOT from the closed-form ground truth.
+    The tuned second/cross differences are O(h^2): Richardson gives the truncation
+    as ~|fd(h)-fd(2h)|/3, so 2*|fd(h)-fd(2h)| safely bounds it. The f64 second-
+    difference also carries a cancellation roundoff ~ eps_f64 * |value_scale| / h^2
+    (the second difference divides by h^2 a quantity formed by subtracting nearly
+    equal f64 prices); we use the f32 eps as a conservative multiplier since the
+    displayed price is ultimately f32-meaningful. Built from {fd(h), fd(2h), h}
+    only, so |ground_truth - fd(h)| <= band can genuinely fail if the closed-form
+    second derivative is wrong."""
+    richardson = 2.0 * abs(fd_h - fd_2h)
+    roundoff = 8.0 * EPS_F32 * max(abs(value_scale), 1.0) / (h * h)
+    return richardson + roundoff + 3e-7
 
 
 # --------------------------------------------------------------------------
@@ -505,8 +564,16 @@ def build_test_source(grid, refs):
                     f'assert_close(index({lst}, {idx}), {lit32(an)}, '
                     f'{lit32(tol_ad_vs_analytic(merr, an))}, "g{gi}c{j} {gk} ad==analytic")'
                 )
-            # SECONDARY: AD vs SHIPPED coarse-step fd_* -- agree up to FD truncation
-            # at the shipped step (predicted in-script via the same h).
+            # SECONDARY: the closed-form GROUND TRUTH is independently corroborated
+            # by the SHIPPED coarse-step fd_* of the displayed price. The subject of
+            # the assertion is the closed-form ground-truth LITERAL vs the in-package
+            # fd_* call, with an A-PRIORI band derived from the step h and f32
+            # precision alone (Richardson + roundoff floor, fd_apriori_band). The
+            # band does NOT depend on the AD value or any measured gt-vs-fd gap, so
+            # this can genuinely fail if the closed-form derivative is wrong -- it is
+            # not the old self-widening 3*|gt-fd| form, which the primary AD==gt gate
+            # already made vacuous by the triangle inequality. (The primary gate above
+            # is what constrains AD; this corroborates the ground truth used there.)
             st = ref["fd_steps"]
             fd_calls = {
                 "delta": f"fd_delta_call({lit32(s)}, {common}, {lit32(st['delta'])})",
@@ -514,12 +581,12 @@ def build_test_source(grid, refs):
                 "rho": f"fd_rho_call({lit32(s)}, {common}, {lit32(st['rho'])})",
                 "theta": f"fd_theta_call({lit32(s)}, {common}, {lit32(st['theta'])})",
             }
-            for gk, lst in (("delta", "dl"), ("vega", "vl"), ("rho", "rl"), ("theta", "tl")):
-                trunc = abs(ref["analytic"][gk] - ref["fd"][gk])
+            for gk in ("delta", "vega", "rho", "theta"):
+                gt = ref["ground_truth"][gk]
+                band = fd_apriori_band(ref["fd"][gk], ref["fd2h"][gk], s, st[gk])
                 asserts.append(
-                    f'assert_close(index({lst}, {idx}), {fd_calls[gk]}, '
-                    f'{lit32(tol_ad_vs_fd(trunc, s, st[gk], ref["analytic"][gk]))}, '
-                    f'"g{gi}c{j} {gk} ad==fd")'
+                    f'assert_close({lit32(gt)}, {fd_calls[gk]}, '
+                    f'{lit32(band)}, "g{gi}c{j} {gk} groundtruth~=fd (a-priori band)")'
                 )
             # ---- SECOND-ORDER GREEKS (nested grad): gamma, volga, vanna ----
             so_lst = {"gamma": "gm", "volga": "vg", "vanna": "vn"}
@@ -539,14 +606,23 @@ def build_test_source(grid, refs):
                     f'assert_close(index({so_lst[gk]}, {idx}), {lit32(an)}, '
                     f'{lit32(tol_so_vs_analytic(gk, merr, an))}, "g{gi}c{j} {gk} ad2==analytic")'
                 )
-            # SECONDARY: vs tuned CENTRAL FD of the DISPLAYED f64 price (truncation).
+            # SECONDARY: the closed-form SECOND-DERIVATIVE ground truth is
+            # independently corroborated by a tuned CENTRAL FD of the DISPLAYED f64
+            # price. The subject is the closed-form ground-truth LITERAL vs the
+            # in-script FD literal, with an A-PRIORI band from the tuned step alone
+            # (Richardson + roundoff, so_fd_apriori_band) -- NOT the old
+            # 3*|gt-fd| self-widening form. so_ground_truth comes from the analytic
+            # chain-rule 2nd derivative; so_fd differences the price directly, so a
+            # bug in the closed-form 2nd derivative makes the two diverge past the
+            # band. The primary ad2==groundtruth gate above is what pins the AD value.
+            so_steps = ref["so_fd_steps"]
+            so_h = {"gamma": so_steps["h_s"], "volga": so_steps["h_v"], "vanna": so_steps["h_v"]}
             for gk in ("gamma", "volga", "vanna"):
-                fdv = ref["so_fd"][gk]
-                trunc = abs(ref["so_ground_truth"][gk] - fdv)
+                sgt = ref["so_ground_truth"][gk]
+                band = so_fd_apriori_band(ref["so_fd"][gk], ref["so_fd2h"][gk], sgt, so_h[gk])
                 asserts.append(
-                    f'assert_close(index({so_lst[gk]}, {idx}), {lit32(fdv)}, '
-                    f'{lit32(tol_so_vs_fd(gk, trunc, ref["so_ground_truth"][gk]))}, '
-                    f'"g{gi}c{j} {gk} ad2==fd-displayed")'
+                    f'assert_close({lit32(sgt)}, {lit32(ref["so_fd"][gk])}, '
+                    f'{lit32(band)}, "g{gi}c{j} {gk} groundtruth~=fd-displayed (a-priori band)")'
                 )
         for a in asserts[:-1]:
             lines.append(f"  _ = {a}")
@@ -555,12 +631,43 @@ def build_test_source(grid, refs):
     return "\n".join(lines) + "\n", test_names
 
 
+class ChelisUnavailable(Exception):
+    """The configured chelis binary is missing or cannot run this gate (e.g. a
+    pre-0.8.0 compiler that fails to satisfy the package pin). Raised so main()
+    can SKIP (exit 0) rather than FAIL on an environment that cannot run it."""
+
+
+def chelis_available() -> tuple[bool, str]:
+    """Return (ok, detail). Mirrors the composite gate's availability guard: if
+    the binary is missing OR its version cannot satisfy the package compiler pin
+    (pre-0.8.0 / errors out), the gate SKIPs rather than reporting a false FAIL.
+    reef.toml is the source of truth for the pin, so we don't hardcode a number
+    here -- we only require the binary to exist and report a version."""
+    try:
+        proc = subprocess.run(
+            [CHELIS, "--version"], cwd=REPO_ROOT,
+            capture_output=True, text=True, timeout=60,
+        )
+    except FileNotFoundError:
+        return False, f"binary not found on PATH or at {CHELIS!r}"
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, f"could not invoke {CHELIS!r}: {exc}"
+    if proc.returncode != 0:
+        return False, f"{CHELIS!r} --version exited {proc.returncode}: {proc.stderr.strip()}"
+    return True, (proc.stdout.strip() or proc.stderr.strip())
+
+
 def run_chelis_test(path: Path):
-    proc = subprocess.run(
-        [CHELIS, "test", str(path.relative_to(REPO_ROOT)),
-         "--jobs", "1", "--timeout", str(TEST_TIMEOUT_S), "--json"],
-        cwd=REPO_ROOT, capture_output=True, text=True, timeout=TEST_TIMEOUT_S + 120,
-    )
+    try:
+        proc = subprocess.run(
+            [CHELIS, "test", str(path.relative_to(REPO_ROOT)),
+             "--jobs", "1", "--timeout", str(TEST_TIMEOUT_S), "--json"],
+            cwd=REPO_ROOT, capture_output=True, text=True, timeout=TEST_TIMEOUT_S + 120,
+        )
+    except FileNotFoundError as exc:
+        raise ChelisUnavailable(
+            f"binary not found on PATH or at {CHELIS!r}"
+        ) from exc
     per_test, summary = {}, {}
     for line in proc.stdout.splitlines():
         try:
@@ -575,6 +682,18 @@ def run_chelis_test(path: Path):
 
 
 def main() -> int:
+    # Availability guard (mirrors the composite gate): a missing or pre-0.8.0
+    # binary SKIPs (exit 0), it does not FAIL. This keeps a clean box / non-pinned
+    # environment from reporting a false negative.
+    ok, detail = chelis_available()
+    if not ok:
+        print(
+            f"SKIP: oracle_greeks_gate -- configured chelis ({CHELIS!r}) unavailable: "
+            f"{detail}. Set CHELIS_BIN (or CHELIS_PROVE_BIN) to a chelis 0.8.0 that "
+            f"satisfies the reef.toml compiler pin to run this gate."
+        )
+        return 0
+
     K = 100.0
     # moneyness x maturity x vol x rate grid + sign-fold straddle.
     spots_main = [80.0, 90.0, 100.0, 110.0, 120.0]
@@ -629,10 +748,12 @@ def main() -> int:
             "ground_truth": gt,
             "price_ref": price_as,
             "fd": {g: fg[g] for g in ("delta", "vega", "rho", "theta")},
+            "fd2h": {g: fg["fd2h"][g] for g in ("delta", "vega", "rho", "theta")},
             "fd_steps": fg["steps"],
             "so_ground_truth": so_gt,
             "so_analytic": so_an,
             "so_fd": {g: so_fd[g] for g in ("gamma", "volga", "vanna")},
+            "so_fd2h": {g: so_fd["fd2h"][g] for g in ("gamma", "volga", "vanna")},
             "so_fd_steps": so_fd["steps"],
             # convenience flat keys for the sign-fold report
             "delta": gt["delta"], "vega": gt["vega"],
@@ -641,10 +762,30 @@ def main() -> int:
         refs.append(ref)
 
     src, test_names = build_test_source(grid, refs)
+    GEN_TEST.parent.mkdir(parents=True, exist_ok=True)
     GEN_TEST.write_text(src)
 
-    rc, per_test, summary, out, err = run_chelis_test(GEN_TEST)
+    # The generated file is unlinked on EVERY exit path (try/finally), so a failing
+    # run never leaves an artifact behind. It lives under .gate-tmp/ (gitignored),
+    # so even mid-run it cannot be picked up by the wholesale tests/ CI scan.
+    try:
+        try:
+            rc, per_test, summary, out, err = run_chelis_test(GEN_TEST)
+        except ChelisUnavailable as exc:
+            print(
+                f"SKIP: oracle_greeks_gate -- configured chelis ({CHELIS!r}) "
+                f"unavailable: {exc}. Set CHELIS_BIN (or CHELIS_PROVE_BIN) to a "
+                f"chelis 0.8.0 that satisfies the reef.toml compiler pin."
+            )
+            return 0
+        return _finish(grid, refs, test_names, src, rc, per_test, summary, out, err,
+                       acc_new_max, acc_old_max)
+    finally:
+        GEN_TEST.unlink(missing_ok=True)
 
+
+def _finish(grid, refs, test_names, src, rc, per_test, summary, out, err,
+            acc_new_max, acc_old_max) -> int:
     n_pass = summary.get("passed", 0)
     n_fail = summary.get("failed", 0)
     failures = {k: v for k, v in per_test.items() if v[0] != "pass"}
@@ -696,14 +837,22 @@ def main() -> int:
             },
             "abs_floors": {"gamma": GAMMA_ABS_FLOOR, "volga": VOLGA_ABS_FLOOR, "vanna": VANNA_ABS_FLOOR},
             "fd_steps_per_greek": "h_s=1% of S (gamma,vanna spot leg); h_v=5e-3 (volga,vanna vol leg)",
-            "gamma_sits_near_fd_bound": {
-                "description": "gamma vs tuned-FD-of-displayed-price: |gt-fd| should approach its tol",
-                "max_ratio_trunc_over_tol": max(
-                    abs(rf["so_fd"]["gamma"] - rf["so_ground_truth"]["gamma"])
-                    / tol_so_vs_fd("gamma", abs(rf["so_fd"]["gamma"] - rf["so_ground_truth"]["gamma"]),
-                                   rf["so_ground_truth"]["gamma"])
-                    for rf in refs
-                ),
+            "fd_corroboration_apriori": {
+                "description": "ground_truth ~= FD-of-displayed-price within an a-priori "
+                               "Richardson band (so_fd_apriori_band) derived from the step "
+                               "alone; NOT the old self-widening 3*|gt-fd|. Ratio = "
+                               "|gt-fd(h)| / band; <1 means it holds, and >0 means it is not "
+                               "auto-satisfied (the band can fail if the closed form is wrong).",
+                "max_residual_over_band": {
+                    gk: max(
+                        abs(rf["so_ground_truth"][gk] - rf["so_fd"][gk])
+                        / so_fd_apriori_band(
+                            rf["so_fd"][gk], rf["so_fd2h"][gk], rf["so_ground_truth"][gk],
+                            rf["so_fd_steps"]["h_s"] if gk == "gamma" else rf["so_fd_steps"]["h_v"])
+                        for rf in refs
+                    )
+                    for gk in ("gamma", "volga", "vanna")
+                },
             },
         },
         "tolerance_derivation": {
@@ -712,28 +861,36 @@ def main() -> int:
                 "max(16*eps_f32*|v|, 3e-6); AD vs exact f64 derivative of A&S price, f32 ULPs",
             "ad_vs_analytic (secondary)":
                 "2*measured_A&S_model_err + max(8*eps_f32*|v|, 3e-6)",
-            "ad_vs_fd (secondary)":
-                "3*predicted_FD_truncation + 4*eps_f32*price/h + max(8*eps_f32*|v|, 3e-6)",
+            "groundtruth_vs_fd (secondary, INDEPENDENT corroboration)":
+                "2*|fd(h)-fd(2h)| (Richardson, a-priori) + 8*eps_f32*price/h + 3e-7; "
+                "subject is closed-form ground_truth vs in-package fd_*; band is "
+                "derived from h+precision alone (NOT from any gt-vs-fd gap), so it "
+                "can fail if the closed form is wrong",
             "binding": "max(16*eps_f32*|price|, 1e-4); erf-impl rounding of same formula",
             "so_ad2_vs_groundtruth (PRIMARY, gating)":
                 "max(48*eps_f32*|v|, greek_floor); nested grad == exact f64 2nd-deriv of A&S price",
             "so_ad2_vs_analytic (secondary)":
                 "2*measured_A&S_2nd_deriv_model_err + primary_so_band",
-            "so_ad2_vs_fd (secondary)":
-                "3*predicted_FD_truncation(f64 displayed price) + primary_so_band",
+            "so_groundtruth_vs_fd (secondary, INDEPENDENT corroboration)":
+                "2*|fd(h)-fd(2h)| (Richardson, a-priori) + 8*eps_f32*|v|/h^2 + 3e-7; "
+                "subject is closed-form 2nd-deriv ground_truth vs FD of displayed "
+                "price; band derived from h alone (NOT from any gt-vs-fd gap)",
         },
         "all_ok": all_ok,
     }
     sys.stdout.write(json.dumps(report, indent=2) + "\n")
 
     if all_ok:
-        GEN_TEST.unlink(missing_ok=True)
         print(f"PASS: oracle_greeks_gate -- {n_pass}/{len(test_names)} groups, "
               f"{len(grid)} cells; binding + monotone + sign-fold green.")
         return 0
-    sys.stderr.write("\n--- chelis stdout ---\n" + out + "\n--- chelis stderr ---\n" + err + "\n")
+    # The generated file is unlinked in the caller's finally even on FAIL (it is
+    # gitignored under .gate-tmp/ and must not be left behind); echo the source and
+    # chelis output here so a failing run is still fully triageable from the log.
+    sys.stderr.write("\n--- chelis stdout ---\n" + out + "\n--- chelis stderr ---\n" + err
+                     + "\n--- generated test source (for triage) ---\n" + src + "\n")
     print(f"FAIL: oracle_greeks_gate -- groups {n_pass} pass / {n_fail} fail; "
-          f"monotone_ok={monotone_ok}. Generated test kept at {GEN_TEST} for triage.")
+          f"monotone_ok={monotone_ok}. Generated test source echoed above for triage.")
     return 1
 
 

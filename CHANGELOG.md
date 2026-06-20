@@ -6,6 +6,63 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-06-20
+
+AD-derived Greeks and a contract-bound composite proof corpus, graduated
+from the proof-infra research onto chelis 0.8.0.
+
+### Added
+
+- **Tensor-lane AD Greeks.** `Shoals.Pricing` gains first-order
+  `deltas_call`/`deltas_put`/`vegas_call`/`rhos_call`/`thetas_call` and
+  second-order `gammas_call`/`volgas_call`/`vannas_call`, each the
+  automatic-differentiation derivative of the displayed price through one f64
+  Abramowitz-Stegun normal CDF (second order via nested `grad`, available on
+  chelis 0.8.0). Oracle-validated (analytic + finite-difference + sign-fold +
+  accuracy-monotone guard) by `scripts/oracle_greeks_gate.py`, with in-suite
+  `Std.Test` standing assertions in `tests/greeks.ch` and
+  `tests-manual/greeks_secondorder.ch`.
+- **Composite derivatives-property corpus.** `Shoals.Properties.Composites`
+  proves put-call parity (reflection), the call upper bound, and the delta
+  bounds as `proven_modulo_fuzz_validated_contract` via chelis 0.8.0's
+  `with contract = "std.normal_cdf.*"` mechanism over the bundled
+  `Std.Contracts.normal_cdf` (SMT base proof + fuzz-discharged contract +
+  cvc5 non-vacuity), with corrupted-coupling and unknown-contract integrity
+  probes. The no-arbitrage properties (non-negativity, intrinsic bound,
+  strike convexity) remain documented backend-roadmap items. A binding
+  cross-check ties the f64 pricer to the f32 certified contract CDF.
+- **Business-wrong demos.** `Shoals.Demos.Businesswrong` (new `demos/` source
+  root): discount-above-one, negative-variance, and call-above-spot models
+  caught by the fuzz tier, each with a corrected control.
+- **C Note import surface.** `docs/cnote-import-surface.json` and
+  `docs/src/import-surface.md` freeze the pricing function names, demo IDs,
+  property IDs, and resolved dependency tree.
+- Research deliverable under `research/proof-infra/`: the C Proof
+  reachability map and its supporting evidence.
+
+### Changed
+
+- Package version `0.20.2 -> 0.21.0` (added API; toolchain pins unchanged at
+  chelis 0.8.0 / nautilus 0.7.27 / coral 0.7.26).
+- `matches_textbook_reference[_put]` tolerance `1e-5 -> 5e-5`: the single f64
+  body diverges from the f32 reference by f32-vs-f64 rounding of the same A&S
+  formula (worst measured ~1.1e-5, ~4.4x margin); accuracy-monotone (the f64
+  body is closer to true Black-Scholes than the old f32 path).
+- CI/scaffolding: `nightly.yml` gains the `composites_binding_heavy` and
+  `greeks_secondorder` heavy-matrix legs; `demos/` added to the fmt/lint
+  coverage in `ci.yml` and `scripts/run_local_gate.py`.
+
+### Fixed
+
+- The shipped alpha grad Greeks (`deltas_call`/`vegas_call`) were broken under
+  `grad` (host-lane `to_list`/`map` combinator); replaced by the tensor-lane
+  body so they actually differentiate.
+- `scripts/oracle_greeks_gate.py` defaulted to a stale hardcoded
+  `0.7.27/bin/chelis` path; now defaults to `chelis` on PATH with a clean
+  SKIP when the toolchain is unavailable, and its finite-difference secondary
+  band is an independent a-priori (Richardson + roundoff) corroboration of the
+  closed-form ground truth rather than a self-fulfilling tolerance.
+
 ## [0.20.2] - 2026-06-19
 
 Mechanical toolchain re-cascade. No API change.

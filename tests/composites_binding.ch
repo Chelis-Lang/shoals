@@ -22,7 +22,11 @@ import Std.Contracts (normal_cdf)
 -- This file is the fast CI smoke: a handful of representative cells (ATM, deep
 -- OTM/ITM, high-vol, short maturity). The full 405-cell grid sweep lives in
 -- `tests-manual/composites_binding_heavy.ch` (nightly), where the measured max
--- abs diff is 2.67e-5. The asserted f32 bound here and there is 1e-4.
+-- abs diff is 2.67e-5. The smoke cells here measure worst 7.63e-6 (deep ITM /
+-- short maturity), so the asserted f32 bound is 5e-5 -- ~6.5x over the worst
+-- measured gap, tight enough for per-PR regression sensitivity yet safely above
+-- the f32-vs-f64 A&S rounding. The heavy nightly grid keeps its 1e-4 bound (its
+-- 2.67e-5 worst leaves less than a 2x margin under 5e-5).
 def d1_f32(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = {
   num = add(log(div(s, k)), mul(add(r, mul(cast(0.5, f32), mul(sigma, sigma))), t))
   div(num, mul(sigma, sqrt(t)))
@@ -35,29 +39,29 @@ def bs_call_contract(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = {
   disc = exp(neg(mul(r, t)))
   sub(mul(s, nd1), mul(k, mul(disc, nd2)))
 }
--- One cell of the binding: shipped f64-erf pricer == contract-CDF BS within 1e-4.
+-- One cell of the binding: shipped f64-erf pricer == contract-CDF BS within 5e-5.
 def test_binding_atm() -> unit ! { Test } = {
   shipped = bs_call_scalar(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
   contract = bs_call_contract(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
-  assert_close(shipped, contract, cast(0.0001, f32), "ATM: shipped pricer == contract-CDF BS within 1e-4")
+  assert_close(shipped, contract, cast(0.00005, f32), "ATM: shipped pricer == contract-CDF BS within 5e-5")
 }
 def test_binding_deep_otm() -> unit ! { Test } = {
   shipped = bs_call_scalar(cast(60.0, f32), cast(130.0, f32), cast(0.01, f32), cast(0.1, f32), cast(0.25, f32))
   contract = bs_call_contract(cast(60.0, f32), cast(130.0, f32), cast(0.01, f32), cast(0.1, f32), cast(0.25, f32))
-  assert_close(shipped, contract, cast(0.0001, f32), "deep OTM: shipped == contract within 1e-4")
+  assert_close(shipped, contract, cast(0.00005, f32), "deep OTM: shipped == contract within 5e-5")
 }
 def test_binding_deep_itm() -> unit ! { Test } = {
   shipped = bs_call_scalar(cast(140.0, f32), cast(70.0, f32), cast(0.1, f32), cast(0.2, f32), cast(2.0, f32))
   contract = bs_call_contract(cast(140.0, f32), cast(70.0, f32), cast(0.1, f32), cast(0.2, f32), cast(2.0, f32))
-  assert_close(shipped, contract, cast(0.0001, f32), "deep ITM: shipped == contract within 1e-4")
+  assert_close(shipped, contract, cast(0.00005, f32), "deep ITM: shipped == contract within 5e-5")
 }
 def test_binding_high_vol() -> unit ! { Test } = {
   shipped = bs_call_scalar(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.4, f32), cast(2.0, f32))
   contract = bs_call_contract(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.4, f32), cast(2.0, f32))
-  assert_close(shipped, contract, cast(0.0001, f32), "high vol: shipped == contract within 1e-4")
+  assert_close(shipped, contract, cast(0.00005, f32), "high vol: shipped == contract within 5e-5")
 }
 def test_binding_short_maturity() -> unit ! { Test } = {
   shipped = bs_call_scalar(cast(120.0, f32), cast(100.0, f32), cast(0.01, f32), cast(0.1, f32), cast(0.25, f32))
   contract = bs_call_contract(cast(120.0, f32), cast(100.0, f32), cast(0.01, f32), cast(0.1, f32), cast(0.25, f32))
-  assert_close(shipped, contract, cast(0.0001, f32), "short maturity: shipped == contract within 1e-4")
+  assert_close(shipped, contract, cast(0.00005, f32), "short maturity: shipped == contract within 5e-5")
 }

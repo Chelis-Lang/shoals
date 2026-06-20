@@ -58,13 +58,13 @@ jobs:
       - name: chelis fmt --check
         run: |
           set -euo pipefail
-          for f in src/*.ch properties/*.ch references/*.ch tests/*.ch tests-manual/*.ch; do
+          for f in src/*.ch properties/*.ch references/*.ch demos/*.ch tests/*.ch tests-manual/*.ch; do
             [ -e "$f" ] || continue
             chelis fmt --check "$f"
           done
 
       - name: chelis lint --check
-        run: chelis lint --check src/ properties/ references/ tests/ tests-manual/ manual-gates/
+        run: chelis lint --check src/ properties/ references/ demos/ tests/ tests-manual/ manual-gates/
 
       - name: chelis reef build
         run: chelis reef build

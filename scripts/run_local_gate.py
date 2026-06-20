@@ -4,10 +4,10 @@
 Invokes:
 
   1. ``chelis fmt --check`` over every ``.ch`` file in
-     ``src/``, ``properties/``, ``references/``, ``tests/``,
+     ``src/``, ``properties/``, ``references/``, ``demos/``, ``tests/``,
      ``tests-manual/``.
   2. ``chelis lint --check`` over ``src/ properties/ references/
-     tests/ tests-manual/ manual-gates/``.
+     demos/ tests/ tests-manual/ manual-gates/``.
   3. ``chelis reef build`` for package-level compiler validation.
   4. ``chelis test tests/ --timeout 1200 --jobs auto`` for the native
      fast-unit suite (this is what CI runs).
@@ -60,6 +60,7 @@ def main() -> int:
         sorted((REPO_ROOT / "src").glob("*.ch"))
         + sorted((REPO_ROOT / "properties").glob("*.ch"))
         + sorted((REPO_ROOT / "references").glob("*.ch"))
+        + sorted((REPO_ROOT / "demos").glob("*.ch"))
         + sorted((REPO_ROOT / "tests").glob("*.ch"))
         + sorted((REPO_ROOT / "tests-manual").glob("*.ch"))
     )
@@ -81,6 +82,7 @@ def main() -> int:
             "src/",
             "properties/",
             "references/",
+            "demos/",
             "tests/",
             "tests-manual/",
             "manual-gates/",

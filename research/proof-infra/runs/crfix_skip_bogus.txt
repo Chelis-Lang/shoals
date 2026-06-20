@@ -1,0 +1,2 @@
+SKIP: oracle_greeks_gate -- configured chelis ('/nonexistent/path/to/chelis') unavailable: binary not found on PATH or at '/nonexistent/path/to/chelis'. Set CHELIS_BIN (or CHELIS_PROVE_BIN) to a chelis 0.8.0 that satisfies the reef.toml compiler pin to run this gate.
+EXIT=0

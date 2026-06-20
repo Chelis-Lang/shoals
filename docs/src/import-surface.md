@@ -4,7 +4,7 @@ This is the frozen surface C Note vendors and resolves in its no-network sandbox
 pinned so C Note builds against a stable contract while Shoals internals evolve. The
 machine-readable manifest is `docs/cnote-import-surface.json`.
 
-Pins: chelis `0.8.0`, shoals `0.20.2`.
+Pins: chelis `0.8.0`, shoals `0.21.0`.
 
 Scope: the full graduation has landed on chelis 0.8.0. First-order and second-order AD
 Greeks are shipped and validated, and the SMT composite derivatives-property corpus

@@ -3,7 +3,7 @@
   "purpose": "Frozen import surface that C Note vendors and resolves in its no-network sandbox. Pinned so C Note builds against a stable contract while Shoals internals evolve.",
   "pins": {
     "chelis": "0.8.0",
-    "shoals": "0.20.2"
+    "shoals": "0.21.0"
   },
   "scope_note": "Re-pinned to chelis 0.8.0. The full graduation has landed: first-order AND second-order AD Greeks, and the SMT composite derivatives-property corpus (parity/upper-bound/delta-bounds as proven-modulo-a-fuzz-validated-contract via the bundled Std.Contracts.normal_cdf contracts). The no-arbitrage properties that refused value-level abstraction (non-negativity, intrinsic bound, strike convexity) remain out, documented as backend-roadmap items.",
   "pricing": {
@@ -59,7 +59,7 @@
     {"module": "Shoals.Properties.NoArbitrage", "ids": ["bull_spread_nonneg", "butterfly_nonneg"]}
   ],
   "dependency_tree": {
-    "shoals": "0.20.2",
+    "shoals": "0.21.0",
     "compiler": "0.8.0",
     "dependencies": [
       {"name": "chelis-std", "version": "0.4.0", "source": "bundled", "archive_sha256": "651d210ce8852de3092714c5807a4f991735b2ac0c58e4ed45f44046b889f2e5"},

@@ -33,7 +33,10 @@ def abs_diff(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = {
   d = sub(shipped, contract)
   if lt(d, cast(0.0, f32)) then neg(d) else d
 }
-def maxcell(acc: f32, d: f32) -> f32 = if gt(d, acc) then d else acc
+-- NaN-aware max: a non-finite cell (d != d) is propagated into the accumulator so
+-- any NaN reaches `worst` and fails the binding assertion. A plain gt-max drops
+-- NaN (gt(NaN, acc) is false), which would let a NaN cell pass silently.
+def maxcell(acc: f32, d: f32) -> f32 = if eq(d, d) then if gt(d, acc) then d else acc else d
 def mats_max(s: f32, k: f32, r: f32, sg: f32, acc: f32) -> f32 = fold(fn (a: f32, t: f32) -> maxcell(a, abs_diff(s, k, r, sg, t)), acc, [cast(0.25, f32), cast(1.0, f32), cast(2.0, f32)])
 def sigmas_max(s: f32, k: f32, r: f32, acc: f32) -> f32 = fold(fn (a: f32, sg: f32) -> mats_max(s, k, r, sg, a), acc, [cast(0.1, f32), cast(0.2, f32), cast(0.4, f32)])
 def rates_max(s: f32, k: f32, acc: f32) -> f32 = fold(fn (a: f32, r: f32) -> sigmas_max(s, k, r, a), acc, [cast(0.01, f32), cast(0.05, f32), cast(0.1, f32)])

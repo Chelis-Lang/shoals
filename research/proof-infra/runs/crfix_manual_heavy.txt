@@ -1,0 +1,6 @@
+=== composites_binding_heavy (NaN-aware maxcell, 1e-4 retained) ===
+tests-manual/composites_binding_heavy.ch
+  test_binding_full_grid ........ PASS
+
+1 passed, 0 failed
+EXIT=0
