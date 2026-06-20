@@ -1,0 +1,6 @@
+{"file":"tests/composites_binding.ch","test":"test_binding_atm","status":"pass"}
+{"file":"tests/composites_binding.ch","test":"test_binding_deep_otm","status":"pass"}
+{"file":"tests/composites_binding.ch","test":"test_binding_deep_itm","status":"pass"}
+{"file":"tests/composites_binding.ch","test":"test_binding_high_vol","status":"pass"}
+{"file":"tests/composites_binding.ch","test":"test_binding_short_maturity","status":"pass"}
+{"summary":{"passed":5,"failed":0}}

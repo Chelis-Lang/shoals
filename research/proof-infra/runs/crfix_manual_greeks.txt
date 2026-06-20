@@ -1,0 +1,9 @@
+=== greeks_secondorder ===
+tests-manual/greeks_secondorder.ch
+  test_gammas_call_matches_displayed_2nd_deriv PASS
+  test_gammas_call_strictly_positive PASS
+  test_volgas_call_matches_displayed_2nd_deriv PASS
+  test_vannas_call_matches_displayed_2nd_deriv PASS
+
+4 passed, 0 failed
+EXIT=0

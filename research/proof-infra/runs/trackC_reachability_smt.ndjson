@@ -1,0 +1,14 @@
+{"kind":"property","name":"c_simplex_preserve_2","proof_tier":"smt","samples":0,"seed":0,"source":{"file":"research/proof-infra/economic/reachability.ch","kind":"surf"},"status":"passed"}
+{"kind":"property","name":"c_simplex_sum_3","proof_tier":"smt","samples":0,"seed":0,"source":{"file":"research/proof-infra/economic/reachability.ch","kind":"surf"},"status":"passed"}
+{"kind":"property","name":"c_simplex_no_rowsum_edge","proof_tier":"smt","reason":"smt counterexample","samples":0,"seed":0,"source":{"file":"research/proof-infra/economic/reachability.ch","kind":"surf"},"status":"failed"}
+{"kind":"property","name":"c_bellman_monotone","proof_tier":"smt","samples":0,"seed":0,"source":{"file":"research/proof-infra/economic/reachability.ch","kind":"surf"},"status":"passed"}
+{"kind":"property","name":"c_bellman_bounded","proof_tier":"smt","samples":0,"seed":0,"source":{"file":"research/proof-infra/economic/reachability.ch","kind":"surf"},"status":"passed"}
+{"kind":"property","name":"c_bellman_contraction","proof_tier":"smt","samples":0,"seed":0,"source":{"file":"research/proof-infra/economic/reachability.ch","kind":"surf"},"status":"passed"}
+{"kind":"property","name":"c_pv_positive","proof_tier":"smt","samples":0,"seed":0,"source":{"file":"research/proof-infra/economic/reachability.ch","kind":"surf"},"status":"passed"}
+{"kind":"property","name":"c_pv_monotone","proof_tier":"smt","samples":0,"seed":0,"source":{"file":"research/proof-infra/economic/reachability.ch","kind":"surf"},"status":"passed"}
+{"kind":"property","name":"c_gordon_positive","proof_tier":"smt","samples":0,"seed":0,"source":{"file":"research/proof-infra/economic/reachability.ch","kind":"surf"},"status":"passed"}
+{"kind":"property","name":"c_gordon_monotone","proof_tier":"smt","samples":0,"seed":0,"source":{"file":"research/proof-infra/economic/reachability.ch","kind":"surf"},"status":"passed"}
+{"kind":"property","name":"c_sat_simplex","proof_tier":"smt","reason":"smt counterexample","samples":0,"seed":0,"source":{"file":"research/proof-infra/economic/reachability.ch","kind":"surf"},"status":"failed"}
+{"kind":"property","name":"c_sat_bellman","proof_tier":"smt","reason":"smt counterexample","samples":0,"seed":0,"source":{"file":"research/proof-infra/economic/reachability.ch","kind":"surf"},"status":"failed"}
+{"kind":"property","name":"c_simplex_unsound_rowsum","proof_tier":"smt","reason":"smt counterexample","samples":0,"seed":0,"source":{"file":"research/proof-infra/economic/reachability.ch","kind":"surf"},"status":"failed"}
+{"errors":0,"failed":4,"kind":"summary","obligations":0,"passed":9,"total":13,"unsupported":0}

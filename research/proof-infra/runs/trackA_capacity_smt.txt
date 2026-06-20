@@ -1,0 +1,8 @@
+## capacity @ 20000ms
+{"kind":"property","name":"cap_exp_above_tangent","proof_tier":"smt","samples":0,"seed":0,"source":{"file":"research/proof-infra/derivatives/capacity.ch","kind":"surf"},"status":"passed"}
+{"kind":"property","name":"cap_sqrt_monotone","proof_tier":"smt","samples":0,"seed":0,"source":{"file":"research/proof-infra/derivatives/capacity.ch","kind":"surf"},"status":"passed"}
+{"kind":"property","name":"cap_poly_upper_bound","proof_tier":"smt","samples":0,"seed":0,"source":{"file":"research/proof-infra/derivatives/capacity.ch","kind":"surf"},"status":"passed"}
+{"errors":0,"failed":0,"kind":"summary","obligations":0,"passed":3,"total":3,"unsupported":0}
+## cap_poly_upper_bound @ 1ms (expect unsupported, NOT failed)
+{"kind":"property","name":"cap_poly_upper_bound","proof_tier":"smt","reason":"property does not lower to Tier B (smt-only)","samples":0,"seed":0,"source":{"file":"research/proof-infra/derivatives/capacity.ch","kind":"surf"},"status":"unsupported"}
+{"errors":0,"failed":0,"kind":"summary","obligations":0,"passed":0,"total":1,"unsupported":1}

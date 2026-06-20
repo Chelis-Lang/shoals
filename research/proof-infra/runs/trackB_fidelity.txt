@@ -1,0 +1,13 @@
+### STEP 3c: fidelity of chelis BS_CALL (A&S erf, f64) to a TRUE-erf reference
+# Difference is the Abramowitz-Stegun erf approximation error (~1e-5 in price),
+# NOT an AD or chelis evaluation error. Algebra is byte-identical to references/blackscholes.ch.
+
+S=100 K=100 r=0.05 sg=0.2 t=1: chelis=10.45057542 true-erf=10.45058357 absdiff=8.16e-06
+S=80 K=100 r=0.01 sg=0.15 t=0.25: chelis=0.00313539 true-erf=0.00313691 absdiff=1.52e-06
+S=120 K=100 r=0.05 sg=0.3 t=2: chelis=36.12771422 true-erf=36.12770760 absdiff=6.62e-06
+S=100 K=100 r=0.05 sg=0.4 t=0.1: chelis=5.28363740 true-erf=5.28362732 absdiff=1.01e-05
+
+### AD Greeks vs TRUE-erf analytic (independent oracle, ATM):
+delta: AD=0.63683582 true-erf=0.63683065 absdiff=5.17e-06
+gamma: AD=0.01876338 true-erf=0.01876202 absdiff=1.36e-06
+vega : AD=37.523872 true-erf=37.524035 absdiff=1.63e-04

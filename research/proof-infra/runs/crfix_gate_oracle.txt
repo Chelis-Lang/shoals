@@ -1,0 +1,98 @@
+=== oracle greeks gate (FIX1/3/4) ===
+{
+  "gate": "oracle_greeks_gate",
+  "chelis": "/home/jeff/Documents/scratch/chelis-prove-pipeline/target/release/chelis",
+  "grid_cells": 63,
+  "groups_run": 14,
+  "chelis_exit": 0,
+  "passed_groups": 14,
+  "failed_groups": 0,
+  "failures": {},
+  "binding_crosscheck": {
+    "description": "call_prices (f64-downcast) == call_textbook (erfc) within f32 bound",
+    "max_tol_used": 0.0001
+  },
+  "accuracy_monotone": {
+    "new_f64_body_max_abs_err_vs_true": 1.4382802895340774e-05,
+    "old_f32_erfc_path_max_abs_err_vs_true_modeled": 3.6372223561897954e-05,
+    "new_le_old": true
+  },
+  "sign_fold": [
+    {
+      "tag": "d1~0",
+      "s": 93.23938199059482,
+      "d1": 2.7755575615628914e-16,
+      "groundtruth_delta": 0.5000038336962553,
+      "groundtruth_vega": 37.19713167454817,
+      "groundtruth_rho": 40.022414257360566,
+      "groundtruth_theta": -5.7208338803228465,
+      "groundtruth_gamma": 0.021394781419187707,
+      "groundtruth_volga": -0.00035745146962540275,
+      "groundtruth_vanna": 0.39892311192015306
+    },
+    {
+      "tag": "neg-d1",
+      "s": 60.0,
+      "d1": -2.2041281188299533,
+      "groundtruth_delta": 0.013758484774462093,
+      "groundtruth_vega": 2.109318336730418,
+      "groundtruth_rho": 0.7710746435877862,
+      "groundtruth_theta": -0.2494855658524311,
+      "groundtruth_gamma": 0.002929659471703351,
+      "groundtruth_volga": 55.887379792618276,
+      "groundtruth_vanna": 0.42259612823187975
+    },
+    {
+      "tag": "deep-neg-d1",
+      "s": 50.0,
+      "d1": -4.653803343927443,
+      "groundtruth_delta": 1.6218564013647851e-06,
+      "groundtruth_vega": 0.0002782316880574603,
+      "groundtruth_rho": 3.943916105202962e-05,
+      "groundtruth_theta": -5.959025371669478e-05,
+      "groundtruth_gamma": 1.113918232323606e-06,
+      "groundtruth_volga": 0.031072803358036083,
+      "groundtruth_vanna": 0.00018884763732208813
+    }
+  ],
+  "second_order": {
+    "description": "gammas_call/volgas_call/vannas_call: nested-grad d2 of the displayed A&S price",
+    "max_so_model_err_vs_trueBS": {
+      "gamma": 0.00013666706336012274,
+      "volga": 0.011214535575447826,
+      "vanna": 0.0005631440995195868
+    },
+    "max_so_fd_trunc_vs_groundtruth": {
+      "gamma": 6.630992079742493e-05,
+      "volga": 0.10135862963375075,
+      "vanna": 0.007896745773275038
+    },
+    "abs_floors": {
+      "gamma": 5e-06,
+      "volga": 0.0015,
+      "vanna": 4e-05
+    },
+    "fd_steps_per_greek": "h_s=1% of S (gamma,vanna spot leg); h_v=5e-3 (volga,vanna vol leg)",
+    "fd_corroboration_apriori": {
+      "description": "ground_truth ~= FD-of-displayed-price within an a-priori Richardson band (so_fd_apriori_band) derived from the step alone; NOT the old self-widening 3*|gt-fd|. Ratio = |gt-fd(h)| / band; <1 means it holds, and >0 means it is not auto-satisfied (the band can fail if the closed form is wrong).",
+      "max_residual_over_band": {
+        "gamma": 0.4801482771110578,
+        "volga": 0.06195974205245385,
+        "vanna": 0.07199364503162359
+      }
+    }
+  },
+  "tolerance_derivation": {
+    "eps_f32": 1.1920928955078125e-07,
+    "ad_vs_groundtruth (PRIMARY, gating)": "max(16*eps_f32*|v|, 3e-6); AD vs exact f64 derivative of A&S price, f32 ULPs",
+    "ad_vs_analytic (secondary)": "2*measured_A&S_model_err + max(8*eps_f32*|v|, 3e-6)",
+    "groundtruth_vs_fd (secondary, INDEPENDENT corroboration)": "2*|fd(h)-fd(2h)| (Richardson, a-priori) + 8*eps_f32*price/h + 3e-7; subject is closed-form ground_truth vs in-package fd_*; band is derived from h+precision alone (NOT from any gt-vs-fd gap), so it can fail if the closed form is wrong",
+    "binding": "max(16*eps_f32*|price|, 1e-4); erf-impl rounding of same formula",
+    "so_ad2_vs_groundtruth (PRIMARY, gating)": "max(48*eps_f32*|v|, greek_floor); nested grad == exact f64 2nd-deriv of A&S price",
+    "so_ad2_vs_analytic (secondary)": "2*measured_A&S_2nd_deriv_model_err + primary_so_band",
+    "so_groundtruth_vs_fd (secondary, INDEPENDENT corroboration)": "2*|fd(h)-fd(2h)| (Richardson, a-priori) + 8*eps_f32*|v|/h^2 + 3e-7; subject is closed-form 2nd-deriv ground_truth vs FD of displayed price; band derived from h alone (NOT from any gt-vs-fd gap)"
+  },
+  "all_ok": true
+}
+PASS: oracle_greeks_gate -- 14/14 groups, 63 cells; binding + monotone + sign-fold green.
+EXIT=0

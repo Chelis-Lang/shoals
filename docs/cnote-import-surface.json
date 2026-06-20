@@ -1,0 +1,70 @@
+{
+  "schema": "shoals.cnote-import-surface/v1",
+  "purpose": "Frozen import surface that C Note vendors and resolves in its no-network sandbox. Pinned so C Note builds against a stable contract while Shoals internals evolve.",
+  "pins": {
+    "chelis": "0.8.0",
+    "shoals": "0.21.0"
+  },
+  "scope_note": "Re-pinned to chelis 0.8.0. The full graduation has landed: first-order AND second-order AD Greeks, and the SMT composite derivatives-property corpus (parity/upper-bound/delta-bounds as proven-modulo-a-fuzz-validated-contract via the bundled Std.Contracts.normal_cdf contracts). The no-arbitrage properties that refused value-level abstraction (non-negativity, intrinsic bound, strike convexity) remain out, documented as backend-roadmap items.",
+  "pricing": {
+    "module": "Shoals.Pricing",
+    "normal_cdf": "one A&S 7.1.26 erf in f64 (same coefficients as Std.Contracts.normal_cdf / Nautilus erf); the f32 entry points downcast the f64 body and every Greek is the AD derivative of that displayed price. The pricer's f64 normal CDF is the f64 lift of the f32 Std.Contracts.normal_cdf the composites are proven about; the two are bound by the binding cross-check (tests/composites_binding.ch).",
+    "exports": [
+      {"id": "bs_call_scalar", "sig": "(s,k,r,sigma,t: f32) -> f32", "role": "price-scalar"},
+      {"id": "bs_put_scalar", "sig": "(s,k,r,sigma,t: f32) -> f32", "role": "price-scalar"},
+      {"id": "call_prices", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "price-vector"},
+      {"id": "put_prices", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "price-vector"},
+      {"id": "call_total", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> f32", "role": "price-reduce"},
+      {"id": "put_total", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> f32", "role": "price-reduce"},
+      {"id": "deltas_call", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-firstorder", "greek": "delta"},
+      {"id": "deltas_put", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-firstorder", "greek": "delta"},
+      {"id": "vegas_call", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-firstorder", "greek": "vega"},
+      {"id": "rhos_call", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-firstorder", "greek": "rho"},
+      {"id": "thetas_call", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-firstorder", "greek": "theta"},
+      {"id": "gammas_call", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-secondorder", "greek": "gamma"},
+      {"id": "volgas_call", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-secondorder", "greek": "volga"},
+      {"id": "vannas_call", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-secondorder", "greek": "vanna"},
+      {"id": "mc_call_price", "sig": "[n](template: tensor[n,f32], s0,k,r,sigma,t: f32) -> f32 ! { Random }", "role": "price-mc"}
+    ],
+    "greek_validation": "First-order (delta/vega/rho/theta) and second-order (gamma/volga/vanna) Greeks are the AD derivatives of the displayed price (gamma/volga/vanna via nested grad). Oracle-validated against the analytic forms AND tuned finite differences of the displayed price (sign-fold + accuracy-monotone guard) by scripts/oracle_greeks_gate.py, with in-suite Std.Test standing assertions (heavy second-order in tests-manual/greeks_secondorder.ch)."
+  },
+  "demos": {
+    "module": "Shoals.Demos.Businesswrong",
+    "tier": "fuzz",
+    "pairs": [
+      {"wrong": "discount_le_one", "control": "discount_le_one_fixed", "error": "discount factor above 1 (negative implied rate)"},
+      {"wrong": "variance_nonneg", "control": "variance_nonneg_fixed", "error": "negative variance (Feller violation)"},
+      {"wrong": "call_le_spot", "control": "call_le_spot_fixed", "error": "call priced above spot (static arbitrage)"}
+    ],
+    "run": "chelis prove demos/businesswrong.ch --tier fuzz-only --samples 500 --seed 0 --json"
+  },
+  "composites": {
+    "module": "Shoals.Properties.Composites",
+    "mechanism": "chelis 0.8.0 `with contract = \"std.normal_cdf.*\"`: the SMT tier abstracts Std.Contracts.normal_cdf calls into symbols carrying the declared contract, proves the structure, and emits a composite verdict. The contract is auto fuzz-discharged (8192 samples, tol 1e-10) with a cvc5 non-vacuity (SAT) check.",
+    "greens": [
+      {"id": "put_call_parity_reflection", "verdict": "proven_modulo_fuzz_validated_contract", "contracts": ["std.normal_cdf.range", "std.normal_cdf.reflection"]},
+      {"id": "call_upper_bounded_by_spot", "verdict": "proven_modulo_fuzz_validated_contract", "contracts": ["std.normal_cdf.range"]},
+      {"id": "delta_in_unit_interval", "verdict": "proven_modulo_fuzz_validated_contract", "contracts": ["std.normal_cdf.range"]}
+    ],
+    "integrity_probes": [
+      {"id": "put_call_parity_corrupted", "verdict": "failed", "note": "corrupting the reflection coupling flips the verdict (counterexample)"},
+      {"id": "delta_unknown_contract", "verdict": "unsupported", "note": "unknown contract id is unsupported, not a pass"}
+    ],
+    "excluded_no_arb_roadmap": ["non_negativity", "intrinsic_lower_bound", "strike_convexity"],
+    "run": "scripts/manual_gates/phase3l_shoals_oracle_composite_corpus.py (needs an SMT-enabled chelis 0.8.0; do not use `prove .` on the whole package -- prove the corpus targeted)"
+  },
+  "properties": [
+    {"module": "Shoals.Properties.Pricing", "ids": ["put_call_parity_holds", "call_price_nonneg", "put_price_nonneg", "call_bounded_by_spot", "matches_textbook_reference", "matches_textbook_reference_put", "mc_matches_textbook_mc_reference"]},
+    {"module": "Shoals.Properties.Greeks", "ids": ["fd_delta_in_unit_range_for_call", "fd_delta_matches_analytic", "vega_nonneg"]},
+    {"module": "Shoals.Properties.NoArbitrage", "ids": ["bull_spread_nonneg", "butterfly_nonneg"]}
+  ],
+  "dependency_tree": {
+    "shoals": "0.21.0",
+    "compiler": "0.8.0",
+    "dependencies": [
+      {"name": "chelis-std", "version": "0.4.0", "source": "bundled", "archive_sha256": "651d210ce8852de3092714c5807a4f991735b2ac0c58e4ed45f44046b889f2e5"},
+      {"name": "coral", "version": "0.7.26", "source": "github://Chelis-Lang/coral@v0.7.26", "archive_sha256": "488fa31b21cdc0bb5389be0965f150f363579f65d63f632413e20f8544b5a271"},
+      {"name": "nautilus", "version": "0.7.27", "source": "github://Chelis-Lang/nautilus@v0.7.27", "archive_sha256": "ccc171cc15c91247e862f2f4df1b24d74f9869c2f31abef840bb9f1d77af408e"}
+    ]
+  }
+}

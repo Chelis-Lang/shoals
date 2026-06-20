@@ -1,0 +1,21 @@
+### STEP 1.5: grad + f64 free-variable capture is a SEPARATE blocker
+
+# (1) f64 captured free var k under grad -> mismatched precisions F64 vs F32
+$ chelis eval '(fn (s: f64, k: f64) -> grad((fn (x: f64) -> mul(x, k)), wrt=x)(s))(3.0, 7.0)'
+error: host runtime could not lower `grad(...)` for evaluation: `grad(...)` lowering rejected: failed to construct backward DAG (grad: constructed backward DAG failed verification: binary op at node 2 has mismatched precisions: F64 vs F32; binary op at node 4 has mismatched precisions: F64 vs F32) at source span `surf:61..70`
+
+# (2) f32 captured free var -> different failure: missing required input
+$ chelis eval '(fn (s: f32, k: f32) -> grad((fn (x: f32) -> mul(x, k)), wrt=x)(s))(3.0, 7.0)'
+error: host runtime `grad` evaluation failed: missing required input `k`
+
+# (3) f64 constant INLINED (no capture) -> works, d/dx(7x)=7
+$ chelis eval '(fn (s: f64) -> grad((fn (x: f64) -> mul(x, cast(7.0, f64))), wrt=x)(s))(3.0)'
+tensor(shape=[], data=[7.0])
+
+# (4) spec-blessed: differentiate named fn with wrt, all args explicit -> works
+$ chelis eval '(fn (s: f64, k: f64) -> grad((fn (x: f64, kk: f64) -> mul(x, kk)), wrt=x)(s, k))(3.0, 7.0)'
+tensor(shape=[], data=[7.0])
+
+# (5) nested grad of named-fn-with-wrt is NOT lowered by host evaluator
+$ chelis eval 'grad(grad(BS_CALL, wrt=s), wrt=s)(...)'
+error: host runtime could not lower `grad(...)` for evaluation: `grad` is not supported by IR evaluation yet; use `chelis build --target c` instead

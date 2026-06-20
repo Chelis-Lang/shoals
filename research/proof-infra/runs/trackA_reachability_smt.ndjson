@@ -1,0 +1,14 @@
+{"kind":"property","name":"a_upper_bound","proof_tier":"smt","samples":0,"seed":0,"source":{"file":"research/proof-infra/derivatives/reachability.ch","kind":"surf"},"status":"passed"}
+{"kind":"property","name":"a_parity_reflection","proof_tier":"smt","samples":0,"seed":0,"source":{"file":"research/proof-infra/derivatives/reachability.ch","kind":"surf"},"status":"passed"}
+{"kind":"property","name":"a_delta_bounds","proof_tier":"smt","samples":0,"seed":0,"source":{"file":"research/proof-infra/derivatives/reachability.ch","kind":"surf"},"status":"passed"}
+{"kind":"property","name":"a_parity_naive","proof_tier":"smt","reason":"smt counterexample","samples":0,"seed":0,"source":{"file":"research/proof-infra/derivatives/reachability.ch","kind":"surf"},"status":"failed"}
+{"kind":"property","name":"a_nonneg_naive","proof_tier":"smt","reason":"smt counterexample","samples":0,"seed":0,"source":{"file":"research/proof-infra/derivatives/reachability.ch","kind":"surf"},"status":"failed"}
+{"kind":"property","name":"a_nonneg_monotone","proof_tier":"smt","reason":"smt counterexample","samples":0,"seed":0,"source":{"file":"research/proof-infra/derivatives/reachability.ch","kind":"surf"},"status":"failed"}
+{"kind":"property","name":"a_intrinsic_naive","proof_tier":"smt","reason":"smt counterexample","samples":0,"seed":0,"source":{"file":"research/proof-infra/derivatives/reachability.ch","kind":"surf"},"status":"failed"}
+{"kind":"property","name":"a_strike_convex_naive","proof_tier":"smt","reason":"smt counterexample","samples":0,"seed":0,"source":{"file":"research/proof-infra/derivatives/reachability.ch","kind":"surf"},"status":"failed"}
+{"kind":"property","name":"a_sat_upper_bound","proof_tier":"smt","reason":"smt counterexample","samples":0,"seed":0,"source":{"file":"research/proof-infra/derivatives/reachability.ch","kind":"surf"},"status":"failed"}
+{"kind":"property","name":"a_sat_parity","proof_tier":"smt","reason":"smt counterexample","samples":0,"seed":0,"source":{"file":"research/proof-infra/derivatives/reachability.ch","kind":"surf"},"status":"failed"}
+{"kind":"property","name":"a_sat_delta","proof_tier":"smt","reason":"smt counterexample","samples":0,"seed":0,"source":{"file":"research/proof-infra/derivatives/reachability.ch","kind":"surf"},"status":"failed"}
+{"kind":"property","name":"a_upper_bound_unsound","proof_tier":"smt","reason":"smt counterexample","samples":0,"seed":0,"source":{"file":"research/proof-infra/derivatives/reachability.ch","kind":"surf"},"status":"failed"}
+{"kind":"property","name":"a_parity_unsound_reflection","proof_tier":"smt","reason":"smt counterexample","samples":0,"seed":0,"source":{"file":"research/proof-infra/derivatives/reachability.ch","kind":"surf"},"status":"failed"}
+{"errors":0,"failed":10,"kind":"summary","obligations":0,"passed":3,"total":13,"unsupported":0}

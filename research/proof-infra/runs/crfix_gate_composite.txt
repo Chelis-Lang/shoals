@@ -1,0 +1,65 @@
+=== composite gate (SMT) ===
+{
+  "gate": "phase3l_shoals_oracle_composite_corpus",
+  "corpus": "properties/composites.ch",
+  "properties": [
+    {
+      "name": "put_call_parity_reflection",
+      "expected": "green",
+      "status": "passed",
+      "composite_verdict": "proven_modulo_fuzz_validated_contract",
+      "reason": null,
+      "discharged_contracts": [
+        "std.normal_cdf.range",
+        "std.normal_cdf.reflection"
+      ],
+      "base_non_vacuous": true,
+      "ok": true
+    },
+    {
+      "name": "call_upper_bounded_by_spot",
+      "expected": "green",
+      "status": "passed",
+      "composite_verdict": "proven_modulo_fuzz_validated_contract",
+      "reason": null,
+      "discharged_contracts": [
+        "std.normal_cdf.range"
+      ],
+      "base_non_vacuous": true,
+      "ok": true
+    },
+    {
+      "name": "delta_in_unit_interval",
+      "expected": "green",
+      "status": "passed",
+      "composite_verdict": "proven_modulo_fuzz_validated_contract",
+      "reason": null,
+      "discharged_contracts": [
+        "std.normal_cdf.range"
+      ],
+      "base_non_vacuous": true,
+      "ok": true
+    },
+    {
+      "name": "put_call_parity_corrupted",
+      "expected": "failed",
+      "status": "failed",
+      "composite_verdict": "failed",
+      "reason": null,
+      "has_counterexample": true,
+      "ok": true
+    },
+    {
+      "name": "delta_unknown_contract",
+      "expected": "unsupported",
+      "status": "unsupported",
+      "composite_verdict": "unsupported",
+      "reason": "unknown contract `std.normal_cdf.not_a_contract`",
+      "ok": true
+    }
+  ],
+  "prove_exit_code": 1,
+  "all_ok": true
+}
+PASS: phase3l_shoals_oracle_composite_corpus — 3 composite greens (proven_modulo_fuzz_validated_contract), 1 corrupted-coupling flip (failed), 1 unknown-contract (unsupported).
+EXIT=0

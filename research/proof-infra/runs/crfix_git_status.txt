@@ -1,0 +1,17 @@
+ M .github/workflows/ci.yml
+ M properties/pricing.ch
+ M scripts/oracle_greeks_gate.py
+ M scripts/run_local_gate.py
+ M tests-manual/composites_binding_heavy.ch
+ M tests/composites_binding.ch
+?? research/proof-infra/runs/crfix_00_build.txt
+?? research/proof-infra/runs/crfix_final_build.txt
+?? research/proof-infra/runs/crfix_fix6_measure.txt
+?? research/proof-infra/runs/crfix_fmt_lint.txt
+?? research/proof-infra/runs/crfix_gate_composite.txt
+?? research/proof-infra/runs/crfix_gate_oracle.txt
+?? research/proof-infra/runs/crfix_git_status.txt
+?? research/proof-infra/runs/crfix_manual_greeks.txt
+?? research/proof-infra/runs/crfix_manual_heavy.txt
+?? research/proof-infra/runs/crfix_skip_bogus.txt
+?? research/proof-infra/runs/crfix_tests_fast.txt

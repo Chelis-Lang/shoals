@@ -1,0 +1,43 @@
+S1 graduation summary (chelis 0.7.27)
+=====================================
+Graduated tensor-lane f64 AD Greeks into src/pricing.ch.
+
+Mechanism discoveries (validated in research/proof-infra/graduation/src/probe.ch):
+- grad cannot differentiate a closure that CAPTURES a free f64 var (precision
+  mismatch / missing-input). Supported form: grad(named_lambda, wrt=P)(all args
+  EXPLICIT). vmap ALSO cannot capture free f64 vars in the host evaluator
+  (host runtime `vmap` evaluation failed: missing required input `kf`).
+- Tensor-lane vectorization without capture: broadcast every scalar param to an
+  [n,1] f64 column (const_col via host-lane map -- builds NON-differentiated
+  inputs), reshape spots to [n,1], and multi-arg vmap over all five columns;
+  each lane pulls its cell out via tensor_to_scalar(sum(col,0)). No free var
+  crosses the vmap/grad boundary.
+- A bare scalar grad output is a rank-0 tensor that Std.Test assert_close cannot
+  evaluate (the inner `if` sees a rank-0 Bool tensor). BUT the per-element result
+  of a vmap'd grad, after cast(_, f32), is a proper tensor[n,f32] whose elements
+  CAN be indexed and asserted. So the vector Greeks are testable; only bare
+  scalar grads are not.
+
+Single body: bs_call_scalar/bs_put_scalar (f32 sig) now compute via bs_call_f64/
+bs_put_f64 and downcast. erf64 = Abramowitz-Stegun 7.1.26 (same coeffs as
+Nautilus.Special.erf), n_cdf64 = 0.5*(1 - erf64(-x/sqrt2)). One erf behind price
+and every Greek.
+
+Greeks repaired in place (names/signatures preserved): deltas_call, deltas_put,
+vegas_call; added rhos_call, thetas_call (theta = -dC/dt). All via
+vmap(grad(bs_call_f64 wrt slot)) over the broadcast columns, downcast to f32.
+
+Accuracy-monotone (Python model of the f32-erfc OLD path vs f64-downcast NEW
+path, both vs true BS over the gate grid): new max abs err 1.44e-5 <= old
+3.64e-5. The new body is at least as accurate.
+
+Existing tests stay green (chelis test, dodged binary /tmp/grad_chelis/ch727 to
+evade an external 0.7.27-process reaper on this host):
+  tests/pricing.ch                      8/8  (mc_converges needs --timeout>30s)
+  tests/pricingextended.ch             11/11
+  tests/pricingextended_closedforms.ch  4/4
+  tests/volsurface.ch                  23/23
+  tests/dupire.ch                       4/4
+fmt --check and lint --check clean on src/pricing.ch; reef build green.
+
+S3 oracle gate (scripts/oracle_greeks_gate.py): 14/14 groups, 63 cells, all_ok.

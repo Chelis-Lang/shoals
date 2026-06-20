@@ -1,0 +1,409 @@
+=== chelis test tests/ (tightened 5e-5) ===
+tests/cds.ch
+  test_cds_pv_zero_at_market_spread PASS
+  test_cds_bootstrap_recovers_constant_hazard PASS
+  test_cds_bootstrap_recovers_piecewise_hazard PASS
+  test_survival_decreasing ...... PASS
+tests/composites_binding.ch
+  test_binding_atm .............. PASS
+  test_binding_deep_otm ......... PASS
+  test_binding_deep_itm ......... PASS
+  test_binding_high_vol ......... PASS
+  test_binding_short_maturity ... PASS
+tests/csa.ch
+  test_csa_exposure_below_threshold_no_collateral PASS
+  test_csa_exposure_above_threshold_mta_satisfied PASS
+  test_csa_exposure_above_threshold_mta_blocks PASS
+  test_csa_monotone_in_threshold PASS
+  test_csa_negative_exposure_clipped_to_zero PASS
+tests/currencytag.ch
+  test_usd_constructor_value_and_currency PASS
+  test_gbp_and_eur_constructors_tag_currency PASS
+  test_non_negative_money_clamps_negative PASS
+  test_convert_changes_currency_and_scales_value PASS
+  test_money_add_same_currency .. PASS
+  test_money_sub_same_currency .. PASS
+tests/curves.ch
+  test_linear_rate_at_midpoint .. PASS
+  test_discount_factor_at_pillar PASS
+  test_bootstrap_round_trip ..... PASS
+  test_rate_at_pillar_exact ..... PASS
+tests/curves_basis.ch
+  test_basis_zero_spread_equals_domestic_df PASS
+  test_basis_positive_spread_lowers_df PASS
+  test_basis_triangle_parity .... PASS
+  test_basis_spread_at_interpolates PASS
+  test_bootstrap_basis_curve_passes_through_quotes PASS
+tests/curves_bootstrap.ch
+  test_deposit_instrument_tenor . PASS
+  test_zero_coupon_instrument_price PASS
+  test_par_swap_instrument_par_rate PASS
+  test_bootstrap_single_deposit_reproduces_implied_zero PASS
+  test_bootstrap_single_zero_coupon_reproduces_implied_zero PASS
+  test_bootstrap_par_swap_reproduces_par_price PASS
+  test_bootstrap_two_pillar_consistency PASS
+  test_bootstrap_mixed_deposit_swap PASS
+  test_bootstrap_residual_at_pillar_zero_at_solution PASS
+  test_bootstrap_residual_at_pillar_nonzero_off_solution PASS
+  test_bootstrap_multi_curve_constructs_yield_curve PASS
+tests/curves_bootstrap_ift.ch
+  test_grad_zero_coupon_matches_analytic PASS
+  test_grad_deposit_matches_analytic PASS
+  test_grad_par_swap_single_pillar PASS
+  test_grad_well_conditioned_vs_fd PASS
+  test_grad_well_conditioned_three_pillars_fd_agreement PASS
+  test_grad_near_collinear_finite_and_bounded PASS
+  test_grad_fd_step_size_stability PASS
+  test_grad_at_parameter_lower_bound_finite PASS
+  test_grad_high_rate_within_bracket PASS
+  test_grad_out_of_bracket_propagates_nan_observably PASS
+  test_grad_pathological_pillar_returns_finite_or_documented PASS
+tests/curves_bootstrap_ift_full.ch
+  test_full_jacobian_diagonal_only_for_zero_coupons PASS
+  test_full_jacobian_par_swap_off_diagonal_nonzero PASS
+  test_full_jacobian_matches_fd_bump PASS
+  test_full_jacobian_diagonal_matches_diagonal_helper PASS
+  test_instrument_validate_rejects_negative_tenor PASS
+  test_instrument_validate_rejects_bad_zero_coupon_price PASS
+  test_instrument_validate_rejects_deposit_rate_below_minus_one PASS
+  test_full_jacobian_returns_nan_for_invalid_input PASS
+  test_instrument_validate_zc_price_boundary PASS
+  test_instrument_validate_deposit_rate_boundary PASS
+tests/curves_ops.ch
+  test_parallel_shift_lifts_all_pillars PASS
+  test_parallel_shift_negative .. PASS
+  test_key_rate_shift_affects_only_chosen_pillar PASS
+  test_twist_short_minus_long_widens_slope PASS
+  test_butterfly_dips_middle .... PASS
+  test_scale_rates_uniform ...... PASS
+  test_curve_kind_default_is_custom PASS
+  test_curve_kind_ois ........... PASS
+  test_curve_kind_sofr .......... PASS
+  test_log_linear_at_pillar ..... PASS
+  test_nss_rate_at_zero_gives_beta0_plus_beta1 PASS
+  test_nss_rate_long_horizon_converges_to_beta0 PASS
+  test_custom_curve_label_preserved PASS
+tests/date.ch
+  test_act_360_one_year ......... PASS
+  test_act_365_one_year ......... PASS
+  test_thirty_360_half_year ..... PASS
+  test_weekend_saturday ......... PASS
+  test_weekend_sunday ........... PASS
+  test_weekend_monday_is_not .... PASS
+  test_date_roll_following_from_saturday PASS
+  test_days_in_month_jan ........ PASS
+  test_days_in_month_feb_non_leap PASS
+  test_days_in_month_feb_leap ... PASS
+  test_days_in_month_apr ........ PASS
+  test_add_months_within_year ... PASS
+  test_add_months_year_wrap ..... PASS
+  test_add_months_day_cap_feb ... PASS
+  test_add_months_day_cap_feb_leap PASS
+  test_add_months_negative ...... PASS
+  test_schedule_calendar_quarterly PASS
+  test_schedule_step_quarterly .. PASS
+tests/distributions.ch
+  test_lognormal_pdf_known_value PASS
+  test_lognormal_cdf_at_one ..... PASS
+  test_student_t_pdf_at_zero_nu5 PASS
+  test_bvn_pdf_at_origin_iid .... PASS
+  test_lognormal_property_round_trip PASS
+  test_student_t_property_symmetric PASS
+  test_student_t_cdf_exact_nu5_x2 PASS
+  test_student_t_cdf_exact_better_than_approx PASS
+  test_gamma_pdf_wrapper ........ PASS
+  test_gamma_cdf_at_zero ........ PASS
+  test_exponential_cdf_inv_round_trip PASS
+  test_uniform_cdf_midpoint ..... PASS
+  test_chi_squared_cdf_at_zero .. PASS
+  test_beta_pdf_uniform_when_a_b_1 PASS
+  test_mvn_factor_2x2_identity .. PASS
+tests/dupire.ch
+  test_dupire_flat_iv_gives_flat_local_vol PASS
+  test_dupire_atm_smile_curvature_sign PASS
+  test_dupire_at_zero_volvol_equals_input_iv PASS
+  test_cubic_log_moneyness_monotonic_input_preserves_monotonicity PASS
+tests/greeks.ch
+  test_deltas_call_ad_matches_displayed_deriv PASS
+  test_vegas_call_ad_matches_displayed_deriv PASS
+  test_fd_delta_call_matches_analytic_atm PASS
+  test_fd_delta_call_in_unit_range PASS
+  test_fd_delta_put_in_negative_unit_range PASS
+  test_put_call_delta_difference_is_one PASS
+  test_fd_gamma_call_matches_analytic_atm PASS
+  test_fd_vega_call_matches_analytic_atm PASS
+  test_fd_vega_nonneg ........... PASS
+  test_fd_vega_call_equals_fd_vega_put PASS
+  test_fd_rho_call_positive ..... PASS
+  test_fd_rho_put_negative ...... PASS
+  test_fd_theta_call_negative ... PASS
+  test_fd_volga_nonneg_at_atm_short_maturity PASS
+  test_fd_vanna_finite .......... PASS
+  test_pathwise_call_delta_in_money PASS
+  test_pathwise_call_delta_otm_zero PASS
+  test_lr_digital_delta_otm_zero_at_indicator PASS
+  test_lr_digital_delta_itm_nonzero PASS
+tests/holidaycal.ch
+  test_nyc_new_year_is_holiday .. PASS
+  test_nyc_independence_day_is_holiday PASS
+  test_nyc_random_wednesday_is_not_holiday PASS
+  test_ldn_christmas_is_holiday . PASS
+  test_ldn_boxing_day_is_holiday PASS
+  test_ldn_does_not_observe_july_4 PASS
+  test_business_day_wednesday ... PASS
+  test_business_day_saturday .... PASS
+  test_business_day_new_year_2025 PASS
+  test_joint_calendar_us_july_4 . PASS
+  test_joint_calendar_uk_boxing_day PASS
+  test_empty_calendar_has_no_holidays PASS
+  test_weekend_only_calendar_treats_weekday_as_business PASS
+  test_easter_2024 .............. PASS
+  test_easter_2025 .............. PASS
+  test_easter_2026 .............. PASS
+  test_easter_2030 .............. PASS
+  test_easter_2050 .............. PASS
+  test_easter_9999 .............. PASS
+  test_good_friday_2025 ......... PASS
+  test_easter_monday_2025 ....... PASS
+  test_ldn_multi_2029_christmas . PASS
+  test_nyc_multi_2026_independence_day PASS
+  test_ldn_multi_easter_2027 .... PASS
+tests/holidaycal_intl.ch
+  test_tyo_coming_of_age_day_2026 PASS
+  test_syd_australia_day_2025 ... PASS
+  test_fra_tag_der_deutschen_einheit_2025 PASS
+  test_hkg_lunar_new_year_2025 .. PASS
+  test_calendars_disagree_on_christmas_eve_dec_24 PASS
+tests/libormarketmodel.ch
+  test_lmm_zero_vol_deterministic PASS
+  test_lmm_martingale_at_zero_drift PASS
+  test_lmm_forward_positivity ... PASS
+  test_hjm_no_arb_drift_zero_at_zero_vol PASS
+  test_hjm_drift_positive_for_positive_vol PASS
+  test_lmm_step_zero_drift_last_forward PASS
+  test_hjm_step_zero_normal_pure_drift PASS
+tests/lsm.ch
+  test_lsm_polynomial_regression_recovers_quadratic PASS
+tests/marketdata.ch
+  test_quote_construct_and_read . PASS
+  test_quote_side_ask ........... PASS
+  test_bar_fields ............... PASS
+  test_bar_high_low_volume ...... PASS
+  test_snapshot_lookup_present .. PASS
+  test_snapshot_lookup_absent ... PASS
+  test_quote_side_last .......... PASS
+  test_quote_side_mid ........... PASS
+  test_snapshot_lookup_finds_second_entry PASS
+tests/modelfit.ch
+  test_clamp_passthrough_in_range PASS
+  test_clamp_below_lo ........... PASS
+  test_clamp_above_hi ........... PASS
+  test_weighted_squared_zero_residuals PASS
+  test_weighted_squared_uniform_weights PASS
+  test_vega_weighted_higher_at_low_vega PASS
+  test_weighted_absolute_zero_residuals PASS
+  test_weighted_absolute_nonneg . PASS
+  test_lm_step_zero_residual_no_move PASS
+  test_lm_step_positive_residual_moves_down PASS
+  test_lm_step_clamped_at_lower_bound PASS
+  test_lm_step_clamped_at_upper_bound PASS
+  test_lm_step_damping_attenuates_move PASS
+tests/modelfit_lm_bounded.ch
+  test_lm_fits_linear_unconstrained PASS
+  test_lm_respects_lower_bound .. PASS
+  test_lm_converged_flag_true_on_easy_problem PASS
+  test_multi_target_fit_alias_matches PASS
+tests/modelfit_sabr_init.ch
+  test_sabr_init_atm_alpha_recovery PASS
+  test_sabr_init_skew_sign_recovers_rho_sign PASS
+  test_sabr_init_convexity_recovers_nu_positive PASS
+  test_sabr_init_clipping ....... PASS
+  test_sabr_multi_start_returns_5_candidates PASS
+tests/orderbook.ch
+  test_best_bid_highest ......... PASS
+  test_best_ask_lowest .......... PASS
+  test_bid_ask_spread ........... PASS
+  test_vwap_two_levels .......... PASS
+  test_total_quantities ......... PASS
+  test_best_bid_empty_is_nan .... PASS
+tests/pde.ch
+  test_thomas_solve_spd_tridiagonal_exact PASS
+  test_thomas_solve_negative_offdiag_exact PASS
+  test_thomas_solve_diagonal_identity PASS
+tests/pricing.ch
+  test_bs_call_atm .............. PASS
+  test_bs_put_atm ............... PASS
+  test_put_call_parity .......... PASS
+  test_call_prices_vector ....... PASS
+  test_call_total_sums_prices ... PASS
+  test_fd_delta_matches_analytic PASS
+  test_mc_reproducible .......... PASS
+  test_mc_converges_to_bs ....... PASS
+tests/pricingextended.ch
+  test_n_cdf_at_zero ............ PASS
+  test_n_pdf_at_zero ............ PASS
+  test_bachelier_call_atm ....... PASS
+  test_bachelier_put_call_parity PASS
+  test_black_call_matches_bs_when_f_eq_s_exp_rt PASS
+  test_black_put_call_parity .... PASS
+  test_garman_kohlhagen_zero_foreign_rate_equals_bs PASS
+  test_garman_kohlhagen_put_call_parity PASS
+  test_margrabe_equals_bs_when_one_asset_deterministic PASS
+  test_margrabe_symmetric_in_s1_eq_s2 PASS
+  test_margrabe_zero_at_correlation_one_equal_vols PASS
+tests/pricingextended_closedforms.ch
+  test_margrabe_stulz_zero_yield_reduces_to_margrabe PASS
+  test_margrabe_stulz_yield_lowers_price PASS
+  test_digital_decomposition_identity PASS
+  test_cash_digital_put_call_parity PASS
+tests/properties.ch
+  test_matches_textbook_atm_call PASS
+  test_matches_textbook_otm_call PASS
+  test_matches_textbook_itm_call PASS
+  test_matches_textbook_low_vol . PASS
+  test_matches_textbook_high_vol PASS
+  test_matches_textbook_low_strike_call PASS
+  test_matches_textbook_high_strike_call PASS
+  test_matches_textbook_put_atm . PASS
+  test_matches_textbook_put_otm . PASS
+  test_matches_textbook_put_itm . PASS
+  test_property_parity_grid_lowsigma PASS
+  test_property_parity_grid_highsigma PASS
+  test_call_bounded_grid_otm .... PASS
+  test_call_bounded_grid_itm .... PASS
+  test_fd_delta_in_unit_range_atm PASS
+  test_fd_delta_matches_analytic_atm PASS
+  test_fd_delta_matches_analytic_itm PASS
+  test_fd_delta_matches_analytic_otm PASS
+  test_vega_nonneg_atm .......... PASS
+  test_mc_matches_textbook_mc_reference PASS
+tests/risk.ch
+  test_parametric_var_simple .... PASS
+  test_parametric_cvar_exceeds_var PASS
+  test_historical_var_quantile .. PASS
+  test_historical_cvar_tail_mean PASS
+  test_empirical_quantile_median PASS
+  test_historical_cvar_full_confidence PASS
+tests/riskext.ch
+  test_mc_var_at_95_simple_quantile PASS
+  test_mc_es_at_95_tail_mean .... PASS
+  test_es_frtb_975_matches_es_at_975 PASS
+  test_es_at_full_confidence_collapses_to_max_loss PASS
+  test_scenario_pnl_grid_linear . PASS
+  test_kupiec_pof_at_expected_rate_near_zero PASS
+  test_kupiec_pof_far_from_expected_positive PASS
+  test_mc_var_99_strict_tail .... PASS
+  test_mc_es_dominates_var ...... PASS
+tests/riskext_backtest.ch
+  test_christoffersen_clustered_exceptions_rejects PASS
+  test_christoffersen_evenly_spaced_exceptions_no_reject PASS
+  test_christoffersen_no_exceptions_finite_lr PASS
+  test_acerbi_szekely_z1_underforecast_negative PASS
+  test_acerbi_szekely_z1_correct_forecast_near_zero PASS
+  test_acerbi_szekely_z2_underforecast_negative PASS
+tests/riskext_frtb_zone.ch
+  test_frtb_zone_at_day_boundaries PASS
+  test_frtb_zone_rolling_all_green PASS
+  test_frtb_zone_rolling_threshold_at_5 PASS
+  test_frtb_zone_rolling_threshold_at_10 PASS
+  test_frtb_zone_rolling_window_slides PASS
+tests/rng.ch
+  test_sobol_first_point ........ PASS
+tests/rng_sobol_1024.ch
+  test_sobol_1024_first_dim_radical_inverse PASS
+  test_sobol_1024_at_dim_512_uniformity PASS
+  test_sobol_1024_returns_finite_values PASS
+  test_sobol_1024_point_runtime_at_matches_dim_runtime PASS
+  test_sobol_1024_dim_caps ...... PASS
+tests/stochastic.ch
+  test_gbm_path_positive ........ PASS
+  test_gbm_path_reproducible .... PASS
+  test_gbm_terminal_mean ........ PASS
+  test_antithetic_mean_finite ... PASS
+tests/stochastic_extended.ch
+  test_merton_compensated_drift_zero_lambda_equals_gbm PASS
+  test_merton_compensated_drift_subtracts_expected_jump_contribution PASS
+  test_cholesky_2x2_identity .... PASS
+  test_cholesky_2x2_correlated .. PASS
+  test_cholesky_round_trip_recovers_covariance PASS
+  test_merton_terminal_positive_paths PASS
+  test_merton_terminal_mean_near_s0_exp_mu_t PASS
+  test_correlated_gbm_2d_marginals PASS
+  test_correlated_gbm_2d_rho_zero_positive_dispersion PASS
+tests/tenor.ch
+  test_days_per_unit_day ........ PASS
+  test_days_per_unit_week ....... PASS
+  test_days_per_unit_month_approx PASS
+  test_days_per_unit_year_approx PASS
+  test_days_per_unit_overnight .. PASS
+  test_days_per_unit_tn ......... PASS
+  test_days_per_unit_sn ......... PASS
+  test_three_months_to_days ..... PASS
+  test_one_year_to_days ......... PASS
+  test_thirty_years_to_days ..... PASS
+  test_tenor_apply_advances_date PASS
+  test_overnight_constructor .... PASS
+  test_tn_constructor ........... PASS
+  test_sn_constructor ........... PASS
+  test_negative_tenor ........... PASS
+  test_parse_3m ................. PASS
+  test_parse_1y ................. PASS
+  test_parse_30y ................ PASS
+  test_parse_2w ................. PASS
+  test_parse_7d ................. PASS
+  test_parse_overnight .......... PASS
+  test_parse_tomorrow_next ...... PASS
+  test_parse_spot_next .......... PASS
+tests/volsurface.ch
+  test_flat_svi_total_variance_equals_a PASS
+  test_flat_svi_independent_of_strike PASS
+  test_smile_svi_higher_otm ..... PASS
+  test_svi_implied_vol_atm_one_year PASS
+  test_svi_shift_atm ............ PASS
+  test_svi_shift_skew_changes_rho PASS
+  test_smile_shift_adds_to_b .... PASS
+  test_implied_vol_from_call_round_trip PASS
+  test_implied_vol_from_call_low_vol PASS
+  test_implied_vol_from_call_high_vol PASS
+  test_parallel_shift_atm_iv_actually_shifts_iv_by_delta PASS
+  test_parallel_shift_atm_iv_on_flat_surface PASS
+  test_iv_solver_failure_on_unbracketed_target PASS
+  test_iv_solver_failure_on_negative_target PASS
+  test_bracket_brackets_root_valid PASS
+  test_bracket_brackets_root_invalid PASS
+  test_sabr_atm_reduces_to_alpha_at_beta_1 PASS
+  test_sabr_atm_matches_full_formula_at_atm PASS
+  test_sabr_smile_higher_otm .... PASS
+  test_sabr_no_smile_at_zero_nu . PASS
+  test_vs_sabr_shift_alpha ...... PASS
+  test_vs_sabr_shift_rho ........ PASS
+  test_vs_sabr_shift_nu ......... PASS
+tests/xva.ch
+  test_survival_at_zero_is_one .. PASS
+  test_survival_decreases_with_time PASS
+  test_survival_one_year_2bp_hazard PASS
+  test_default_probability_sums_to_1_minus_survival PASS
+  test_epe_only_counts_positive . PASS
+  test_ene_only_counts_negative . PASS
+  test_netting_sums_pointwise ... PASS
+  test_cva_zero_when_zero_hazard PASS
+  test_cva_increases_with_hazard PASS
+  test_cva_zero_when_full_recovery PASS
+  test_cva_zero_when_zero_epe ... PASS
+  test_dva_positive_for_negative_ene PASS
+  test_discount_factor_at_zero_is_one PASS
+  test_discount_factor_one_year . PASS
+tests/xva_fva_kva.ch
+  test_fva_zero_funding_spread_zero PASS
+  test_fva_increasing_in_funding_spread PASS
+  test_fva_increasing_in_horizon PASS
+  test_kva_zero_cost_zero ....... PASS
+  test_kva_increasing_in_capital_weight PASS
+  test_kva_additivity_in_capital_weight PASS
+tests/xva_stochastic_hazard.ch
+  test_cva_stochastic_hazard_constant_reduces_to_constant_cva PASS
+  test_cva_stochastic_hazard_increasing_hazard_increases_cva PASS
+  test_cva_stochastic_hazard_zero_recovery_equals_lgd_full PASS
+
+364 passed, 0 failed
+EXIT=0

@@ -1,0 +1,57 @@
+{
+  "gate": "oracle_greeks_gate",
+  "chelis": "/tmp/grad_chelis/ch727",
+  "grid_cells": 63,
+  "groups_run": 14,
+  "chelis_exit": 0,
+  "passed_groups": 14,
+  "failed_groups": 0,
+  "failures": {},
+  "binding_crosscheck": {
+    "description": "call_prices (f64-downcast) == call_textbook (erfc) within f32 bound",
+    "max_tol_used": 0.0001
+  },
+  "accuracy_monotone": {
+    "new_f64_body_max_abs_err_vs_true": 1.4382802895340774e-05,
+    "old_f32_erfc_path_max_abs_err_vs_true_modeled": 3.6372223561897954e-05,
+    "new_le_old": true
+  },
+  "sign_fold": [
+    {
+      "tag": "d1~0",
+      "s": 93.23938199059482,
+      "d1": 2.7755575615628914e-16,
+      "groundtruth_delta": 0.5000038336962553,
+      "groundtruth_vega": 37.19713167454817,
+      "groundtruth_rho": 40.022414257360566,
+      "groundtruth_theta": -5.7208338803228465
+    },
+    {
+      "tag": "neg-d1",
+      "s": 60.0,
+      "d1": -2.2041281188299533,
+      "groundtruth_delta": 0.013758484774462093,
+      "groundtruth_vega": 2.109318336730418,
+      "groundtruth_rho": 0.7710746435877862,
+      "groundtruth_theta": -0.2494855658524311
+    },
+    {
+      "tag": "deep-neg-d1",
+      "s": 50.0,
+      "d1": -4.653803343927443,
+      "groundtruth_delta": 1.6218564013647851e-06,
+      "groundtruth_vega": 0.0002782316880574603,
+      "groundtruth_rho": 3.943916105202962e-05,
+      "groundtruth_theta": -5.959025371669478e-05
+    }
+  ],
+  "tolerance_derivation": {
+    "eps_f32": 1.1920928955078125e-07,
+    "ad_vs_groundtruth (PRIMARY, gating)": "max(16*eps_f32*|v|, 3e-6); AD vs exact f64 derivative of A&S price, f32 ULPs",
+    "ad_vs_analytic (secondary)": "2*measured_A&S_model_err + max(8*eps_f32*|v|, 3e-6)",
+    "ad_vs_fd (secondary)": "3*predicted_FD_truncation + 4*eps_f32*price/h + max(8*eps_f32*|v|, 3e-6)",
+    "binding": "max(16*eps_f32*|price|, 1e-4); erf-impl rounding of same formula"
+  },
+  "all_ok": true
+}
+PASS: oracle_greeks_gate -- 14/14 groups, 63 cells; binding + monotone + sign-fold green.

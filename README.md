@@ -6,9 +6,16 @@ Ships as a reef package under the `Shoals` module prefix.
 
 ## Status
 
-v0.20.2. M0-M9 milestone sweep complete + Milestone A
+v0.21.0. M0-M9 milestone sweep complete + Milestone A
 (foundations cleanup) + the FlukeBall currency-tag slice, unioned
-into a single line. Full slice:
+into a single line, plus the AD-Greeks graduation on chelis 0.8.0:
+tensor-lane first- and second-order Greeks (delta/vega/rho/theta via
+`grad`, gamma/volga/vanna via nested grad), each the AD derivative of
+the displayed price and oracle-validated, and a contract-bound composite
+derivatives-property corpus (`Shoals.Properties.Composites`) proving
+put-call parity, the upper bound, and the delta bounds as
+`proven_modulo_fuzz_validated_contract` over the bundled
+`Std.Contracts.normal_cdf`. Full slice:
 M0 baseline + M1 foundations (Date, Calendar, Tenor, MarketData,
 Distributions) + M2 yield-curve sensitivity ops
 (parallel/key-rate/twist/butterfly shifts, log-linear and
@@ -164,7 +171,7 @@ violation per `crates/chelis-lint/` rules; advisory warnings are
 non-blocking.
 
 Runtime gate expected success condition: the fast `tests/` unit
-suite passes at v0.20.2. The suite unions the M0-M9 + Milestone A
+suite passes at v0.21.0. The suite unions the M0-M9 + Milestone A
 SDE/PDE/XVA coverage with the FlukeBall currency-tag tests; the
 heavy MC / PDE / Fourier / optimization files live in
 `tests-manual/` and are exercised by the milestone manual-gate
@@ -177,13 +184,15 @@ terminal-mean and terminal-variance theorems, and order-book invariants.
 Properties under `properties/` are exercised through
 `tests/properties.ch` (textbook call/put agreement,
 finite-difference-delta smoke, and optimized-vs-textbook-MC
-properties). Grad-vs-textbook Greek runtime properties remain
-deferred at M0: the upstream `grad-eval-host-runtime` bug closed
-(chelis 2026-05-07), so host-runtime `grad` works in general, but
-the specific Shoals pricing body (`to_list` + `map` over a host-lane
-list combinator) has not been verified end-to-end through `grad`
-under the new compiler. Re-evaluation belongs to the M6 Greeks
-discipline milestone in `docs/plan-quant-surface.md`.
+properties). Grad-derived Greeks are now shipped and validated, not
+deferred: the host-lane `to_list`/`map` pricing body was replaced by a
+pure tensor-lane f64 body, so `grad` (and nested `grad` for the
+second-order Greeks) flows through it. `deltas_call`/`vegas_call`/
+`rhos_call`/`thetas_call`/`gammas_call`/`volgas_call`/`vannas_call` are
+each the AD derivative of the displayed price, with first-order standing
+assertions in `tests/greeks.ch`, second-order in
+`tests-manual/greeks_secondorder.ch`, and the full grid (analytic + FD +
+sign-fold + accuracy-monotone) in `scripts/oracle_greeks_gate.py`.
 The v0.7.6 testing cutover timing is recorded in
 `docs/testing_cutover_0.7.6.json`: node-local `--jobs auto` ran 48
 tests in 1:04.89; serial `--jobs 1` ran the same suite in 1:25.44.
@@ -195,7 +204,7 @@ is a manual gate and is not exercised from this repo. The Shoals
 default PR scope includes `chelis reef build` and the node-local
 runtime suite; the monorepo oracle remains a separate manual gate.
 
-## Known limitations in v0.20.2
+## Known limitations in v0.21.0
 
 1. **First-class property-gate integration is pending.** Shoals keeps
    property bodies as plain `def`s exercised through `tests/properties.ch`;

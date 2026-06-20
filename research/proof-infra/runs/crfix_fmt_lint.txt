@@ -1,0 +1,4 @@
+=== fmt --check full CI globs (incl demos) ===
+fmt --check: ALL CLEAN
+=== lint --check full dir list (incl demos) ===
+lint_rc=0

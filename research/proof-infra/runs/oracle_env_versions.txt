@@ -1,0 +1,5 @@
+python 3.11.14
+quantecon 0.11.2
+numpy 2.4.6
+scipy 1.17.1
+chelis 0.7.27
