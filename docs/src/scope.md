@@ -23,16 +23,17 @@ is outside what these functions provide.
   gamma, and the put delta. There is no analytic theta or rho exposed in that
   module; the textbook theta and rho live among the
   [reference oracles](references.md).
-- The gradient-derived sensitivity paths in `Shoals.Pricing` (`deltas_call`,
-  `deltas_put`, `vegas_call`, `rhos_call`, `thetas_call`) differentiate the
+- The gradient-derived sensitivity paths in `Shoals.Pricing` differentiate the
   displayed price through `grad`: one f64 normal CDF sits behind both the price
   and every Greek, so a Greek is the automatic-differentiation derivative of the
-  price the same module returns. These first-order Greeks are validated against
-  the analytic and finite-difference oracles by `scripts/oracle_greeks_gate.py`
-  rather than by in-suite assertions on chelis 0.7.27 (a rank-0 grad output is
-  not yet assertable through `Std.Test`). Second-order Greeks (gamma, volga,
-  vanna) are not exposed yet. The finite-difference Greeks in `Shoals.Greeks`
-  remain the paths the in-suite test gate exercises directly.
+  price the same module returns. First-order: `deltas_call`, `deltas_put`,
+  `vegas_call`, `rhos_call`, `thetas_call`. Second-order (via nested grad on
+  chelis 0.8.0): `gammas_call`, `volgas_call`, `vannas_call`. All are validated
+  against the analytic and finite-difference oracles by
+  `scripts/oracle_greeks_gate.py` and carry in-suite `Std.Test` standing
+  assertions (the heavy second-order grad assertions live in
+  `tests-manual/greeks_secondorder.ch`). The finite-difference Greeks in
+  `Shoals.Greeks` remain a separate, independently exercised oracle.
 
 ## Curves
 

@@ -35,6 +35,8 @@ jobs:
       fail-fast: false
       matrix:
         file:
+          - composites_binding_heavy
+          - greeks_secondorder
           - heston
           - heston_heavy
           - hull_white

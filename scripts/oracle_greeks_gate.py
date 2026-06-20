@@ -2,11 +2,12 @@
 """AD-Greeks oracle gate for Shoals.Pricing (stdlib only).
 
 Validates the SHIPPED first-order Greeks in ``Shoals.Pricing`` --
-``deltas_call``, ``vegas_call``, ``rhos_call``, ``thetas_call`` -- and the
-tensor-lane prices ``call_prices`` against THREE independent references, on a
-moneyness x maturity grid plus a sign-fold straddle (a point near d1=0 and a
-clearly-negative-d1 low-spot point where the hand-built erf's odd reflection is
-exercised):
+``deltas_call``, ``vegas_call``, ``rhos_call``, ``thetas_call`` -- the
+nested-grad SECOND-order Greeks ``gammas_call``, ``volgas_call``,
+``vannas_call``, and the tensor-lane prices ``call_prices`` against THREE
+independent references, on a moneyness x maturity grid plus a sign-fold straddle
+(a point near d1=0 and a clearly-negative-d1 low-spot point where the hand-built
+erf's odd reflection is exercised):
 
   1. ANALYTIC textbook closed forms (delta=N(d1), vega=S phi(d1) sqrt(t),
      rho=K t e^{-rt} N(d2), theta=-dC/dt) evaluated in this script through the
@@ -20,6 +21,15 @@ exercised):
      which goes through Nautilus.Special.erfc) within an f32-precision bound.
      This records that the displayed Greek is the derivative of the displayed
      price -- the two share one erf up to f32 rounding.
+
+  SECOND-ORDER (nested grad): gamma=d2C/dS2, volga=d2C/dsg2, vanna=d2C/dSdsg are
+  validated against (a) the exact f64 SECOND derivative of the DISPLAYED A&S price
+  (primary, tight: this is the correctness invariant -- gamma is the second
+  derivative of the displayed price), (b) the true-BS second-order closed forms
+  (secondary, agree up to A&S model error), and (c) tuned CENTRAL finite
+  differences of the DISPLAYED f64 price with a per-Greek step (secondary, agree
+  up to FD truncation; gamma's tuned step makes its FD bound the tightest so gamma
+  sits near that bound). A negative-d1 sign-fold point is included.
 
   ACCURACY-MONOTONE guard: the new f64-body reference error vs analytic-true must
   be <= the old f32-erfc path's error (no illegitimate tolerance re-baseline).
@@ -169,6 +179,38 @@ def pdf_as(x: float) -> float:
     return 0.5 * erf_as_deriv(-x / SQRT2) / SQRT2
 
 
+def erf_as_deriv2(x: float) -> float:
+    """d^2/dx^2 erf_AS(x), closed form. erf_AS' is even (erf is odd), so it equals
+    g(|x|) and its x-derivative is g'(|x|)*sign(x). For |x|<1e-5 the package uses
+    the linear branch erf ~ (2/sqrt pi) x, whose second derivative is 0. Verified
+    against a high-order central difference of ``erf_as_deriv`` to ~1e-10."""
+    a1, a2, a3, a4, a5 = _AS
+    p = _AS_P
+    ax = abs(x)
+    if ax < 1e-5:
+        return 0.0
+    t = 1.0 / (1.0 + p * ax)
+    dt = -p * t * t                                       # dt/d(ax)
+    poly = t * (a1 + t * (a2 + t * (a3 + t * (a4 + t * a5))))
+    polyp = a1 + t * (2 * a2 + t * (3 * a3 + t * (4 * a4 + t * 5 * a5)))   # d poly/dt
+    polypp = 2 * a2 + t * (6 * a3 + t * (12 * a4 + t * 20 * a5))           # d^2 poly/dt^2
+    e = math.exp(-ax * ax)
+    de = -2 * ax * e                                      # d/d(ax) e^{-ax^2}
+    # erf_as_deriv = M(ax) = e^{-ax^2} (p t^2 polyp + 2 ax poly). Differentiate in ax.
+    inner = p * t * t * polyp + 2 * ax * poly
+    d_inner = p * (2 * t * dt * polyp + t * t * polypp * dt) + 2 * poly + 2 * ax * polyp * dt
+    g_prime = de * inner + e * d_inner
+    return g_prime * (1.0 if x >= 0 else -1.0)
+
+
+def pdf_as_deriv(x: float) -> float:
+    """d/dx pdf_as(x) = d^2/dx^2 ncdf_as(x). pdf_as(x)=0.5 erf_AS'(-x/sqrt2)/sqrt2,
+    so pdf_as'(x) = -0.25 * erf_AS''(-x/sqrt2). The analytic 'pdf-prime' of the A&S
+    normal CDF; the building block of the exact SECOND derivatives of the displayed
+    price, used the same way pdf_as builds the exact first derivatives."""
+    return -0.25 * erf_as_deriv2(-x / SQRT2)
+
+
 def ad_ground_truth_greeks(s, k, r, sg, t):
     """The EXACT first-order derivatives of the DISPLAYED A&S-erf price -- what
     AD must reproduce. CLOSED FORM via the chain rule using the analytic A&S
@@ -206,6 +248,85 @@ def ad_ground_truth_greeks(s, k, r, sg, t):
     dCdt = s * n1 * dd1_dt - k * (-r * disc * N2 + disc * n2 * dd2_dt)
     theta = -dCdt
     return {"delta": delta, "vega": vega, "rho": rho, "theta": theta}
+
+
+def ad_second_order_groundtruth(s, k, r, sg, t):
+    """The EXACT second derivatives of the DISPLAYED A&S-erf price -- what the
+    nested-grad Greeks (gammas_call, volgas_call, vannas_call) must reproduce.
+    CLOSED FORM via the chain rule with the analytic A&S pdf and pdf-prime
+    (pdf_as, pdf_as_deriv), NOT finite differences: like the first-order ground
+    truth, this evaluates the chain rule pointwise so the A&S small-|x| branch kink
+    at d1=0 does not inject FD noise. This is the tight oracle isolating the nested
+    autodiff transform; it matches AD to f32 ULPs.
+
+      C  = S N(d1) - K e^{-rt} N(d2),  N=ncdf_as, n=pdf_as, n'=pdf_as_deriv.
+      gamma = d2C/dS2, volga = d2C/dsg2, vanna = d2C/dS dsg, all of the A&S price."""
+    st = math.sqrt(t)
+    d1, d2 = d1d2(s, k, r, sg, t)
+    disc = math.exp(-r * t)
+    n1, n2 = pdf_as(d1), pdf_as(d2)
+    np1, np2 = pdf_as_deriv(d1), pdf_as_deriv(d2)
+    # gamma = d2C/dS2. dd1/dS = dd2/dS = a = 1/(S sg sqrt t); d a/dS = -a/S.
+    a = 1.0 / (s * sg * st)
+    da_ds = -a / s
+    # delta = N1 + S n1 a - K disc n2 a ; differentiate again in S.
+    gamma = (n1 * a
+             + (n1 * a + s * np1 * a * a + s * n1 * da_ds)
+             - k * disc * (np2 * a * a + n2 * da_ds))
+    # volga = d2C/dsg2. dd1/dsg = -d1/sg + sqrt t ; dd2/dsg = that - sqrt t.
+    dd1 = -d1 / sg + st
+    dd2 = dd1 - st
+    # d2 d1/dsg2 = -(dd1/dsg)/sg + d1/sg^2 ; same for d2 (sqrt t is sg-independent).
+    dd1_2 = -dd1 / sg + d1 / (sg * sg)
+    dd2_2 = dd1_2
+    # vega = S n1 dd1 - K disc n2 dd2 ; differentiate in sg.
+    volga = (s * (np1 * dd1 * dd1 + n1 * dd1_2)
+             - k * disc * (np2 * dd2 * dd2 + n2 * dd2_2))
+    # vanna = d(delta)/dsg. a depends on sg: da/dsg = -a/sg.
+    da_dsg = -a / sg
+    vanna = (n1 * dd1
+             + s * (np1 * dd1 * a + n1 * da_dsg)
+             - k * disc * (np2 * dd2 * a + n2 * da_dsg))
+    return {"gamma": gamma, "volga": volga, "vanna": vanna}
+
+
+def second_order_analytic(s, k, r, sg, t):
+    """EXACT textbook closed forms of the TRUE Black-Scholes second-order Greeks
+    using the EXACT Gaussian pdf (gamma = phi(d1)/(S sg sqrt t),
+    volga = vega d1 d2 / sg, vanna = -phi(d1) d2 / sg). They agree with the AD
+    Greeks only up to the A&S approximation's second-derivative model error, which
+    is measured per cell as |this - ad_second_order_groundtruth| and folded into
+    the secondary tolerance -- it never loosens the primary ground-truth gate."""
+    st = math.sqrt(t)
+    d1, d2 = d1d2(s, k, r, sg, t)
+    n1 = npdf(d1)
+    gamma = n1 / (s * sg * st)
+    vega = s * n1 * st
+    volga = vega * d1 * d2 / sg
+    vanna = -n1 * d2 / sg
+    return {"gamma": gamma, "volga": volga, "vanna": vanna}
+
+
+def fd_second_order(s, k, r, sg, t, ncdf):
+    """Tuned CENTRAL finite differences of the DISPLAYED f64 A&S price -- the
+    second independent reference required for gamma/volga/vanna. Steps are tuned
+    PER GREEK so neither O(h^2) truncation nor f64 cancellation dominates the
+    second difference: gamma differences a small curvature out of S-scale prices,
+    so it takes a large spot step (h_s = 1% of S); volga/vanna take vol steps that
+    keep the second difference well-conditioned. Computed in f64 (no f32 rounding)
+    so this isolates FD truncation of the SAME body the AD Greeks differentiate."""
+    def c(ss, kk, rr, vv, tt):
+        return call_price(ss, kk, rr, vv, tt, ncdf)
+    h_s = 1e-2 * s          # spot step ~1% of S: gamma curvature out of S-scale price
+    h_v = 5e-3              # vol step: volga/vanna second differences well-conditioned
+    gamma = (c(s + h_s, k, r, sg, t) - 2 * c(s, k, r, sg, t) + c(s - h_s, k, r, sg, t)) / (h_s * h_s)
+    volga = (c(s, k, r, sg + h_v, t) - 2 * c(s, k, r, sg, t) + c(s, k, r, sg - h_v, t)) / (h_v * h_v)
+
+    def delta(sig):
+        return (c(s + h_s, k, r, sig, t) - c(s - h_s, k, r, sig, t)) / (2 * h_s)
+    vanna = (delta(sg + h_v) - delta(sg - h_v)) / (2 * h_v)
+    return {"gamma": gamma, "volga": volga, "vanna": vanna,
+            "steps": {"h_s": h_s, "h_v": h_v}}
 
 
 def fd_greeks(s, k, r, sg, t, ncdf):
@@ -275,6 +396,47 @@ def tol_binding(price: float) -> float:
     return max(16.0 * EPS_F32 * abs(price), 1e-4)
 
 
+# -- Second-order tolerances. A nested grad applies the chain rule TWICE, so the
+# f32 output carries roughly double the chained-rounding of a first-order Greek;
+# the relative band is widened to 48*eps_f32 (vs 16 for first order). The absolute
+# floor is GREEK-SPECIFIC and PHYSICALLY scaled: gamma ~1e-2 with a steep S-scale
+# curvature so its f32 ULP floor is small (5e-6) -- gamma must sit NEAR this bound;
+# volga ~1e1..1e2 carries a larger absolute floor; vanna ~1e-1..1e0 an intermediate
+# one. No fixed percent: each floor is a stated multiple of eps_f32 times the
+# Greek's natural magnitude scale, echoed into the JSON report.
+SECOND_ORDER_REL = 48.0 * EPS_F32         # ~5.7e-6 relative, double the first-order band
+GAMMA_ABS_FLOOR = 5e-6                     # gamma ~1e-2; f32 ULP-scale floor (tight; gamma sits near it)
+VOLGA_ABS_FLOOR = 1.5e-3                   # volga ~1e1..1e2; ULPs of that magnitude
+VANNA_ABS_FLOOR = 4e-5                     # vanna ~1e-1..1e0; intermediate floor
+
+
+def tol_so_vs_groundtruth(greek: str, v: float) -> float:
+    """PRIMARY, tight. The nested-grad Greek must equal the exact SECOND derivative
+    of the DISPLAYED A&S price (ad_second_order_groundtruth). Difference is f32
+    rounding of the AD output vs the f64 closed form, doubled-chain-rule band plus
+    the greek-specific f32 floor."""
+    floor = {"gamma": GAMMA_ABS_FLOOR, "volga": VOLGA_ABS_FLOOR, "vanna": VANNA_ABS_FLOOR}[greek]
+    return max(SECOND_ORDER_REL * abs(v), floor)
+
+
+def tol_so_vs_analytic(greek: str, model_err: float, v: float) -> float:
+    """SECONDARY. Nested-grad Greek vs the EXACT true-BS second-order closed form.
+    They differ by the A&S approximation's SECOND-derivative model error, measured
+    per cell as |true_BS - ground_truth| (model_err). Tolerance = 2x that measured
+    model error + the primary band. Documents that AD tracks true BS to within the
+    erf model error; the primary ground-truth gate keeps AD itself pinned tight."""
+    return 2.0 * model_err + tol_so_vs_groundtruth(greek, v)
+
+
+def tol_so_vs_fd(greek: str, trunc_err: float, v: float) -> float:
+    """SECONDARY. Nested-grad Greek vs the tuned CENTRAL FD of the DISPLAYED f64
+    price. Differ by the FD O(h^2) truncation at the tuned step, predicted in-script
+    as |ground_truth - fd| (trunc_err), plus the primary band. f64 FD here so there
+    is no f32 quotient band -- truncation dominates. Gamma's tuned step makes its
+    truncation the smallest, so the gamma FD bound is the tightest of the three."""
+    return 3.0 * trunc_err + tol_so_vs_groundtruth(greek, v)
+
+
 # --------------------------------------------------------------------------
 # Chelis test-file generation. One file, asserted in one `chelis test` pass.
 # Greek vectors are computed once per (k,r,sg,t) sub-grid sharing a spot tensor;
@@ -289,7 +451,7 @@ def build_test_source(grid, refs):
     lines = [
         "module Shoals.Tests.OracleGreeksGenerated",
         "import Std.Test (assert_close)",
-        "import Shoals.Pricing (call_prices, deltas_call, vegas_call, rhos_call, thetas_call)",
+        "import Shoals.Pricing (call_prices, deltas_call, vegas_call, rhos_call, thetas_call, gammas_call, volgas_call, vannas_call)",
         "import Shoals.References.BlackScholes (call_textbook)",
         "import Shoals.Greeks (fd_delta_call, fd_vega_call, fd_rho_call, fd_theta_call)",
     ]
@@ -313,7 +475,10 @@ def build_test_source(grid, refs):
         lines.append(f"  dl = to_list(deltas_call(copy(spots), {common}))")
         lines.append(f"  vl = to_list(vegas_call(copy(spots), {common}))")
         lines.append(f"  rl = to_list(rhos_call(copy(spots), {common}))")
-        lines.append(f"  tl = to_list(thetas_call(spots, {common}))")
+        lines.append(f"  tl = to_list(thetas_call(copy(spots), {common}))")
+        lines.append(f"  gm = to_list(gammas_call(copy(spots), {common}))")
+        lines.append(f"  vg = to_list(volgas_call(copy(spots), {common}))")
+        lines.append(f"  vn = to_list(vannas_call(spots, {common}))")
         asserts = []
         for j, (cell, ref) in enumerate(members):
             s = cell["s"]
@@ -355,6 +520,33 @@ def build_test_source(grid, refs):
                     f'assert_close(index({lst}, {idx}), {fd_calls[gk]}, '
                     f'{lit32(tol_ad_vs_fd(trunc, s, st[gk], ref["analytic"][gk]))}, '
                     f'"g{gi}c{j} {gk} ad==fd")'
+                )
+            # ---- SECOND-ORDER GREEKS (nested grad): gamma, volga, vanna ----
+            so_lst = {"gamma": "gm", "volga": "vg", "vanna": "vn"}
+            # PRIMARY (tight): nested-grad Greek == exact SECOND derivative of the
+            # DISPLAYED A&S price (closed-form ground truth). Isolates nested AD.
+            for gk in ("gamma", "volga", "vanna"):
+                sgt = ref["so_ground_truth"][gk]
+                asserts.append(
+                    f'assert_close(index({so_lst[gk]}, {idx}), {lit32(sgt)}, '
+                    f'{lit32(tol_so_vs_groundtruth(gk, sgt))}, "g{gi}c{j} {gk} ad2==groundtruth")'
+                )
+            # SECONDARY: vs EXACT true-BS second-order closed form (model error).
+            for gk in ("gamma", "volga", "vanna"):
+                an = ref["so_analytic"][gk]
+                merr = abs(an - ref["so_ground_truth"][gk])
+                asserts.append(
+                    f'assert_close(index({so_lst[gk]}, {idx}), {lit32(an)}, '
+                    f'{lit32(tol_so_vs_analytic(gk, merr, an))}, "g{gi}c{j} {gk} ad2==analytic")'
+                )
+            # SECONDARY: vs tuned CENTRAL FD of the DISPLAYED f64 price (truncation).
+            for gk in ("gamma", "volga", "vanna"):
+                fdv = ref["so_fd"][gk]
+                trunc = abs(ref["so_ground_truth"][gk] - fdv)
+                asserts.append(
+                    f'assert_close(index({so_lst[gk]}, {idx}), {lit32(fdv)}, '
+                    f'{lit32(tol_so_vs_fd(gk, trunc, ref["so_ground_truth"][gk]))}, '
+                    f'"g{gi}c{j} {gk} ad2==fd-displayed")'
                 )
         for a in asserts[:-1]:
             lines.append(f"  _ = {a}")
@@ -426,12 +618,22 @@ def main() -> int:
         acc_new_max = max(acc_new_max, abs(price_new_f32 - price_true))
         acc_old_max = max(acc_old_max, abs(price_old_f32 - price_true))
         gt = ad_ground_truth_greeks(s, k, r, sg, t)
+        # Second-order references: exact 2nd derivative of the DISPLAYED A&S price
+        # (primary), true-BS 2nd-order closed form (secondary), tuned f64 FD of the
+        # displayed price (secondary).
+        so_gt = ad_second_order_groundtruth(s, k, r, sg, t)
+        so_an = second_order_analytic(s, k, r, sg, t)
+        so_fd = fd_second_order(s, k, r, sg, t, ncdf_as)
         ref = {
             "analytic": ag,
             "ground_truth": gt,
             "price_ref": price_as,
             "fd": {g: fg[g] for g in ("delta", "vega", "rho", "theta")},
             "fd_steps": fg["steps"],
+            "so_ground_truth": so_gt,
+            "so_analytic": so_an,
+            "so_fd": {g: so_fd[g] for g in ("gamma", "volga", "vanna")},
+            "so_fd_steps": so_fd["steps"],
             # convenience flat keys for the sign-fold report
             "delta": gt["delta"], "vega": gt["vega"],
             "rho": gt["rho"], "theta": gt["theta"],
@@ -476,9 +678,34 @@ def main() -> int:
              "groundtruth_delta": rf["ground_truth"]["delta"],
              "groundtruth_vega": rf["ground_truth"]["vega"],
              "groundtruth_rho": rf["ground_truth"]["rho"],
-             "groundtruth_theta": rf["ground_truth"]["theta"]}
+             "groundtruth_theta": rf["ground_truth"]["theta"],
+             "groundtruth_gamma": rf["so_ground_truth"]["gamma"],
+             "groundtruth_volga": rf["so_ground_truth"]["volga"],
+             "groundtruth_vanna": rf["so_ground_truth"]["vanna"]}
             for c, rf in zip(grid, refs) if c["tag"] != "grid"
         ],
+        "second_order": {
+            "description": "gammas_call/volgas_call/vannas_call: nested-grad d2 of the displayed A&S price",
+            "max_so_model_err_vs_trueBS": {
+                gk: max(abs(rf["so_analytic"][gk] - rf["so_ground_truth"][gk]) for rf in refs)
+                for gk in ("gamma", "volga", "vanna")
+            },
+            "max_so_fd_trunc_vs_groundtruth": {
+                gk: max(abs(rf["so_fd"][gk] - rf["so_ground_truth"][gk]) for rf in refs)
+                for gk in ("gamma", "volga", "vanna")
+            },
+            "abs_floors": {"gamma": GAMMA_ABS_FLOOR, "volga": VOLGA_ABS_FLOOR, "vanna": VANNA_ABS_FLOOR},
+            "fd_steps_per_greek": "h_s=1% of S (gamma,vanna spot leg); h_v=5e-3 (volga,vanna vol leg)",
+            "gamma_sits_near_fd_bound": {
+                "description": "gamma vs tuned-FD-of-displayed-price: |gt-fd| should approach its tol",
+                "max_ratio_trunc_over_tol": max(
+                    abs(rf["so_fd"]["gamma"] - rf["so_ground_truth"]["gamma"])
+                    / tol_so_vs_fd("gamma", abs(rf["so_fd"]["gamma"] - rf["so_ground_truth"]["gamma"]),
+                                   rf["so_ground_truth"]["gamma"])
+                    for rf in refs
+                ),
+            },
+        },
         "tolerance_derivation": {
             "eps_f32": EPS_F32,
             "ad_vs_groundtruth (PRIMARY, gating)":
@@ -488,6 +715,12 @@ def main() -> int:
             "ad_vs_fd (secondary)":
                 "3*predicted_FD_truncation + 4*eps_f32*price/h + max(8*eps_f32*|v|, 3e-6)",
             "binding": "max(16*eps_f32*|price|, 1e-4); erf-impl rounding of same formula",
+            "so_ad2_vs_groundtruth (PRIMARY, gating)":
+                "max(48*eps_f32*|v|, greek_floor); nested grad == exact f64 2nd-deriv of A&S price",
+            "so_ad2_vs_analytic (secondary)":
+                "2*measured_A&S_2nd_deriv_model_err + primary_so_band",
+            "so_ad2_vs_fd (secondary)":
+                "3*predicted_FD_truncation(f64 displayed price) + primary_so_band",
         },
         "all_ok": all_ok,
     }

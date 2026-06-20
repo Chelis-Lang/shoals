@@ -1,0 +1,4 @@
+S7 binding -- worst-cell |bs_call_scalar - bs_call_contract| over the 405-cell
+(spot x strike x rate x sigma x maturity) grid, measured via chelis eval:
+  max_abs = 0.000026702880859375  (2.67e-5)
+Asserted f32 bound (tests/ + tests-manual/): 1e-4.

@@ -1,7 +1,27 @@
 module Shoals.Tests.Greeks
 import Std.Test (assert_close, assert_true)
 import Shoals.Greeks (fd_delta_call, fd_delta_put, fd_gamma_call, fd_vega_call, fd_vega_put, fd_rho_call, fd_rho_put, fd_theta_call, fd_theta_put, fd_vanna_call, fd_volga_call, analytic_delta_call, analytic_delta_put, analytic_vega_call, analytic_gamma_call, pathwise_smooth_call_terminal_delta, lr_digital_call_delta)
+import Shoals.Pricing (deltas_call, vegas_call)
 def abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
+-- Light FIRST-ORDER AD-Greek standing smoke (single vmap(grad) -- fast enough for
+-- tests/). deltas_call and vegas_call are the AD derivatives of the displayed
+-- f64 Black-Scholes body; the targets are the exact derivatives of THAT displayed
+-- A&S-erf price (closed form, validated in scripts/oracle_greeks_gate.py). The
+-- heavy nested-grad second-order Greeks live in tests-manual/greeks_secondorder.ch.
+def test_deltas_call_ad_matches_displayed_deriv() -> unit ! { Test } = {
+  spots = to_tensor([cast(80.0, f32), cast(100.0, f32), cast(120.0, f32)])
+  d = to_list(deltas_call(spots, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32)))
+  _ = assert_close(index(d, cast(0, int64)), cast(0.22192375, f32), cast(0.000005, f32), "AD delta s=80")
+  _ = assert_close(index(d, cast(1, int64)), cast(0.63683582, f32), cast(0.000005, f32), "AD delta ATM")
+  assert_close(index(d, cast(2, int64)), cast(0.89645624, f32), cast(0.000005, f32), "AD delta s=120")
+}
+def test_vegas_call_ad_matches_displayed_deriv() -> unit ! { Test } = {
+  spots = to_tensor([cast(80.0, f32), cast(100.0, f32), cast(120.0, f32)])
+  v = to_list(vegas_call(spots, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32)))
+  _ = assert_close(index(v, cast(0, int64)), cast(23.805821, f32), cast(0.002, f32), "AD vega s=80")
+  _ = assert_close(index(v, cast(1, int64)), cast(37.523872, f32), cast(0.002, f32), "AD vega ATM")
+  assert_close(index(v, cast(2, int64)), cast(21.600513, f32), cast(0.002, f32), "AD vega s=120")
+}
 def test_fd_delta_call_matches_analytic_atm() -> unit ! { Test } = {
   s = cast(100.0, f32)
   k = cast(100.0, f32)
