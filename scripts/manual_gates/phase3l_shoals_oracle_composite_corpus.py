@@ -2,12 +2,13 @@
 """Composite derivatives property corpus gate (S8).
 
 Runs ``chelis prove`` over ``properties/composites.ch`` and asserts each
-property reaches the expected COMPOSITE verdict under the chelis 0.8.0 contract
+property reaches the expected COMPOSITE verdict under the chelis 0.9.0 contract
 mechanism:
 
   * ``put_call_parity_reflection``  -> passed,
         composite_verdict ``proven_modulo_fuzz_validated_contract`` (or
-        all-SMT ``proven``), with the std.normal_cdf.reflection contract
+        all-SMT ``proven_modulo_real_arithmetic``; ``proven`` is the retired
+        back-compat alias), with the std.normal_cdf.reflection contract
         discharged (fuzz, 8192 samples) AND a cvc5 non-vacuity SAT check.
   * ``call_upper_bounded_by_spot``  -> passed, composite proven (range contract).
   * ``delta_in_unit_interval``      -> passed, composite proven (range contract).
@@ -48,8 +49,19 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 CORPUS = "properties/composites.ch"
 
 # A composite green is one of these (base SMT proof + a fuzz-validated contract,
-# or an all-SMT proof when no transcendental contract is needed).
-GREEN_VERDICTS = {"proven_modulo_fuzz_validated_contract", "proven"}
+# or an all-SMT proof when no transcendental contract is needed). Under chelis
+# 0.9.0 every all-SMT green now reads ``proven_modulo_real_arithmetic``; the
+# bare ``proven`` token it replaces is kept here as a back-compat alias. The
+# shoals composites corpus emits ``proven_modulo_fuzz_validated_contract`` for
+# all three greens (each carries a normal_cdf contract), so the real-arithmetic
+# token is forward-compat for a future contract-free composite. The 0.9.0
+# ``sound_approximate`` verdict is intentionally NOT accepted: no legitimately
+# green property in this corpus emits it (observed at the 0.9.0 cascade).
+GREEN_VERDICTS = {
+    "proven_modulo_fuzz_validated_contract",
+    "proven_modulo_real_arithmetic",
+    "proven",
+}
 
 # property name -> expected outcome.
 #   ("green", required_contract_ids)  -> passed with a composite green and those
@@ -149,7 +161,7 @@ def main() -> int:
         )
         print(
             f"SKIP: {GATE_NAME} — configured chelis ({prove_binary()}) {why}; SMT is an "
-            f"optional build. Set CHELIS_PROVE_BIN to an SMT-enabled chelis 0.8.0 to run "
+            f"optional build. Set CHELIS_PROVE_BIN to an SMT-enabled chelis 0.9.0 to run "
             f"this gate."
         )
         return 0
@@ -198,9 +210,16 @@ def main() -> int:
     report["all_ok"] = all_ok
     sys.stdout.write(json.dumps(report, indent=2) + "\n")
     if all_ok:
+        green_tokens = sorted(
+            {
+                e["composite_verdict"]
+                for e in report["properties"]
+                if e["expected"] == "green" and e["composite_verdict"]
+            }
+        )
         print(
             f"PASS: {GATE_NAME} — 3 composite greens "
-            f"(proven_modulo_fuzz_validated_contract), 1 corrupted-coupling flip "
+            f"({', '.join(green_tokens)}), 1 corrupted-coupling flip "
             f"(failed), 1 unknown-contract (unsupported)."
         )
         return 0

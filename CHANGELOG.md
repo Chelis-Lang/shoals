@@ -6,6 +6,38 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-06-23
+
+Toolchain cascade to chelis 0.9.0, with the composite-oracle verdict
+allowlist refreshed for the 0.9.0 verdict taxonomy. No pricing,
+Greeks, or property API change.
+
+### Changed
+
+- **Toolchain cascade to chelis 0.9.0.** `reef.toml` moves
+  `compiler =0.8.0 -> =0.9.0`, `nautilus 0.7.27 -> 0.7.28`, and
+  `coral 0.7.26 -> 0.7.27`; `chelis-std` stays `0.4.0` (its bundled
+  archive re-resolves under the 0.9.0 compiler). The package version
+  moves `0.21.0 -> 0.21.1`, a patch bump for the released
+  compiler/dependency cascade. `reef.lock` was regenerated against the
+  0.9.0 binary; CI, nightly, and release workflows continue to derive
+  every toolchain and dependency pin from `reef.toml`.
+- **Composite-oracle verdict allowlist.**
+  `scripts/manual_gates/phase3l_shoals_oracle_composite_corpus.py`
+  accepts the chelis 0.9.0 all-SMT green verdict
+  `proven_modulo_real_arithmetic` alongside the unchanged
+  contract-discharged green `proven_modulo_fuzz_validated_contract`
+  (still emitted by all three shoals composites, each carrying a
+  `std.normal_cdf` contract) and the retired back-compat `proven`
+  alias. The 0.9.0 `sound_approximate` verdict is intentionally not
+  accepted: no legitimately green composite emits it (verified by
+  running the oracle against the SMT 0.9.0 binary). The PASS message
+  now reports the observed green tokens instead of a hardcoded name.
+- `docs/cnote-import-surface.json` and `docs/src/import-surface.md`
+  re-freeze the resolved dependency tree (new chelis-std / coral /
+  nautilus archive SHA-256 pins) under chelis 0.9.0 for C Note's
+  no-network vendor.
+
 ## [0.21.0] - 2026-06-20
 
 AD-derived Greeks and a contract-bound composite proof corpus, graduated

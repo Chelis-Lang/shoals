@@ -4,9 +4,9 @@ This is the frozen surface C Note vendors and resolves in its no-network sandbox
 pinned so C Note builds against a stable contract while Shoals internals evolve. The
 machine-readable manifest is `docs/cnote-import-surface.json`.
 
-Pins: chelis `0.8.0`, shoals `0.21.0`.
+Pins: chelis `0.9.0`, shoals `0.21.1`.
 
-Scope: the full graduation has landed on chelis 0.8.0. First-order and second-order AD
+Scope: the full graduation has landed on chelis 0.9.0. First-order and second-order AD
 Greeks are shipped and validated, and the SMT composite derivatives-property corpus
 (parity, the upper bound, the delta bounds) is proven via the bundled `Std.Contracts`
 normal-CDF contracts. The no-arbitrage properties that refused value-level abstraction
@@ -36,7 +36,7 @@ second-order grad assertions in `tests-manual/greeks_secondorder.ch`).
 
 ## Composite property corpus (`Shoals.Properties.Composites`)
 
-Proven via chelis 0.8.0's contract mechanism: a `@property ... with contract =
+Proven via chelis 0.9.0's contract mechanism: a `@property ... with contract =
 "std.normal_cdf.*"` abstracts calls to the bundled `Std.Contracts.normal_cdf` into SMT
 symbols carrying the declared contract, proves the structure, and emits a composite
 verdict. The contract is auto fuzz-discharged (8192 samples, tolerance 1e-10) with a cvc5
@@ -50,7 +50,7 @@ non-vacuity check.
   contract id is not a pass).
 
 Run the corpus via `scripts/manual_gates/phase3l_shoals_oracle_composite_corpus.py` with
-an SMT-enabled chelis 0.8.0. Do not run `chelis prove .` on the whole package: that
+an SMT-enabled chelis 0.9.0. Do not run `chelis prove .` on the whole package: that
 re-runs the starving fuzz demos and hangs; the gate proves the corpus targeted.
 
 ### What a composite green means, and the binding (the honest scoping)
@@ -82,5 +82,5 @@ Shipped verification predicates C Note can surface: `Shoals.Properties.Pricing`,
 ## Dependency tree
 
 C Note vendors the resolved tree from `reef.lock`: `chelis-std 0.4.0` (bundled),
-`coral 0.7.26`, `nautilus 0.7.27`, all under compiler `0.8.0`. SHA-256 pins are in the
+`coral 0.7.27`, `nautilus 0.7.28`, all under compiler `0.9.0`. SHA-256 pins are in the
 manifest.

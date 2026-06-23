@@ -28,7 +28,7 @@ is outside what these functions provide.
   and every Greek, so a Greek is the automatic-differentiation derivative of the
   price the same module returns. First-order: `deltas_call`, `deltas_put`,
   `vegas_call`, `rhos_call`, `thetas_call`. Second-order (via nested grad on
-  chelis 0.8.0): `gammas_call`, `volgas_call`, `vannas_call`. All are validated
+  chelis 0.9.0): `gammas_call`, `volgas_call`, `vannas_call`. All are validated
   against the analytic and finite-difference oracles by
   `scripts/oracle_greeks_gate.py` and carry in-suite `Std.Test` standing
   assertions (the heavy second-order grad assertions live in
