@@ -2,7 +2,7 @@
 """Composite derivatives property corpus gate (S8).
 
 Runs ``chelis prove`` over ``properties/composites.ch`` and asserts each
-property reaches the expected COMPOSITE verdict under the chelis 0.9.0 contract
+property reaches the expected COMPOSITE verdict under the chelis 0.10.1 contract
 mechanism:
 
   * ``put_call_parity_reflection``  -> passed,

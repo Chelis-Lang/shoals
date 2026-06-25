@@ -94,19 +94,19 @@ that adds grad-derived Greek properties re-evaluates.
 
 ## Toolchain
 
-Pinned to `chelis v0.9.0` in `reef.toml`:
+Pinned to `chelis v0.10.1` in `reef.toml`:
 
 ```toml
 [package]
-compiler = "=0.9.0"
+compiler = "=0.10.1"
 ```
 
 Dependencies resolve via the local Reef registry (`~/.chelis/reef/`):
 
 * `chelis-std` 0.4.0 — standard library
-* `nautilus`   0.7.28 — distributions, special functions, stats,
+* `nautilus`   0.7.30 — distributions, special functions, stats,
   interpolation
-* `coral`      0.7.27 — dataframe runtime (transitively required for
+* `coral`      0.7.28 — dataframe runtime (transitively required for
   the same `nautilus` minor version)
 
 ## Build
@@ -238,8 +238,8 @@ following the chelis-reef v0.4.1 multi-source-roots fix
 (`6b58030 feat(reef): multi-source-roots — additional_sources in reef.toml;
 bump v0.4.1`). The reef.toml declares
 `additional_sources = ["properties", "references"]`. v0.1.0 carries the
-canonical layout forward and pins chelis 0.9.0, nautilus 0.7.28, and
-coral 0.7.27. (References to the pre-reset v0.7.x numbering point at
+canonical layout forward and pins chelis 0.10.1, nautilus 0.7.30, and
+coral 0.7.28. (References to the pre-reset v0.7.x numbering point at
 the historical version track and remain valid as release-history
 records; current planning lives on Shoals's own track per
 `docs/plan-quant-surface.md`.)
@@ -252,7 +252,7 @@ exposes `chelis.check(...)` and `chelis.eval(source, bindings)` to
 Python. The pre-reset v0.1.0-alpha release verified a Shoals-shaped
 program round-trips through that surface; the program shape is
 unchanged at v0.1.0, the verification remains valid, and re-running
-it under chelis 0.9.0 is a follow-up verification task.
+it under chelis 0.10.1 is a follow-up verification task.
 
 Setup (one-time):
 

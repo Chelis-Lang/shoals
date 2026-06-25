@@ -689,7 +689,7 @@ def main() -> int:
     if not ok:
         print(
             f"SKIP: oracle_greeks_gate -- configured chelis ({CHELIS!r}) unavailable: "
-            f"{detail}. Set CHELIS_BIN (or CHELIS_PROVE_BIN) to a chelis 0.9.0 that "
+            f"{detail}. Set CHELIS_BIN (or CHELIS_PROVE_BIN) to a chelis 0.10.1 that "
             f"satisfies the reef.toml compiler pin to run this gate."
         )
         return 0
@@ -775,7 +775,7 @@ def main() -> int:
             print(
                 f"SKIP: oracle_greeks_gate -- configured chelis ({CHELIS!r}) "
                 f"unavailable: {exc}. Set CHELIS_BIN (or CHELIS_PROVE_BIN) to a "
-                f"chelis 0.9.0 that satisfies the reef.toml compiler pin."
+                f"chelis 0.10.1 that satisfies the reef.toml compiler pin."
             )
             return 0
         return _finish(grid, refs, test_names, src, rc, per_test, summary, out, err,

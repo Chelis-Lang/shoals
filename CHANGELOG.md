@@ -6,6 +6,17 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.21.2] - 2026-06-25
+
+Cascade to chelis v0.10.1, nautilus v0.7.30, coral v0.7.28.
+
+### Changed
+
+- **Toolchain cascade to chelis 0.10.1.** `reef.toml` moves
+  `compiler =0.9.0 -> =0.10.1`, `nautilus 0.7.28 -> 0.7.30`, and
+  `coral 0.7.27 -> 0.7.28`; `chelis-std` stays `0.4.0`. The package
+  version moves `0.21.1 -> 0.21.2`.
+
 ## [0.21.1] - 2026-06-23
 
 Toolchain cascade to chelis 0.9.0, with the composite-oracle verdict

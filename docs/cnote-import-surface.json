@@ -2,10 +2,10 @@
   "schema": "shoals.cnote-import-surface/v1",
   "purpose": "Frozen import surface that C Note vendors and resolves in its no-network sandbox. Pinned so C Note builds against a stable contract while Shoals internals evolve.",
   "pins": {
-    "chelis": "0.9.0",
-    "shoals": "0.21.1"
+    "chelis": "0.10.1",
+    "shoals": "0.21.2"
   },
-  "scope_note": "Re-pinned to chelis 0.9.0. The full graduation has landed: first-order AND second-order AD Greeks, and the SMT composite derivatives-property corpus (parity/upper-bound/delta-bounds as proven-modulo-a-fuzz-validated-contract via the bundled Std.Contracts.normal_cdf contracts). The no-arbitrage properties that refused value-level abstraction (non-negativity, intrinsic bound, strike convexity) remain out, documented as backend-roadmap items.",
+  "scope_note": "Re-pinned to chelis 0.10.1. The full graduation has landed: first-order AND second-order AD Greeks, and the SMT composite derivatives-property corpus (parity/upper-bound/delta-bounds as proven-modulo-a-fuzz-validated-contract via the bundled Std.Contracts.normal_cdf contracts). The no-arbitrage properties that refused value-level abstraction (non-negativity, intrinsic bound, strike convexity) remain out, documented as backend-roadmap items.",
   "pricing": {
     "module": "Shoals.Pricing",
     "normal_cdf": "one A&S 7.1.26 erf in f64 (same coefficients as Std.Contracts.normal_cdf / Nautilus erf); the f32 entry points downcast the f64 body and every Greek is the AD derivative of that displayed price. The pricer's f64 normal CDF is the f64 lift of the f32 Std.Contracts.normal_cdf the composites are proven about; the two are bound by the binding cross-check (tests/composites_binding.ch).",
