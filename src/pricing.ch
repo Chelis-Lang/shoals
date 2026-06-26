@@ -1,6 +1,6 @@
 module Shoals.Pricing
 import Nautilus.Distributions (normal_sample)
-export (bs_call_scalar, bs_put_scalar, call_prices, put_prices, call_total, put_total, deltas_call, deltas_put, vegas_call, rhos_call, thetas_call, gammas_call, volgas_call, vannas_call, mc_call_price)
+export (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, call_prices, put_prices, call_total, put_total, deltas_call, deltas_put, vegas_call, rhos_call, thetas_call, gammas_call, volgas_call, vannas_call, mc_call_price)
 -- One normal CDF behind both price and Greeks. erf is the Abramowitz-Stegun
 -- 7.1.26 rational approximation in f64 -- byte-for-byte the same coefficients as
 -- Nautilus.Special.erf, reimplemented in f64 because the package symbol is
@@ -64,6 +64,18 @@ def const_col[n](spots: tensor[n, f32], v: f64) -> tensor[n, 1, f64] = {
 def spot_col[n](spots: tensor[n, f32]) -> tensor[n, 1, f64] = {
   nn = cast(shape(copy(spots), cast(0, int32)), int64)
   reshape(cast(spots, f64), [nn, cast(1, int64)])
+}
+def f64_col[n](xs: tensor[n, f64]) -> tensor[n, 1, f64] = {
+  nn = cast(shape(copy(xs), cast(0, int32)), int64)
+  reshape(xs, [nn, cast(1, int64)])
+}
+def bs_call_f64_vector[n](spots: tensor[n, f64], strikes: tensor[n, f64], rates: tensor[n, f64], sigmas: tensor[n, f64], times: tensor[n, f64]) -> tensor[n, f64] = {
+  sc = f64_col(spots)
+  kc = f64_col(strikes)
+  rc = f64_col(rates)
+  vc = f64_col(sigmas)
+  tc = f64_col(times)
+  vmap(fn (sa: tensor[1, f64], ka: tensor[1, f64], ra: tensor[1, f64], va: tensor[1, f64], ta: tensor[1, f64]) -> bs_call_f64(tensor_to_scalar(sum(sa, 0)), tensor_to_scalar(sum(ka, 0)), tensor_to_scalar(sum(ra, 0)), tensor_to_scalar(sum(va, 0)), tensor_to_scalar(sum(ta, 0))), axis=0)(sc, kc, rc, vc, tc)
 }
 -- Tensor-lane prices via multi-arg vmap over the per-spot f64 body (no capture),
 -- so grad flows through the same body the Greeks differentiate.
