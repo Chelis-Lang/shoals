@@ -7,5 +7,5 @@ additional_sources = ["properties", "references", "demos"]
 
 [dependencies]
 chelis-std = { version = "0.4.0" }
-nautilus = { version = "0.7.30" }
+nautilus = { version = "0.7.31" }
 coral = { version = "0.7.28" }
