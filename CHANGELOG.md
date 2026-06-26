@@ -6,6 +6,12 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `Shoals.Pricing.bs_call_f64_vector`, a tensor-lane f64 Black-Scholes
+  call entry for row-wise desk inputs, with scalar-equivalence tests
+  over representative desk rows.
+
 ## [0.21.2] - 2026-06-25
 
 Cascade to chelis v0.10.1, nautilus v0.7.30, coral v0.7.28.
