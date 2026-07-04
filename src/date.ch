@@ -50,7 +50,7 @@ def date_roll_modified_following(d: Date, weekend_only: bool) -> Date = {
 def schedule_from_tenor(start: Date, end: Date, step_months: int64) -> List[Date] = {
   step_days = mul(step_months, cast(30, int64))
   total = days_between(start, end)
-  n_steps = if lt(step_days, cast(1, int64)) then cast(0, int64) else div(total, step_days)
+  n_steps = if lt(step_days, cast(1, int64)) then cast(0, int64) else floor_div(total, step_days)
   idxs = range(cast(0, int64), add(n_steps, cast(1, int64)))
   fold(fn (acc: List[Date], i: int64) -> {
     candidate = add_days(start, mul(i, step_days))
@@ -70,7 +70,7 @@ def add_months(d: Date, n: int64) -> Date = {
 }
 def schedule_from_tenor_calendar(start: Date, end: Date, step_months: int64) -> List[Date] = {
   end_ord = days_between(start, end)
-  rough = if lt(step_months, cast(1, int64)) then cast(0, int64) else add(div(end_ord, mul(step_months, cast(28, int64))), cast(2, int64))
+  rough = if lt(step_months, cast(1, int64)) then cast(0, int64) else add(floor_div(end_ord, mul(step_months, cast(28, int64))), cast(2, int64))
   idxs = range(cast(0, int64), add(rough, cast(1, int64)))
   fold(fn (acc: List[Date], i: int64) -> {
     candidate = add_months(start, mul(i, step_months))
