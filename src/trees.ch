@@ -1,5 +1,25 @@
 module Shoals.Trees
-export (tr_crr_european_call, tr_crr_european_put, tr_crr_american_call, tr_crr_american_put, tr_tian_european_call, tr_tian_european_put, tr_jr_european_call, tr_jr_european_put, tr_trinomial_european_call, tr_trinomial_american_put)
+export (tr_crr_european_call, tr_crr_european_put, tr_crr_american_call, tr_crr_american_put, tr_tian_european_call, tr_tian_european_put, tr_jr_european_call, tr_jr_european_put, tr_trinomial_european_call, tr_trinomial_american_put, tr_crr_call_2step, tr_crr_call_2step_nodisc)
+-- Closed-form 2-step CRR European call: the fully expanded binomial value with
+-- move factors u/d, risk-neutral probability q, and per-step discount as GUARDED
+-- INPUTS. Pure arithmetic + ITE (relu), no transcendentals, so the pricing
+-- structure lowers to cvc5 -- shoals' genuine proven-over-reals model lane
+-- (dischargeability probe p14; properties in Shoals.Properties.CanonTrees).
+-- General-depth CRR needs induction over the lattice and is held out (no chelis
+-- induction tier at 0.14.0; re-probe on an induction/fixed-point capability).
+def relu(x: f32) -> f32 = if (x >= 0.0) then x else 0.0
+def tr_crr_call_2step(s: f32, k: f32, u: f32, d: f32, q: f32, disc: f32) -> f32 = ((disc * disc) * ((((q * q) * relu((((s * u) * u) - k))) + (((2.0 * q) * (1.0 - q)) * relu((((s * u) * d) - k)))) + (((1.0 - q) * (1.0 - q)) * relu((((s * d) * d) - k)))))
+-- DEFECTIVE pricer (manifest `defective: true`): the same 2-step CRR call with
+-- the discount factor DROPPED -- it prices the raw risk-neutral expected payoff
+-- instead of its present value, a real and common finance bug (forgetting to
+-- discount). It conforms to the european_call_fixed_depth kind but VIOLATES the
+-- no-arbitrage upper bound C <= s inside the valid input region (when the
+-- risk-neutral growth exceeds 1 and the option is in the money the undiscounted
+-- expected payoff can exceed spot), i.e. it admits arbitrage: a quant would sell
+-- this "call" for more than the underlying. The break is polynomial, so cvc5
+-- refutes C <= s with a concrete in-domain counterexample that re-executes at
+-- f32 (dischargeability lane: proven-over-reals refutation, in_region_defect).
+def tr_crr_call_2step_nodisc(s: f32, k: f32, u: f32, d: f32, q: f32) -> f32 = ((((q * q) * relu((((s * u) * u) - k))) + (((2.0 * q) * (1.0 - q)) * relu((((s * u) * d) - k)))) + (((1.0 - q) * (1.0 - q)) * relu((((s * d) * d) - k))))
 def tr_zero() -> f32 = cast(0.0, f32)
 def tr_one() -> f32 = cast(1.0, f32)
 def tr_half() -> f32 = cast(0.5, f32)

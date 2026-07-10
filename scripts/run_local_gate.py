@@ -105,10 +105,22 @@ def main() -> int:
         print("FAIL: chelis test tests/ --jobs auto")
         return rc
 
-    print("[5/5] chelis test tests-manual/ --jobs auto")
+    print("[5/7] chelis test tests-manual/ --jobs auto")
     rc = run(["chelis", "test", "tests-manual/", "--timeout", "1200", "--jobs", "auto"], quiet=False)
     if rc != 0:
         print("FAIL: chelis test tests-manual/ --jobs auto")
+        return rc
+
+    print("[6/7] contract_gate (offline manifest resolvability + pin freshness)")
+    rc = run(["python3", "scripts/contract_gate.py"], quiet=False)
+    if rc != 0:
+        print("FAIL: scripts/contract_gate.py")
+        return rc
+
+    print("[7/7] prove_gate (canon self-audit against the release binary)")
+    rc = run(["python3", "scripts/prove_gate.py"], quiet=False)
+    if rc != 0:
+        print("FAIL: scripts/prove_gate.py")
         return rc
 
     print("OK: shoals local gate green")

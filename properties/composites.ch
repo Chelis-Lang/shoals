@@ -75,3 +75,14 @@ import Std.Contracts (normal_cdf)
 @property delta_unknown_contract forall(d1: f32):
   ((normal_cdf(d1) >= 0.0) && (normal_cdf(d1) <= 1.0))
   with contract = "std.normal_cdf.not_a_contract"
+-- E3 -- Corrupted upper bound: claims the call is bounded by HALF the spot,
+-- which the range contract refutes (N(d1) can reach 1 with the strike leg near
+-- 0, so the call approaches s > 0.5*s). Expect: status = failed.
+@property call_upper_bounded_by_spot_corrupted forall(s: f32, k: f32, d1: f32, d2: f32, disc: f32) where (s >= 0.0), (k >= 0.0), (disc >= 0.0), (disc <= 1.0):
+  (((s * normal_cdf(d1)) - (k * (disc * normal_cdf(d2)))) <= (0.5 * s))
+  with contract = "std.normal_cdf.range"
+-- E4 -- Corrupted delta bound: claims the call delta N(d1) never exceeds 0.5,
+-- which the range contract refutes (N(d1) reaches 1). Expect: status = failed.
+@property delta_in_unit_interval_corrupted forall(d1: f32):
+  ((normal_cdf(d1) >= 0.0) && (normal_cdf(d1) <= 0.5))
+  with contract = "std.normal_cdf.range"

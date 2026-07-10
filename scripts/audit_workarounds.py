@@ -159,6 +159,33 @@ def collect_citations(root: Path) -> dict[str, list[str]]:
 
 ACTIVE_SECTIONS = ("Actively blocking", "Tracking", "Parked")
 ENTRY_HEADER = re.compile(r"^\s*-\s+\*\*")  # a bullet whose text opens with bold
+# Hardening: a citation on a line that asserts the issue is still live. A CLOSED
+# issue cited this way (outside UPSTREAM_BUGS §Archived) is a stale tracking
+# pointer -- surfaced as a warning even when it is not a formal active-subject,
+# so resolved-upstream references (e.g. a plan doc's "tracks chelis#NNN") do not
+# rot silently. Warning, not failure: these are prose references, not narrowings.
+TRACKING_VERB = re.compile(
+    r"\b(track(?:s|ing|ed)?|blocked on|pending|awaiting|TODO|FIXME|"
+    r"workaround|work[- ]?around|still (?:blocked|open))\b", re.I)
+
+
+def tracking_cited_issues(root: Path) -> set[str]:
+    found: set[str] = set()
+    for ext in SCAN_EXTS:
+        for f in root.rglob(ext):
+            if SKIP_DIRS.intersection(f.parts):
+                continue
+            if f.name == "UPSTREAM_BUGS.md":
+                continue  # its own sectioning is handled by upstream_bug_subjects
+            try:
+                text = f.read_text()
+            except (UnicodeDecodeError, PermissionError):
+                continue
+            for line in text.splitlines():
+                if TRACKING_VERB.search(line):
+                    for m in CITATION.finditer(line):
+                        found.add(m.group(1))
+    return found
 
 
 def upstream_bug_subjects(root: Path) -> tuple[set[str], set[str]]:
@@ -222,6 +249,7 @@ def scan_citations(root: Path) -> bool:
         return True
 
     active_subjects, archived_subjects = upstream_bug_subjects(root)
+    tracking = tracking_cited_issues(root)
     print(f"\nFound {len(citations)} distinct chelis# citation(s); "
           "checking upstream state:")
 
@@ -256,6 +284,12 @@ def scan_citations(root: Path) -> bool:
         elif state == "OPEN" and role == "archived-subject":
             print(f"    NOTE: {cit} is an §Archived subject but still OPEN upstream "
                   "— confirm it should not move back to §Tracking.")
+        elif state in ("CLOSED", "MERGED") and role == "reference" \
+                and number in tracking:
+            print(f"    WARNING: {cit} is CLOSED/MERGED upstream but cited with "
+                  "tracking language (tracks/blocked-on/pending/...) outside "
+                  "§Archived. Confirm the reference is historical or update it "
+                  "(triage, not a gate failure).")
 
     if ok:
         print("\nNo stale citations (no CLOSED-upstream issue is the subject of an "

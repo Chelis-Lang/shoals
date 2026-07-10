@@ -78,6 +78,33 @@ chelis#434 transcendental boundary or the depth-3 inlining cap in a way the
 harness can express as a pinned-diagnostic reproducer). Until then the
 UPSTREAM_BUGS entries are re-probed manually at each bump. Recorded on shoals#4.
 
+## Characterization Contract (producer obligations)
+
+Shoals is a **producer** for the Verified Model Characterization cross-repo
+seam. The normative contract is
+`c-note/docs/contracts/characterization_contract_v1.md` (frozen, additive-only);
+C Note is the consumer. Shoals' local obligations:
+
+- `docs/cnote-import-surface.json` is the invariant-surface manifest
+  (`chelis-shell.invariant-surface/1.0`): reference models with kinds/domains,
+  and invariants across three honest tiers (`proven` CRR lane, the
+  `proven_modulo_contract` composites lane, the `fuzz_validated` direct-pricer
+  lane) plus the `defective: true` in-region-break model. Every below-proven
+  tier cites a `tier_upgrade_trigger` and a `dischargeability_probe`; tiers are
+  grounded in the Phase-0 record (`c-note/fixtures/dischargeability/`). Published
+  at release as `shoals-<ver>.invariants.json` (byte-identical).
+- `scripts/contract_gate.py` (offline: manifest resolvability + pin freshness)
+  and `scripts/prove_gate.py` (keystone: expected-tier enforcement against the
+  pinned release binary; classifies from `proof_tier`+qualifiers, **never** the
+  `composite_verdict` string; anti-vacuity via the prover goal string because
+  `dependency_edges` do not cross import boundaries). Both run in CI and the
+  local gate. The fuzz lane (real transcendental pricers, ~17s/sample) is gated
+  in **nightly** (`PROVE_GATE_FUZZ=1`), not per-PR -- a documented budget split,
+  not a dropped invariant.
+- Additive-only within schema major 1; renames/removals need a major bump and a
+  relayed heads-up (the master agent relays between repos; shells never read
+  each other's manifest).
+
 ## Pin Bump Checklist
 
 A pin bump is a **de-narrowing event**, not a version edit — run all of this in
