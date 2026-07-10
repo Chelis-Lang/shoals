@@ -11,7 +11,25 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Literal chelis pin. MUST equal the reef.toml `compiler = "=X.Y.Z"` pin;
+# scripts/audit_workarounds.py --pins-only enforces that offline (the
+# reef-derived grep in the extract step can't be evaluated without a checkout,
+# so a literal has to exist for the guard to check). The extract step below
+# re-derives the pin from reef.toml only to assert this literal has not drifted.
+env:
+  CHELIS_TAG: v0.14.0
+  CHELIS_VERSION: 0.14.0
+
 jobs:
+  hard-rule-guard:
+    name: hard-rule-guard (offline pin consistency)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Audit pin consistency (offline)
+        run: python3 scripts/audit_workarounds.py --pins-only
+
   check:
     runs-on: ubuntu-latest
     steps:
@@ -21,19 +39,25 @@ jobs:
       - name: Extract versions from reef.toml
         run: |
           set -euo pipefail
-          CHELIS_VERSION=$(grep -oP '^compiler\s*=\s*"=\K[0-9]+\.[0-9]+\.[0-9]+' reef.toml)
+          # chelis pin comes from the literal top-level env (CHELIS_TAG /
+          # CHELIS_VERSION); re-derive it from reef.toml only to assert the
+          # literal has not drifted. reef.toml stays the single source of truth.
+          REEF_CHELIS=$(grep -oP '^compiler\s*=\s*"=\K[0-9]+\.[0-9]+\.[0-9]+' reef.toml)
           NAUTILUS_VERSION=$(grep -A0 '^nautilus' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
           CORAL_VERSION=$(grep -A0 '^coral' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-          if [ -z "$CHELIS_VERSION" ] || [ -z "$NAUTILUS_VERSION" ] || [ -z "$CORAL_VERSION" ]; then
+          if [ -z "$REEF_CHELIS" ] || [ -z "$NAUTILUS_VERSION" ] || [ -z "$CORAL_VERSION" ]; then
             echo "Failed to parse one or more versions from reef.toml" >&2
             cat reef.toml >&2
             exit 1
           fi
-          echo "CHELIS_VERSION=$CHELIS_VERSION" >> "$GITHUB_ENV"
-          echo "CHELIS_TAG=v$CHELIS_VERSION"     >> "$GITHUB_ENV"
+          if [ "$REEF_CHELIS" != "$CHELIS_VERSION" ]; then
+            echo "Pin drift: reef.toml chelis=$REEF_CHELIS but literal CHELIS_VERSION=$CHELIS_VERSION" >&2
+            echo "Bump the top-level env pin and reef.toml together (scripts/audit_workarounds.py --pins-only)." >&2
+            exit 1
+          fi
           echo "NAUTILUS_TAG=v$NAUTILUS_VERSION" >> "$GITHUB_ENV"
           echo "CORAL_TAG=v$CORAL_VERSION"       >> "$GITHUB_ENV"
-          echo "Detected: chelis=$CHELIS_VERSION nautilus=$NAUTILUS_VERSION coral=$CORAL_VERSION"
+          echo "Detected: chelis=$CHELIS_VERSION (literal, ==reef) nautilus=$NAUTILUS_VERSION coral=$CORAL_VERSION"
 
       - name: Install chelis toolchain (cached)
         id: chelis
