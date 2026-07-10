@@ -101,11 +101,13 @@ C Note is the consumer. Shoals' local obligations:
   local gate. The active canon is entirely SMT-tier (proven /
   proven_modulo_contract / disproved), every invariant observed to pass against
   the release binary. The direct-pricer positivity invariant is
-  **deferred/unverified** (`deferred_invariants`): the real transcendental
-  pricers cannot be fuzzed within any budget at 0.14.0 -- one fuzz sample of one
-  positivity property did not complete in 200s (chelis#434 / p08). It re-enters
-  `invariants` only when a run demonstrates its tier (prove_gate carries the
-  dormant fuzz machinery for that day).
+  **deferred** (`deferred_invariants`, no expected tier): not characterizable at
+  0.14.0 on either lane -- the proven lane is blocked by chelis#637 (free-variable
+  abstraction discards the N(d1)/N(d2) coupling; chelis#434's envelope does not
+  fix this), and the fuzz lane is intractable (one fuzz sample of one positivity
+  property did not complete in 200s; `docs/issue_drafts/fuzz_sampler_transcendental_cost.md`,
+  p08). It re-enters `invariants` only when a run demonstrates a tier (prove_gate
+  carries the dormant fuzz machinery for that day).
 - Additive-only within schema major 1; renames/removals need a major bump and a
   relayed heads-up (the master agent relays between repos; shells never read
   each other's manifest).
