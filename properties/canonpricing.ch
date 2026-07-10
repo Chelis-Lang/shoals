@@ -25,14 +25,16 @@ import Shoals.PricingExtended (black_call)
 @property bs_call_price_nonneg forall(s: f32, k: f32, r: f32, sigma: f32, t: f32) where (s > 0.0), (k > 0.0), (sigma > 0.0), (t > 0.0), (r >= 0.0):
   (bs_call_scalar(s, k, r, sigma, t) >= 0.0)
 -- Corrupted twin: claims a positive price floor the deep-out-of-the-money
--- region violates (a call struck far above spot is worth ~0 < 0.05), so fuzz
--- finds an in-domain counterexample.
+-- region violates (a false lower bound: most in-domain calls are worth well
+-- under 5, and every out-of-the-money call is worth ~0), so fuzz finds an
+-- in-domain counterexample within the first sample or two -- the violating
+-- control refutes cheaply even at a small fuzz budget.
 @property bs_call_price_nonneg_corrupted forall(s: f32, k: f32, r: f32, sigma: f32, t: f32) where (s > 0.0), (k > 0.0), (sigma > 0.0), (t > 0.0), (r >= 0.0):
-  (bs_call_scalar(s, k, r, sigma, t) >= 0.05)
+  (bs_call_scalar(s, k, r, sigma, t) >= 5.0)
 -- Kind-reuse demonstration: the same european-call-forward positivity invariant
 -- instantiated against a SECOND model, the Black-76 forward call. Same invariant
 -- id family, different output fn (manifest kind_applies_to).
 @property b76_call_price_nonneg forall(f: f32, k: f32, sigma: f32, t: f32, df: f32) where (f > 0.0), (k > 0.0), (sigma > 0.0), (t > 0.0), (df > 0.0):
   (black_call(f, k, sigma, t, df) >= 0.0)
 @property b76_call_price_nonneg_corrupted forall(f: f32, k: f32, sigma: f32, t: f32, df: f32) where (f > 0.0), (k > 0.0), (sigma > 0.0), (t > 0.0), (df > 0.0):
-  (black_call(f, k, sigma, t, df) >= 0.05)
+  (black_call(f, k, sigma, t, df) >= 5.0)

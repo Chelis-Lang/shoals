@@ -26,11 +26,13 @@ published 2026-07-10 is not yet validated for this shell).
   - `proven_modulo_contract` lane: the existing `properties/composites.ch`
     derivatives corpus (put-call parity / upper bound / delta bounds),
     re-gated at 0.14.0 (probe p12), each green now carrying a corrupted twin.
-  - `fuzz_validated` lane: `bs_call_price_nonneg` (and a Black-76
-    `b76_call_price_nonneg` kind-reuse mirror) direct against the real
-    transcendental pricers (`properties/canonpricing.ch`); `log` has no cvc5
-    kind (chelis#434) so these are honestly fuzz-tier, `tier_upgrade_trigger`
-    chelis#434 (probe p08).
+  - Direct-pricer positivity (`bs_call_price_nonneg` + a Black-76
+    `b76_call_price_nonneg` kind-reuse mirror, `properties/canonpricing.ch`)
+    ships **deferred/unverified** (manifest `deferred_invariants`), not as a
+    claimed tier: `log` has no cvc5 kind (chelis#434) so it cannot reach SMT,
+    and the fuzz tier could not be observed at 0.14.0 -- one fuzz sample of one
+    positivity property did not complete in 200s. Cited to chelis#434 + p08; it
+    re-enters the active canon when a run demonstrates its tier.
 - **DEFECTIVE reference model** `Shoals.Trees.tr_crr_call_2step_nodisc` (manifest
   `defective: true`): the 2-step CRR call with the discount factor dropped. It
   conforms to the european-call-fixed-depth kind yet violates the no-arbitrage

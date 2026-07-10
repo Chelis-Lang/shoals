@@ -136,7 +136,13 @@ def run_prove(binary: str, file: str, fuzz: bool, samples: int) -> dict:
     """Run prove on one canon file; return {property_name: record}."""
     cmd = [binary, "prove", file, "--json"]
     if fuzz:
-        cmd += ["--tier", "auto", "--samples", str(samples), "--seed", FUZZ_SEED]
+        # fuzz-only, NOT auto: the transcendental pricers cannot lower to SMT
+        # (chelis#434), and --tier auto burns an unbounded SMT-lowering attempt
+        # (no --smt-timeout applies to the auto escalation) BEFORE degrading to
+        # fuzz. fuzz-only samples directly. Cost is still ~17s per accepted
+        # sample (p08), so the satisfying controls dominate: keep the nightly
+        # sample budget (FUZZ_SAMPLES) small and measured.
+        cmd += ["--tier", "fuzz-only", "--samples", str(samples), "--seed", FUZZ_SEED]
     else:
         cmd += ["--tier", "smt-only", "--smt-timeout", SMT_TIMEOUT_MS]
     out = subprocess.run(cmd, cwd=REPO, capture_output=True, text=True)
@@ -202,17 +208,16 @@ def witness_in_domain(cx: dict, preconditions: list) -> tuple[bool, str]:
 
 
 def goal_names_ref(goal: str, invariant: dict) -> bool:
-    """Anti-vacuity via the goal string (dependency_edges are [] across imports)."""
-    b = invariant["binding"]
-    if b["references_output_fn"] == "structural":
-        return "normal_cdf" in (goal or "")
-    fn = invariant.get("target_model")
-    # the output fn is on the model; but the goal carries the fn NAME directly.
-    # accept if any exported output-fn token appears.
-    for tok in (invariant.get("_output_fn", ""), fn or ""):
-        if tok and tok in (goal or ""):
-            return True
-    return invariant.get("_output_fn", "___") in (goal or "")
+    """Anti-vacuity via the goal string (dependency_edges are [] across imports).
+
+    Match the output fn at a CALL SITE (`fn(`), not as a bare substring, so a fn
+    name that is a prefix of another (tr_crr_call_2step vs
+    tr_crr_call_2step_nodisc) does not false-match its sibling."""
+    goal = goal or ""
+    if invariant["binding"]["references_output_fn"] == "structural":
+        return re.search(r"normal_cdf\s*\(", goal) is not None
+    fn = invariant.get("_output_fn", "")
+    return bool(fn) and re.search(rf"{re.escape(fn)}\s*\(", goal) is not None
 
 
 def check_control(recs, name, want_status, label) -> tuple[bool, dict | None]:
@@ -329,12 +334,13 @@ def main() -> None:
     models = {m["id"]: m for m in manifest["models"]}
     binary = resolve_bin()
     samples = int(os.environ.get("FUZZ_SAMPLES", DEFAULT_FUZZ_SAMPLES))
-    # The real transcendental pricers cost ~17s per accepted fuzz sample (p08),
-    # so the fuzz lane is NOT per-PR-viable at any meaningful sample count. The
-    # per-PR gate runs the deterministic SMT lanes (proven / proven_modulo_contract
-    # / disproved); the fuzz lane is gated in nightly with PROVE_GATE_FUZZ=1 at
-    # the full sample budget. This is a budget split, not a dropped invariant --
-    # the fuzz invariants stay in the manifest and are characterizable.
+    # The active canon carries NO fuzz_validated invariants at 0.14.0: the real
+    # transcendental pricers cannot be fuzzed within any budget (one fuzz sample
+    # of one positivity property did not complete in 200s -- chelis#434 / p08),
+    # so the direct-pricer positivity invariant is deferred/unverified in the
+    # manifest. This fuzz-lane machinery (fuzz-only, gated() below) stays dormant
+    # and ready: when a run demonstrates the tier, move the invariant back into
+    # `invariants` and run with PROVE_GATE_FUZZ=1.
     include_fuzz = os.environ.get("PROVE_GATE_FUZZ") == "1"
     print(f"prove_gate: binary={binary} pin={pin} fuzz_samples={samples} "
           f"fuzz_lane={'on' if include_fuzz else 'off (nightly)'}")

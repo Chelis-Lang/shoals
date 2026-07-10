@@ -113,11 +113,12 @@ jobs:
       - name: Validate the invariant-surface manifest
         run: python3 scripts/contract_gate.py
 
-  # Keystone canon self-audit against the pinned RELEASE binary. Scope is the
-  # canon files only (canonpricing/canontrees + composites via the manifest);
-  # the fuzz lane runs a MINIMAL per-PR sample budget (p08: the real
-  # transcendental pricers cost seconds per fuzz sample, so 500 samples is not
-  # per-PR-viable) -- the full-sample sweep runs in nightly.
+  # Keystone canon self-audit against the pinned RELEASE binary. The active
+  # canon is entirely SMT-tier (proven / proven_modulo_contract / disproved) so
+  # this gate is deterministic. There is no fuzz lane: the direct-pricer
+  # positivity invariant is deferred/unverified (real transcendental pricers
+  # can't be fuzzed in any budget at 0.14.0 -- one sample did not complete in
+  # 200s, chelis#434 / p08).
   prove-gate:
     name: prove-gate (canon self-audit)
     runs-on: ubuntu-latest
@@ -162,8 +163,8 @@ jobs:
       - name: chelis reef build
         run: chelis reef build
 
-      # SMT lanes only per-PR (proven / proven_modulo_contract / disproved) --
-      # deterministic and fast. The fuzz lane (real transcendental pricers,
-      # ~17s/sample, p08) runs in nightly with PROVE_GATE_FUZZ=1.
-      - name: prove_gate (SMT lanes; fuzz lane -> nightly)
+      # The active canon is entirely SMT-tier (deterministic). prove_gate keeps
+      # dormant fuzz machinery (PROVE_GATE_FUZZ / --tier fuzz-only) for the day
+      # the deferred direct-pricer invariant becomes observable.
+      - name: prove_gate (SMT lanes -- the entire active canon)
         run: python3 scripts/prove_gate.py

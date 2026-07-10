@@ -234,50 +234,22 @@
       "dischargeability_probe": "p12_shoals_published_composites",
       "violation_text": "the call delta N(d1) falls outside [0,1]",
       "fuzz_domain_note": "structure proven at Tier B for any N satisfying the range contract; the contract is fuzz-validated on the real n_cdf"
-    },
-    {
-      "id": "shoals.inv.call_price_nonneg.v1",
-      "kind_applies_to": ["finance.option_pricer.european_call", "finance.option_pricer.european_call_forward"],
-      "target_model": "bs_call",
-      "property": {"file": "properties/canonpricing.ch", "name": "bs_call_price_nonneg", "module": "Shoals.Properties.CanonPricing"},
-      "binding": {"mechanism": "direct-call", "references_output_fn": "direct", "goal_pattern": "({{output_fn}}(s, k, r, sigma, t) >= 0.0)", "contracts": []},
-      "preconditions": [
-        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "sigma", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "t", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "r", "op": "gte", "rhs": {"const": 0.0}}
-      ],
-      "controls": {
-        "satisfying": {"name": "bs_call_price_nonneg", "expected": "passed"},
-        "violating": {"name": "bs_call_price_nonneg_corrupted", "expected": "failed", "witness_required": true}
-      },
-      "also_instantiated_for": [
-        {
-          "target_model": "b76_call",
-          "property": {"file": "properties/canonpricing.ch", "name": "b76_call_price_nonneg", "module": "Shoals.Properties.CanonPricing"},
-          "preconditions": [
-            {"lhs": "f", "op": "gt", "rhs": {"const": 0.0}},
-            {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
-            {"lhs": "sigma", "op": "gt", "rhs": {"const": 0.0}},
-            {"lhs": "t", "op": "gt", "rhs": {"const": 0.0}},
-            {"lhs": "df", "op": "gt", "rhs": {"const": 0.0}}
-          ],
-          "controls": {
-            "satisfying": {"name": "b76_call_price_nonneg", "expected": "passed"},
-            "violating": {"name": "b76_call_price_nonneg_corrupted", "expected": "failed", "witness_required": true}
-          }
-        }
-      ],
-      "expected_tier_per_pin": {"0.14.0": "fuzz_validated"},
-      "tier_upgrade_trigger": "chelis#434",
-      "dischargeability_probe": "p08_pkg_bs_positive",
-      "run_samples": 25,
-      "violation_text": "the model prices this call below zero -- free money at these inputs",
-      "fuzz_domain_note": "log has no cvc5 kind (chelis#434) so the real transcendental pricer cannot reach SMT; --tier auto degrades honestly to fuzz. Per-PR gate runs --samples 25 (p08: each accepted sample evaluates the full f64 erf chain, ~2s+/sample, so 500 samples is not per-PR-viable; corrupted twins refute in ~1 sample). Positivity guards are the widest sound domain so they intersect the prover fuzz box [-10,10]^n with usable acceptance density (p11 rule); realistic finance magnitudes live in the model sweep_defaults. Full-sample sweep runs in nightly."
     }
   ],
   "deferred_invariants": [
+    {
+      "id": "shoals.inv.call_price_nonneg.v1",
+      "kind_applies_to": ["finance.option_pricer.european_call", "finance.option_pricer.european_call_forward"],
+      "target_models": ["bs_call", "b76_call"],
+      "property": {"file": "properties/canonpricing.ch", "name": "bs_call_price_nonneg", "module": "Shoals.Properties.CanonPricing"},
+      "mirror_property": {"file": "properties/canonpricing.ch", "name": "b76_call_price_nonneg", "module": "Shoals.Properties.CanonPricing"},
+      "would_be_tier": "fuzz_validated",
+      "status": "unverified",
+      "tier_upgrade_trigger": "chelis#434",
+      "dischargeability_probe": "p08_pkg_bs_positive",
+      "reason": "Direct-call positivity against the real transcendental pricers (bs_call_scalar, black_call). log has no cvc5 kind (chelis#434) so it cannot reach SMT, and the fuzz tier could not be OBSERVED to pass at 0.14.0: measured on the pinned release binary with --tier fuzz-only, one accepted fuzz sample of a SINGLE positivity property does not complete in 200s (the whole 4-property file at N=5 emitted zero verdicts in 20min) -- the interpreted f64 erf/exp/log/sqrt body under the sampler is far slower than the ~17s/sample estimate. Per the no-unobserved-tier rule this invariant ships UNVERIFIED (deferred), not as a claimed fuzz_validated. The property + a fast-refuting corrupted twin stay in properties/canonpricing.ch as the reproducer; contract_gate does not gate deferred invariants.",
+      "trigger": "chelis#434 transcendental discharge (makes it provable, upgrading past fuzz), OR a chelis fuzz-performance / compiled-eval path that makes sampling the real transcendental pricer feasible enough to observe the tier -- then move back to `invariants`."
+    },
     {
       "id": "shoals.inv.call_monotone_in_s.bs.v1",
       "reason": "Two-point monotonicity against the real transcendental bs_call_scalar is fuzz-tier (chelis#434) and evaluates the pricer twice per sample; deferred from the per-PR gate to keep the fuzz budget bounded (p08). Reachable; not dropped.",
