@@ -34,6 +34,76 @@ to this file so Claude-style and Codex-style entry points do not drift.
   reintroduce per-file matrix sharding or chelis source checkouts
   in CI unless a documented semantic reason appears.
 
+## Capability Surface
+
+Before designing around a suspected language gap, read
+[`docs/CHELIS_SURFACE.md`](docs/CHELIS_SURFACE.md) — the inventory of what
+chelis + chelis-std actually provide to the finance domain at the pinned
+release, with `@pin` (usable today) / `@upstream` (next bump) markers. The
+proof-reachability depth reference is `research/proof-infra/report.md`.
+
+## Upstream Bugs
+
+Tracked upstream chelis issues and capability gaps that affect Shoals live in
+[`docs/UPSTREAM_BUGS.md`](docs/UPSTREAM_BUGS.md) (§Actively blocking / §Tracking
+/ §Parked / §Archived, with a stated per-section re-probe cadence). File
+suspected bugs upstream in `Chelis-Lang/chelis` and cite them as `chelis#NNN`
+(own-repo items as `shoals#NNN`) at the narrowing site — **never by a prose
+name**, so `scripts/audit_workarounds.py` can find them. Any narrowing (a
+`fail(...)` guard the reference accepts, a held-out property, a fixed shape,
+a forward-only surface) cites `chelis#NNN` / a draft / a dated deferral slot at
+the site; an uncited narrowing is invisible to de-narrowing.
+
+`scripts/audit_workarounds.py` (stdlib-only, per the scripting policy):
+
+- `--pins-only` — offline pin-consistency guard: the `reef.toml` compiler pin
+  MUST equal the literal `CHELIS_TAG` / `CHELIS_VERSION` env pins in every
+  toolchain-installing workflow (`ci.yml`, `release.yml`, `nightly.yml`). This
+  is the blocking `hard-rule-guard` CI job; it never touches the network. The
+  literal pins exist so the guard has something to check offline — the
+  reef-derived greps can't be evaluated without a checkout.
+- full mode (default) — pins check plus a citation-staleness scan: asks GitHub
+  whether each cited `chelis#NNN` is resolved and fails if a CLOSED/MERGED
+  issue is the **subject** of an active UPSTREAM_BUGS entry. Offline-tolerant
+  (skips the upstream check with a warning if `gh` is unavailable; never fails
+  closed on the network). Run it at every pin bump, not per-PR.
+
+### Deferred conformance artifacts (contract §5/§6)
+
+`tests_neg/` (negative-test parity) and `tests_blocked/` (expected-to-fail
+upstream-blocker probes) with their runners are **deferred** for Shoals as of
+2026-07-10. Trigger to land them: the **first shoals-side negative fixture or
+mechanically-expressible blocked probe** (e.g. a shoals property that hits the
+chelis#434 transcendental boundary or the depth-3 inlining cap in a way the
+harness can express as a pinned-diagnostic reproducer). Until then the
+UPSTREAM_BUGS entries are re-probed manually at each bump. Recorded on shoals#4.
+
+## Pin Bump Checklist
+
+A pin bump is a **de-narrowing event**, not a version edit — run all of this in
+one change set (contract §7):
+
+1. Update **every** pin location: `reef.toml` `compiler = "=X.Y.Z"` and the
+   literal `CHELIS_TAG` / `CHELIS_VERSION` env pair in each toolchain-installing
+   workflow. Verify with `python3 scripts/audit_workarounds.py --pins-only`.
+   Install via the pinned toolchain (the shared install action reads the pin).
+2. Run the blocked-probe suite once it exists (deferred today); FIX-detected →
+   execute the sidecar de-narrowing instructions and promote the probe;
+   DRIFTED → investigate before re-citing.
+3. Run `python3 scripts/audit_workarounds.py` (full mode); triage every
+   CLOSED/MERGED-but-still-cited subject. No silent carryover.
+4. Re-probe every `docs/UPSTREAM_BUGS.md` entry whose trigger names this
+   release, **per-surface** — a changelog claim is not a verification. Re-prove
+   the reproducer against the pinned binary.
+5. Refresh `docs/CHELIS_SURFACE.md`: header versions (pinned / latest upstream /
+   last-refreshed) and every `@pin` / `@upstream` marker.
+6. Promote UPSTREAM_BUGS entries per the re-probe verdicts (→ §Archived, or back
+   to §Tracking with the residue).
+7. Run the complete local gate before pushing: `python3
+   scripts/run_local_gate.py` (fmt + lint + `chelis reef build` + the fast
+   `tests/` suite + the heavy `tests-manual/` suite) and
+   `python3 scripts/audit_workarounds.py --pins-only`.
+
 ## Phase Spec
 
 The owning spec section for this shell is checked in at
