@@ -101,3 +101,70 @@ jobs:
       - name: chelis test (tests/ fast unit suite)
         timeout-minutes: 30
         run: chelis test tests/ --timeout 1200 --jobs auto
+
+  # Offline manifest validation (no toolchain): schema/pin freshness + every
+  # invariant/control/output-fn/precondition resolves to real sources.
+  contract-gate:
+    name: contract-gate (offline manifest validation)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate the invariant-surface manifest
+        run: python3 scripts/contract_gate.py
+
+  # Keystone canon self-audit against the pinned RELEASE binary. The active
+  # canon is entirely SMT-tier (proven / proven_modulo_contract / disproved) so
+  # this gate is deterministic. There is no fuzz lane: the direct-pricer
+  # positivity invariant is deferred/unverified (real transcendental pricers
+  # can't be fuzzed in any budget at 0.14.0 -- one sample did not complete in
+  # 200s, chelis#434 / p08).
+  prove-gate:
+    name: prove-gate (canon self-audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract versions from reef.toml
+        run: |
+          set -euo pipefail
+          REEF_CHELIS=$(grep -oP '^compiler\s*=\s*"=\K[0-9]+\.[0-9]+\.[0-9]+' reef.toml)
+          NAUTILUS_VERSION=$(grep -A0 '^nautilus' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          CORAL_VERSION=$(grep -A0 '^coral' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ "$REEF_CHELIS" != "$CHELIS_VERSION" ]; then
+            echo "Pin drift: reef.toml chelis=$REEF_CHELIS but literal CHELIS_VERSION=$CHELIS_VERSION" >&2
+            exit 1
+          fi
+          echo "NAUTILUS_TAG=v$NAUTILUS_VERSION" >> "$GITHUB_ENV"
+          echo "CORAL_TAG=v$CORAL_VERSION"       >> "$GITHUB_ENV"
+
+      - name: Install chelis toolchain (cached)
+        id: chelis
+        uses: ./.github/actions/install-chelis
+        with:
+          chelis-tag: ${{ env.CHELIS_TAG }}
+          chelis-version: ${{ env.CHELIS_VERSION }}
+          gh-token: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+          reef-cache-key: nautilus-${{ env.NAUTILUS_TAG }}-coral-${{ env.CORAL_TAG }}
+
+      - name: Install released dependencies
+        if: steps.chelis.outputs.reef-cache-hit != 'true'
+        timeout-minutes: 5
+        env:
+          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+        run: |
+          set -euo pipefail
+          chelis reef install --from-github "Chelis-Lang/nautilus@${NAUTILUS_TAG}"
+          chelis reef install --from-github "Chelis-Lang/coral@${CORAL_TAG}"
+
+      - name: chelis reef build
+        run: chelis reef build
+
+      # The active canon is entirely SMT-tier (deterministic). prove_gate keeps
+      # dormant fuzz machinery (PROVE_GATE_FUZZ / --tier fuzz-only) for the day
+      # the deferred direct-pricer invariant becomes observable.
+      - name: prove_gate (SMT lanes -- the entire active canon)
+        run: python3 scripts/prove_gate.py

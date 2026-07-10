@@ -78,6 +78,40 @@ chelis#434 transcendental boundary or the depth-3 inlining cap in a way the
 harness can express as a pinned-diagnostic reproducer). Until then the
 UPSTREAM_BUGS entries are re-probed manually at each bump. Recorded on shoals#4.
 
+## Characterization Contract (producer obligations)
+
+Shoals is a **producer** for the Verified Model Characterization cross-repo
+seam. The normative contract is
+`c-note/docs/contracts/characterization_contract_v1.md` (frozen, additive-only);
+C Note is the consumer. Shoals' local obligations:
+
+- `docs/cnote-import-surface.json` is the invariant-surface manifest
+  (`chelis-shell.invariant-surface/1.0`): reference models with kinds/domains,
+  and invariants across three honest tiers (`proven` CRR lane, the
+  `proven_modulo_contract` composites lane, the `fuzz_validated` direct-pricer
+  lane) plus the `defective: true` in-region-break model. Every below-proven
+  tier cites a `tier_upgrade_trigger` and a `dischargeability_probe`; tiers are
+  grounded in the Phase-0 record (`c-note/fixtures/dischargeability/`). Published
+  at release as `shoals-<ver>.invariants.json` (byte-identical).
+- `scripts/contract_gate.py` (offline: manifest resolvability + pin freshness)
+  and `scripts/prove_gate.py` (keystone: expected-tier enforcement against the
+  pinned release binary; classifies from `proof_tier`+qualifiers, **never** the
+  `composite_verdict` string; anti-vacuity via the prover goal string because
+  `dependency_edges` do not cross import boundaries). Both run in CI and the
+  local gate. The active canon is entirely SMT-tier (proven /
+  proven_modulo_contract / disproved), every invariant observed to pass against
+  the release binary. The direct-pricer positivity invariant is
+  **deferred** (`deferred_invariants`, no expected tier): not characterizable at
+  0.14.0 on either lane -- the proven lane is blocked by chelis#637 (free-variable
+  abstraction discards the N(d1)/N(d2) coupling; chelis#434's envelope does not
+  fix this), and the fuzz lane is intractable (one fuzz sample of one positivity
+  property did not complete in 200s; `docs/issue_drafts/fuzz_sampler_transcendental_cost.md`,
+  p08). It re-enters `invariants` only when a run demonstrates a tier (prove_gate
+  carries the dormant fuzz machinery for that day).
+- Additive-only within schema major 1; renames/removals need a major bump and a
+  relayed heads-up (the master agent relays between repos; shells never read
+  each other's manifest).
+
 ## Pin Bump Checklist
 
 A pin bump is a **de-narrowing event**, not a version edit — run all of this in

@@ -103,8 +103,10 @@ proven — see chelis#434 below).
   on a pure-fuzz result.** A property that was itself only fuzz-validated, whose
   sole "contract" was also fuzz-discharged, reported a `composite_verdict`
   string implying an SMT proof resting on a fuzz-validated contract.
-  - **Resolution:** CLOSED, fixed upstream by chelis#445/#447 (the fuzz-base
-    honesty taxonomy), both ancestors of v0.14.0; regression-locked in
+  - **Resolution:** CLOSED, fixed upstream by chelis#445 (the fuzz-base honesty
+    taxonomy: a pure-fuzz base reads `fuzz_validated`, never a contract-qualified
+    proven verdict) and chelis#447 (the symmetric `DisprovedModuloRealArithmetic`
+    side of that taxonomy), both ancestors of v0.14.0; regression-locked in
     `issue_435_pure_fuzz_base_reads_fuzz_validated_not_proven_modulo_contract`.
     A pure-fuzz base now reads `composite_verdict = fuzz_validated`. The genuine
     SMT-base + fuzz-contract case — which is exactly Shoals'
@@ -115,5 +117,15 @@ proven — see chelis#434 below).
     consumes `prove --json` classifies a verdict from `proof_tier` +
     assumption-discharge tier, **never** by string-matching the
     `composite_verdict` token. This is correct-by-construction regardless of
-    #435 and stays in place: a `proven_modulo_*` string is trusted only when
+    #435 and stays in place (`scripts/prove_gate.py` `classify_tier` + its
+    honesty self-test): a `proven_modulo_*` string is trusted only when
     `proof_tier == "smt"`. Nothing to re-probe.
+
+- **chelis#199 — control-flow AD (D1).** Referenced from
+  `docs/plan-quant-surface.md` as a forward-looking capability the M5/M7/M8
+  milestones "track". Triaged 2026-07-10: **CLOSED upstream** (control-flow AD
+  landed), so the reference is historical, not a live blocker. No shoals surface
+  is narrowed on it today; the plan-doc mention is a resolved roadmap pointer.
+  `scripts/audit_workarounds.py` reports it `CLOSED [reference]` (informational,
+  not a gate failure) since it is not the subject of an active UPSTREAM_BUGS
+  entry.

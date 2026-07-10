@@ -1,70 +1,267 @@
 {
-  "schema": "shoals.cnote-import-surface/v1",
-  "purpose": "Frozen import surface that C Note vendors and resolves in its no-network sandbox. Pinned so C Note builds against a stable contract while Shoals internals evolve.",
-  "pins": {
-    "chelis": "0.10.1",
-    "shoals": "0.21.2"
-  },
-  "scope_note": "Re-pinned to chelis 0.10.1. The full graduation has landed: first-order AND second-order AD Greeks, and the SMT composite derivatives-property corpus (parity/upper-bound/delta-bounds as proven-modulo-a-fuzz-validated-contract via the bundled Std.Contracts.normal_cdf contracts). The no-arbitrage properties that refused value-level abstraction (non-negativity, intrinsic bound, strike convexity) remain out, documented as backend-roadmap items.",
-  "pricing": {
-    "module": "Shoals.Pricing",
-    "normal_cdf": "one A&S 7.1.26 erf in f64 (same coefficients as Std.Contracts.normal_cdf / Nautilus erf); the f32 entry points downcast the f64 body and every Greek is the AD derivative of that displayed price. The pricer's f64 normal CDF is the f64 lift of the f32 Std.Contracts.normal_cdf the composites are proven about; the two are bound by the binding cross-check (tests/composites_binding.ch).",
-    "exports": [
-      {"id": "bs_call_scalar", "sig": "(s,k,r,sigma,t: f32) -> f32", "role": "price-scalar"},
-      {"id": "bs_put_scalar", "sig": "(s,k,r,sigma,t: f32) -> f32", "role": "price-scalar"},
-      {"id": "call_prices", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "price-vector"},
-      {"id": "put_prices", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "price-vector"},
-      {"id": "call_total", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> f32", "role": "price-reduce"},
-      {"id": "put_total", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> f32", "role": "price-reduce"},
-      {"id": "deltas_call", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-firstorder", "greek": "delta"},
-      {"id": "deltas_put", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-firstorder", "greek": "delta"},
-      {"id": "vegas_call", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-firstorder", "greek": "vega"},
-      {"id": "rhos_call", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-firstorder", "greek": "rho"},
-      {"id": "thetas_call", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-firstorder", "greek": "theta"},
-      {"id": "gammas_call", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-secondorder", "greek": "gamma"},
-      {"id": "volgas_call", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-secondorder", "greek": "volga"},
-      {"id": "vannas_call", "sig": "[n](spots: tensor[n,f32], k,r,sigma,t: f32) -> tensor[n,f32]", "role": "greek-ad-secondorder", "greek": "vanna"},
-      {"id": "mc_call_price", "sig": "[n](template: tensor[n,f32], s0,k,r,sigma,t: f32) -> f32 ! { Random }", "role": "price-mc"}
-    ],
-    "greek_validation": "First-order (delta/vega/rho/theta) and second-order (gamma/volga/vanna) Greeks are the AD derivatives of the displayed price (gamma/volga/vanna via nested grad). Oracle-validated against the analytic forms AND tuned finite differences of the displayed price (sign-fold + accuracy-monotone guard) by scripts/oracle_greeks_gate.py, with in-suite Std.Test standing assertions (heavy second-order in tests-manual/greeks_secondorder.ch)."
-  },
-  "demos": {
-    "module": "Shoals.Demos.Businesswrong",
-    "tier": "fuzz",
-    "pairs": [
-      {"wrong": "discount_le_one", "control": "discount_le_one_fixed", "error": "discount factor above 1 (negative implied rate)"},
-      {"wrong": "variance_nonneg", "control": "variance_nonneg_fixed", "error": "negative variance (Feller violation)"},
-      {"wrong": "call_le_spot", "control": "call_le_spot_fixed", "error": "call priced above spot (static arbitrage)"}
-    ],
-    "run": "chelis prove demos/businesswrong.ch --tier fuzz-only --samples 500 --seed 0 --json"
-  },
-  "composites": {
-    "module": "Shoals.Properties.Composites",
-    "mechanism": "chelis 0.9.0 `with contract = \"std.normal_cdf.*\"`: the SMT tier abstracts Std.Contracts.normal_cdf calls into symbols carrying the declared contract, proves the structure, and emits a composite verdict. The contract is auto fuzz-discharged (8192 samples, tol 1e-10) with a cvc5 non-vacuity (SAT) check.",
-    "greens": [
-      {"id": "put_call_parity_reflection", "verdict": "proven_modulo_fuzz_validated_contract", "contracts": ["std.normal_cdf.range", "std.normal_cdf.reflection"]},
-      {"id": "call_upper_bounded_by_spot", "verdict": "proven_modulo_fuzz_validated_contract", "contracts": ["std.normal_cdf.range"]},
-      {"id": "delta_in_unit_interval", "verdict": "proven_modulo_fuzz_validated_contract", "contracts": ["std.normal_cdf.range"]}
-    ],
-    "integrity_probes": [
-      {"id": "put_call_parity_corrupted", "verdict": "failed", "note": "corrupting the reflection coupling flips the verdict (counterexample)"},
-      {"id": "delta_unknown_contract", "verdict": "unsupported", "note": "unknown contract id is unsupported, not a pass"}
-    ],
-    "excluded_no_arb_roadmap": ["non_negativity", "intrinsic_lower_bound", "strike_convexity"],
-    "run": "scripts/manual_gates/phase3l_shoals_oracle_composite_corpus.py (needs an SMT-enabled chelis 0.9.0; do not use `prove .` on the whole package -- prove the corpus targeted)"
-  },
-  "properties": [
-    {"module": "Shoals.Properties.Pricing", "ids": ["put_call_parity_holds", "call_price_nonneg", "put_price_nonneg", "call_bounded_by_spot", "matches_textbook_reference", "matches_textbook_reference_put", "mc_matches_textbook_mc_reference"]},
-    {"module": "Shoals.Properties.Greeks", "ids": ["fd_delta_in_unit_range_for_call", "fd_delta_matches_analytic", "vega_nonneg"]},
-    {"module": "Shoals.Properties.NoArbitrage", "ids": ["bull_spread_nonneg", "butterfly_nonneg"]}
+  "schema_id": "chelis-shell.invariant-surface",
+  "schema_version": "1.0",
+  "pkg": "shoals",
+  "pkg_version": "0.22.0",
+  "chelis_pin": "0.14.0",
+  "generated_note": "Producer manifest for the C Note characterization engine (frozen contract characterization_contract_v1.md sec 1). Also published as the release asset shoals-0.22.0.invariants.json (byte-identical). Tiers are grounded in the Phase-0 dischargeability record record.chelis-0.14.0.json; every below-proven tier cites a tier_upgrade_trigger and a dischargeability_probe. Latest upstream chelis is 0.15.0 (published 2026-07-10); 0.22.0 stays pinned to 0.14.0 which is the validated release for this canon (0.15.0 not yet validated for this shell).",
+  "models": [
+    {
+      "id": "bs_call",
+      "kind": "finance.option_pricer.european_call",
+      "module": "Shoals.Pricing",
+      "output_fn": "bs_call_scalar",
+      "sig": "(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32",
+      "params": [
+        {"name": "s", "meaning": "spot price", "unit": "currency", "domain": {"gt": 0.0}, "sweep_default": {"min": 0.5, "max": 9.5, "value": 5.0}},
+        {"name": "k", "meaning": "strike", "unit": "currency", "domain": {"gt": 0.0}, "sweep_default": {"min": 0.5, "max": 9.5, "value": 5.0}},
+        {"name": "r", "meaning": "risk-free rate", "unit": "rate", "domain": {"gte": 0.0}, "sweep_default": {"min": 0.0, "max": 0.2, "value": 0.05}},
+        {"name": "sigma", "meaning": "volatility", "unit": "rate", "domain": {"gt": 0.0}, "sweep_default": {"min": 0.05, "max": 1.0, "value": 0.2}},
+        {"name": "t", "meaning": "time to expiry", "unit": "years", "domain": {"gt": 0.0}, "sweep_default": {"min": 0.1, "max": 3.0, "value": 1.0}}
+      ],
+      "salient_dims": ["s", "sigma"],
+      "output": {"meaning": "call present value", "unit": "currency"},
+      "sensitivities": [{"wrt": "s", "fn": "deltas_call", "order": 1}, {"wrt": "sigma", "fn": "vegas_call", "order": 1}],
+      "defective": false,
+      "notes": "Flagship transcendental pricer. bs_call_scalar wraps the pure-f64 bs_call_f64 (both exported); the shipped Greeks differentiate bs_call_f64."
+    },
+    {
+      "id": "b76_call",
+      "kind": "finance.option_pricer.european_call_forward",
+      "module": "Shoals.PricingExtended",
+      "output_fn": "black_call",
+      "sig": "(f: f32, k: f32, sigma: f32, t: f32, df: f32) -> f32",
+      "params": [
+        {"name": "f", "meaning": "forward price", "unit": "currency", "domain": {"gt": 0.0}, "sweep_default": {"min": 0.5, "max": 9.5, "value": 5.0}},
+        {"name": "k", "meaning": "strike", "unit": "currency", "domain": {"gt": 0.0}, "sweep_default": {"min": 0.5, "max": 9.5, "value": 5.0}},
+        {"name": "sigma", "meaning": "volatility", "unit": "rate", "domain": {"gt": 0.0}, "sweep_default": {"min": 0.05, "max": 1.0, "value": 0.2}},
+        {"name": "t", "meaning": "time to expiry", "unit": "years", "domain": {"gt": 0.0}, "sweep_default": {"min": 0.1, "max": 3.0, "value": 1.0}},
+        {"name": "df", "meaning": "discount factor", "unit": "ratio", "domain": {"gt": 0.0, "lte": 1.0}, "sweep_default": {"min": 0.8, "max": 1.0, "value": 0.95}}
+      ],
+      "salient_dims": ["f", "sigma"],
+      "output": {"meaning": "forward call present value", "unit": "currency"},
+      "sensitivities": [],
+      "defective": false,
+      "notes": "Black-76 forward call. Shares the lognormal european-call invariant family with bs_call, so the same kind-level invariants instantiate against a second model (kind-reuse demonstration)."
+    },
+    {
+      "id": "tr_crr_call_2step",
+      "kind": "finance.lattice_pricer.european_call_fixed_depth",
+      "module": "Shoals.Trees",
+      "output_fn": "tr_crr_call_2step",
+      "sig": "(s: f32, k: f32, u: f32, d: f32, q: f32, disc: f32) -> f32",
+      "params": [
+        {"name": "s", "meaning": "spot price", "unit": "currency", "domain": {"gt": 0.0}, "sweep_default": {"min": 0.5, "max": 9.5, "value": 5.0}},
+        {"name": "k", "meaning": "strike", "unit": "currency", "domain": {"gt": 0.0}, "sweep_default": {"min": 0.5, "max": 9.5, "value": 5.0}},
+        {"name": "u", "meaning": "up move factor", "unit": "ratio", "domain": {"gt": 1.0}, "sweep_default": {"min": 1.05, "max": 2.0, "value": 1.2}},
+        {"name": "d", "meaning": "down move factor", "unit": "ratio", "domain": {"gt": 0.0, "lt": 1.0}, "sweep_default": {"min": 0.5, "max": 0.95, "value": 0.83}},
+        {"name": "q", "meaning": "risk-neutral up probability", "unit": "probability", "domain": {"gt": 0.0, "lt": 1.0}, "sweep_default": {"min": 0.1, "max": 0.9, "value": 0.5}},
+        {"name": "disc", "meaning": "per-step discount factor", "unit": "ratio", "domain": {"gt": 0.0, "lte": 1.0}, "sweep_default": {"min": 0.9, "max": 1.0, "value": 0.98}}
+      ],
+      "salient_dims": ["s", "q"],
+      "output": {"meaning": "2-step CRR call present value", "unit": "currency"},
+      "sensitivities": [],
+      "defective": false,
+      "notes": "Closed-form 2-step CRR European call. Pure arithmetic + ITE (no transcendentals), so its pricing structure lowers to cvc5 -- the shell's genuine proven-over-reals model. General-depth CRR needs induction and is held out."
+    },
+    {
+      "id": "tr_crr_call_2step_nodisc",
+      "kind": "finance.lattice_pricer.european_call_fixed_depth",
+      "module": "Shoals.Trees",
+      "output_fn": "tr_crr_call_2step_nodisc",
+      "sig": "(s: f32, k: f32, u: f32, d: f32, q: f32) -> f32",
+      "params": [
+        {"name": "s", "meaning": "spot price", "unit": "currency", "domain": {"gt": 0.0}, "sweep_default": {"min": 0.5, "max": 9.5, "value": 5.0}},
+        {"name": "k", "meaning": "strike", "unit": "currency", "domain": {"gt": 0.0}, "sweep_default": {"min": 0.5, "max": 9.5, "value": 5.0}},
+        {"name": "u", "meaning": "up move factor", "unit": "ratio", "domain": {"gt": 1.0}, "sweep_default": {"min": 1.05, "max": 2.0, "value": 1.5}},
+        {"name": "d", "meaning": "down move factor", "unit": "ratio", "domain": {"gt": 0.0, "lt": 1.0}, "sweep_default": {"min": 0.5, "max": 0.95, "value": 0.5}},
+        {"name": "q", "meaning": "risk-neutral up probability", "unit": "probability", "domain": {"gt": 0.0, "lt": 1.0}, "sweep_default": {"min": 0.1, "max": 0.9, "value": 0.5}}
+      ],
+      "salient_dims": ["s", "q"],
+      "output": {"meaning": "undiscounted 2-step CRR call value (DEFECTIVE)", "unit": "currency"},
+      "sensitivities": [],
+      "defective": true,
+      "notes": "DEFECTIVE reference model (sprint in-region-break deliverable). Identical to tr_crr_call_2step but with the discount factor DROPPED -- it returns the raw risk-neutral expected payoff, not its present value (a real, common finance bug: forgetting to discount). It conforms to the european_call_fixed_depth kind yet VIOLATES the no-arbitrage upper bound C <= s inside its valid input region (verified in-domain witness s=1.0 k=0.5 u=2.0 d=0.5 q=0.5 gives price 1.125 > spot 1.0). See invariant shoals.inv.call_upper_bounded_by_spot.crr_nodisc_defect.v1."
+    }
   ],
-  "dependency_tree": {
-    "shoals": "0.21.1",
-    "compiler": "0.9.0",
-    "dependencies": [
-      {"name": "chelis-std", "version": "0.4.0", "source": "bundled", "archive_sha256": "d690c2b8e30b145a69cb4b63925bce6b85ad0245eb940c533dfd7b278af1d2f4"},
-      {"name": "coral", "version": "0.7.27", "source": "github://Chelis-Lang/coral@v0.7.27", "archive_sha256": "8d4122ced4c904df59cde5a858d2fa1e7aae267197385930839d0ff5a199d033"},
-      {"name": "nautilus", "version": "0.7.28", "source": "github://Chelis-Lang/nautilus@v0.7.28", "archive_sha256": "9e8280c898dcd43db78addc99f1e31561cdb2d59102b9cb7a2efb793b5ef2bf4"}
-    ]
-  }
+  "invariants": [
+    {
+      "id": "shoals.inv.crr_call_nonneg.v1",
+      "kind_applies_to": ["finance.lattice_pricer.european_call_fixed_depth"],
+      "target_model": "tr_crr_call_2step",
+      "property": {"file": "properties/canontrees.ch", "name": "crr_call_nonneg", "module": "Shoals.Properties.CanonTrees"},
+      "binding": {"mechanism": "direct-call", "references_output_fn": "direct", "goal_pattern": "({{output_fn}}(s, k, u, d, q, disc) >= 0.0)", "contracts": []},
+      "preconditions": [
+        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "u", "op": "gt", "rhs": {"const": 1.0}},
+        {"lhs": "d", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "d", "op": "lt", "rhs": {"const": 1.0}},
+        {"lhs": "q", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "q", "op": "lt", "rhs": {"const": 1.0}},
+        {"lhs": "disc", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "disc", "op": "lte", "rhs": {"const": 1.0}}
+      ],
+      "controls": {
+        "satisfying": {"name": "crr_call_nonneg", "expected": "passed"},
+        "violating": {"name": "crr_call_nonneg_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "non_vacuity_witness": "crr_call_nonneg_guards_satisfiable",
+      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "dischargeability_probe": "p14_crr_two_step",
+      "violation_text": "the lattice pricer returns a negative call price -- free money at these inputs",
+      "fuzz_domain_note": "proven over the reals at Tier B (no fuzz); guards keep goal-site inlining within the depth-3 cap (p07)"
+    },
+    {
+      "id": "shoals.inv.crr_call_monotone_in_s.v1",
+      "kind_applies_to": ["finance.lattice_pricer.european_call_fixed_depth"],
+      "target_model": "tr_crr_call_2step",
+      "property": {"file": "properties/canontrees.ch", "name": "crr_call_monotone_in_s", "module": "Shoals.Properties.CanonTrees"},
+      "binding": {"mechanism": "direct-call", "references_output_fn": "direct", "goal_pattern": "({{output_fn}}(s2, ...) >= {{output_fn}}(s1, ...))", "contracts": []},
+      "preconditions": [
+        {"lhs": "s1", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "s2", "op": "gt", "rhs": {"input": "s1"}},
+        {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "u", "op": "gt", "rhs": {"const": 1.0}},
+        {"lhs": "d", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "d", "op": "lt", "rhs": {"const": 1.0}},
+        {"lhs": "q", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "q", "op": "lt", "rhs": {"const": 1.0}},
+        {"lhs": "disc", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "disc", "op": "lte", "rhs": {"const": 1.0}}
+      ],
+      "controls": {
+        "satisfying": {"name": "crr_call_monotone_in_s", "expected": "passed"},
+        "violating": {"name": "crr_call_monotone_in_s_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "non_vacuity_witness": "crr_call_monotone_in_s_guards_satisfiable",
+      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "dischargeability_probe": "p14_crr_two_step",
+      "violation_text": "the lattice call price falls when spot rises -- a monotonicity (delta-sign) violation",
+      "fuzz_domain_note": "proven over the reals at Tier B (no fuzz)"
+    },
+    {
+      "id": "shoals.inv.call_upper_bounded_by_spot.crr_nodisc_defect.v1",
+      "kind_applies_to": ["finance.lattice_pricer.european_call_fixed_depth"],
+      "target_model": "tr_crr_call_2step_nodisc",
+      "property": {"file": "properties/canontrees.ch", "name": "crr_nodisc_call_upper_bound", "module": "Shoals.Properties.CanonTrees"},
+      "binding": {"mechanism": "direct-call", "references_output_fn": "direct", "goal_pattern": "({{output_fn}}(s, k, u, d, q) <= s)", "contracts": []},
+      "preconditions": [
+        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "u", "op": "gt", "rhs": {"const": 1.0}},
+        {"lhs": "d", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "d", "op": "lt", "rhs": {"const": 1.0}},
+        {"lhs": "q", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "q", "op": "lt", "rhs": {"const": 1.0}}
+      ],
+      "controls": {
+        "violating": {"name": "crr_nodisc_call_upper_bound", "expected": "failed", "witness_required": true}
+      },
+      "defective_model": true,
+      "witness": {
+        "inputs": {"s": "1.0", "k": "0.5", "u": "2.0", "d": "0.5", "q": "0.5"},
+        "source": "smt_model_reals_hedged",
+        "f32_reexecuted": true,
+        "computed_output": "1.125",
+        "spot": "1.0",
+        "in_region": true,
+        "region_classification": "in_region_defect"
+      },
+      "expected_tier_per_pin": {"0.14.0": "disproved"},
+      "dischargeability_probe": "p14_crr_two_step",
+      "violation_text": "admits arbitrage: the undiscounted model prices the call at 1.125 when the underlying spot is only 1.0 (C > s)",
+      "fuzz_domain_note": "polynomial break; cvc5 refutes C<=s and the witness re-executes at f32 (in_region_defect, not reals-hedged)"
+    },
+    {
+      "id": "shoals.inv.put_call_parity_reflection.v1",
+      "kind_applies_to": ["finance.option_pricer.european_call"],
+      "target_model": "bs_call",
+      "property": {"file": "properties/composites.ch", "name": "put_call_parity_reflection", "module": "Shoals.Properties.Composites"},
+      "binding": {"mechanism": "contract-abstraction", "references_output_fn": "structural", "goal_pattern": null, "contracts": ["std.normal_cdf.reflection"]},
+      "preconditions": [
+        {"lhs": "s", "op": "gte", "rhs": {"const": 0.0}},
+        {"lhs": "k", "op": "gte", "rhs": {"const": 0.0}},
+        {"lhs": "disc", "op": "gte", "rhs": {"const": 0.0}},
+        {"lhs": "disc", "op": "lte", "rhs": {"const": 1.0}}
+      ],
+      "controls": {
+        "satisfying": {"name": "put_call_parity_reflection", "expected": "passed"},
+        "violating": {"name": "put_call_parity_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "expected_tier_per_pin": {"0.14.0": "proven_modulo_contract"},
+      "tier_upgrade_trigger": "chelis#434",
+      "dischargeability_probe": "p12_shoals_published_composites",
+      "violation_text": "put-call parity fails under the sound reflection contract",
+      "fuzz_domain_note": "structure proven at Tier B for any N satisfying the reflection contract; the contract is fuzz-validated on the real n_cdf"
+    },
+    {
+      "id": "shoals.inv.call_upper_bounded_by_spot.v1",
+      "kind_applies_to": ["finance.option_pricer.european_call"],
+      "target_model": "bs_call",
+      "property": {"file": "properties/composites.ch", "name": "call_upper_bounded_by_spot", "module": "Shoals.Properties.Composites"},
+      "binding": {"mechanism": "contract-abstraction", "references_output_fn": "structural", "goal_pattern": null, "contracts": ["std.normal_cdf.range"]},
+      "preconditions": [
+        {"lhs": "s", "op": "gte", "rhs": {"const": 0.0}},
+        {"lhs": "k", "op": "gte", "rhs": {"const": 0.0}},
+        {"lhs": "disc", "op": "gte", "rhs": {"const": 0.0}},
+        {"lhs": "disc", "op": "lte", "rhs": {"const": 1.0}}
+      ],
+      "controls": {
+        "satisfying": {"name": "call_upper_bounded_by_spot", "expected": "passed"},
+        "violating": {"name": "call_upper_bounded_by_spot_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "expected_tier_per_pin": {"0.14.0": "proven_modulo_contract"},
+      "tier_upgrade_trigger": "chelis#434",
+      "dischargeability_probe": "p12_shoals_published_composites",
+      "violation_text": "the call is priced above the underlying spot -- admits arbitrage",
+      "fuzz_domain_note": "structure proven at Tier B for any N satisfying the range contract; the contract is fuzz-validated on the real n_cdf"
+    },
+    {
+      "id": "shoals.inv.delta_in_unit_interval.v1",
+      "kind_applies_to": ["finance.option_pricer.european_call"],
+      "target_model": "bs_call",
+      "property": {"file": "properties/composites.ch", "name": "delta_in_unit_interval", "module": "Shoals.Properties.Composites"},
+      "binding": {"mechanism": "contract-abstraction", "references_output_fn": "structural", "goal_pattern": null, "contracts": ["std.normal_cdf.range"]},
+      "preconditions": [],
+      "controls": {
+        "satisfying": {"name": "delta_in_unit_interval", "expected": "passed"},
+        "violating": {"name": "delta_in_unit_interval_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "edge_control": {"name": "delta_unknown_contract", "expected": "unsupported"},
+      "expected_tier_per_pin": {"0.14.0": "proven_modulo_contract"},
+      "tier_upgrade_trigger": "chelis#434",
+      "dischargeability_probe": "p12_shoals_published_composites",
+      "violation_text": "the call delta N(d1) falls outside [0,1]",
+      "fuzz_domain_note": "structure proven at Tier B for any N satisfying the range contract; the contract is fuzz-validated on the real n_cdf"
+    }
+  ],
+  "deferred_invariants": [
+    {
+      "id": "shoals.inv.call_price_nonneg.v1",
+      "kind_applies_to": ["finance.option_pricer.european_call", "finance.option_pricer.european_call_forward"],
+      "target_models": ["bs_call", "b76_call"],
+      "property": {"file": "properties/canonpricing.ch", "name": "bs_call_price_nonneg", "module": "Shoals.Properties.CanonPricing"},
+      "mirror_property": {"file": "properties/canonpricing.ch", "name": "b76_call_price_nonneg", "module": "Shoals.Properties.CanonPricing"},
+      "dischargeability_probe": "p08_pkg_bs_positive",
+      "reason": "Direct-call positivity against the real transcendental pricers (bs_call_scalar, black_call). NOT characterizable at 0.14.0, on BOTH lanes: (proven) chelis#434's certified-envelope discharge abstracts each normal_cdf call to a free bounded variable, which discards the N(d1)/N(d2) moneyness coupling; the abstracted residual is then falsifiable (e.g. N(d1)=0, N(d2)=1), so BS positivity is NOT provable even with the envelope -- that ceiling is chelis#637 (relational / whole-expression abstraction, the Beacon BoxRange shape). (fuzz) the tier could not be OBSERVED at 0.14.0: measured on the pinned release binary with --tier fuzz-only, one accepted fuzz sample of a SINGLE positivity property does not complete in 200s (the 4-property file at N=5 emitted zero verdicts in 20min) -- the interpreted f64 erf/exp/log/sqrt body under the sampler is intractable. Per the no-unobserved-tier / no-expected-tier-for-deferred rule this entry carries no expected_tier_per_pin. The property + a fast-refuting corrupted twin stay in properties/canonpricing.ch as the reproducer; contract_gate does not gate deferred invariants.",
+      "trigger": "un-deferring is a de-narrowing event on EITHER lane: (a) FUZZ -- a chelis fuzz-performance / compiled-eval improvement that makes sampling the real transcendental pricer tractable (evidence: docs/issue_drafts/fuzz_sampler_transcendental_cost.md; related: c-note docs/issue_drafts/reef_package_prove_load_time.md); or (b) PROVEN -- chelis#637 (relational/whole-expression abstraction preserving the N(d1)/N(d2) coupling), NOT chelis#434. Then move back to `invariants` with the observed tier."
+    },
+    {
+      "id": "shoals.inv.call_monotone_in_s.bs.v1",
+      "dischargeability_probe": "p08_pkg_bs_positive",
+      "reason": "Two-point monotonicity against the real transcendental bs_call_scalar. Same ceiling as call_price_nonneg: free-variable abstraction of the normal_cdf calls discards the coupling (chelis#637), and the fuzz lane is intractable at 0.14.0 (evaluates the pricer twice per sample). Not characterizable at this pin; no expected tier.",
+      "trigger": "(a) FUZZ feasibility (docs/issue_drafts/fuzz_sampler_transcendental_cost.md), or (b) PROVEN via chelis#637 (relational abstraction)."
+    },
+    {
+      "id": "shoals.inv.bs_intrinsic_lower_bound.v1",
+      "reason": "C >= s - k*disc is not reachable via value-level (free-variable) abstraction -- it needs the moneyness coupling between d1, d2 and s vs k*disc that the abstraction discards (research/proof-infra/report.md sec 4 negative-space finding). The relational/whole-expression abstraction that preserves the coupling is chelis#637 (the Beacon BoxRange shape). Not characterizable at this pin; no expected tier.",
+      "trigger": "chelis#637 (relational / BoxRange abstraction), or a Beacon box-range validity proof of the coupled expression."
+    },
+    {
+      "id": "shoals.inv.bs_vega_nonneg_grad.v1",
+      "reason": "grad-in-property sign invariants (vega/delta/gamma) do NOT lower through a cross-module import of the pricer (prove hangs; economoist docs/issue_drafts/dependency_edges_imports.md) and grad through bs_call_scalar hits the f32/f64 precision-mismatch across the grad boundary (research/proof-infra/report.md sec 5). grad never lowers to SMT (fuzz-only), and the fuzz lane over the real pricer is intractable at 0.14.0. Not characterizable at this pin; no expected tier.",
+      "trigger": "an inlined equivalent-form grad body proved from a scratch dir outside the package (own change set), gated once the fuzz-sampler cost (docs/issue_drafts/fuzz_sampler_transcendental_cost.md) is addressed."
+    }
+  ]
 }

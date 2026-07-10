@@ -6,6 +6,68 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-07-10
+
+The Verified Model Characterization canon. Ships the invariant-surface
+producer manifest, the keystone self-audit gate, and a defective-model
+in-region-break deliverable, all grounded in the Phase-0 dischargeability
+record for chelis 0.14.0 (releases stay pinned to 0.14.0; chelis 0.15.0
+published 2026-07-10 is not yet validated for this shell).
+
+### Added
+
+- **Canon reference models and invariants across three honest tiers.**
+  - Proven-over-reals lane: `Shoals.Trees.tr_crr_call_2step`, a closed-form
+    2-step CRR European call (pure arithmetic + ITE, no transcendentals),
+    with `crr_call_nonneg` and `crr_call_monotone_in_s` discharging
+    unqualified at Tier B (`properties/canontrees.ch`), each with a
+    corrupted twin and a `_guards_satisfiable` non-vacuity witness
+    (dischargeability probe p14).
+  - `proven_modulo_contract` lane: the existing `properties/composites.ch`
+    derivatives corpus (put-call parity / upper bound / delta bounds),
+    re-gated at 0.14.0 (probe p12), each green now carrying a corrupted twin.
+  - Direct-pricer positivity (`bs_call_price_nonneg` + a Black-76
+    `b76_call_price_nonneg` kind-reuse mirror, `properties/canonpricing.ch`)
+    ships **deferred** (manifest `deferred_invariants`, no expected tier -- not
+    characterizable at 0.14.0 on either lane): the proven lane is blocked not by
+    chelis#434 (its envelope abstracts each `normal_cdf` to a free variable,
+    discarding the N(d1)/N(d2) coupling, so the residual is falsifiable) but by
+    chelis#637 (relational/whole-expression abstraction); and the fuzz lane is
+    intractable -- one fuzz sample of one positivity property did not complete in
+    200s (`docs/issue_drafts/fuzz_sampler_transcendental_cost.md`, p08). It
+    re-enters the active canon when a run demonstrates a tier.
+- **DEFECTIVE reference model** `Shoals.Trees.tr_crr_call_2step_nodisc` (manifest
+  `defective: true`): the 2-step CRR call with the discount factor dropped. It
+  conforms to the european-call-fixed-depth kind yet violates the no-arbitrage
+  upper bound `C <= s` inside its valid region -- cvc5 refutes with the
+  in-domain arbitrage witness `s=1, k=0.5, u=2, d=0.5, q=0.5` (price 1.125 >
+  spot 1.0), which re-executes at f32 (`in_region_defect`).
+- `docs/cnote-import-surface.json` re-authored as the frozen
+  `chelis-shell.invariant-surface/1.0` producer manifest (models + invariants
+  + kinds + domains + per-pin expected tiers). Published as the release asset
+  `shoals-0.22.0.invariants.json`.
+- `scripts/prove_gate.py` (keystone self-audit gate: expected-tier-driven,
+  classifies from `proof_tier`+qualifiers never `composite_verdict`,
+  anti-vacuity via the prover goal string, controls flip with in-domain
+  witnesses, honesty self-test, name lint) and `scripts/contract_gate.py`
+  (offline manifest resolvability + pin freshness). Wired into CI and
+  `scripts/run_local_gate.py`.
+
+### Changed
+
+- `Shoals.Pricing.bs_call_f64_vector` (previously sitting under
+  `[Unreleased]`) is recorded here where it verifiably shipped -- moved out of
+  Unreleased to fix the changelog drift.
+
+### Removed
+
+- `scripts/manual_gates/phase3l_shoals_oracle_composite_corpus.py`, superseded
+  by `scripts/prove_gate.py`. Its `CHELIS_PROVE_BIN`-era (0.9/0.10) assumptions
+  were stale; the composite corpus is now gated against the pinned release
+  binary through the manifest.
+
+## [0.21.4] - 2026-07-06
+
 ### Added
 
 - `Shoals.Pricing.bs_call_f64_vector`, a tensor-lane f64 Black-Scholes

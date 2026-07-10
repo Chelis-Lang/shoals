@@ -35,6 +35,13 @@ env:
   CHELIS_VERSION: 0.14.0
 
 jobs:
+  # NOTE: there is no nightly canon fuzz gate. The direct-pricer positivity
+  # invariant is deferred/unverified (docs/cnote-import-surface.json
+  # deferred_invariants): the real transcendental pricers cannot be fuzzed
+  # within any budget at 0.14.0 -- one fuzz sample of one positivity property
+  # did not complete in 200s (chelis#434 / p08). The per-PR ci.yml prove-gate
+  # covers the deterministic SMT lanes, which is the entire active canon.
+
   heavy:
     name: heavy ${{ matrix.file }}
     runs-on: ubuntu-latest
