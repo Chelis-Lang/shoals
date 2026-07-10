@@ -87,12 +87,14 @@ C Note is the consumer. Shoals' local obligations:
 
 - `docs/cnote-import-surface.json` is the invariant-surface manifest
   (`chelis-shell.invariant-surface/1.0`): reference models with kinds/domains,
-  and invariants across three honest tiers (`proven` CRR lane, the
-  `proven_modulo_contract` composites lane, the `fuzz_validated` direct-pricer
-  lane) plus the `defective: true` in-region-break model. Every below-proven
-  tier cites a `tier_upgrade_trigger` and a `dischargeability_probe`; tiers are
-  grounded in the Phase-0 record (`c-note/fixtures/dischargeability/`). Published
-  at release as `shoals-<ver>.invariants.json` (byte-identical).
+  and an active invariant set that is entirely SMT-tier (`proven` CRR lane, the
+  `proven_modulo_contract` composites lane, and the `disproved`
+  defective-model break) plus the `defective: true` in-region-break model. The
+  direct-pricer positivity lane is `deferred_invariants` (see below), not an
+  active tier. Every below-proven active tier cites a `tier_upgrade_trigger` and
+  a `dischargeability_probe`; tiers are grounded in the Phase-0 record
+  (`c-note/fixtures/dischargeability/`). Published at release as
+  `shoals-<ver>.invariants.json` (byte-identical).
 - `scripts/contract_gate.py` (offline: manifest resolvability + pin freshness)
   and `scripts/prove_gate.py` (keystone: expected-tier enforcement against the
   pinned release binary; classifies from `proof_tier`+qualifiers, **never** the
