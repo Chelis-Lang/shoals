@@ -105,7 +105,7 @@ C Note is the consumer. Shoals' local obligations:
   0.14.0 on either lane -- the proven lane is blocked by chelis#637 (free-variable
   abstraction discards the N(d1)/N(d2) coupling; chelis#434's envelope does not
   fix this), and the fuzz lane is intractable (one fuzz sample of one positivity
-  property did not complete in 200s; `docs/issue_drafts/fuzz_sampler_transcendental_cost.md`,
+  property did not complete in 200s; chelis#659,
   p08). It re-enters `invariants` only when a run demonstrates a tier (prove_gate
   carries the dormant fuzz machinery for that day).
 - Additive-only within schema major 1; renames/removals need a major bump and a

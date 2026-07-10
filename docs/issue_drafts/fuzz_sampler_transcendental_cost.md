@@ -1,8 +1,9 @@
-# Draft: `prove --tier fuzz-only` is intractable over an f64 transcendental body (one sample does not complete in 200s)
+# `prove --tier fuzz-only` is intractable over an f64 transcendental body (one sample does not complete in 200s)
 
-**Filing condition:** file against `Chelis-Lang/chelis` if the fuzz-lane cost is
-not already tracked upstream, OR fold into an existing prove-performance issue.
+**FILED: chelis#659** (2026-07-10). Dedup-checked against chelis#644 (sampler
+*domain*/box-starvation — distinct root cause) and cross-referenced there.
 Related upstream evidence: c-note `docs/issue_drafts/reef_package_prove_load_time.md`.
+This draft is retained as the local record; cite `chelis#659` at narrowing sites.
 
 ## Summary
 
