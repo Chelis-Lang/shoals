@@ -53,16 +53,22 @@ def read_reef_pin(root: Path) -> str:
     return m.group(1)
 
 
-# A workflow "installs the chelis toolchain" if it invokes the shared install
-# action OR downloads the released chelis tarball directly. Contract §2 requires
-# every such workflow to carry a matching literal CHELIS_TAG / CHELIS_VERSION env
-# pair, guarded offline. These markers identify those workflows from their text
-# without running them; a workflow with no chelis install (nothing to pin) is
-# correctly exempt.
+# A workflow "installs the chelis toolchain" if it downloads the released chelis
+# tarball (inline or via the shared composite action) or builds chelis from
+# source. Contract §2 requires every such workflow to carry a matching literal
+# CHELIS_TAG / CHELIS_VERSION env pair, guarded offline. These markers identify
+# those workflows from their text without running them; a workflow with no chelis
+# install (nothing to pin) is correctly exempt. A composite action
+# (`./.github/actions/install-chelis`) hides the raw `gh release download` /
+# `repository:` strings behind the action file, so the action reference itself is
+# a marker — otherwise env-pin enforcement would silently skip those workflows.
+# Kept identical to economoist's guard (Scaffolding Drift Rule: shells share one
+# shape) even where a marker matches no current shoals workflow.
 TOOLCHAIN_INSTALL_MARKERS = (
-    "actions/install-chelis",          # the shared composite install action (ci.yml, nightly.yml)
-    "gh release download",             # inline download of the chelis tarball (release.yml)
+    "gh release download",          # download the published chelis tarball
+    "actions/install-chelis",       # install the release tarball via the composite action
     "repository: Chelis-Lang/chelis",  # checkout chelis source to build it
+    "cargo build --release -p chelis-cli",  # build chelis from source
 )
 
 
