@@ -87,12 +87,14 @@ C Note is the consumer. Shoals' local obligations:
 
 - `docs/cnote-import-surface.json` is the invariant-surface manifest
   (`chelis-shell.invariant-surface/1.0`): reference models with kinds/domains,
-  and invariants across three honest tiers (`proven` CRR lane, the
-  `proven_modulo_contract` composites lane, the `fuzz_validated` direct-pricer
-  lane) plus the `defective: true` in-region-break model. Every below-proven
-  tier cites a `tier_upgrade_trigger` and a `dischargeability_probe`; tiers are
-  grounded in the Phase-0 record (`c-note/fixtures/dischargeability/`). Published
-  at release as `shoals-<ver>.invariants.json` (byte-identical).
+  and an active invariant set that is entirely SMT-tier (`proven` CRR lane, the
+  `proven_modulo_contract` composites lane, and the `disproved`
+  defective-model break) plus the `defective: true` in-region-break model. The
+  direct-pricer positivity lane is `deferred_invariants` (see below), not an
+  active tier. Every below-proven active tier cites a `tier_upgrade_trigger` and
+  a `dischargeability_probe`; tiers are grounded in the Phase-0 record
+  (`c-note/fixtures/dischargeability/`). Published at release as
+  `shoals-<ver>.invariants.json` (byte-identical).
 - `scripts/contract_gate.py` (offline: manifest resolvability + pin freshness)
   and `scripts/prove_gate.py` (keystone: expected-tier enforcement against the
   pinned release binary; classifies from `proof_tier`+qualifiers, **never** the
@@ -105,7 +107,7 @@ C Note is the consumer. Shoals' local obligations:
   0.14.0 on either lane -- the proven lane is blocked by chelis#637 (free-variable
   abstraction discards the N(d1)/N(d2) coupling; chelis#434's envelope does not
   fix this), and the fuzz lane is intractable (one fuzz sample of one positivity
-  property did not complete in 200s; `docs/issue_drafts/fuzz_sampler_transcendental_cost.md`,
+  property did not complete in 200s; chelis#659,
   p08). It re-enters `invariants` only when a run demonstrates a tier (prove_gate
   carries the dormant fuzz machinery for that day).
 - Additive-only within schema major 1; renames/removals need a major bump and a

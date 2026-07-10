@@ -245,13 +245,13 @@
       "mirror_property": {"file": "properties/canonpricing.ch", "name": "b76_call_price_nonneg", "module": "Shoals.Properties.CanonPricing"},
       "dischargeability_probe": "p08_pkg_bs_positive",
       "reason": "Direct-call positivity against the real transcendental pricers (bs_call_scalar, black_call). NOT characterizable at 0.14.0, on BOTH lanes: (proven) chelis#434's certified-envelope discharge abstracts each normal_cdf call to a free bounded variable, which discards the N(d1)/N(d2) moneyness coupling; the abstracted residual is then falsifiable (e.g. N(d1)=0, N(d2)=1), so BS positivity is NOT provable even with the envelope -- that ceiling is chelis#637 (relational / whole-expression abstraction, the Beacon BoxRange shape). (fuzz) the tier could not be OBSERVED at 0.14.0: measured on the pinned release binary with --tier fuzz-only, one accepted fuzz sample of a SINGLE positivity property does not complete in 200s (the 4-property file at N=5 emitted zero verdicts in 20min) -- the interpreted f64 erf/exp/log/sqrt body under the sampler is intractable. Per the no-unobserved-tier / no-expected-tier-for-deferred rule this entry carries no expected_tier_per_pin. The property + a fast-refuting corrupted twin stay in properties/canonpricing.ch as the reproducer; contract_gate does not gate deferred invariants.",
-      "trigger": "un-deferring is a de-narrowing event on EITHER lane: (a) FUZZ -- a chelis fuzz-performance / compiled-eval improvement that makes sampling the real transcendental pricer tractable (evidence: docs/issue_drafts/fuzz_sampler_transcendental_cost.md; related: c-note docs/issue_drafts/reef_package_prove_load_time.md); or (b) PROVEN -- chelis#637 (relational/whole-expression abstraction preserving the N(d1)/N(d2) coupling), NOT chelis#434. Then move back to `invariants` with the observed tier."
+      "trigger": "un-deferring is a de-narrowing event on EITHER lane: (a) FUZZ -- a chelis fuzz-performance / compiled-eval improvement that makes sampling the real transcendental pricer tractable (evidence: chelis#659; related: c-note docs/issue_drafts/reef_package_prove_load_time.md); or (b) PROVEN -- chelis#637 (relational/whole-expression abstraction preserving the N(d1)/N(d2) coupling), NOT chelis#434. Then move back to `invariants` with the observed tier."
     },
     {
       "id": "shoals.inv.call_monotone_in_s.bs.v1",
       "dischargeability_probe": "p08_pkg_bs_positive",
       "reason": "Two-point monotonicity against the real transcendental bs_call_scalar. Same ceiling as call_price_nonneg: free-variable abstraction of the normal_cdf calls discards the coupling (chelis#637), and the fuzz lane is intractable at 0.14.0 (evaluates the pricer twice per sample). Not characterizable at this pin; no expected tier.",
-      "trigger": "(a) FUZZ feasibility (docs/issue_drafts/fuzz_sampler_transcendental_cost.md), or (b) PROVEN via chelis#637 (relational abstraction)."
+      "trigger": "(a) FUZZ feasibility (chelis#659), or (b) PROVEN via chelis#637 (relational abstraction)."
     },
     {
       "id": "shoals.inv.bs_intrinsic_lower_bound.v1",
@@ -261,7 +261,7 @@
     {
       "id": "shoals.inv.bs_vega_nonneg_grad.v1",
       "reason": "grad-in-property sign invariants (vega/delta/gamma) do NOT lower through a cross-module import of the pricer (prove hangs; economoist docs/issue_drafts/dependency_edges_imports.md) and grad through bs_call_scalar hits the f32/f64 precision-mismatch across the grad boundary (research/proof-infra/report.md sec 5). grad never lowers to SMT (fuzz-only), and the fuzz lane over the real pricer is intractable at 0.14.0. Not characterizable at this pin; no expected tier.",
-      "trigger": "an inlined equivalent-form grad body proved from a scratch dir outside the package (own change set), gated once the fuzz-sampler cost (docs/issue_drafts/fuzz_sampler_transcendental_cost.md) is addressed."
+      "trigger": "an inlined equivalent-form grad body proved from a scratch dir outside the package (own change set), gated once the fuzz-sampler cost (chelis#659) is addressed."
     }
   ]
 }

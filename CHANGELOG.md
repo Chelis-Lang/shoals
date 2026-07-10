@@ -34,7 +34,7 @@ published 2026-07-10 is not yet validated for this shell).
     discarding the N(d1)/N(d2) coupling, so the residual is falsifiable) but by
     chelis#637 (relational/whole-expression abstraction); and the fuzz lane is
     intractable -- one fuzz sample of one positivity property did not complete in
-    200s (`docs/issue_drafts/fuzz_sampler_transcendental_cost.md`, p08). It
+    200s (chelis#659, p08). It
     re-enters the active canon when a run demonstrates a tier.
 - **DEFECTIVE reference model** `Shoals.Trees.tr_crr_call_2step_nodisc` (manifest
   `defective: true`): the 2-step CRR call with the discount factor dropped. It
