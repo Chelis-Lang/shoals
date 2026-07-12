@@ -12,7 +12,13 @@ the unconsumed v1 manifest lacked:
     @property in the named file;
   * every control / non_vacuity_witness / edge_control name exists as a @property;
   * every structured precondition appears (normalized) in the property's
-    where-clause text (prove --json has no structured preconditions field);
+    where-clause text (declared subset of the proof's guards);
+  * COMPLETENESS (the reverse direction): every region-constraining guard in
+    the property's where-clause is a declared precondition (declared superset of
+    the proof's guards). An UNDER-declared manifest -- declared a strict subset
+    of the where-clause -- lets the consumer derive a validity region WIDER than
+    what was proved (a region-overclaim forge the red-team found in a sibling
+    shell). Together the two directions pin declared == where-clause exactly;
   * expected_tier_per_pin has an entry for the current pin;
   * every below-proven expected tier carries a tier_upgrade_trigger citation.
 """
@@ -27,7 +33,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 MANIFEST = REPO / "docs" / "cnote-import-surface.json"
 BELOW_PROVEN = {"proven_modulo_contract", "sound_approximate", "fuzz_validated"}
-OP = {"gt": ">", "gte": ">=", "lt": "<", "lte": "<="}
+OP = {"gt": ">", "gte": ">=", "lt": "<", "lte": "<=", "eq": "=="}
+# where-clause comparison operator -> contract op token (longest first).
+SYM2TOK = {">=": "gte", "<=": "lte", "==": "eq", ">": "gt", "<": "lt"}
 
 _errors: list[str] = []
 
@@ -85,6 +93,93 @@ def check_precondition(where_ns: str, pc: dict, ctx: str) -> None:
         err(f"{ctx}: precondition {needle} not found in property where-clause")
 
 
+def canon_pc(pc: dict) -> tuple:
+    """A declared manifest precondition in canonical comparable form."""
+    rhs = pc["rhs"]
+    if "const" in rhs:
+        r = ("const", float(rhs["const"]))
+    else:  # `input` is the param-reference key; `param` accepted as read-alias.
+        r = ("input", rhs.get("input", rhs.get("param")))
+    return (pc["lhs"], pc["op"], r)
+
+
+def parse_where_guards(header: str) -> tuple[list[tuple], list[str]]:
+    """Guards of a `@property ... where (g), (g), ...:` header, in the same
+    canonical form as canon_pc, plus any guards that did not parse. Returns
+    ([] , []) for a property with no where-clause."""
+    w = re.search(r"\bwhere\b(.*):", header)
+    if not w:
+        return [], []
+    guards: list[tuple] = []
+    unparsed: list[str] = []
+    for inner in re.findall(r"\(([^()]+)\)", w.group(1)):
+        g = re.match(r"\s*([A-Za-z_]\w*)\s*(>=|<=|==|>|<)\s*([A-Za-z0-9_.]+)\s*$", inner)
+        if not g:
+            unparsed.append(inner.strip())
+            continue
+        lhs, sym, rhs = g.groups()
+        tok = SYM2TOK[sym]
+        if re.fullmatch(r"[0-9.]+", rhs):
+            guards.append((lhs, tok, ("const", float(rhs))))
+        else:
+            guards.append((lhs, tok, ("input", rhs)))
+    return guards, unparsed
+
+
+def completeness_errors(header: str, preconditions: list, ctx: str) -> list[str]:
+    """Pure (no global mutation): the completeness errors for one property.
+    Every region-constraining guard in the where-clause MUST be a declared
+    precondition (declared superset of the proof's guards). Reverse of
+    check_precondition; an UNDER-declared manifest lets the consumer derive a
+    region wider than the proof (region-overclaim forge). Fails closed on an
+    unparsed guard -- an unparsed guard might be the under-declared one."""
+    out: list[str] = []
+    guards, unparsed = parse_where_guards(header)
+    declared = {canon_pc(pc) for pc in preconditions}
+    for lhs, tok, rhs in guards:
+        if (lhs, tok, rhs) not in declared:
+            rhs_s = fmt_const(rhs[1]) if rhs[0] == "const" else rhs[1]
+            out.append(f"{ctx}: UNDER-DECLARED -- property where-clause guard "
+                       f"({lhs} {OP[tok]} {rhs_s}) is not a declared precondition; "
+                       "the consumer would derive a validity region WIDER than the proof")
+    for u in unparsed:
+        out.append(f"{ctx}: could not parse where-clause guard `({u})`; cannot "
+                   "confirm it is declared (failing closed -- may be under-declared)")
+    return out
+
+
+def check_completeness(header: str, preconditions: list, ctx: str) -> None:
+    for e in completeness_errors(header, preconditions, ctx):
+        err(e)
+
+
+def self_test() -> None:
+    """The completeness check must catch an under-declared manifest. Runs first;
+    a regression that weakens the check fails the gate itself (mirrors
+    prove_gate's honesty self-test)."""
+    hdr = "@property x forall(a: f32, b: f32) where (a > 0.0), (b < 1.0):"
+    complete = [{"lhs": "a", "op": "gt", "rhs": {"const": 0.0}},
+                {"lhs": "b", "op": "lt", "rhs": {"const": 1.0}}]
+    under = [{"lhs": "a", "op": "gt", "rhs": {"const": 0.0}}]  # missing (b < 1.0)
+    hdr_rel = "@property y forall(a: f32, b: f32) where (b > a):"
+    checks = [
+        ("complete accepted", completeness_errors(hdr, complete, "st") == []),
+        ("under-declared caught", len(completeness_errors(hdr, under, "st")) == 1
+            and "UNDER-DECLARED" in completeness_errors(hdr, under, "st")[0]),
+        ("param-ref guard accepted", completeness_errors(
+            hdr_rel, [{"lhs": "b", "op": "gt", "rhs": {"input": "a"}}], "st") == []),
+        ("param-ref under-declared caught",
+            len(completeness_errors(hdr_rel, [], "st")) == 1),
+        ("no-where property clean", completeness_errors(
+            "@property z forall(d1: f32):", [], "st") == []),
+    ]
+    failed = [name for name, ok in checks if not ok]
+    if failed:
+        err("completeness self-test FAILED: " + "; ".join(failed))
+    else:
+        print(f"  completeness self-test: PASS ({len(checks)} cases)")
+
+
 def check_instantiation(inv: dict, inst: dict, models: dict) -> None:
     ctx = f"{inv['id']}"
     prop = inst["property"]
@@ -99,21 +194,26 @@ def check_instantiation(inv: dict, inst: dict, models: dict) -> None:
         names.append(inv["non_vacuity_witness"])
     if inv.get("edge_control"):
         names.append(inv["edge_control"]["name"])
-    where_ns = None
+    where_block = None
     for nm in names:
         blk = property_block(pfile, nm)
         if blk is None:
             err(f"{ctx}: @property `{nm}` not found in {prop['file']}")
         elif nm == inst["controls"].get("satisfying", {}).get("name") or \
                 (inv.get("defective_model") and nm == inst["controls"]["violating"]["name"]):
-            where_ns = re.sub(r"\s+", "", blk)
-    # preconditions checked against the satisfying (or defect) control's guards.
-    if where_ns is not None:
+            where_block = blk
+    # preconditions vs the satisfying (or defect) control's where-clause, BOTH
+    # directions: declared subset of the guards (each declared appears in text)
+    # AND declared superset of the guards (completeness -- no under-declaration).
+    if where_block is not None:
+        where_ns = re.sub(r"\s+", "", where_block)
         for pc in inst.get("preconditions", []):
             check_precondition(where_ns, pc, ctx)
+        check_completeness(where_block, inst.get("preconditions", []), ctx)
 
 
 def main() -> None:
+    self_test()
     manifest = json.loads(MANIFEST.read_text())
     ver, pin = reef_pins()
 
