@@ -8,6 +8,19 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `scripts/prove_gate.py` gains a **metamorphic anti-vacuity** check
+  (red-team hardening). The syntactic "goal names the output fn" check is
+  forgeable — a canceling call `f(x)-f(x)<c` or reflexive `f(x)==f(x)` names
+  the fn but its truth is independent of the model. The gate now re-proves each
+  green with the referenced body (direct lane: identity-of-first-param /
+  negated / constant) or abstracted contract (structural lane: `normal_cdf`
+  substituted by contract-violating constants) replaced by several
+  alternatives, and requires the outcome to flip under **at least one** (a
+  single substitution is unsound — `F≡0` makes monotonicity trivially true).
+  Committed forge fixtures under `metamorphic/` (canceling + reflexive that
+  must be rejected, a legit monotonicity green that must survive) drive a
+  self-test. All six active canon invariants pass; the ≥1-of-several rule is
+  load-bearing (the upper-bound composite flips only under `normal_cdf=2.0`).
 - `scripts/contract_gate.py` gains a **precondition-completeness** check
   (red-team hardening): every region-constraining guard in a property's
   where-clause must be a declared manifest precondition (declared ⊇

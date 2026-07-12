@@ -9,12 +9,18 @@ RELEASE binary. For every manifest invariant:
      de-narrowing motion"). Tier is classified from proof_tier + qualifiers,
      NEVER from the composite_verdict string (contract rule; verdict strings
      may demote, never promote).
-  2. Anti-vacuity: the prover-emitted GOAL string for the satisfying control
-     names the output fn (direct) or the abstracted contract symbol
-     (structural). dependency_edges is NOT used -- it does not cross module
-     import boundaries (uniformly [] for imported output fns; economoist
-     docs/issue_drafts/dependency_edges_imports.md), so keying on it would
-     false-pass vacuity. The corrupt-flip (control 2) is the second half.
+  2. Anti-vacuity, TWO layers:
+     (a) syntactic (fast necessary condition): the prover-emitted GOAL string
+         names the output fn (direct) or the abstracted contract symbol
+         (structural). dependency_edges is NOT used -- it is [] across import
+         boundaries. This alone is FORGEABLE (a canceling call f(x)-f(x)<c or
+         reflexive f(x)==f(x) names the fn but is model-independent).
+     (b) metamorphic (the real bar): re-prove the goal with the referenced body
+         (direct lane) or abstracted contract (structural lane) SUBSTITUTED by
+         several alternatives, and require the outcome to flip under AT LEAST
+         ONE -- only a goal whose truth depends on the model survives. A
+         self-test runs the same core on committed metamorphic/ forge fixtures
+         (canceling + reflexive rejected, a legit green survives).
   3. Violating control breaks with a real IN-DOMAIN witness: status matches the
      declared expectation (failed / unsupported), a counterexample is present
      (when failed), and the counterexample satisfies the manifest's structured
@@ -315,6 +321,191 @@ def check_non_vacuity(recs, inv) -> bool:
     return True
 
 
+# --- Metamorphic anti-vacuity ------------------------------------------------
+# A syntactic "the goal names the output fn" check is forgeable: a canceling
+# call f(x)-f(x)<c or a reflexive f(x)==f(x) textually names the fn but its
+# truth is INDEPENDENT of the model body. The real bar is metamorphic: re-prove
+# the goal with the referenced body (direct lane) or abstracted contract
+# (structural lane) SUBSTITUTED by several alternatives and require the outcome
+# to CHANGE under AT LEAST ONE. A single substitution is unsound (F=const-0
+# makes monotonicity F(s2)>=F(s1) trivially true -> false-positive); the
+# >=1-of-several rule fixes it. Substitutions use PLAIN forms -- `cast(...)`
+# does not lower to SMT, so a cast-wrapped body wrongly reads `unsupported`.
+FORGE_DIR = REPO / "metamorphic"
+STRUCT_CONTRACT_SUBS = ["2.0", "0.3"]  # constants VIOLATING the normal_cdf contract
+
+
+def outcome(tier: str) -> str:
+    """Coarse metamorphic outcome. proven_modulo_contract collapses to `proved`
+    so a structural substitution (which drops the modulo-contract qualifier)
+    only counts as a flip when it changes proved<->disproved, not merely the
+    qualifier."""
+    if tier in ("proven", "proven_modulo_contract"):
+        return "proved"
+    if tier == "disproved":
+        return "disproved"
+    return "other"
+
+
+def prove_standalone(binary: str, source: str) -> str:
+    """Prove a self-contained scratch .ch OUTSIDE the repo (package
+    auto-detection changes prove semantics); return the single property's
+    classified tier, or 'error' if it did not type-check / emit a record."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        f = Path(td) / "forge.ch"
+        f.write_text(source)
+        out = subprocess.run(
+            [binary, "prove", str(f), "--json", "--tier", "smt-only",
+             "--smt-timeout", SMT_TIMEOUT_MS],
+            cwd=td, capture_output=True, text=True)
+        for line in out.stdout.splitlines():
+            line = line.strip()
+            if not line.startswith("{"):
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if obj.get("kind") == "property":
+                return classify_tier(obj)
+        return "error"
+
+
+def extract_property_block(pfile: Path, name: str) -> str | None:
+    """The `@property NAME ...:` header line plus its indented continuation
+    (goal, `with contract`). Stops at the first non-indented line."""
+    lines = pfile.read_text().splitlines()
+    out: list[str] = []
+    started = False
+    for ln in lines:
+        if not started:
+            if re.match(rf"@property\s+{re.escape(name)}\b", ln):
+                started = True
+                out.append(ln)
+            continue
+        if ln[:1] in (" ", "\t"):
+            out.append(ln)
+        else:
+            break
+    return "\n".join(out) if started else None
+
+
+def _first_param(sig: str) -> str:
+    m = re.search(r"\(\s*(\w+)\s*:", sig)
+    return m.group(1) if m else ""
+
+
+def _ret_type(sig: str) -> str:
+    m = re.search(r"->\s*(\w+)", sig)
+    return m.group(1) if m else "f32"
+
+
+def direct_alt_bodies(sig: str) -> list[tuple[str, str]]:
+    """(label, body) alternatives for the output fn: identity-of-first-param,
+    negated-first-param, and a distinct constant (plain, no cast)."""
+    p0 = _first_param(sig)
+    ret = _ret_type(sig)
+    const = "0.0" if ret == "f32" else f"cast(0.0, {ret})"
+    return [("identity", p0), ("negated", f"neg({p0})"), ("constant", const)]
+
+
+def _strip_contract(prop_block: str) -> str:
+    return "\n".join(ln for ln in prop_block.splitlines() if "with contract" not in ln)
+
+
+def metamorphic_flips(binary: str, prop_block: str, orig_out: str,
+                      structural: bool, fn: str = "", sig: str = "") -> tuple[bool, list]:
+    """Re-prove the goal under several substitutions; return (flipped, results).
+    flipped == some alternative's outcome differs from the original."""
+    results = []
+    if structural:
+        body = _strip_contract(prop_block)
+        for c in STRUCT_CONTRACT_SUBS:
+            src = f"module Forge\ndef normal_cdf(x: f32) -> f32 = {c}\n{body}\n"
+            t = prove_standalone(binary, src)
+            results.append((f"normal_cdf={c}", t, outcome(t)))
+    else:
+        for label, alt in direct_alt_bodies(sig):
+            src = f"module Forge\ndef {fn}{sig} = {alt}\n{prop_block}\n"
+            t = prove_standalone(binary, src)
+            results.append((f"{label}({alt})", t, outcome(t)))
+    flipped = any(o != orig_out for _, _, o in results)
+    return flipped, results
+
+
+def check_metamorphic(inv: dict, models: dict, binary: str) -> bool:
+    """Anti-vacuity by metamorphic substitution (supersedes the syntactic
+    goal-names-fn check for real F-dependence)."""
+    binding = inv["binding"]
+    if inv.get("defective_model"):
+        ctrl_name = inv["controls"]["violating"]["name"]
+        orig_out = "disproved"
+    else:
+        ctrl_name = inv["controls"]["satisfying"]["name"]
+        orig_out = "proved"
+    prop_block = extract_property_block(REPO / inv["property"]["file"], ctrl_name)
+    if prop_block is None:
+        fail(f"metamorphic: property `{ctrl_name}` not found for {inv['id']}")
+        return False
+    structural = binding["references_output_fn"] == "structural"
+    if structural:
+        flipped, results = metamorphic_flips(binary, prop_block, orig_out, True)
+        lane = "contract"
+    else:
+        model = models[inv["target_model"]]
+        flipped, results = metamorphic_flips(
+            binary, prop_block, orig_out, False,
+            fn=model["output_fn"], sig=model["sig"])
+        lane = "body"
+    if not flipped:
+        fail(f"metamorphic VACUITY: {inv['id']} [{lane}] goal outcome "
+             f"'{orig_out}' is INVARIANT under every substitution "
+             f"{[(l, o) for l, _, o in results]} -- its truth is independent of "
+             "the model (a canceling/reflexive forge would pass a syntactic check)")
+        return False
+    flips = [l for l, _, o in results if o != orig_out]
+    print(f"    metamorphic [{lane}] `{ctrl_name}`: orig={orig_out}; "
+          f"outcome flips under {flips}")
+    return True
+
+
+def parse_fixture(path: Path) -> tuple[str, str, str]:
+    """(fn, sig, property-block) from a self-contained forge fixture .ch."""
+    text = path.read_text()
+    dm = re.search(r"def\s+(\w+)\s*(\(.*?\)\s*->\s*\w+)\s*=", text)
+    pm = re.search(r"@property\s+(\w+)", text)
+    fn, sig = dm.group(1), dm.group(2).strip()
+    return fn, sig, extract_property_block(path, pm.group(1))
+
+
+def metamorphic_self_test(binary: str) -> bool:
+    """The metamorphic check must REJECT vacuous greens (canceling, reflexive:
+    no substitution flips) and SURVIVE a legit green (a substitution flips).
+    Runs the same core on the committed forge fixtures under metamorphic/."""
+    expect = {  # fixture stem -> should the outcome flip under substitution?
+        "forge_canceling": False,     # f(x)-f(x)<c: invariant -> REJECT
+        "forge_reflexive": False,     # f(x)==f(x): invariant -> REJECT
+        "forge_legit_monotone": True,  # f(x2)>=f(x1): flips under neg -> SURVIVE
+    }
+    ok = True
+    for stem, should_flip in expect.items():
+        path = FORGE_DIR / f"{stem}.ch"
+        if not path.is_file():
+            fail(f"metamorphic self-test: fixture {path.relative_to(REPO)} missing")
+            ok = False
+            continue
+        fn, sig, block = parse_fixture(path)
+        flipped, results = metamorphic_flips(binary, block, "proved", False, fn=fn, sig=sig)
+        if flipped != should_flip:
+            fail(f"metamorphic self-test: {stem} flipped={flipped}, expected "
+                 f"{should_flip} (results {[(l, o) for l, _, o in results]})")
+            ok = False
+    print(f"  metamorphic self-test: {'PASS' if ok else 'FAIL'} "
+          "(canceling+reflexive rejected, legit green survives)")
+    return ok
+
+
 def name_lint(files: list[Path]) -> bool:
     ok = True
     for f in files:
@@ -349,6 +540,7 @@ def main() -> None:
         return include_fuzz or inv["expected_tier_per_pin"].get(pin) != "fuzz_validated"
 
     ok = honesty_self_test()
+    ok = metamorphic_self_test(binary) and ok
 
     canon_files = [REPO / "properties" / "canonpricing.ch",
                    REPO / "properties" / "canontrees.ch"]
@@ -401,6 +593,12 @@ def main() -> None:
                                     "preconditions": inv.get("preconditions", [])},
                                    pin, output_fn)
         i_ok = check_non_vacuity(recs, inv) and i_ok
+        # Metamorphic anti-vacuity (SMT lanes): substitute the model body /
+        # abstracted contract and require the outcome to flip. The syntactic
+        # goal_names_ref check above is a fast necessary condition; this is the
+        # real one. (Fuzz-tier invariants -- none active -- are out of scope.)
+        if exp != "fuzz_validated":
+            i_ok = check_metamorphic(inv, models, binary) and i_ok
         for inst in inv.get("also_instantiated_for", []):
             of = models[inst["target_model"]]["output_fn"]
             irecs = recs_by_file[inst["property"]["file"]]
