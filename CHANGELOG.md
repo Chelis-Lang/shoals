@@ -6,6 +6,18 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- `scripts/contract_gate.py` gains a **precondition-completeness** check
+  (red-team hardening): every region-constraining guard in a property's
+  where-clause must be a declared manifest precondition (declared ⊇
+  where-clause), the reverse of the existing declared ⊆ text direction. An
+  under-declared manifest would let the C Note consumer derive a validity
+  region wider than the proof (a region-overclaim forge found in a sibling
+  shell). Includes a self-test. Audit of the shipped v0.22.0 manifest was
+  clean — every active invariant already declares its full where-clause — so
+  this is preventive, with no manifest change required.
+
 ## [0.22.0] - 2026-07-10
 
 The Verified Model Characterization canon. Ships the invariant-surface
