@@ -2,9 +2,9 @@
   "schema_id": "chelis-shell.invariant-surface",
   "schema_version": "1.0",
   "pkg": "shoals",
-  "pkg_version": "0.22.0",
+  "pkg_version": "0.23.0",
   "chelis_pin": "0.14.0",
-  "generated_note": "Producer manifest for the C Note characterization engine (frozen contract characterization_contract_v1.md sec 1). Also published as the release asset shoals-0.22.0.invariants.json (byte-identical). Tiers are grounded in the Phase-0 dischargeability record record.chelis-0.14.0.json; every below-proven tier cites a tier_upgrade_trigger and a dischargeability_probe. Latest upstream chelis is 0.15.0 (published 2026-07-10); 0.22.0 stays pinned to 0.14.0 which is the validated release for this canon (0.15.0 not yet validated for this shell).",
+  "generated_note": "Producer manifest for the C Note characterization engine (frozen contract characterization_contract_v1.md sec 1). Also published as the release asset shoals-0.23.0.invariants.json (byte-identical). v0.23.0 adds the MODEL-FREE canon: kind-scoped invariants (target_model: null, anchor_model names the proving ground) that reference the output fn DIRECTLY via goal_pattern, so the engine instantiates them against any pricer of the kind -- a european_call no-arbitrage family (nonneg / upper bound C<=s / intrinsic lower bound / bull spread / butterfly) anchored on the risk-neutral tr_crr_call_2step_rn, and a discrete-compounding finance.fixed_income.* family (discount factor / bond PV / price-yield monotonicity / convexity) anchored on a 2-period bond, both genuinely proven over the reals, plus a defective undiscounted bond. Tiers are grounded in the Phase-0 dischargeability record record.chelis-0.14.0.json; every below-proven tier cites a tier_upgrade_trigger and a dischargeability_probe. Latest upstream chelis is 0.15.0 (published 2026-07-10); 0.23.0 stays pinned to 0.14.0 which is the validated release for this canon (0.15.0 not yet validated for this shell).",
   "models": [
     {
       "id": "bs_call",
@@ -82,6 +82,72 @@
       "sensitivities": [],
       "defective": true,
       "notes": "DEFECTIVE reference model (sprint in-region-break deliverable). Identical to tr_crr_call_2step but with the discount factor DROPPED -- it returns the raw risk-neutral expected payoff, not its present value (a real, common finance bug: forgetting to discount). It conforms to the european_call_fixed_depth kind yet VIOLATES the no-arbitrage upper bound C <= s inside its valid input region (verified in-domain witness s=1.0 k=0.5 u=2.0 d=0.5 q=0.5 gives price 1.125 > spot 1.0). See invariant shoals.inv.call_upper_bounded_by_spot.crr_nodisc_defect.v1."
+    },
+    {
+      "id": "tr_crr_call_2step_rn",
+      "kind": "finance.option_pricer.european_call",
+      "module": "Shoals.Trees",
+      "output_fn": "tr_crr_call_2step_rn",
+      "sig": "(s: f32, k: f32, u: f32, d: f32, q: f32) -> f32",
+      "params": [
+        {"name": "s", "meaning": "spot price", "unit": "currency", "domain": {"gt": 0.0}, "sweep_default": {"min": 0.5, "max": 9.5, "value": 5.0}},
+        {"name": "k", "meaning": "strike", "unit": "currency", "domain": {"gt": 0.0}, "sweep_default": {"min": 0.5, "max": 9.5, "value": 5.0}},
+        {"name": "u", "meaning": "up move factor", "unit": "ratio", "domain": {"gt": 1.0}, "sweep_default": {"min": 1.05, "max": 2.0, "value": 1.2}},
+        {"name": "d", "meaning": "down move factor", "unit": "ratio", "domain": {"gt": 0.0, "lt": 1.0}, "sweep_default": {"min": 0.5, "max": 0.95, "value": 0.83}},
+        {"name": "q", "meaning": "risk-neutral up probability", "unit": "probability", "domain": {"gt": 0.0, "lt": 1.0}, "sweep_default": {"min": 0.1, "max": 0.9, "value": 0.5}}
+      ],
+      "salient_dims": ["s", "k"],
+      "output": {"meaning": "risk-neutral 2-step CRR call present value", "unit": "currency"},
+      "sensitivities": [],
+      "defective": false,
+      "notes": "Risk-neutral 2-step CRR European call: the per-step discount is DERIVED as disc = 1/(q*u+(1-q)*d), so the discounted underlying is a martingale by construction (no-arbitrage-consistent). Pure arithmetic + division + ITE, lowers to cvc5. The genuine proven-over-reals ANCHOR for the model-free european_call no-arbitrage canon (nonneg, upper bound C<=s, intrinsic lower bound, bull spread, butterfly). The value bounds hold ONLY under the martingale condition, so they FAIL on the free-parameter tr_crr_call_2step (which admits an in-domain arbitrage witness) -- that contrast is the teaching exemplar of genuine-vs-deferred."
+    },
+    {
+      "id": "fi_discount_2p",
+      "kind": "finance.fixed_income.discount_factor",
+      "module": "Shoals.FixedIncome",
+      "output_fn": "fi_df2",
+      "sig": "(y: f32) -> f32",
+      "params": [
+        {"name": "y", "meaning": "per-period yield", "unit": "rate", "domain": {"gte": 0.0}, "sweep_default": {"min": 0.0, "max": 0.2, "value": 0.05}}
+      ],
+      "salient_dims": ["y"],
+      "output": {"meaning": "2-period discount factor", "unit": "ratio"},
+      "sensitivities": [],
+      "defective": false,
+      "notes": "Closed-form 2-period discount factor 1/(1+y)^2. Pure arithmetic + division, lowers to cvc5. Anchors the discount-factor-bounded invariant (in (0,1] for y >= 0)."
+    },
+    {
+      "id": "fi_bond_2p",
+      "kind": "finance.fixed_income.coupon_bond",
+      "module": "Shoals.FixedIncome",
+      "output_fn": "fi_bond2",
+      "sig": "(c: f32, y: f32) -> f32",
+      "params": [
+        {"name": "c", "meaning": "coupon rate per period", "unit": "rate", "domain": {"gt": 0.0}, "sweep_default": {"min": 0.01, "max": 0.1, "value": 0.05}},
+        {"name": "y", "meaning": "per-period yield", "unit": "rate", "domain": {"gte": 0.0}, "sweep_default": {"min": 0.0, "max": 0.2, "value": 0.05}}
+      ],
+      "salient_dims": ["y", "c"],
+      "output": {"meaning": "2-period unit-face coupon bond present value", "unit": "currency"},
+      "sensitivities": [],
+      "defective": false,
+      "notes": "Closed-form 2-period unit-face coupon bond PV = c/(1+y) + (1+c)/(1+y)^2. Pure arithmetic + division, lowers to cvc5 -- the genuine proven-over-reals rates anchor (bond PV bounds, price-yield monotonicity, convexity). Held at n=2: the three-point convexity second difference over reciprocal powers is unsupported at n>=3 at this pin, so a 2-period bond is the largest schedule that proves d2P/dy2>0 in the faithful yield form. General-schedule discounting needs a fold (no induction tier at 0.14.0) and is held out."
+    },
+    {
+      "id": "fi_bond_2p_nodisc",
+      "kind": "finance.fixed_income.coupon_bond",
+      "module": "Shoals.FixedIncome",
+      "output_fn": "fi_bond2_nodisc",
+      "sig": "(c: f32, y: f32) -> f32",
+      "params": [
+        {"name": "c", "meaning": "coupon rate per period", "unit": "rate", "domain": {"gt": 0.0}, "sweep_default": {"min": 0.01, "max": 0.1, "value": 0.05}},
+        {"name": "y", "meaning": "per-period yield", "unit": "rate", "domain": {"gte": 0.0}, "sweep_default": {"min": 0.0, "max": 0.2, "value": 0.05}}
+      ],
+      "salient_dims": ["y", "c"],
+      "output": {"meaning": "undiscounted 2-period bond nominal sum (DEFECTIVE)", "unit": "currency"},
+      "sensitivities": [],
+      "defective": true,
+      "notes": "DEFECTIVE reference model (sprint in-region-break deliverable, rates analogue of tr_crr_call_2step_nodisc). Identical cashflows to fi_bond2 but summed with NO discounting -- returns the nominal sum c+(1+c) and ignores the yield, a real and common rates bug. It conforms to the coupon_bond kind yet VIOLATES strict price-yield monotonicity inside its valid region (its price is constant in y, so DV01/duration is understated to zero). See invariant shoals.inv.fi_bond_pv_monotone_in_yield.nodisc_defect.v1."
     }
   ],
   "invariants": [
@@ -234,6 +300,253 @@
       "dischargeability_probe": "p12_shoals_published_composites",
       "violation_text": "the call delta N(d1) falls outside [0,1]",
       "fuzz_domain_note": "structure proven at Tier B for any N satisfying the range contract; the contract is fuzz-validated on the real n_cdf"
+    },
+    {
+      "id": "shoals.inv.crr_rn_call_nonneg.v1",
+      "kind_applies_to": ["finance.option_pricer.european_call"],
+      "target_model": null,
+      "anchor_model": "tr_crr_call_2step_rn",
+      "property": {"file": "properties/canontrees.ch", "name": "crr_rn_call_nonneg", "module": "Shoals.Properties.CanonTrees"},
+      "binding": {"mechanism": "direct-call", "references_output_fn": "direct", "goal_pattern": "({{output_fn}}(s, k, u, d, q) >= 0.0)", "contracts": []},
+      "preconditions": [
+        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "u", "op": "gt", "rhs": {"const": 1.0}},
+        {"lhs": "d", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "d", "op": "lt", "rhs": {"const": 1.0}},
+        {"lhs": "q", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "q", "op": "lt", "rhs": {"const": 1.0}}
+      ],
+      "controls": {
+        "satisfying": {"name": "crr_rn_call_nonneg", "expected": "passed"},
+        "violating": {"name": "crr_rn_call_nonneg_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "non_vacuity_witness": "crr_rn_price_guards_satisfiable",
+      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "dischargeability_probe": "p14_crr_two_step",
+      "violation_text": "the european-call pricer returns a negative price -- free money at these inputs",
+      "fuzz_domain_note": "proven over the reals at Tier B (no fuzz); model-free (binds to any european_call output fn), genuinely proven on the CRR anchor and deferred on the transcendental Black-Scholes flagship (chelis#637)"
+    },
+    {
+      "id": "shoals.inv.crr_rn_call_upper_bounded_by_spot.v1",
+      "kind_applies_to": ["finance.option_pricer.european_call"],
+      "target_model": null,
+      "anchor_model": "tr_crr_call_2step_rn",
+      "property": {"file": "properties/canontrees.ch", "name": "crr_rn_call_upper_bounded_by_spot", "module": "Shoals.Properties.CanonTrees"},
+      "binding": {"mechanism": "direct-call", "references_output_fn": "direct", "goal_pattern": "({{output_fn}}(s, k, u, d, q) <= s)", "contracts": []},
+      "preconditions": [
+        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "u", "op": "gt", "rhs": {"const": 1.0}},
+        {"lhs": "d", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "d", "op": "lt", "rhs": {"const": 1.0}},
+        {"lhs": "q", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "q", "op": "lt", "rhs": {"const": 1.0}}
+      ],
+      "controls": {
+        "satisfying": {"name": "crr_rn_call_upper_bounded_by_spot", "expected": "passed"},
+        "violating": {"name": "crr_rn_call_upper_bounded_by_spot_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "non_vacuity_witness": "crr_rn_price_guards_satisfiable",
+      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "dischargeability_probe": "p14_crr_two_step",
+      "violation_text": "the call is priced above the underlying spot -- admits arbitrage",
+      "fuzz_domain_note": "proven over the reals at Tier B; holds ONLY under the martingale condition the risk-neutral anchor enforces, so it FAILS on the free-parameter tr_crr_call_2step -- deferred on Black-Scholes (chelis#637)"
+    },
+    {
+      "id": "shoals.inv.crr_rn_call_intrinsic_lower_bound.v1",
+      "kind_applies_to": ["finance.option_pricer.european_call"],
+      "target_model": null,
+      "anchor_model": "tr_crr_call_2step_rn",
+      "property": {"file": "properties/canontrees.ch", "name": "crr_rn_call_intrinsic_lower_bound", "module": "Shoals.Properties.CanonTrees"},
+      "binding": {"mechanism": "direct-call", "references_output_fn": "direct", "goal_pattern": "({{output_fn}}(s, k, u, d, q) >= (s - k*disc^2))", "contracts": []},
+      "preconditions": [
+        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "u", "op": "gt", "rhs": {"const": 1.0}},
+        {"lhs": "d", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "d", "op": "lt", "rhs": {"const": 1.0}},
+        {"lhs": "q", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "q", "op": "lt", "rhs": {"const": 1.0}}
+      ],
+      "controls": {
+        "satisfying": {"name": "crr_rn_call_intrinsic_lower_bound", "expected": "passed"},
+        "violating": {"name": "crr_rn_call_intrinsic_lower_bound_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "non_vacuity_witness": "crr_rn_price_guards_satisfiable",
+      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "dischargeability_probe": "p14_crr_two_step",
+      "violation_text": "the call is priced below its discounted intrinsic value s - k*disc^2 -- admits arbitrage (buy and exercise)",
+      "fuzz_domain_note": "proven over the reals at Tier B; the teaching exemplar of the genuine-vs-deferred split -- the SAME bound is DEFERRED on Black-Scholes where value-level abstraction discards the N(d1)/N(d2) coupling (chelis#637)"
+    },
+    {
+      "id": "shoals.inv.crr_rn_call_bull_spread_nonneg.v1",
+      "kind_applies_to": ["finance.option_pricer.european_call"],
+      "target_model": null,
+      "anchor_model": "tr_crr_call_2step_rn",
+      "property": {"file": "properties/canontrees.ch", "name": "crr_rn_call_bull_spread_nonneg", "module": "Shoals.Properties.CanonTrees"},
+      "binding": {"mechanism": "direct-call", "references_output_fn": "direct", "goal_pattern": "({{output_fn}}(s, klo, u, d, q) >= {{output_fn}}(s, khi, u, d, q))", "contracts": []},
+      "preconditions": [
+        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "klo", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "khi", "op": "gt", "rhs": {"input": "klo"}},
+        {"lhs": "u", "op": "gt", "rhs": {"const": 1.0}},
+        {"lhs": "d", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "d", "op": "lt", "rhs": {"const": 1.0}},
+        {"lhs": "q", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "q", "op": "lt", "rhs": {"const": 1.0}}
+      ],
+      "controls": {
+        "satisfying": {"name": "crr_rn_call_bull_spread_nonneg", "expected": "passed"},
+        "violating": {"name": "crr_rn_call_bull_spread_nonneg_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "non_vacuity_witness": "crr_rn_bull_guards_satisfiable",
+      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "dischargeability_probe": "p14_crr_two_step",
+      "violation_text": "a lower-strike call is worth less than a higher-strike call -- a bull-spread (strike-monotonicity) violation admitting arbitrage",
+      "fuzz_domain_note": "proven over the reals at Tier B; re-anchors the noarbitrage.ch bull_spread form on the CRR pricer (it falls to fuzz against the transcendental bs_call_scalar)"
+    },
+    {
+      "id": "shoals.inv.crr_rn_call_butterfly_convex.v1",
+      "kind_applies_to": ["finance.option_pricer.european_call"],
+      "target_model": null,
+      "anchor_model": "tr_crr_call_2step_rn",
+      "property": {"file": "properties/canontrees.ch", "name": "crr_rn_call_butterfly_convex", "module": "Shoals.Properties.CanonTrees"},
+      "binding": {"mechanism": "direct-call", "references_output_fn": "direct", "goal_pattern": "((({{output_fn}}(s, k-h, u, d, q) + {{output_fn}}(s, k+h, u, d, q)) - 2*{{output_fn}}(s, k, u, d, q)) >= 0.0)", "contracts": []},
+      "preconditions": [
+        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "h", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "k", "op": "gt", "rhs": {"input": "h"}},
+        {"lhs": "u", "op": "gt", "rhs": {"const": 1.0}},
+        {"lhs": "d", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "d", "op": "lt", "rhs": {"const": 1.0}},
+        {"lhs": "q", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "q", "op": "lt", "rhs": {"const": 1.0}}
+      ],
+      "controls": {
+        "satisfying": {"name": "crr_rn_call_butterfly_convex", "expected": "passed"},
+        "violating": {"name": "crr_rn_call_butterfly_convex_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "non_vacuity_witness": "crr_rn_butterfly_guards_satisfiable",
+      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "dischargeability_probe": "p14_crr_two_step",
+      "violation_text": "a long butterfly on equally-spaced strikes has negative value -- a convexity-in-strike violation admitting arbitrage",
+      "fuzz_domain_note": "proven over the reals at Tier B; re-anchors the noarbitrage.ch butterfly form on the CRR pricer. Anti-vacuity: the affine metamorphic trio cannot flip a butterfly (second difference of any affine body is 0); the sum-based neg_sq_sum substitution does (prove_gate strengthening, forge_legit_convex fixture)"
+    },
+    {
+      "id": "shoals.inv.fi_discount_factor_bounded.v1",
+      "kind_applies_to": ["finance.fixed_income.discount_factor"],
+      "target_model": null,
+      "anchor_model": "fi_discount_2p",
+      "property": {"file": "properties/canonfixedincome.ch", "name": "fi_discount_factor_bounded", "module": "Shoals.Properties.CanonFixedIncome"},
+      "binding": {"mechanism": "direct-call", "references_output_fn": "direct", "goal_pattern": "and(lte({{output_fn}}(y), 1.0), gt({{output_fn}}(y), 0.0))", "contracts": []},
+      "preconditions": [
+        {"lhs": "y", "op": "gte", "rhs": {"const": 0.0}}
+      ],
+      "controls": {
+        "satisfying": {"name": "fi_discount_factor_bounded", "expected": "passed"},
+        "violating": {"name": "fi_discount_factor_bounded_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "non_vacuity_witness": "fi_discount_guards_satisfiable",
+      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "dischargeability_probe": "p14_crr_two_step",
+      "violation_text": "the multi-period discount factor falls outside (0, 1] -- discounting a non-negative yield either creates value or turns it negative",
+      "fuzz_domain_note": "proven over the reals at Tier B (no fuzz)"
+    },
+    {
+      "id": "shoals.inv.fi_bond_pv_bounded.v1",
+      "kind_applies_to": ["finance.fixed_income.coupon_bond"],
+      "target_model": null,
+      "anchor_model": "fi_bond_2p",
+      "property": {"file": "properties/canonfixedincome.ch", "name": "fi_bond_pv_bounded", "module": "Shoals.Properties.CanonFixedIncome"},
+      "binding": {"mechanism": "direct-call", "references_output_fn": "direct", "goal_pattern": "and(gt({{output_fn}}(c, y), 0.0), lte({{output_fn}}(c, y), (c*2 + 1)))", "contracts": []},
+      "preconditions": [
+        {"lhs": "c", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "y", "op": "gte", "rhs": {"const": 0.0}}
+      ],
+      "controls": {
+        "satisfying": {"name": "fi_bond_pv_bounded", "expected": "passed"},
+        "violating": {"name": "fi_bond_pv_bounded_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "non_vacuity_witness": "fi_bond_pv_guards_satisfiable",
+      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "dischargeability_probe": "p14_crr_two_step",
+      "violation_text": "the bond PV is non-positive or exceeds the undiscounted sum of its cashflows -- not a proper present value",
+      "fuzz_domain_note": "proven over the reals at Tier B (no fuzz)"
+    },
+    {
+      "id": "shoals.inv.fi_bond_pv_monotone_in_yield.v1",
+      "kind_applies_to": ["finance.fixed_income.coupon_bond"],
+      "target_model": null,
+      "anchor_model": "fi_bond_2p",
+      "property": {"file": "properties/canonfixedincome.ch", "name": "fi_bond_pv_monotone_in_yield", "module": "Shoals.Properties.CanonFixedIncome"},
+      "binding": {"mechanism": "direct-call", "references_output_fn": "direct", "goal_pattern": "({{output_fn}}(c, y2) < {{output_fn}}(c, y1))", "contracts": []},
+      "preconditions": [
+        {"lhs": "c", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "y1", "op": "gte", "rhs": {"const": 0.0}},
+        {"lhs": "y2", "op": "gt", "rhs": {"input": "y1"}}
+      ],
+      "controls": {
+        "satisfying": {"name": "fi_bond_pv_monotone_in_yield", "expected": "passed"},
+        "violating": {"name": "fi_bond_pv_monotone_in_yield_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "non_vacuity_witness": "fi_bond_mono_guards_satisfiable",
+      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "dischargeability_probe": "p14_crr_two_step",
+      "violation_text": "the bond price rises as yield rises -- a duration/DV01 sign violation",
+      "fuzz_domain_note": "proven over the reals at Tier B; dP/dy < 0 (the DV01/duration sign) as a two-point difference"
+    },
+    {
+      "id": "shoals.inv.fi_bond_pv_convex_in_yield.v1",
+      "kind_applies_to": ["finance.fixed_income.coupon_bond"],
+      "target_model": null,
+      "anchor_model": "fi_bond_2p",
+      "property": {"file": "properties/canonfixedincome.ch", "name": "fi_bond_pv_convex_in_yield", "module": "Shoals.Properties.CanonFixedIncome"},
+      "binding": {"mechanism": "direct-call", "references_output_fn": "direct", "goal_pattern": "((({{output_fn}}(c, y-h) + {{output_fn}}(c, y+h)) - 2*{{output_fn}}(c, y)) >= 0.0)", "contracts": []},
+      "preconditions": [
+        {"lhs": "c", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "h", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "y", "op": "gte", "rhs": {"input": "h"}}
+      ],
+      "controls": {
+        "satisfying": {"name": "fi_bond_pv_convex_in_yield", "expected": "passed"},
+        "violating": {"name": "fi_bond_pv_convex_in_yield_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "non_vacuity_witness": "fi_bond_convex_guards_satisfiable",
+      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "dischargeability_probe": "p14_crr_two_step",
+      "violation_text": "the bond price is concave in yield -- a negative-convexity violation",
+      "fuzz_domain_note": "proven over the reals at Tier B; d2P/dy2 > 0 (positive bond convexity) as a three-point second difference. Held at n=2 -- the largest schedule the yield-form convexity discharges at this pin (n>=3 unsupported)"
+    },
+    {
+      "id": "shoals.inv.fi_bond_pv_monotone_in_yield.nodisc_defect.v1",
+      "kind_applies_to": ["finance.fixed_income.coupon_bond"],
+      "target_model": null,
+      "anchor_model": "fi_bond_2p_nodisc",
+      "property": {"file": "properties/canonfixedincome.ch", "name": "fi_bond_nodisc_monotone_defect", "module": "Shoals.Properties.CanonFixedIncome"},
+      "binding": {"mechanism": "direct-call", "references_output_fn": "direct", "goal_pattern": "({{output_fn}}(c, y2) < {{output_fn}}(c, y1))", "contracts": []},
+      "preconditions": [
+        {"lhs": "c", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "y1", "op": "gte", "rhs": {"const": 0.0}},
+        {"lhs": "y2", "op": "gt", "rhs": {"input": "y1"}}
+      ],
+      "controls": {
+        "violating": {"name": "fi_bond_nodisc_monotone_defect", "expected": "failed", "witness_required": true}
+      },
+      "defective_model": true,
+      "witness": {
+        "inputs": {"c": "1.0", "y1": "0.0", "y2": "1.0"},
+        "source": "smt_model_reals",
+        "f32_reexecuted": true,
+        "price_at_y1": "3.0",
+        "price_at_y2": "3.0",
+        "in_region": true,
+        "region_classification": "in_region_defect"
+      },
+      "expected_tier_per_pin": {"0.14.0": "disproved"},
+      "dischargeability_probe": "p14_crr_two_step",
+      "violation_text": "reports zero rate sensitivity: the undiscounted bond prices at 3.0 whether the yield is 0.0 or 1.0 (dP/dy = 0, DV01 understated to zero)",
+      "fuzz_domain_note": "polynomial (constant) break; cvc5 refutes strict dP/dy<0 and the witness re-executes at f32 (in_region_defect, not reals-hedged)"
     }
   ],
   "deferred_invariants": [

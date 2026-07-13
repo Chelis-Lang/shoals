@@ -1,5 +1,5 @@
 module Shoals.Properties.CanonTrees
-import Shoals.Trees (tr_crr_call_2step, tr_crr_call_2step_nodisc)
+import Shoals.Trees (tr_crr_call_2step, tr_crr_call_2step_nodisc, tr_crr_call_2step_rn)
 -- Canon proven-over-reals lane: the 2-step CRR European call is pure arithmetic
 -- + ITE (no transcendentals), so its pricing structure lowers to cvc5 and these
 -- goals discharge unqualified at Tier B (proven_modulo_real_arithmetic).
@@ -41,3 +41,66 @@ import Shoals.Trees (tr_crr_call_2step, tr_crr_call_2step_nodisc)
 -- the call above the underlying spot at these inputs).
 @property crr_nodisc_call_upper_bound forall(s: f32, k: f32, u: f32, d: f32, q: f32) where (s > 0.0), (k > 0.0), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0):
   (tr_crr_call_2step_nodisc(s, k, u, d, q) <= s)
+-- ===========================================================================
+-- MODEL-FREE EUROPEAN-CALL CANON (kind finance.option_pricer.european_call).
+-- Anchored on the risk-neutral tr_crr_call_2step_rn (disc derived from the
+-- martingale condition, so no-arbitrage-consistent by construction). Unlike the
+-- structural composites lane (which abstracts normal_cdf and is unbindable to a
+-- user pricer), each of these references the output fn DIRECTLY, so the C Note
+-- engine instantiates them against ANY european-call pricer's output fn via the
+-- manifest goal_pattern. All discharge unqualified at Tier B
+-- (proven_modulo_real_arithmetic) over the reals; on the transcendental
+-- Black-Scholes flagship the same invariants are deferred (chelis#637). Each
+-- ships a corrupted twin that cvc5 must refute with an in-domain witness and a
+-- `_guards_satisfiable` non-vacuity witness that cvc5 refutes with a
+-- guard-satisfying model.
+-- (1) NON-NEGATIVITY: a call price is never negative (each relu payoff and each
+-- binomial weight is non-negative, disc^2 > 0).
+@property crr_rn_call_nonneg forall(s: f32, k: f32, u: f32, d: f32, q: f32) where (s > 0.0), (k > 0.0), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0):
+  (tr_crr_call_2step_rn(s, k, u, d, q) >= 0.0)
+@property crr_rn_call_nonneg_corrupted forall(s: f32, k: f32, u: f32, d: f32, q: f32) where (s > 0.0), (k > 0.0), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0):
+  (tr_crr_call_2step_rn(s, k, u, d, q) >= 0.05)
+@property crr_rn_price_guards_satisfiable forall(s: f32, k: f32, u: f32, d: f32, q: f32) where (s > 0.0), (k > 0.0), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0):
+  false
+-- (2) NO-ARBITRAGE UPPER BOUND: a call is never worth more than the underlying
+-- spot. Holds ONLY under the martingale condition (disc * expected gross return
+-- = 1), which tr_crr_call_2step_rn enforces by construction; the free-parameter
+-- tr_crr_call_2step VIOLATES this (see the nodisc arbitrage twin above). The
+-- corrupted twin claims the too-tight bound C <= s - 0.1, refuted by a low-strike
+-- (near-the-spot) call.
+@property crr_rn_call_upper_bounded_by_spot forall(s: f32, k: f32, u: f32, d: f32, q: f32) where (s > 0.0), (k > 0.0), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0):
+  (tr_crr_call_2step_rn(s, k, u, d, q) <= s)
+@property crr_rn_call_upper_bounded_by_spot_corrupted forall(s: f32, k: f32, u: f32, d: f32, q: f32) where (s > 0.0), (k > 0.0), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0):
+  (tr_crr_call_2step_rn(s, k, u, d, q) <= (s - 0.1))
+-- (3) INTRINSIC / FORWARD LOWER BOUND: a call is worth at least its discounted
+-- intrinsic value s - k*disc^2 (and >= 0, covered by (1)). disc^2 = 1/g^2 with
+-- g = q*u + (1-q)*d. This is the exemplar of the genuine-vs-deferred split: the
+-- identical bound is DEFERRED on Black-Scholes (needs the N(d1)/N(d2) coupling
+-- that value-level abstraction discards, chelis#637) yet PROVES here over the
+-- reals. Corrupted twin drops the strike term (claims C >= s), refuted by an
+-- out-of-the-money call worth ~0.
+@property crr_rn_call_intrinsic_lower_bound forall(s: f32, k: f32, u: f32, d: f32, q: f32) where (s > 0.0), (k > 0.0), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0):
+  (tr_crr_call_2step_rn(s, k, u, d, q) >= (s - (k * ((1.0 / ((q * u) + ((1.0 - q) * d))) * (1.0 / ((q * u) + ((1.0 - q) * d)))))))
+@property crr_rn_call_intrinsic_lower_bound_corrupted forall(s: f32, k: f32, u: f32, d: f32, q: f32) where (s > 0.0), (k > 0.0), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0):
+  (tr_crr_call_2step_rn(s, k, u, d, q) >= s)
+-- (4) BULL SPREAD / MONOTONE-DECREASING IN STRIKE: a call with a lower strike is
+-- worth at least as much as one with a higher strike (a bull call spread has
+-- non-negative value). Re-anchors the noarbitrage.ch bull_spread form on the CRR
+-- pricer so it proves (it calls the transcendental bs_call_scalar there and falls
+-- to fuzz). Corrupted twin claims increasing-in-strike.
+@property crr_rn_call_bull_spread_nonneg forall(s: f32, klo: f32, khi: f32, u: f32, d: f32, q: f32) where (s > 0.0), (klo > 0.0), (khi > klo), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0):
+  (tr_crr_call_2step_rn(s, klo, u, d, q) >= tr_crr_call_2step_rn(s, khi, u, d, q))
+@property crr_rn_call_bull_spread_nonneg_corrupted forall(s: f32, klo: f32, khi: f32, u: f32, d: f32, q: f32) where (s > 0.0), (klo > 0.0), (khi > klo), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0):
+  (tr_crr_call_2step_rn(s, klo, u, d, q) <= tr_crr_call_2step_rn(s, khi, u, d, q))
+@property crr_rn_bull_guards_satisfiable forall(s: f32, klo: f32, khi: f32, u: f32, d: f32, q: f32) where (s > 0.0), (klo > 0.0), (khi > klo), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0):
+  false
+-- (5) BUTTERFLY / CONVEXITY IN STRIKE: the call price is convex in strike (a
+-- long butterfly on equally-spaced strikes k-h, k, k+h has non-negative value).
+-- Re-anchors the noarbitrage.ch butterfly form on the CRR pricer. Corrupted twin
+-- claims strict concavity (<= -0.01).
+@property crr_rn_call_butterfly_convex forall(s: f32, k: f32, h: f32, u: f32, d: f32, q: f32) where (s > 0.0), (h > 0.0), (k > h), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0):
+  (((tr_crr_call_2step_rn(s, (k - h), u, d, q) + tr_crr_call_2step_rn(s, (k + h), u, d, q)) - (2.0 * tr_crr_call_2step_rn(s, k, u, d, q))) >= 0.0)
+@property crr_rn_call_butterfly_convex_corrupted forall(s: f32, k: f32, h: f32, u: f32, d: f32, q: f32) where (s > 0.0), (h > 0.0), (k > h), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0):
+  (((tr_crr_call_2step_rn(s, (k - h), u, d, q) + tr_crr_call_2step_rn(s, (k + h), u, d, q)) - (2.0 * tr_crr_call_2step_rn(s, k, u, d, q))) <= (0.0 - 0.01))
+@property crr_rn_butterfly_guards_satisfiable forall(s: f32, k: f32, h: f32, u: f32, d: f32, q: f32) where (s > 0.0), (h > 0.0), (k > h), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0):
+  false

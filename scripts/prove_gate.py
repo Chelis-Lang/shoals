@@ -401,13 +401,47 @@ def _ret_type(sig: str) -> str:
     return m.group(1) if m else "f32"
 
 
+def _params(sig: str) -> list[tuple[str, str]]:
+    """[(name, type), ...] from a signature's parameter list (return excluded)."""
+    return re.findall(r"(\w+)\s*:\s*(\w+)", sig.split("->")[0])
+
+
 def direct_alt_bodies(sig: str) -> list[tuple[str, str]]:
-    """(label, body) alternatives for the output fn: identity-of-first-param,
-    negated-first-param, and a distinct constant (plain, no cast)."""
-    p0 = _first_param(sig)
+    """(label, body) alternatives substituted for the output fn body. The
+    affine trio -- identity-of-first-param, negated-first-param, a distinct
+    constant -- discriminates single-call and first-param-relational goals
+    (nonneg, monotone-in-spot, the intrinsic lower bound), but it CANNOT flip
+    three shapes the model-free canon adds, so the goal would read spuriously
+    vacuous:
+      * an upper bound `F <= s` -- every affine body (s, neg(s), 0) is <= s
+        under the guards, so none flips;
+      * a relation that varies a NON-first parameter (bull spread / strike
+        monotonicity) -- an affine body depends only on the first param, so both
+        strike-calls collapse to the same value and the goal is reflexive;
+      * a convexity/butterfly second difference -- the butterfly of ANY affine
+        body is identically zero, so convexity can never flip under the trio.
+    The sum-based triple below closes all three: a body that depends on EVERY
+    parameter linearly flips upper-bound and non-first-param relations, and its
+    concave square `neg(sum^2)` flips convexity. This is a strict STRENGTHENING
+    of the metamorphic check (more discriminating substitutions -> harder to
+    forge); a truly model-independent goal still flips under none of them. Added
+    only for the all-f32 case, which every finance model satisfies: `cast(...)`
+    does not lower to SMT, so a mixed-type sum would read `unsupported` and give
+    a spurious non-flip. The forge_legit_convex self-test fixture locks the
+    `neg_sq_sum` capability (a real convexity green survives)."""
+    params = _params(sig)
+    p0 = params[0][0] if params else _first_param(sig)
     ret = _ret_type(sig)
     const = "0.0" if ret == "f32" else f"cast(0.0, {ret})"
-    return [("identity", p0), ("negated", f"neg({p0})"), ("constant", const)]
+    alts = [("identity", p0), ("negated", f"neg({p0})"), ("constant", const)]
+    if ret == "f32" and params and all(t == "f32" for _, t in params):
+        names = [n for n, _ in params]
+        s = names[0]
+        for n in names[1:]:
+            s = f"add({s}, {n})"
+        alts += [("sum", s), ("neg_sum", f"neg({s})"),
+                 ("neg_sq_sum", f"neg(mul({s}, {s}))")]
+    return alts
 
 
 def _strip_contract(prop_block: str) -> str:
@@ -453,7 +487,9 @@ def check_metamorphic(inv: dict, models: dict, binary: str) -> bool:
         flipped, results = metamorphic_flips(binary, prop_block, orig_out, True)
         lane = "contract"
     else:
-        model = models[inv["target_model"]]
+        # Model-free invariants set target_model: null; the body substituted is
+        # the anchor model's output fn.
+        model = models[inv.get("target_model") or inv.get("anchor_model")]
         flipped, results = metamorphic_flips(
             binary, prop_block, orig_out, False,
             fn=model["output_fn"], sig=model["sig"])
@@ -487,6 +523,8 @@ def metamorphic_self_test(binary: str) -> bool:
         "forge_canceling": False,     # f(x)-f(x)<c: invariant -> REJECT
         "forge_reflexive": False,     # f(x)==f(x): invariant -> REJECT
         "forge_legit_monotone": True,  # f(x2)>=f(x1): flips under neg -> SURVIVE
+        "forge_legit_convex": True,   # butterfly>=0: flips under neg_sq_sum -> SURVIVE
+        "forge_vacuous_convex": False,  # butterfly at one point (0>=0): body-independent -> REJECT
     }
     ok = True
     for stem, should_flip in expect.items():
@@ -543,7 +581,8 @@ def main() -> None:
     ok = metamorphic_self_test(binary) and ok
 
     canon_files = [REPO / "properties" / "canonpricing.ch",
-                   REPO / "properties" / "canontrees.ch"]
+                   REPO / "properties" / "canontrees.ch",
+                   REPO / "properties" / "canonfixedincome.ch"]
     ok = name_lint([f for f in canon_files if f.exists()]) and ok
 
     # Group invariants by property file; a file is a fuzz lane if any of its
@@ -585,7 +624,10 @@ def main() -> None:
             fail(f"{inv['id']}: expected tier {exp} is below-proven but carries "
                  "no tier_upgrade_trigger")
             ok = False
-        output_fn = models[inv["target_model"]]["output_fn"]
+        # Model-free (kind-scoped) invariants set target_model: null and name the
+        # proving-ground model in anchor_model; model-pinned ones use target_model.
+        anchor = inv.get("target_model") or inv.get("anchor_model")
+        output_fn = models[anchor]["output_fn"]
         recs = recs_by_file[inv["property"]["file"]]
         print(f"  [{inv['id']}] expected {exp}")
         i_ok = check_instantiation(recs, inv,

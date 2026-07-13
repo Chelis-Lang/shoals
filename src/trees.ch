@@ -1,5 +1,5 @@
 module Shoals.Trees
-export (tr_crr_european_call, tr_crr_european_put, tr_crr_american_call, tr_crr_american_put, tr_tian_european_call, tr_tian_european_put, tr_jr_european_call, tr_jr_european_put, tr_trinomial_european_call, tr_trinomial_american_put, tr_crr_call_2step, tr_crr_call_2step_nodisc)
+export (tr_crr_european_call, tr_crr_european_put, tr_crr_american_call, tr_crr_american_put, tr_tian_european_call, tr_tian_european_put, tr_jr_european_call, tr_jr_european_put, tr_trinomial_european_call, tr_trinomial_american_put, tr_crr_call_2step, tr_crr_call_2step_nodisc, tr_crr_call_2step_rn)
 -- Closed-form 2-step CRR European call: the fully expanded binomial value with
 -- move factors u/d, risk-neutral probability q, and per-step discount as GUARDED
 -- INPUTS. Pure arithmetic + ITE (relu), no transcendentals, so the pricing
@@ -20,6 +20,27 @@ def tr_crr_call_2step(s: f32, k: f32, u: f32, d: f32, q: f32, disc: f32) -> f32 
 -- refutes C <= s with a concrete in-domain counterexample that re-executes at
 -- f32 (dischargeability lane: proven-over-reals refutation, in_region_defect).
 def tr_crr_call_2step_nodisc(s: f32, k: f32, u: f32, d: f32, q: f32) -> f32 = ((((q * q) * relu((((s * u) * u) - k))) + (((2.0 * q) * (1.0 - q)) * relu((((s * u) * d) - k)))) + (((1.0 - q) * (1.0 - q)) * relu((((s * d) * d) - k))))
+-- RISK-NEUTRAL 2-step CRR call: the martingale-consistent variant. Instead of
+-- taking the per-step discount as a free input (tr_crr_call_2step), it DERIVES
+-- disc = 1 / (q*u + (1-q)*d), so the discounted underlying is a martingale by
+-- construction (disc * expected gross return per step = 1). This is exactly the
+-- no-arbitrage pricing condition, so the model spans precisely the arb-consistent
+-- CRR configurations for any q in (0,1), u > 1, d in (0,1). It is the genuine
+-- proven-over-reals anchor for the MODEL-FREE european-call no-arbitrage canon:
+-- the strike-monotonicity (bull spread) and convexity (butterfly) invariants hold
+-- for any CRR call, but the value bounds C <= s and C >= s - k*disc^2 hold ONLY
+-- under the martingale condition -- they FAIL on the free-parameter
+-- tr_crr_call_2step (cvc5 finds an in-domain arbitrage witness) and are the
+-- teaching exemplar of the genuine-vs-deferred distinction (the same intrinsic
+-- lower bound is deferred on Black-Scholes: chelis#637). Division lowers to cvc5,
+-- so these discharge unqualified at Tier B (proven_modulo_real_arithmetic); g > 0
+-- under the guards (both q*u and (1-q)*d positive), so 1/g is well defined.
+-- Properties in Shoals.Properties.CanonTrees; dischargeability lane p14.
+def tr_crr_call_2step_rn(s: f32, k: f32, u: f32, d: f32, q: f32) -> f32 = {
+  g = ((q * u) + ((1.0 - q) * d))
+  disc = (1.0 / g)
+  ((disc * disc) * ((((q * q) * relu((((s * u) * u) - k))) + (((2.0 * q) * (1.0 - q)) * relu((((s * u) * d) - k)))) + (((1.0 - q) * (1.0 - q)) * relu((((s * d) * d) - k)))))
+}
 def tr_zero() -> f32 = cast(0.0, f32)
 def tr_one() -> f32 = cast(1.0, f32)
 def tr_half() -> f32 = cast(0.5, f32)
