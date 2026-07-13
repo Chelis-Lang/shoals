@@ -6,8 +6,71 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-07-13
+
+The model-free canon. Kind-scoped invariants that reference the output fn
+DIRECTLY (`target_model: null` + `anchor_model` names the proving ground) via a
+`goal_pattern`, so the C Note engine can instantiate them against any pricer of
+the kind -- unblocking characterization of user-authored models against a
+bindable no-arbitrage canon (the three shipped `european_call` invariants are
+structural / normal-cdf-abstracted and cannot bind to a user pricer).
+Everything new discharges `proven_modulo_real_arithmetic` over the reals on its
+anchor; the two defective models disprove with in-domain, f32-re-executing
+witnesses.
+
+### Added
+
+- **Risk-neutral 2-step CRR anchor** `Shoals.Trees.tr_crr_call_2step_rn`: the
+  per-step discount is derived as `disc = 1 / (q*u + (1-q)*d)`, so the
+  discounted underlying is a martingale by construction (no-arbitrage-
+  consistent). Pure arithmetic + division + ITE, lowers to cvc5.
+- **Model-free european_call no-arbitrage family** (`properties/canontrees.ch`,
+  kind `finance.option_pricer.european_call`), each with a corrupted twin
+  (refuted with an in-domain witness) and a `_guards_satisfiable` non-vacuity
+  witness: `crr_rn_call_nonneg` (price >= 0),
+  `crr_rn_call_upper_bounded_by_spot` (C <= s),
+  `crr_rn_call_intrinsic_lower_bound` (C >= s - k*disc^2),
+  `crr_rn_call_bull_spread_nonneg` (monotone-decreasing in strike), and
+  `crr_rn_call_butterfly_convex` (convex in strike). The upper and intrinsic-
+  lower bounds hold ONLY under the martingale condition -- they FAIL on the
+  free-parameter `tr_crr_call_2step` -- and the intrinsic lower bound is the
+  teaching exemplar of the genuine-vs-deferred split: the identical bound is a
+  `deferred_invariant` on Black-Scholes (chelis#637). Re-anchors the
+  `noarbitrage.ch` bull-spread / butterfly forms on the CRR pricer so they prove
+  (they fall to fuzz against the transcendental `bs_call_scalar`).
+- **Discrete-compounding fixed-income family** (new `src/fixedincome.ch` and
+  `properties/canonfixedincome.ch`, kinds `finance.fixed_income.*`), anchored on
+  a closed-form 2-period coupon bond and its discount factor:
+  `fi_discount_factor_bounded` (`1/(1+y)^2` in (0,1]), `fi_bond_pv_bounded`
+  (0 < PV <= nominal), `fi_bond_pv_monotone_in_yield` (dP/dy < 0, the DV01 /
+  duration sign), and `fi_bond_pv_convex_in_yield` (d2P/dy2 > 0, positive bond
+  convexity). Held at n=2: the three-point convexity second difference over
+  reciprocal powers is `unsupported` at n>=3 at this pin. Authored in discrete
+  closed form (no `curves.ch` tensor-fold/interp, which falls to fuzz).
+- **Defective undiscounted bond** `fi_bond2_nodisc` (rates analogue of
+  `tr_crr_call_2step_nodisc`): drops discounting, so its price is constant in
+  yield and it DISPROVES strict price-yield monotonicity (DV01 understated to
+  zero).
+
 ### Changed
 
+- **Manifest schema (additive within major 1):** an invariant may set
+  `target_model: null` and name its proving-ground model in `anchor_model` (the
+  model-free / kind-scoped shape); both gates resolve `target_model or
+  anchor_model`. `docs/cnote-import-surface.json` carries four new models and
+  ten new invariants; published byte-identical as the
+  `shoals-0.23.0.invariants.json` release asset.
+- **`scripts/prove_gate.py` metamorphic anti-vacuity strengthened.** The body-
+  substitution set gains sum-based bodies (`sum`, `neg_sum`, `neg_sq_sum`). The
+  affine trio (identity / negated / constant) cannot flip an upper bound, a
+  relation that varies a NON-first parameter (strike monotonicity), or a
+  convexity second difference (the butterfly of any affine body is identically
+  zero), so those genuine greens would read as spuriously vacuous. A body
+  depending on every parameter, plus its concave square, closes all three -- a
+  strict strengthening (strictly more discriminating; a model-independent goal
+  still flips under none). Locked by a new `metamorphic/forge_legit_convex.ch`
+  self-test fixture; name-lint now also covers
+  `properties/canonfixedincome.ch`.
 - `scripts/prove_gate.py` gains a **metamorphic anti-vacuity** check
   (red-team hardening). The syntactic "goal names the output fn" check is
   forgeable — a canceling call `f(x)-f(x)<c` or reflexive `f(x)==f(x)` names

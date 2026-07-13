@@ -232,8 +232,12 @@ def main() -> None:
             err(f"model {m['id']}: output_fn `{m['output_fn']}` not exported by {m['module']}")
 
     for inv in manifest["invariants"]:
-        if inv.get("target_model") not in models:
-            err(f"{inv['id']}: target_model `{inv.get('target_model')}` not in models")
+        # Model-free (kind-scoped) invariants set target_model: null and name the
+        # proving-ground model in anchor_model; either must resolve to a model.
+        anchor = inv.get("target_model") or inv.get("anchor_model")
+        if anchor not in models:
+            err(f"{inv['id']}: neither target_model nor anchor_model resolves to a "
+                f"model (got {anchor!r})")
         if pin not in inv.get("expected_tier_per_pin", {}):
             err(f"{inv['id']}: no expected_tier_per_pin entry for current pin {pin}")
         else:
