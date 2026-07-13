@@ -68,9 +68,13 @@ witnesses.
   zero), so those genuine greens would read as spuriously vacuous. A body
   depending on every parameter, plus its concave square, closes all three -- a
   strict strengthening (strictly more discriminating; a model-independent goal
-  still flips under none). Locked by a new `metamorphic/forge_legit_convex.ch`
-  self-test fixture; name-lint now also covers
-  `properties/canonfixedincome.ch`.
+  still flips under none). Locked by two new self-test fixtures in both
+  directions: `metamorphic/forge_legit_convex.ch` (a genuine convexity green
+  must SURVIVE -- flips only under `neg_sq_sum`) and
+  `metamorphic/forge_vacuous_convex.ch` (a butterfly-shaped but body-independent
+  `0 >= 0` green must still be REJECTED -- flips under nothing, proving the
+  strengthening opened no convexity-shaped vacuity hole). Name-lint now also
+  covers `properties/canonfixedincome.ch`.
 - `scripts/prove_gate.py` gains a **metamorphic anti-vacuity** check
   (red-team hardening). The syntactic "goal names the output fn" check is
   forgeable — a canceling call `f(x)-f(x)<c` or reflexive `f(x)==f(x)` names

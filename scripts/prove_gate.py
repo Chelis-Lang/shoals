@@ -524,6 +524,7 @@ def metamorphic_self_test(binary: str) -> bool:
         "forge_reflexive": False,     # f(x)==f(x): invariant -> REJECT
         "forge_legit_monotone": True,  # f(x2)>=f(x1): flips under neg -> SURVIVE
         "forge_legit_convex": True,   # butterfly>=0: flips under neg_sq_sum -> SURVIVE
+        "forge_vacuous_convex": False,  # butterfly at one point (0>=0): body-independent -> REJECT
     }
     ok = True
     for stem, should_flip in expect.items():
