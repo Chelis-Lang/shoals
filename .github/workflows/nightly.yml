@@ -1,26 +1,34 @@
 name: nightly
 
-# The heavy validation suite. Per-PR CI (ci.yml) runs only the fast
-# deterministic unit tests in tests/. The Monte-Carlo / PDE / Fourier /
-# optimization-benchmark files live in tests-manual/ and overrun the
-# per-PR runner's wall-clock budget, so they run here weekly (and on
-# demand) instead. Toolchain versions are derived from reef.toml, same
-# as ci.yml.
+# The scheduled real-chelis validation that does NOT belong on the per-PR
+# path. Per-PR CI (ci.yml) stays LEAN: fmt + lint + the reef-build compile
+# signal + the offline gates (hard-rule-guard, contract-gate). Everything
+# real-chelis/real-SMT runs here, on two cadences:
+#
+#   * DAILY (03:00 UTC) — the gates moved off the per-PR path so they no
+#     longer cost every PR ~17-19 min of real-chelis/real-SMT wall:
+#       - `tests` : the fast deterministic unit suite (tests/, ~13 min).
+#       - `prove` : the keystone canon self-audit (scripts/prove_gate.py,
+#                   real-SMT ~8.6 min).
+#   * WEEKLY (Sun 06:00 UTC) — the `heavy` matrix: the Monte-Carlo / PDE /
+#     Fourier / optimization-benchmark files in tests-manual/, sharded one
+#     leg per file so no single leg approaches the 2-vCPU ubuntu-latest
+#     runner's reclaim window (a single-invocation run of the whole directory
+#     was SIGTERM-killed, exit 143, at ~54 min before its own step timeout).
+#     Deliberately not daily: it is the heaviest, most runner-hostile suite.
+#   * workflow_dispatch runs ALL THREE tiers on demand.
+#
+# Toolchain versions are derived from reef.toml, same as ci.yml.
 #
 # The milestone acceptance oracles (scripts/manual_gates/phase3l_*.py) are
 # a MANUAL gate — run on demand / locally, deliberately NOT scheduled in
 # CI: each spawns a fresh `chelis test` that rebuilds the chelis-std +
 # nautilus + coral graph (recompile-bound), the wrong shape for a CI step.
-#
-# The heavy suite is sharded one matrix leg per tests-manual/*.ch file so
-# no single leg approaches the 2-vCPU ubuntu-latest runner's reclaim
-# window. A single-invocation run of the whole directory was SIGTERM-killed
-# (exit 143) at ~54 min before its own step timeout fired; per-file legs
-# with a 600s per-test budget fit comfortably and run in parallel.
 
 on:
   schedule:
-    - cron: '0 6 * * 0'   # 06:00 UTC, Sundays (weekly)
+    - cron: '0 3 * * *'   # 03:00 UTC daily — the `tests` + `prove` gates
+    - cron: '0 6 * * 0'   # 06:00 UTC Sundays (weekly) — the `heavy` matrix
   workflow_dispatch:
 
 concurrency:
@@ -35,15 +43,132 @@ env:
   CHELIS_VERSION: 0.14.0
 
 jobs:
-  # NOTE: there is no nightly canon fuzz gate. The direct-pricer positivity
-  # invariant is deferred/unverified (docs/cnote-import-surface.json
-  # deferred_invariants): the real transcendental pricers cannot be fuzzed
-  # within any budget at 0.14.0 -- one fuzz sample of one positivity property
-  # did not complete in 200s (chelis#434 / p08). The per-PR ci.yml prove-gate
-  # covers the deterministic SMT lanes, which is the entire active canon.
+  # The fast deterministic unit suite (tests/) — moved off the per-PR path.
+  # ~13 min of real-chelis wall on the 2-vCPU runner: the tallest slice of the
+  # old per-PR gate. Runs DAILY (and on workflow_dispatch). This is the
+  # per-PR-derived fast suite; the heavy tests-manual/ suite is the weekly
+  # `heavy` matrix below.
+  tests:
+    name: tests (fast unit suite)
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 3 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract versions from reef.toml
+        run: |
+          set -euo pipefail
+          # chelis pin comes from the literal top-level env; re-derive from
+          # reef.toml only to assert it has not drifted (reef.toml is truth).
+          REEF_CHELIS=$(grep -oP '^compiler\s*=\s*"=\K[0-9]+\.[0-9]+\.[0-9]+' reef.toml)
+          NAUTILUS_VERSION=$(grep -A0 '^nautilus' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          CORAL_VERSION=$(grep -A0 '^coral' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ -z "$REEF_CHELIS" ] || [ -z "$NAUTILUS_VERSION" ] || [ -z "$CORAL_VERSION" ]; then
+            echo "Failed to parse one or more versions from reef.toml" >&2
+            cat reef.toml >&2
+            exit 1
+          fi
+          if [ "$REEF_CHELIS" != "$CHELIS_VERSION" ]; then
+            echo "Pin drift: reef.toml chelis=$REEF_CHELIS but literal CHELIS_VERSION=$CHELIS_VERSION" >&2
+            echo "Bump the top-level env pin and reef.toml together (scripts/audit_workarounds.py --pins-only)." >&2
+            exit 1
+          fi
+          echo "NAUTILUS_TAG=v$NAUTILUS_VERSION" >> "$GITHUB_ENV"
+          echo "CORAL_TAG=v$CORAL_VERSION"       >> "$GITHUB_ENV"
+          echo "Detected: chelis=$CHELIS_VERSION (literal, ==reef) nautilus=$NAUTILUS_VERSION coral=$CORAL_VERSION"
+
+      - name: Install chelis toolchain (cached)
+        id: chelis
+        uses: ./.github/actions/install-chelis
+        with:
+          chelis-tag: ${{ env.CHELIS_TAG }}
+          chelis-version: ${{ env.CHELIS_VERSION }}
+          gh-token: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+          reef-cache-key: nautilus-${{ env.NAUTILUS_TAG }}-coral-${{ env.CORAL_TAG }}
+
+      - name: Install released dependencies
+        if: steps.chelis.outputs.reef-cache-hit != 'true'
+        timeout-minutes: 5
+        env:
+          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+        run: |
+          set -euo pipefail
+          chelis reef install --from-github "Chelis-Lang/nautilus@${NAUTILUS_TAG}"
+          chelis reef install --from-github "Chelis-Lang/coral@${CORAL_TAG}"
+
+      - name: chelis reef build
+        run: chelis reef build
+
+      - name: chelis test (tests/ fast unit suite)
+        timeout-minutes: 30
+        run: chelis test tests/ --timeout 1200 --jobs auto
+
+  # The keystone canon self-audit against the pinned RELEASE binary — moved
+  # off the per-PR path. Real-SMT ~8.6 min (the reef package load alone is
+  # multi-minute; prove_gate has no cheap subset to smoke). Runs DAILY (and on
+  # workflow_dispatch).
+  #
+  # The active canon is entirely SMT-tier (proven / proven_modulo_contract /
+  # disproved) so this gate is deterministic. There is NO nightly canon fuzz
+  # gate: the direct-pricer positivity invariant is deferred/unverified
+  # (docs/cnote-import-surface.json deferred_invariants) — the real
+  # transcendental pricers cannot be fuzzed within any budget at 0.14.0 (one
+  # fuzz sample of one positivity property did not complete in 200s, chelis#434
+  # / p08). prove_gate keeps dormant fuzz machinery (PROVE_GATE_FUZZ / --tier
+  # fuzz-only) for the day that deferred invariant becomes observable.
+  prove:
+    name: prove-gate (canon self-audit)
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 3 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract versions from reef.toml
+        run: |
+          set -euo pipefail
+          REEF_CHELIS=$(grep -oP '^compiler\s*=\s*"=\K[0-9]+\.[0-9]+\.[0-9]+' reef.toml)
+          NAUTILUS_VERSION=$(grep -A0 '^nautilus' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          CORAL_VERSION=$(grep -A0 '^coral' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ "$REEF_CHELIS" != "$CHELIS_VERSION" ]; then
+            echo "Pin drift: reef.toml chelis=$REEF_CHELIS but literal CHELIS_VERSION=$CHELIS_VERSION" >&2
+            exit 1
+          fi
+          echo "NAUTILUS_TAG=v$NAUTILUS_VERSION" >> "$GITHUB_ENV"
+          echo "CORAL_TAG=v$CORAL_VERSION"       >> "$GITHUB_ENV"
+
+      - name: Install chelis toolchain (cached)
+        id: chelis
+        uses: ./.github/actions/install-chelis
+        with:
+          chelis-tag: ${{ env.CHELIS_TAG }}
+          chelis-version: ${{ env.CHELIS_VERSION }}
+          gh-token: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+          reef-cache-key: nautilus-${{ env.NAUTILUS_TAG }}-coral-${{ env.CORAL_TAG }}
+
+      - name: Install released dependencies
+        if: steps.chelis.outputs.reef-cache-hit != 'true'
+        timeout-minutes: 5
+        env:
+          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+        run: |
+          set -euo pipefail
+          chelis reef install --from-github "Chelis-Lang/nautilus@${NAUTILUS_TAG}"
+          chelis reef install --from-github "Chelis-Lang/coral@${CORAL_TAG}"
+
+      - name: chelis reef build
+        run: chelis reef build
+
+      - name: prove_gate (SMT lanes -- the entire active canon)
+        run: python3 scripts/prove_gate.py
 
   heavy:
     name: heavy ${{ matrix.file }}
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 6 * * 0'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -144,11 +269,11 @@ jobs:
   # Surface a nightly failure as a tracking issue (opens on failure, closes
   # on green) so a red nightly is impossible to miss — scheduled-run
   # failures do not show a red status on main, which is how the heavy
-  # nightly stayed red unnoticed. `needs` the matrix job; `if: always()`
-  # so it runs regardless of outcome.
+  # nightly stayed red unnoticed. `needs` all three real-chelis jobs;
+  # `if: always()` so it runs regardless of outcome.
   report:
     name: Surface nightly status
-    needs: [heavy]
+    needs: [tests, prove, heavy]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -157,13 +282,27 @@ jobs:
       - name: Open/close nightly-failure tracking issue
         uses: actions/github-script@v7
         env:
+          TESTS_RESULT: ${{ needs.tests.result }}
+          PROVE_RESULT: ${{ needs.prove.result }}
           HEAVY_RESULT: ${{ needs.heavy.result }}
         with:
           script: |
             const title = 'Nightly failing: shoals';
             const { owner, repo } = context.repo;
             const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
-            const failed = process.env.HEAVY_RESULT !== 'success';
+            // Jobs that did not run on this cadence report 'skipped' (daily runs
+            // skip `heavy`; the weekly run skips `tests`/`prove`) — not a
+            // failure. Only success|skipped are OK; anything else (failure,
+            // cancelled, timed_out) is a real nightly failure.
+            const results = {
+              tests: process.env.TESTS_RESULT,
+              prove: process.env.PROVE_RESULT,
+              heavy: process.env.HEAVY_RESULT,
+            };
+            const failedJobs = Object.entries(results)
+              .filter(([, r]) => r !== 'success' && r !== 'skipped')
+              .map(([n, r]) => `${n}=${r}`);
+            const failed = failedJobs.length > 0;
             const q = `repo:${owner}/${repo} is:issue is:open in:title "${title}"`;
             const found = await github.rest.search.issuesAndPullRequests({ q });
             const existing = found.data.items.find(i => i.title === title);
@@ -173,7 +312,7 @@ jobs:
               } else {
                 const issue = await github.rest.issues.create({
                   owner, repo, title,
-                  body: `The **nightly** heavy suite failed (heavy=${process.env.HEAVY_RESULT}).\n\nRun: ${runUrl}\nCommit: \`${context.sha}\`\n\nAuto-opened on failure; auto-closes when the nightly next passes.`,
+                  body: `The **nightly** suite failed (${failedJobs.join(', ')}).\n\nRun: ${runUrl}\nCommit: \`${context.sha}\`\n\nAuto-opened on failure; auto-closes when the nightly next passes.`,
                   labels: ['nightly-failure'],
                 });
                 core.info(`Opened tracking issue #${issue.data.number}.`);

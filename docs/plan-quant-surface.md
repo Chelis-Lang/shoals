@@ -47,11 +47,13 @@ work packets, suggested agent-team allocation, acceptance criteria
   `stable` happens module-by-module after the corresponding manual
   oracle in `phase3l_shoals_oracle_*` is green AND the AD profile
   is `composed` (not `unproven-primitive` or `unsupported`).
-- **Native testing discipline.** Default per-PR gate is
-  `chelis fmt --check`, `chelis lint --check`, `chelis reef build`, and
-  `chelis test tests/ --timeout 1200 --jobs auto`. Heavier oracles
-  (multi-curve bootstrap, Heston QE, XVA smoke) run as manual gates at
-  milestone exits via scripts under `scripts/manual_gates/`.
+- **Native testing discipline.** The lean per-PR gate is
+  `chelis fmt --check`, `chelis lint --check`, `chelis reef build`, plus the
+  offline gates. The real-chelis `chelis test tests/ --timeout 1200 --jobs
+  auto` suite runs NIGHTLY (`.github/workflows/nightly.yml`), not per-PR —
+  it is ~13 min of real-chelis wall. Heavier oracles (multi-curve bootstrap,
+  Heston QE, XVA smoke) run as manual gates at milestone exits via scripts
+  under `scripts/manual_gates/`.
 - **Manual-gate pattern.** Each named gate
   (`phase3l_shoals_oracle_*`) is a python script under
   `scripts/manual_gates/<gate_name>.py` that drives `chelis` from
