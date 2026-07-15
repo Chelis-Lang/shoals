@@ -131,8 +131,9 @@ over the directory in Python. See `.github/workflows/ci.yml` and
 
 The default test tier uses 20 000 Monte-Carlo paths and 2 % tolerance
 for convergence assertions. The longer `--timeout 1200` is required
-because the host evaluator runs the 20K MC sample loop in ~60 s. It is
-part of the default PR gate.
+because the host evaluator runs the 20K MC sample loop in ~60 s. This
+suite runs in the **nightly** CI gate, not per-PR — it is ~13 min of
+real-chelis wall (see `.github/workflows/nightly.yml`).
 
 ### Manual rigor gate
 
@@ -159,13 +160,20 @@ gate, not part of every PR push.
 
 ## Acceptance gate
 
-Default PR/repo-local gate: `scripts/run_local_gate.py` and CI run
-`chelis fmt --check` over repository `.ch` sources,
-`chelis lint --check src/ properties/ references/ tests/ tests-manual/ manual-gates/`,
-`chelis reef build`, and `chelis test tests/ --timeout 1200 --jobs auto`.
-`chelis reef build` is the compiler-owned package oracle: it resolves
-the Reef manifest, lowers the package, and rejects stale source or
-dependency wiring; the runtime lane exercises the finance invariants.
+The **lean per-PR** CI gate (`.github/workflows/ci.yml`) runs the fast
+checks only: `chelis fmt --check` over repository `.ch` sources,
+`chelis lint --check src/ properties/ references/ demos/ tests/ tests-manual/ manual-gates/`,
+`chelis reef build`, plus the two offline gates (pin consistency and
+`scripts/contract_gate.py`). `chelis reef build` is the compiler-owned
+package oracle: it resolves the Reef manifest, lowers the package, and
+rejects stale source or dependency wiring — the per-PR compile signal.
+
+The real-chelis/real-SMT lanes — `chelis test tests/ --timeout 1200
+--jobs auto` (the runtime finance invariants), the heavy `tests-manual/`
+suite, and `scripts/prove_gate.py` (the keystone canon self-audit) — run
+in the **nightly** CI gate (`.github/workflows/nightly.yml`, scheduled +
+workflow_dispatch), not per-PR. `scripts/run_local_gate.py` runs every
+lane locally before push.
 The `chelis lint --check` step blocks on any blocking nomenclature
 violation per `crates/chelis-lint/` rules; advisory warnings are
 non-blocking.

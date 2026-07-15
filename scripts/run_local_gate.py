@@ -10,16 +10,23 @@ Invokes:
      demos/ tests/ tests-manual/ manual-gates/``.
   3. ``chelis reef build`` for package-level compiler validation.
   4. ``chelis test tests/ --timeout 1200 --jobs auto`` for the native
-     fast-unit suite (this is what CI runs).
+     fast-unit suite (CI runs this NIGHTLY, not per-PR — it is ~13 min of
+     real-chelis wall, too slow for the lean per-PR gate).
   5. ``chelis test tests-manual/ --timeout 1200 --jobs auto`` for the
      heavy MC / PDE / Fourier / optimization-benchmark suite that is
-     too slow for the per-PR CI runner. CI does NOT run this stage;
-     the milestone manual-gate scripts under ``scripts/manual_gates/``
-     exercise these files by explicit path.
+     too slow for the per-PR CI runner. CI runs this in the weekly nightly
+     ``heavy`` matrix, sharded one leg per file; the milestone manual-gate
+     scripts under ``scripts/manual_gates/`` exercise these files by
+     explicit path.
+  6. ``scripts/contract_gate.py`` — offline manifest resolvability + pin
+     freshness (also a per-PR CI gate).
+  7. ``scripts/prove_gate.py`` — the keystone canon self-audit against the
+     release binary (CI runs this NIGHTLY, not per-PR — real-SMT ~8.6 min).
 
-Exits 0 only if all stages succeed. Stages 1-4 mirror the default PR
-gate in the GitHub Actions workflow under ``.github/workflows/ci.yml``;
-stage 5 is local-only.
+Exits 0 only if all stages succeed. The lean per-PR CI gate
+(``.github/workflows/ci.yml``) mirrors only stages 1-3 (fmt + lint + reef
+build) plus the offline contract_gate; the real-chelis/real-SMT stages
+(4, 5, 7) run in ``.github/workflows/nightly.yml``, not per-PR.
 
 Usage:
 
