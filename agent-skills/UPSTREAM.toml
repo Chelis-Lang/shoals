@@ -1,0 +1,13 @@
+# Materialized from the pinned chelis toolchain's embedded skill set.
+# Do not edit skill bodies here; run `chelis reef conform sync`.
+
+skills = [
+  "backend-numerics",
+  "cli-surface",
+  "example-corpus",
+  "issue-resolution",
+  "packaging-install",
+  "phase-gate",
+  "redteam-exec",
+  "spec-sync",
+]

@@ -1,36 +1,46 @@
 #!/usr/bin/env python3
 """Run the Shoals local acceptance gate.
 
-Invokes:
+Default mode mirrors the **lean per-PR CI** (`.github/workflows/ci.yml`)
+and nothing more — the real-chelis/real-SMT nightly stages do NOT run
+unless you pass ``--full``:
 
-  1. ``chelis fmt --check`` over every ``.ch`` file in
-     ``src/``, ``properties/``, ``references/``, ``demos/``, ``tests/``,
-     ``tests-manual/``.
-  2. ``chelis lint --check`` over ``src/ properties/ references/
-     demos/ tests/ tests-manual/ manual-gates/``.
-  3. ``chelis reef build`` for package-level compiler validation.
-  4. ``chelis test tests/ --timeout 1200 --jobs auto`` for the native
-     fast-unit suite (CI runs this NIGHTLY, not per-PR — it is ~13 min of
-     real-chelis wall, too slow for the lean per-PR gate).
-  5. ``chelis test tests-manual/ --timeout 1200 --jobs auto`` for the
-     heavy MC / PDE / Fourier / optimization-benchmark suite that is
-     too slow for the per-PR CI runner. CI runs this in the weekly nightly
-     ``heavy`` matrix, sharded one leg per file; the milestone manual-gate
-     scripts under ``scripts/manual_gates/`` exercise these files by
-     explicit path.
-  6. ``scripts/contract_gate.py`` — offline manifest resolvability + pin
+  1. ``python3 scripts/audit_workarounds.py --pins-only`` (the
+     hard-rule-guard job: offline pin consistency).
+  2. ``chelis fmt --check`` over every ``.ch`` file in ``src/``,
+     ``properties/``, ``references/``, ``demos/``, ``tests/``,
+     ``tests-manual/``, ``tests_neg/``, ``tests_blocked/``.
+  3. ``chelis lint --check`` over those directories + ``manual-gates/``.
+  4. ``chelis reef build`` for package-level compiler validation.
+  5. ``chelis test tests_neg/ --expect neg`` (contract §6).
+  6. ``chelis test tests_blocked/ --expect blocked`` (contract §5 —
+     a pass here is FIX-detected and fails loudly by design).
+  7. ``chelis reef conform audit`` (contract §11). The per-PR CI also runs
+     ``conform bump-check --base origin/main``; that step is CI-only —
+     a stale local ``origin/main`` would make it false-fail, and CI runs
+     it authoritatively on every PR.
+  8. ``scripts/contract_gate.py`` — offline manifest resolvability + pin
      freshness (also a per-PR CI gate).
-  7. ``scripts/prove_gate.py`` — the keystone canon self-audit against the
-     release binary (CI runs this NIGHTLY, not per-PR — real-SMT ~8.6 min).
 
-Exits 0 only if all stages succeed. The lean per-PR CI gate
-(``.github/workflows/ci.yml``) mirrors only stages 1-3 (fmt + lint + reef
-build) plus the offline contract_gate; the real-chelis/real-SMT stages
-(4, 5, 7) run in ``.github/workflows/nightly.yml``, not per-PR.
+``--full`` appends the stages CI runs in ``.github/workflows/nightly.yml``
+(scheduled, NOT per-PR) — run this at least once at a pin bump
+(``AGENTS.md`` §Pin Bump Checklist) or before a release tag:
+
+  9.  ``chelis test tests/ --timeout 1200 --jobs auto`` — the fast unit
+      suite (~13 min of real-chelis wall; nightly in CI).
+  10. ``chelis test tests-manual/ --timeout 1200 --jobs auto`` — the heavy
+      MC / PDE / Fourier / optimization-benchmark suite (weekly nightly
+      ``heavy`` matrix in CI, sharded one leg per file; the milestone
+      manual-gate scripts under ``scripts/manual_gates/`` exercise these
+      files by explicit path).
+  11. ``scripts/prove_gate.py`` — the keystone canon self-audit against
+      the release binary (real SMT, ~8.6 min; nightly in CI).
+
+Exits 0 only if all requested stages succeed.
 
 Usage:
 
-    python scripts/run_local_gate.py [--quiet]
+    python scripts/run_local_gate.py [--quiet] [--full]
 
 This script lives in Python per the repo policy that prohibits shell
 scripts (`AGENTS.md`).
@@ -44,6 +54,18 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+LINT_DIRS = [
+    "src/",
+    "properties/",
+    "references/",
+    "demos/",
+    "tests/",
+    "tests-manual/",
+    "manual-gates/",
+    "tests_neg/",
+    "tests_blocked/",
+]
 
 
 def run(cmd: list[str], *, quiet: bool) -> int:
@@ -60,6 +82,12 @@ def run(cmd: list[str], *, quiet: bool) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--quiet", action="store_true", help="suppress per-file lines")
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="also run the nightly-CI stages (unit suite, heavy suite, "
+        "prove gate) — required once at a pin bump / before a release tag",
+    )
     args = parser.parse_args()
     quiet = args.quiet
 
@@ -70,67 +98,67 @@ def main() -> int:
         + sorted((REPO_ROOT / "demos").glob("*.ch"))
         + sorted((REPO_ROOT / "tests").glob("*.ch"))
         + sorted((REPO_ROOT / "tests-manual").glob("*.ch"))
+        + sorted((REPO_ROOT / "tests_neg").glob("*/*.ch"))
+        + sorted((REPO_ROOT / "tests_blocked").glob("*/*.ch"))
     )
 
-    print("[1/5] chelis fmt --check")
-    for path in fmt_files:
-        rel = path.relative_to(REPO_ROOT)
-        rc = run(["chelis", "fmt", "--check", str(rel)], quiet=quiet)
+    per_pr_stages: list[tuple[str, list[str]]] = [
+        (
+            "audit_workarounds --pins-only (offline pin consistency)",
+            ["python3", "scripts/audit_workarounds.py", "--pins-only"],
+        ),
+        ("chelis fmt --check", []),  # expanded per-file below
+        ("chelis lint --check", ["chelis", "lint", "--check", *LINT_DIRS]),
+        ("chelis reef build", ["chelis", "reef", "build"]),
+        (
+            "chelis test tests_neg/ --expect neg",
+            ["chelis", "test", "tests_neg/", "--expect", "neg"],
+        ),
+        (
+            "chelis test tests_blocked/ --expect blocked",
+            ["chelis", "test", "tests_blocked/", "--expect", "blocked"],
+        ),
+        ("chelis reef conform audit", ["chelis", "reef", "conform", "audit"]),
+        (
+            "contract_gate (offline manifest resolvability + pin freshness)",
+            ["python3", "scripts/contract_gate.py"],
+        ),
+    ]
+    nightly_stages: list[tuple[str, list[str]]] = [
+        (
+            "chelis test tests/ --jobs auto",
+            ["chelis", "test", "tests/", "--timeout", "1200", "--jobs", "auto"],
+        ),
+        (
+            "chelis test tests-manual/ --jobs auto",
+            ["chelis", "test", "tests-manual/", "--timeout", "1200", "--jobs", "auto"],
+        ),
+        (
+            "prove_gate (canon self-audit against the release binary)",
+            ["python3", "scripts/prove_gate.py"],
+        ),
+    ]
+
+    stages = per_pr_stages + (nightly_stages if args.full else [])
+    total = len(stages)
+
+    for i, (label, cmd) in enumerate(stages, start=1):
+        print(f"[{i}/{total}] {label}")
+        if not cmd:  # the per-file fmt stage
+            for path in fmt_files:
+                rel = path.relative_to(REPO_ROOT)
+                rc = run(["chelis", "fmt", "--check", str(rel)], quiet=quiet)
+                if rc != 0:
+                    print(f"FAIL: chelis fmt --check {rel}")
+                    return rc
+            continue
+        rc = run(cmd, quiet=False)
         if rc != 0:
-            print(f"FAIL: chelis fmt --check {rel}")
+            print(f"FAIL: {label}")
             return rc
 
-    print("[2/5] chelis lint --check")
-    rc = run(
-        [
-            "chelis",
-            "lint",
-            "--check",
-            "src/",
-            "properties/",
-            "references/",
-            "demos/",
-            "tests/",
-            "tests-manual/",
-            "manual-gates/",
-        ],
-        quiet=False,
-    )
-    if rc != 0:
-        print("FAIL: chelis lint --check")
-        return rc
-
-    print("[3/5] chelis reef build")
-    rc = run(["chelis", "reef", "build"], quiet=False)
-    if rc != 0:
-        print("FAIL: chelis reef build")
-        return rc
-
-    print("[4/5] chelis test tests/ --jobs auto")
-    rc = run(["chelis", "test", "tests/", "--timeout", "1200", "--jobs", "auto"], quiet=False)
-    if rc != 0:
-        print("FAIL: chelis test tests/ --jobs auto")
-        return rc
-
-    print("[5/7] chelis test tests-manual/ --jobs auto")
-    rc = run(["chelis", "test", "tests-manual/", "--timeout", "1200", "--jobs", "auto"], quiet=False)
-    if rc != 0:
-        print("FAIL: chelis test tests-manual/ --jobs auto")
-        return rc
-
-    print("[6/7] contract_gate (offline manifest resolvability + pin freshness)")
-    rc = run(["python3", "scripts/contract_gate.py"], quiet=False)
-    if rc != 0:
-        print("FAIL: scripts/contract_gate.py")
-        return rc
-
-    print("[7/7] prove_gate (canon self-audit against the release binary)")
-    rc = run(["python3", "scripts/prove_gate.py"], quiet=False)
-    if rc != 0:
-        print("FAIL: scripts/prove_gate.py")
-        return rc
-
-    print("OK: shoals local gate green")
+    mode = "full (per-PR + nightly stages)" if args.full else "per-PR mirror"
+    print(f"OK: shoals local gate green [{mode}]")
     return 0
 
 

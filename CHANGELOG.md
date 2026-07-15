@@ -6,7 +6,60 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.23.0] - 2026-07-13
+## [0.23.1] - 2026-07-15
+
+Chelis pin bump `=0.14.0` → `=0.16.1` (a de-narrowing event, shoals#26) +
+adoption of the toolchain-native conformance surface (`chelis reef conform`,
+chelis#628). No pricing/API change. **Blocked on the dependency chain until
+0.16.1-pinned releases of nautilus (0.7.34, nautilus PR #29) and coral
+(0.7.31, coral PR #18) exist** — validated locally against
+locally-built packages of both.
+
+### Changed
+
+- **Toolchain pin `=0.16.1`** in `reef.toml` and every workflow env
+  (`ci.yml`, `nightly.yml`, `release.yml`); deps `nautilus 0.7.34`,
+  `coral 0.7.31`. Managed blocks restamped and the shared skill set
+  re-materialized from the pinned toolchain (`agent-skills/UPSTREAM.toml`;
+  new vendored skills `issue-resolution`, `packaging-install`).
+- **CI now carries the contract §11 conformance gate**: blocking
+  `chelis reef conform audit` + `chelis reef conform bump-check
+  --base origin/main` (checkout at `fetch-depth: 0`), plus the §5/§6
+  expected-failure suites (below) on the lean per-PR path.
+- **`scripts/run_local_gate.py` now mirrors the lean per-PR CI by
+  default** (pins audit, fmt, lint, reef build, neg/blocked expect suites,
+  conform audit, contract gate); the nightly-CI stages (fast `tests/`
+  suite, heavy `tests-manual/` suite, prove gate) moved behind `--full`,
+  required once at a pin bump / before a release tag.
+
+### Added
+
+- **`tests_neg/`** (contract §6): runtime-guard negative cases with
+  `.expect` sidecars — `currencytag/money_add_mismatch_neg` (the
+  cross-currency guard Whale's bankroll code depends on) and
+  `tenor/parse_tenor_bad_suffix_neg`. Run via
+  `chelis test tests_neg/ --expect neg`.
+- **`tests_blocked/`** (contract §5): executable blocked-probe suite.
+  `runtime/mod_big_i64_precision.ch` pins the i64 `mod` f64-path precision
+  drift (the reason `Shoals.Rng` hand-rolls `i64_mod`); the prove-lane
+  blockers (chelis#637, chelis#659) are on the README §cannot-be-probed
+  manual re-probe list. Run via `chelis test tests_blocked/ --expect
+  blocked`.
+
+### De-narrowed / re-probed at 0.16.1
+
+- **chelis#434 CLOSED → §Archived**: the certified special-function
+  envelope discharge shipped in 0.16.0 (`proven_modulo_certified_envelope`
+  verdict class). The flagship BS positivity / intrinsic-lower-bound goals
+  remain structurally unreachable (the `N(d1)`/`N(d2)` coupling is
+  discarded) — residual tracked as **chelis#637** (new §Tracking entry),
+  now cited at the affected narrowing sites (`properties/canonpricing.ch`,
+  `src/trees.ch`); `properties/canonpricing.ch` keeps `fuzz_validated` as
+  its expected tier with chelis#637 as the tier-upgrade trigger.
+- **chelis#659** (fuzz-tier transcendental sampling cost): re-probed, still
+  open; the nightly fuzz-lane comment now cites it directly (previously
+  mis-cited chelis#434). **docs/CHELIS_SURFACE.md** refreshed (header pins,
+  envelope row `@upstream` → `@pin` with the #637 residual).
 
 The model-free canon. Kind-scoped invariants that reference the output fn
 DIRECTLY (`target_model: null` + `anchor_model` names the proving ground) via a

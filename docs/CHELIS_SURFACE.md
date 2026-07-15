@@ -1,3 +1,13 @@
+<!-- BEGIN CHELIS MANAGED BLOCK: chelis-surface-header chelis@0.16.1 (sha256:28011bed9ccb5778) -->
+This file is a domain-scoped view of the canonical Chelis capability surface,
+generated for the pinned toolchain. Each capability row is marked `@pin` (usable
+at the current pin) or `@upstream` (lands at the next bump). **Read it before
+designing around a suspected language gap** — most downstream over-narrowing
+traces to not knowing the real surface. Regenerate with `chelis reef conform
+sync` at every pin bump; the upstream source of truth is `docs/CHELIS_SURFACE.md`
+in `Chelis-Lang/chelis`.
+<!-- END CHELIS MANAGED BLOCK: chelis-surface-header -->
+
 # Chelis Capability Surface for Shoals
 
 What the Chelis language and the bundled chelis-std actually provide to the
@@ -5,11 +15,11 @@ quantitative-finance domain this shell touches — numerical methods, pricing,
 Greeks, and the proof surface over them. **Read this before designing around a
 suspected language gap.**
 
-> **Pinned:** chelis 0.14.0 (chelis-std 0.4.0, bundled; nautilus 0.7.33,
-> coral 0.7.30) · **Latest upstream:** 0.15.0 (published 2026-07-10) ·
-> **Last refreshed:** 2026-07-10
+> **Pinned:** chelis 0.16.1 (chelis-std 0.4.0, bundled; nautilus 0.7.34,
+> coral 0.7.31) · **Latest upstream:** 0.16.1 (published 2026-07-12) ·
+> **Last refreshed:** 2026-07-15
 
-Rows are marked `@pin` (usable today at 0.14.0) or `@upstream` (expected at the
+Rows are marked `@pin` (usable today at 0.16.1) or `@upstream` (expected at the
 next bump). Refresh this table at every pin bump (`AGENTS.md` §Pin Bump
 Checklist). The authoritative depth reference for the proof reachability map is
 `research/proof-infra/report.md`; the source-of-truth for the cvc5-lowerable set
@@ -25,7 +35,7 @@ tiers: **A** (type/dimension/linearity), **B** (SMT via cvc5 over the reals),
 |---|---|---|
 | SMT prove tier (cvc5) shipped in the **release** tarball | `@pin` | SMT is in the released binary as of chelis 0.11.0 (no from-source `--features smt` build needed at this pin). Tier B lowers to cvc5 over the **reals** (`QF_NRA`, or `QF_NRAT` when a transcendental is present); a green is a real-arithmetic fact, **not** an IEEE-`f32` statement. `arith_model:"real"`. |
 | Transcendentals `exp`, `sqrt`, `sin`, `cos` lower to SMT | `@pin*` | These four **do** lower — cvc5 kinds `EXPONENTIAL`/`SQRT`/`SINE`/`COSINE`, selecting the `QF_NRAT` logic. *`QF_NRAT` is **incomplete**: cvc5 may return `unknown`, which chelis records as `unsupported` (solver capacity) and `--tier auto` degrades **honestly** to fuzz — never a false proven. Keep structural greens transcendental-free by construction where possible (report §3). |
-| `log` lowers to SMT | `@upstream` | **`log` does NOT lower** — cvc5 has no LOG kind, so a goal that inlines a real `normal_cdf`/`bs_call` body (every `d1` uses `log`) cannot be discharged at Tier B and routes to Tier C. This is **chelis#434** (rescoped upstream to the transcendental-discharge capability; the message-leak is already fixed and the failure is an honest `unsupported` naming `log`). See `UPSTREAM_BUGS.md`. |
+| Certified-envelope transcendental discharge (`erf`/`normal_cdf`/`exp`/`log`/`sqrt` subterms) | `@pin` | Shipped in 0.16.0 (**chelis#434, now CLOSED**): a soundly-boundable transcendental subterm is abstracted to a fresh variable over its Gappa/Arb-certified envelope hull and the goal discharges as **`proven_modulo_certified_envelope`** (strictly weaker than `proven_modulo_real_arithmetic`, disclosed in the verdict). Fail-closed on unboundable arguments. **Residual:** goals whose truth depends on the *coupling* between two abstractions of the same quantity — the flagship BS positivity / intrinsic lower bound via `N(d1)`/`N(d2)` — are structurally unreachable and stay `deferred_invariant`: **chelis#637** (open). See `UPSTREAM_BUGS.md`. |
 | `erf` / bundled `n_cdf` via an abstract-subterm contract | `@pin` | `erf` is not directly cvc5-lowerable, but the bundled normal-CDF **contract** (`0 ≤ N ≤ 1`, reflection `N(-x)=1-N(x)`) is discharged at the SMT tier as an abstract subterm (`chelis-prove/src/contracts.rs`), which is what lets the abstracted derivatives structure prove. The contract is separately fuzz-validated against the real `n_cdf` (max abs err ≈ 2 ulp vs scipy, report §7). |
 | Algebraic `abs`, `min`, `max` lower to SMT | `@pin` | In `CVC5_LOWERABLE`, `QF_NRA` (algebraic, not transcendental). `min`/`max` lower to ITE. |
 | Composite derivatives greens | `@pin` | `properties/composites.ch`: structure proven at Tier B for any `N` satisfying its contract, verdict `proven_modulo_fuzz_validated_contract`. This string is **legitimate here** (a real SMT base resting on a fuzz-validated contract); it was only a false-positive for **pure-fuzz** bases, fixed by chelis#435 (archived). Classify verdicts from `proof_tier`, never the string alone. |

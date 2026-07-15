@@ -31,43 +31,81 @@ reflection, delta ∈ [0,1]) reach SMT as **composites** — structure proven fo
 any `N` satisfying its contract, with that contract separately fuzz-validated on
 the real `n_cdf`. Nothing upstream blocks shipping the current surface; the real
 transcendental pricing bodies degrade **honestly** to fuzz (never a false
-proven — see chelis#434 below).
+proven — the coupled-subterm goals stay deferred, see chelis#637 below).
 
 ## Tracking
 
-- **chelis#434 — the SMT tier cannot discharge a transcendental finance body
-  (Black–Scholes positivity through `log`/`exp`/`sqrt`).** `log` has no
-  cvc5 kind, so `chelis prove` cannot build a cvc5 term for any goal that
-  inlines a real `normal_cdf`/`bs_call` body (`references/blackscholes.ch` and
-  any property that targets the un-abstracted pricer). Minimal reproducer: the
-  `normal_cdf(x)` body in the issue (uses `log`/`exp` via the rational
-  approximation) as a `@property bs_call_positive` goal.
-  - **State at pin 0.14.0 (re-probed):** the internal-message leak
-    (`variable d1 has no declared cvc5 term`) is **fixed** — `--tier smt-only`
-    now returns an honest `unsupported` **naming the transcendental (`log`)**,
-    and `--tier auto` falls to `fuzz_validated`; it is **never** a false
-    `proven`. Regression-locked upstream in
-    `chelis-prove/tests/transcendental_finance_lowering.rs` (present at v0.14.0).
-    `log`'s deliberate absence from the cvc5-lowerable set is
-    `chelis-prove/src/tier_b.rs` (`CVC5_LOWERABLE`, with the `chelis#434`
-    citation in the `cannot_lower_reason` doc comment).
-  - **Why it stays open:** chelis#434 was rescoped upstream to the
-    transcendental-**discharge capability** (faithfully proving BS positivity
-    through a `log`/`exp`/`sqrt` envelope — the WS-7/Beacon work), which is
-    **not** delivered at 0.14.0. Complementary to the shipped `erf`
-    abstract-subterm contract path, which is what makes `properties/composites.ch`
-    green.
+- **chelis#637 — the certified-envelope discharge cannot express
+  coupled-subterm dependencies (`N(d1)`/`N(d2)`): BS positivity / intrinsic
+  lower bound unreachable by free-variable abstraction.** The 0.16.0
+  envelope path (chelis#434, §Archived) abstracts each transcendental
+  subterm to an INDEPENDENT fresh variable over its certified hull, so the
+  quantitative coupling `bs_call = s·N(d1) − k·e^{−rt}·N(d2)` (with
+  `d2 < d1`) is discarded and the residual is falsifiable in-abstraction:
+  cvc5 answers SAT-in-abstraction and the honest verdict is
+  `deferred_invariant`/`unsupported`, never a proof.
+  - **State at pin 0.16.1 (re-probed):** the direct-pricer positivity
+    invariant stays **deferred** (`deferred_invariants` in
+    `docs/cnote-import-surface.json`, dischargeability lane p08); the
+    identical intrinsic-lower-bound invariant PROVES on the CRR
+    risk-neutral anchor (`properties/canontrees.ch`
+    `crr_rn_call_intrinsic_lower_bound`) — the teaching exemplar of the
+    genuine-vs-deferred split (`src/trees.ch`).
   - **Affected surface:** every `properties/` goal that would inline a real
-    `bs_call`/`normal_cdf` body; `references/blackscholes.ch`.
-  - **Workaround:** abstract the transcendental to a bounded free parameter
-    carrying its contract (`nd1 = N(d1) ∈ [0,1]`, reflection `N(-x)=1-N(x)`,
-    `disc = exp(-r t) ∈ [0,1]`) so the goal is polynomial and lowers; validate
-    the contract on the real `n_cdf` separately (fuzz + the scipy oracle). This
-    is exactly the method in `properties/composites.ch` and the report §3–§4.
-  - **Re-probe trigger:** any chelis release note naming transcendental /
-    `log`/`exp`/`sqrt` SMT discharge, a certified transcendental envelope, or
-    Beacon transcendental support. Re-probe by proving `bs_call_positive` on the
-    un-abstracted body per-surface, not by reading the changelog.
+    `bs_call`/`normal_cdf` body and whose truth depends on subterm
+    coupling; `properties/canonpricing.ch` (expected tier stays
+    `fuzz_validated`); `references/blackscholes.ch`.
+  - **Workaround:** unchanged — abstract the transcendental to a bounded
+    free parameter carrying its contract (`nd1 = N(d1) ∈ [0,1]`, reflection
+    `N(-x)=1-N(x)`, `disc = exp(-r t) ∈ [0,1]`) so the goal is polynomial
+    (`properties/composites.ch`, report §3–§4); or re-anchor the invariant
+    on a rational-arithmetic pricer (`properties/canontrees.ch`).
+  - **Not expressible as a `tests_blocked/` probe** (prove-verdict surface;
+    see `tests_blocked/README.md` §cannot-be-probed) — re-probed by
+    `scripts/prove_gate.py` and manually at every bump.
+  - **Re-probe trigger:** any chelis release note naming coupled-subterm /
+    relational abstraction, whole-expression `BoxRange` interval
+    evaluation, or a chelis#637 close. Re-probe by proving
+    `bs_call_positive` on the un-abstracted body per-surface, not by
+    reading the changelog.
+
+- **chelis#659 — fuzz-tier proving cannot complete a single sample over a
+  real f64 transcendental body within any usable budget.** A single
+  accepted fuzz sample of one BS positivity property exceeds 200s on the
+  release binary, so the honest `fuzz_validated` lane for the real
+  transcendental pricers is un-gateable (this is why there is NO nightly
+  canon fuzz gate — see the comment in `.github/workflows/nightly.yml`).
+  Filed 2026-07-10 from the measurements in
+  `docs/issue_drafts/fuzz_sampler_transcendental_cost.md`; sibling
+  chelis#644 (fixed sampler domain box) starves realistic-magnitude
+  guards.
+  - **State at pin 0.16.1 (re-probed):** still open upstream; no
+    0.15.x/0.16.x release note touches the fuzz sampler cost. The
+    direct-pricer positivity invariant stays in `deferred_invariants` on
+    the fuzz lane too (`AGENTS.md` §manifest).
+  - **Not expressible as a `tests_blocked/` probe** (a probe would hang the
+    suite, not fail it; see `tests_blocked/README.md` §cannot-be-probed).
+  - **Re-probe trigger:** any release note naming fuzz sampler cost /
+    budget / per-property domains (chelis#644), or a chelis#659 close.
+    Re-probe with a bounded `chelis prove --tier fuzz-only` run on p08.
+
+- **i64 `mod` f64-path precision drift (unfiled by design; probe-backed).**
+  Builtin `mod(big_i64, m)` loses precision once the operand exceeds f64's
+  53-bit mantissa (~9e15): the Park-Miller-shaped update
+  `mod(1103515245·1406938949 + 12345, 2147483647)` returns 178065920
+  instead of the exact 178066070 (re-verified at the 0.16.1 bump). Mirrors
+  the school shell's pinned probe of the same drift class (kept unfiled
+  there pending a Rust-side reproducer; shoals defers to that filing —
+  cite this entry, not a number, at narrowing sites until it exists).
+  - **Affected surface / workaround:** `Shoals.Rng` hand-rolls `i64_mod`
+    (`sub`/`mul`/`floor_div`) for the Sobol/xor bit walks instead of
+    calling the builtin — the hand-roll stays until the upstream path is
+    exact.
+  - **Probe:** `tests_blocked/runtime/mod_big_i64_precision.ch` (run by
+    `chelis test tests_blocked/ --expect blocked` in CI; FIX-detected =
+    follow the sidecar's de-narrowing instructions).
+  - **Re-probe trigger:** any chelis release touching the i64 `mod`
+    runtime (the probe re-probes mechanically on every CI run).
 
 - **Depth-3 SMT function-call inlining cap (constraint; probe pending).** The
   Tier-B lowerer inlines nested function calls only to a fixed depth —
@@ -98,6 +136,30 @@ proven — see chelis#434 below).
   (`beacon_available=false` in the release binary; `CHELIS_BEACON_BIN`-gated).
 
 ## Archived
+
+- **chelis#434 — the SMT tier cannot discharge a transcendental finance body
+  (Black–Scholes positivity through `log`/`exp`/`sqrt`).** `log` had no cvc5
+  kind, so no goal inlining a real `normal_cdf`/`bs_call` body could be built
+  as a cvc5 term; after the 0.14.0-era message-leak fix the failure was an
+  honest `unsupported` naming `log`, with `--tier auto` falling to
+  `fuzz_validated`.
+  - **Resolution:** CLOSED, shipped in v0.16.0 as the certified
+    special-function envelope discharge: a soundly-boundable
+    `erf`/`normal_cdf`/`exp`/`log`/`sqrt` subterm is abstracted to a fresh
+    variable over its Gappa/Arb-certified envelope hull and the goal
+    discharges as **`proven_modulo_certified_envelope`** (a strictly weaker,
+    disclosed verdict class; fail-closed on unboundable arguments).
+    Re-probed at the 0.16.1 bump per-surface via `scripts/prove_gate.py`.
+  - **Residual (live tracker chelis#637, §Tracking):** the flagship BS
+    positivity / intrinsic-lower-bound goals are structurally unreachable by
+    independent-subterm abstraction (the `N(d1)`/`N(d2)` coupling is
+    discarded), so the direct-pricer invariants stay deferred and
+    `properties/canonpricing.ch` keeps `fuzz_validated` as its expected
+    tier. Code citations at those narrowing sites now cite chelis#637.
+  - **Retained discipline:** the contract-abstraction method in
+    `properties/composites.ch` (bounded free parameter + separately
+    fuzz-validated contract) remains the canonical pattern for
+    coupling-dependent goals regardless of the envelope capability.
 
 - **chelis#435 — `prove --json` emitted `proven_modulo_fuzz_validated_contract`
   on a pure-fuzz result.** A property that was itself only fuzz-validated, whose

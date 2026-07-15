@@ -3,7 +3,8 @@ import Shoals.Trees (tr_crr_call_2step, tr_crr_call_2step_nodisc, tr_crr_call_2s
 -- Canon proven-over-reals lane: the 2-step CRR European call is pure arithmetic
 -- + ITE (no transcendentals), so its pricing structure lowers to cvc5 and these
 -- goals discharge unqualified at Tier B (proven_modulo_real_arithmetic).
--- Dischargeability probe p14 (both goals recorded `passed/smt` at 0.14.0). Each
+-- Dischargeability probe p14 (both goals recorded `passed/smt` at 0.14.0,
+-- re-verified by the prove gate at the 0.16.1 bump). Each
 -- invariant references the real output fn tr_crr_call_2step (anti-vacuity: the
 -- dependency edge names the pricer, never a guard restatement), ships a
 -- corrupted twin that must refute with a counterexample, and a

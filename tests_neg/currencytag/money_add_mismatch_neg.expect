@@ -1,0 +1,6 @@
+money_add: currency mismatch
+
+`money_add` guards cross-currency addition with a runtime `fail` naming the
+operation (src/currencytag.ch). Currencies are runtime ADT tags, so the
+rejection is a runtime panic; `money_sub` routes through the same
+`same_currency` guard shape.
