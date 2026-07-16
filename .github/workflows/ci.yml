@@ -86,7 +86,10 @@ jobs:
       - name: chelis fmt --check
         run: |
           set -euo pipefail
-          for f in src/*.ch properties/*.ch references/*.ch demos/*.ch tests/*.ch tests-manual/*.ch tests_neg/*/*.ch tests_blocked/*/*.ch; do
+          # globstar so tests_neg/tests_blocked cases are found at any depth
+          # (the test runner discovers them recursively; fmt must match).
+          shopt -s globstar
+          for f in src/*.ch properties/*.ch references/*.ch demos/*.ch tests/*.ch tests-manual/*.ch tests_neg/**/*.ch tests_blocked/**/*.ch; do
             [ -e "$f" ] || continue
             chelis fmt --check "$f"
           done
@@ -121,7 +124,8 @@ jobs:
       # suite (tests-manual/) run in .github/workflows/nightly.yml (scheduled +
       # workflow_dispatch, real toolchain), and the local gate runs them only
       # under `scripts/run_local_gate.py --full` (its default mode mirrors
-      # exactly this per-PR job set).
+      # this per-PR job set, minus the CI-only `conform bump-check` — a
+      # stale local origin/main would make that step false-fail).
 
   # Offline manifest validation (no toolchain): schema/pin freshness + every
   # invariant/control/output-fn/precondition resolves to real sources.

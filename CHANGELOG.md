@@ -6,14 +6,13 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.23.1] - 2026-07-15
+## [0.23.1] - 2026-07-16
 
 Chelis pin bump `=0.14.0` → `=0.16.1` (a de-narrowing event, shoals#26) +
 adoption of the toolchain-native conformance surface (`chelis reef conform`,
 chelis#628). No pricing/API change. Validated against the released
-nautilus v0.7.34 artifact (2026-07-16) and coral 0.7.31 built from its
-green bump-PR tip (coral#18); merge gated on the coral v0.7.31 release —
-the last link in the 0.16.1 dependency chain.
+nautilus v0.7.34 and coral v0.7.31 artifacts — the 0.16.1 dependency
+chain (nautilus#29 → coral#18 → here) completed 2026-07-16.
 
 ### Changed
 
@@ -31,6 +30,11 @@ the last link in the 0.16.1 dependency chain.
   conform audit, contract gate); the nightly-CI stages (fast `tests/`
   suite, heavy `tests-manual/` suite, prove gate) moved behind `--full`,
   required once at a pin bump / before a release tag.
+  *Recorded per-repo divergence (AGENTS.md §Scaffolding Drift Rule):
+  shoals pilots this per-PR-mirror default ahead of the sibling shells —
+  their local gates keep the full-run shape until their own 0.16.1
+  conform-bump change sets, which is the natural slot to mirror it
+  (each shell's gate script is already being rewritten there).*
 
 ### Added
 

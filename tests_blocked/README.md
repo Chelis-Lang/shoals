@@ -1,6 +1,6 @@
 # tests_blocked/ — upstream-blocker probes
 
-Every `.ch` here would be a **minimal reproducer of an open upstream chelis
+Every `.ch` here is a **minimal reproducer of an open upstream chelis
 bug** that Shoals works around, **EXPECTED TO FAIL** at the current pin,
 run via `chelis test tests_blocked/ --expect blocked` (a pass = FIX-detected:
 execute the de-narrowing instructions in the probe's `.expect` sidecar,

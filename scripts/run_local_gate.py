@@ -68,10 +68,17 @@ LINT_DIRS = [
 ]
 
 
-def run(cmd: list[str], *, quiet: bool) -> int:
-    """Run a subprocess, return its exit code. Streams stdout on failure."""
+def run(cmd: list[str], *, quiet: bool, stream: bool = False) -> int:
+    """Run a subprocess, return its exit code.
+
+    Captured by default (output shown only on failure). ``stream=True``
+    inherits stdout/stderr — used for the multi-minute nightly stages so
+    progress is visible and the full suite output is never buffered.
+    """
     if not quiet:
         print(f"  $ {' '.join(cmd)}", flush=True)
+    if stream:
+        return subprocess.run(cmd, cwd=REPO_ROOT).returncode
     result = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True)
     if result.returncode != 0:
         sys.stdout.write(result.stdout)
@@ -98,8 +105,8 @@ def main() -> int:
         + sorted((REPO_ROOT / "demos").glob("*.ch"))
         + sorted((REPO_ROOT / "tests").glob("*.ch"))
         + sorted((REPO_ROOT / "tests-manual").glob("*.ch"))
-        + sorted((REPO_ROOT / "tests_neg").glob("*/*.ch"))
-        + sorted((REPO_ROOT / "tests_blocked").glob("*/*.ch"))
+        + sorted((REPO_ROOT / "tests_neg").glob("**/*.ch"))
+        + sorted((REPO_ROOT / "tests_blocked").glob("**/*.ch"))
     )
 
     per_pr_stages: list[tuple[str, list[str]]] = [
@@ -139,10 +146,12 @@ def main() -> int:
         ),
     ]
 
-    stages = per_pr_stages + (nightly_stages if args.full else [])
+    stages = [(label, cmd, False) for label, cmd in per_pr_stages]
+    if args.full:
+        stages += [(label, cmd, True) for label, cmd in nightly_stages]
     total = len(stages)
 
-    for i, (label, cmd) in enumerate(stages, start=1):
+    for i, (label, cmd, stream) in enumerate(stages, start=1):
         print(f"[{i}/{total}] {label}")
         if not cmd:  # the per-file fmt stage
             for path in fmt_files:
@@ -152,7 +161,7 @@ def main() -> int:
                     print(f"FAIL: chelis fmt --check {rel}")
                     return rc
             continue
-        rc = run(cmd, quiet=False)
+        rc = run(cmd, quiet=False, stream=stream)
         if rc != 0:
             print(f"FAIL: {label}")
             return rc
