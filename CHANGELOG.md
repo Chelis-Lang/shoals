@@ -10,10 +10,10 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 Chelis pin bump `=0.14.0` → `=0.16.1` (a de-narrowing event, shoals#26) +
 adoption of the toolchain-native conformance surface (`chelis reef conform`,
-chelis#628). No pricing/API change. **Blocked on the dependency chain until
-0.16.1-pinned releases of nautilus (0.7.34, nautilus PR #29) and coral
-(0.7.31, coral PR #18) exist** — validated locally against
-locally-built packages of both.
+chelis#628). No pricing/API change. Validated against the released
+nautilus v0.7.34 artifact (2026-07-16) and coral 0.7.31 built from its
+green bump-PR tip (coral#18); merge gated on the coral v0.7.31 release —
+the last link in the 0.16.1 dependency chain.
 
 ### Changed
 
