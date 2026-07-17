@@ -17,8 +17,8 @@ concurrency:
 # so a literal has to exist for the guard to check). The extract step below
 # re-derives the pin from reef.toml only to assert this literal has not drifted.
 env:
-  CHELIS_TAG: v0.14.0
-  CHELIS_VERSION: 0.14.0
+  CHELIS_TAG: v0.16.1
+  CHELIS_VERSION: 0.16.1
 
 jobs:
   hard-rule-guard:
@@ -35,6 +35,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Full history so `conform bump-check --base origin/main` can resolve
+          # the base pin; the default shallow clone would fail closed.
+          fetch-depth: 0
 
       - name: Extract versions from reef.toml
         run: |
@@ -82,16 +86,35 @@ jobs:
       - name: chelis fmt --check
         run: |
           set -euo pipefail
-          for f in src/*.ch properties/*.ch references/*.ch demos/*.ch tests/*.ch tests-manual/*.ch; do
+          # globstar so tests_neg/tests_blocked cases are found at any depth
+          # (the test runner discovers them recursively; fmt must match).
+          shopt -s globstar
+          for f in src/*.ch properties/*.ch references/*.ch demos/*.ch tests/*.ch tests-manual/*.ch tests_neg/**/*.ch tests_blocked/**/*.ch; do
             [ -e "$f" ] || continue
             chelis fmt --check "$f"
           done
 
       - name: chelis lint --check
-        run: chelis lint --check src/ properties/ references/ demos/ tests/ tests-manual/ manual-gates/
+        run: chelis lint --check src/ properties/ references/ demos/ tests/ tests-manual/ manual-gates/ tests_neg/ tests_blocked/
 
       - name: chelis reef build
         run: chelis reef build
+
+      # Contract §5/§6 expected-failure suites: seconds each (per-file
+      # isolated), so they stay on the lean per-PR path.
+      - name: Negative tests
+        run: chelis test tests_neg/ --expect neg
+
+      - name: Blocked-probe suite
+        run: chelis test tests_blocked/ --expect blocked
+
+      # Contract §11 conformance + §7 pin-bump guard (toolchain-native since
+      # chelis 0.15.1, chelis#628).
+      - name: Conformance audit
+        run: chelis reef conform audit
+
+      - name: Pin-bump guard
+        run: chelis reef conform bump-check --base origin/main
 
       # Per-PR CI is deliberately LEAN and stops at the compile signal
       # (chelis reef build) above. The real-chelis test suites do NOT run on
@@ -99,8 +122,10 @@ jobs:
       # real-chelis wall on the 2-vCPU runner — the tallest slice of the old
       # per-PR gate) and the heavy MC / PDE / Fourier / optimization-benchmark
       # suite (tests-manual/) run in .github/workflows/nightly.yml (scheduled +
-      # workflow_dispatch, real toolchain), and the local gate
-      # (scripts/run_local_gate.py) runs them before push.
+      # workflow_dispatch, real toolchain), and the local gate runs them only
+      # under `scripts/run_local_gate.py --full` (its default mode mirrors
+      # this per-PR job set, minus the CI-only `conform bump-check` — a
+      # stale local origin/main would make that step false-fail).
 
   # Offline manifest validation (no toolchain): schema/pin freshness + every
   # invariant/control/output-fn/precondition resolves to real sources.

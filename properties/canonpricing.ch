@@ -2,11 +2,15 @@ module Shoals.Properties.CanonPricing
 import Shoals.Pricing (bs_call_scalar)
 import Shoals.PricingExtended (black_call)
 -- Canon fuzz-validated lane: direct-call invariants against the REAL
--- transcendental pricers. Their bodies use `log`, which has no cvc5 kind
--- (chelis#434), so smt-only returns `unsupported` and `--tier auto` degrades
--- HONESTLY to fuzz -- never a false proven. Expected tier at 0.14.0:
--- fuzz_validated; tier_upgrade_trigger chelis#434 (the log/exp/sqrt envelope
--- workstream). Dischargeability lane p08 (real bs_call positivity).
+-- transcendental pricers. The certified-envelope discharge (chelis#434,
+-- CLOSED at 0.16.0) abstracts each `log`/`exp`/`sqrt`/`erf` subterm to an
+-- independent envelope-bounded variable, but these goals depend on the
+-- COUPLING between `N(d1)`/`N(d2)` abstractions of the same quantity, which
+-- free-variable abstraction discards (chelis#637) -- so `--tier auto` still
+-- degrades HONESTLY to fuzz, never a false proven. Expected tier at 0.16.1:
+-- fuzz_validated; tier_upgrade_trigger chelis#637 (coupled-subterm /
+-- relational abstraction). Dischargeability lane p08 (real bs_call
+-- positivity).
 --
 -- Guard authoring (p11 fuzz-box rule): the prover samples a fixed [-10,10]^n box
 -- with rejection, so every guard region must intersect the box with usable

@@ -2,9 +2,9 @@
   "schema_id": "chelis-shell.invariant-surface",
   "schema_version": "1.0",
   "pkg": "shoals",
-  "pkg_version": "0.23.0",
-  "chelis_pin": "0.14.0",
-  "generated_note": "Producer manifest for the C Note characterization engine (frozen contract characterization_contract_v1.md sec 1). Also published as the release asset shoals-0.23.0.invariants.json (byte-identical). v0.23.0 adds the MODEL-FREE canon: kind-scoped invariants (target_model: null, anchor_model names the proving ground) that reference the output fn DIRECTLY via goal_pattern, so the engine instantiates them against any pricer of the kind -- a european_call no-arbitrage family (nonneg / upper bound C<=s / intrinsic lower bound / bull spread / butterfly) anchored on the risk-neutral tr_crr_call_2step_rn, and a discrete-compounding finance.fixed_income.* family (discount factor / bond PV / price-yield monotonicity / convexity) anchored on a 2-period bond, both genuinely proven over the reals, plus a defective undiscounted bond. Tiers are grounded in the Phase-0 dischargeability record record.chelis-0.14.0.json; every below-proven tier cites a tier_upgrade_trigger and a dischargeability_probe. Latest upstream chelis is 0.15.0 (published 2026-07-10); 0.23.0 stays pinned to 0.14.0 which is the validated release for this canon (0.15.0 not yet validated for this shell).",
+  "pkg_version": "0.23.1",
+  "chelis_pin": "0.16.1",
+  "generated_note": "Producer manifest for the C Note characterization engine (frozen contract characterization_contract_v1.md sec 1). Also published as the release asset shoals-0.23.1.invariants.json (byte-identical). v0.23.0 adds the MODEL-FREE canon: kind-scoped invariants (target_model: null, anchor_model names the proving ground) that reference the output fn DIRECTLY via goal_pattern, so the engine instantiates them against any pricer of the kind -- a european_call no-arbitrage family (nonneg / upper bound C<=s / intrinsic lower bound / bull spread / butterfly) anchored on the risk-neutral tr_crr_call_2step_rn, and a discrete-compounding finance.fixed_income.* family (discount factor / bond PV / price-yield monotonicity / convexity) anchored on a 2-period bond, both genuinely proven over the reals, plus a defective undiscounted bond. Tiers are grounded in the Phase-0 dischargeability record record.chelis-0.14.0.json; every below-proven tier cites a tier_upgrade_trigger and a dischargeability_probe. v0.23.1 bumps the pin to 0.16.1 (latest upstream, published 2026-07-12), re-validated for this canon by the prove gate at the bump; tier history per pin is kept in each invariant's expected_tier_per_pin.",
   "models": [
     {
       "id": "bs_call",
@@ -131,7 +131,7 @@
       "output": {"meaning": "2-period unit-face coupon bond present value", "unit": "currency"},
       "sensitivities": [],
       "defective": false,
-      "notes": "Closed-form 2-period unit-face coupon bond PV = c/(1+y) + (1+c)/(1+y)^2. Pure arithmetic + division, lowers to cvc5 -- the genuine proven-over-reals rates anchor (bond PV bounds, price-yield monotonicity, convexity). Held at n=2: the three-point convexity second difference over reciprocal powers is unsupported at n>=3 at this pin, so a 2-period bond is the largest schedule that proves d2P/dy2>0 in the faithful yield form. General-schedule discounting needs a fold (no induction tier at 0.14.0) and is held out."
+      "notes": "Closed-form 2-period unit-face coupon bond PV = c/(1+y) + (1+c)/(1+y)^2. Pure arithmetic + division, lowers to cvc5 -- the genuine proven-over-reals rates anchor (bond PV bounds, price-yield monotonicity, convexity). Held at n=2: the three-point convexity second difference over reciprocal powers is unsupported at n>=3 at this pin, so a 2-period bond is the largest schedule that proves d2P/dy2>0 in the faithful yield form. General-schedule discounting needs a fold (no induction tier at 0.16.1) and is held out."
     },
     {
       "id": "fi_bond_2p_nodisc",
@@ -173,7 +173,7 @@
         "violating": {"name": "crr_call_nonneg_corrupted", "expected": "failed", "witness_required": true}
       },
       "non_vacuity_witness": "crr_call_nonneg_guards_satisfiable",
-      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "expected_tier_per_pin": {"0.14.0": "proven", "0.16.1": "proven"},
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice pricer returns a negative call price -- free money at these inputs",
       "fuzz_domain_note": "proven over the reals at Tier B (no fuzz); guards keep goal-site inlining within the depth-3 cap (p07)"
@@ -201,7 +201,7 @@
         "violating": {"name": "crr_call_monotone_in_s_corrupted", "expected": "failed", "witness_required": true}
       },
       "non_vacuity_witness": "crr_call_monotone_in_s_guards_satisfiable",
-      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "expected_tier_per_pin": {"0.14.0": "proven", "0.16.1": "proven"},
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price falls when spot rises -- a monotonicity (delta-sign) violation",
       "fuzz_domain_note": "proven over the reals at Tier B (no fuzz)"
@@ -234,7 +234,7 @@
         "in_region": true,
         "region_classification": "in_region_defect"
       },
-      "expected_tier_per_pin": {"0.14.0": "disproved"},
+      "expected_tier_per_pin": {"0.14.0": "disproved", "0.16.1": "disproved"},
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "admits arbitrage: the undiscounted model prices the call at 1.125 when the underlying spot is only 1.0 (C > s)",
       "fuzz_domain_note": "polynomial break; cvc5 refutes C<=s and the witness re-executes at f32 (in_region_defect, not reals-hedged)"
@@ -255,7 +255,7 @@
         "satisfying": {"name": "put_call_parity_reflection", "expected": "passed"},
         "violating": {"name": "put_call_parity_corrupted", "expected": "failed", "witness_required": true}
       },
-      "expected_tier_per_pin": {"0.14.0": "proven_modulo_contract"},
+      "expected_tier_per_pin": {"0.14.0": "proven_modulo_contract", "0.16.1": "proven_modulo_contract"},
       "tier_upgrade_trigger": "chelis#434",
       "dischargeability_probe": "p12_shoals_published_composites",
       "violation_text": "put-call parity fails under the sound reflection contract",
@@ -277,7 +277,7 @@
         "satisfying": {"name": "call_upper_bounded_by_spot", "expected": "passed"},
         "violating": {"name": "call_upper_bounded_by_spot_corrupted", "expected": "failed", "witness_required": true}
       },
-      "expected_tier_per_pin": {"0.14.0": "proven_modulo_contract"},
+      "expected_tier_per_pin": {"0.14.0": "proven_modulo_contract", "0.16.1": "proven_modulo_contract"},
       "tier_upgrade_trigger": "chelis#434",
       "dischargeability_probe": "p12_shoals_published_composites",
       "violation_text": "the call is priced above the underlying spot -- admits arbitrage",
@@ -295,7 +295,7 @@
         "violating": {"name": "delta_in_unit_interval_corrupted", "expected": "failed", "witness_required": true}
       },
       "edge_control": {"name": "delta_unknown_contract", "expected": "unsupported"},
-      "expected_tier_per_pin": {"0.14.0": "proven_modulo_contract"},
+      "expected_tier_per_pin": {"0.14.0": "proven_modulo_contract", "0.16.1": "proven_modulo_contract"},
       "tier_upgrade_trigger": "chelis#434",
       "dischargeability_probe": "p12_shoals_published_composites",
       "violation_text": "the call delta N(d1) falls outside [0,1]",
@@ -322,7 +322,7 @@
         "violating": {"name": "crr_rn_call_nonneg_corrupted", "expected": "failed", "witness_required": true}
       },
       "non_vacuity_witness": "crr_rn_price_guards_satisfiable",
-      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "expected_tier_per_pin": {"0.14.0": "proven", "0.16.1": "proven"},
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the european-call pricer returns a negative price -- free money at these inputs",
       "fuzz_domain_note": "proven over the reals at Tier B (no fuzz); model-free (binds to any european_call output fn), genuinely proven on the CRR anchor and deferred on the transcendental Black-Scholes flagship (chelis#637)"
@@ -348,7 +348,7 @@
         "violating": {"name": "crr_rn_call_upper_bounded_by_spot_corrupted", "expected": "failed", "witness_required": true}
       },
       "non_vacuity_witness": "crr_rn_price_guards_satisfiable",
-      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "expected_tier_per_pin": {"0.14.0": "proven", "0.16.1": "proven"},
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the call is priced above the underlying spot -- admits arbitrage",
       "fuzz_domain_note": "proven over the reals at Tier B; holds ONLY under the martingale condition the risk-neutral anchor enforces, so it FAILS on the free-parameter tr_crr_call_2step -- deferred on Black-Scholes (chelis#637)"
@@ -374,7 +374,7 @@
         "violating": {"name": "crr_rn_call_intrinsic_lower_bound_corrupted", "expected": "failed", "witness_required": true}
       },
       "non_vacuity_witness": "crr_rn_price_guards_satisfiable",
-      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "expected_tier_per_pin": {"0.14.0": "proven", "0.16.1": "proven"},
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the call is priced below its discounted intrinsic value s - k*disc^2 -- admits arbitrage (buy and exercise)",
       "fuzz_domain_note": "proven over the reals at Tier B; the teaching exemplar of the genuine-vs-deferred split -- the SAME bound is DEFERRED on Black-Scholes where value-level abstraction discards the N(d1)/N(d2) coupling (chelis#637)"
@@ -401,7 +401,7 @@
         "violating": {"name": "crr_rn_call_bull_spread_nonneg_corrupted", "expected": "failed", "witness_required": true}
       },
       "non_vacuity_witness": "crr_rn_bull_guards_satisfiable",
-      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "expected_tier_per_pin": {"0.14.0": "proven", "0.16.1": "proven"},
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "a lower-strike call is worth less than a higher-strike call -- a bull-spread (strike-monotonicity) violation admitting arbitrage",
       "fuzz_domain_note": "proven over the reals at Tier B; re-anchors the noarbitrage.ch bull_spread form on the CRR pricer (it falls to fuzz against the transcendental bs_call_scalar)"
@@ -428,7 +428,7 @@
         "violating": {"name": "crr_rn_call_butterfly_convex_corrupted", "expected": "failed", "witness_required": true}
       },
       "non_vacuity_witness": "crr_rn_butterfly_guards_satisfiable",
-      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "expected_tier_per_pin": {"0.14.0": "proven", "0.16.1": "proven"},
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "a long butterfly on equally-spaced strikes has negative value -- a convexity-in-strike violation admitting arbitrage",
       "fuzz_domain_note": "proven over the reals at Tier B; re-anchors the noarbitrage.ch butterfly form on the CRR pricer. Anti-vacuity: the affine metamorphic trio cannot flip a butterfly (second difference of any affine body is 0); the sum-based neg_sq_sum substitution does (prove_gate strengthening, forge_legit_convex fixture)"
@@ -448,7 +448,7 @@
         "violating": {"name": "fi_discount_factor_bounded_corrupted", "expected": "failed", "witness_required": true}
       },
       "non_vacuity_witness": "fi_discount_guards_satisfiable",
-      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "expected_tier_per_pin": {"0.14.0": "proven", "0.16.1": "proven"},
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the multi-period discount factor falls outside (0, 1] -- discounting a non-negative yield either creates value or turns it negative",
       "fuzz_domain_note": "proven over the reals at Tier B (no fuzz)"
@@ -469,7 +469,7 @@
         "violating": {"name": "fi_bond_pv_bounded_corrupted", "expected": "failed", "witness_required": true}
       },
       "non_vacuity_witness": "fi_bond_pv_guards_satisfiable",
-      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "expected_tier_per_pin": {"0.14.0": "proven", "0.16.1": "proven"},
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond PV is non-positive or exceeds the undiscounted sum of its cashflows -- not a proper present value",
       "fuzz_domain_note": "proven over the reals at Tier B (no fuzz)"
@@ -491,7 +491,7 @@
         "violating": {"name": "fi_bond_pv_monotone_in_yield_corrupted", "expected": "failed", "witness_required": true}
       },
       "non_vacuity_witness": "fi_bond_mono_guards_satisfiable",
-      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "expected_tier_per_pin": {"0.14.0": "proven", "0.16.1": "proven"},
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond price rises as yield rises -- a duration/DV01 sign violation",
       "fuzz_domain_note": "proven over the reals at Tier B; dP/dy < 0 (the DV01/duration sign) as a two-point difference"
@@ -513,7 +513,7 @@
         "violating": {"name": "fi_bond_pv_convex_in_yield_corrupted", "expected": "failed", "witness_required": true}
       },
       "non_vacuity_witness": "fi_bond_convex_guards_satisfiable",
-      "expected_tier_per_pin": {"0.14.0": "proven"},
+      "expected_tier_per_pin": {"0.14.0": "proven", "0.16.1": "proven"},
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond price is concave in yield -- a negative-convexity violation",
       "fuzz_domain_note": "proven over the reals at Tier B; d2P/dy2 > 0 (positive bond convexity) as a three-point second difference. Held at n=2 -- the largest schedule the yield-form convexity discharges at this pin (n>=3 unsupported)"
@@ -543,7 +543,7 @@
         "in_region": true,
         "region_classification": "in_region_defect"
       },
-      "expected_tier_per_pin": {"0.14.0": "disproved"},
+      "expected_tier_per_pin": {"0.14.0": "disproved", "0.16.1": "disproved"},
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "reports zero rate sensitivity: the undiscounted bond prices at 3.0 whether the yield is 0.0 or 1.0 (dP/dy = 0, DV01 understated to zero)",
       "fuzz_domain_note": "polynomial (constant) break; cvc5 refutes strict dP/dy<0 and the witness re-executes at f32 (in_region_defect, not reals-hedged)"

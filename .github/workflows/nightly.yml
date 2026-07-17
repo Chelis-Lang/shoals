@@ -39,8 +39,8 @@ concurrency:
 # scripts/audit_workarounds.py --pins-only enforces it offline. The extract
 # step re-derives the pin from reef.toml only to assert this has not drifted.
 env:
-  CHELIS_TAG: v0.14.0
-  CHELIS_VERSION: 0.14.0
+  CHELIS_TAG: v0.16.1
+  CHELIS_VERSION: 0.16.1
 
 jobs:
   # The fast deterministic unit suite (tests/) — moved off the per-PR path.
@@ -114,8 +114,8 @@ jobs:
   # disproved) so this gate is deterministic. There is NO nightly canon fuzz
   # gate: the direct-pricer positivity invariant is deferred/unverified
   # (docs/cnote-import-surface.json deferred_invariants) — the real
-  # transcendental pricers cannot be fuzzed within any budget at 0.14.0 (one
-  # fuzz sample of one positivity property did not complete in 200s, chelis#434
+  # transcendental pricers cannot be fuzzed within any budget at 0.16.1 (one
+  # fuzz sample of one positivity property did not complete in 200s, chelis#659
   # / p08). prove_gate keeps dormant fuzz machinery (PROVE_GATE_FUZZ / --tier
   # fuzz-only) for the day that deferred invariant becomes observable.
   prove:

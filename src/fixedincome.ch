@@ -10,7 +10,7 @@ export (fi_df2, fi_bond2, fi_bond2_nodisc)
 -- pin, so a 2-period bond is the largest schedule that proves d2P/dy2 > 0 in the
 -- faithful yield form (rather than reparameterizing to the discount factor, which
 -- is a different statement). General-schedule discounting needs a fold over the
--- cashflow list (no induction tier at 0.14.0) and is held out -- do NOT build the
+-- cashflow list (no induction tier at 0.16.1) and is held out -- do NOT build the
 -- rates canon via curves.ch tensor-fold/interp, which falls to fuzz.
 -- 2-period discount factor at per-period yield y: 1 / (1 + y)^2. In (0, 1] for
 -- y >= 0. Denominator 1 + y >= 1 > 0 under the guard, so the reciprocal is well
