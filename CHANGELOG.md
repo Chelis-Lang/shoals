@@ -6,6 +6,46 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-07-22
+
+Canon Breadth. Extends the verification canon from the small-lattice /
+fixed-period teaching models to the Greek-sign family, VaR/risk-measure stubs,
+general-size promotion stubs, and practitioner-scale demos — closing the buyer
+gap between proven-structure invariants and what a desk actually runs.
+
+### Added
+
+- **Greek sign invariants** (`properties/canongreeks.ch`, proven over the reals
+  at Tier B): `crr_call_vega_sign` (monotone-nondecreasing in u — the lattice
+  analog of vega >= 0), `crr_call_disc_sensitivity` (monotone-nondecreasing in
+  disc — the lattice analog of ∂C/∂disc >= 0), and `crr_call_gamma_sign`
+  (convexity in spot — the lattice analog of gamma >= 0). Each with corrupted
+  twin and guards\_satisfiable witness. All anchor on `tr_crr_call_2step`.
+- **BS promotion gate stubs** (deferred invariants): `bs_vega_sign.v1`,
+  `bs_rho_sign.v1`, `bs_gamma_sign.v1` — the transcendental-pricer versions
+  gated on chelis#637 (Beacon / BoxRange) and chelis#659 (fuzz feasibility).
+- **VaR / quantile coherence stubs** (`properties/canonrisk.ch`, deferred):
+  `var_monotone_in_confidence`, `cvar_dominates_var`, `var_nonneg_positive_mean`
+  — the risk-measure invariant family targeting `Shoals.Risk.parametric_var` /
+  `parametric_cvar`, gated on the chelis-std quantile primitive or fuzz
+  feasibility. New manifest model `parametric_var` (kind
+  `finance.risk_measure.parametric`).
+- **General-size promotion stubs** (`properties/canongeneral.ch`, deferred):
+  `crr_general_nonneg`, `crr_general_monotone_in_s`,
+  `fi_bond_general_monotone_in_yield`, `fi_bond_general_pv_bounded` — fold-based
+  n-step / n-period bodies gated on the chelis induction tier.
+- **`fi_bond_general`** (`src/fixedincome.ch`): fold-based n-period unit-face
+  coupon bond PV, the general-size anchor for the rates canon.
+- **Model realism demos** (`demos/realism.ch`): 200-step CRR converging to BS
+  within 0.5%, 60-period (30Y semiannual) bond matching analytic within 1%,
+  10K-path MC within 2% of BS. Practitioner-scale characterization demos
+  asserting convergence to known references — no proof-tier claims.
+
+### Changed
+
+- Manifest `docs/cnote-import-surface.json`: +1 model (9 total), +3 active
+  invariants (19 total), +10 deferred invariants (14 total).
+
 ## [0.23.1] - 2026-07-16
 
 Chelis pin bump `=0.14.0` → `=0.16.1` (a de-narrowing event, shoals#26) +
@@ -64,6 +104,8 @@ chain (nautilus#29 → coral#18 → here) completed 2026-07-16.
   open; the nightly fuzz-lane comment now cites it directly (previously
   mis-cited chelis#434). **docs/CHELIS_SURFACE.md** refreshed (header pins,
   envelope row `@upstream` → `@pin` with the #637 residual).
+
+## [0.23.0] - 2026-07-13
 
 The model-free canon. Kind-scoped invariants that reference the output fn
 DIRECTLY (`target_model: null` + `anchor_model` names the proving ground) via a

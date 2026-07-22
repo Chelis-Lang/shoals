@@ -33,3 +33,34 @@ The three wrong properties report `status: "failed"` with a
 `counterexample` object; the three `*_fixed` controls report
 `status: "passed"`. The search is deterministic: the same seed
 reproduces the same counterexample on every run.
+
+---
+
+# Model realism demos
+
+The `demos/realism.ch` module exercises the canon's model universe at
+practitioner-scale sizes with real market parameters, demonstrating that
+the verified lattice, bond, and MC pricers produce correct prices at
+the sizes a desk actually runs. **No proof-tier claims are made** —
+these are convergence assertions, not formal invariants.
+
+Module: `Shoals.Demos.Realism`.
+
+- `test_crr_200step_converges_to_bs`: a 200-step CRR lattice prices a
+  1Y ATM European call (S=100, K=100, r=5%, σ=20%) and asserts within
+  0.5% of the Black-Scholes closed form. This is the lattice depth a
+  desk uses for vanilla pricing.
+- `test_bond_60period_semiannual`: a 60-period (30Y semiannual) coupon
+  bond at c=5%, y=4% is priced by `fi_bond_general` and compared to
+  the analytic present-value formula, asserting within 1%.
+- `test_mc_10k_converges_to_bs`: 10,000 GBM paths price the same 1Y
+  ATM call and assert within 2% of Black-Scholes. This is a quick
+  intraday path count.
+
+## Running
+
+```
+chelis test demos/realism.ch --timeout 120
+```
+
+All three tests pass. Execution time is under 60s on a single core.

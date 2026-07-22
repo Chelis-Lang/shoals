@@ -2,9 +2,9 @@
   "schema_id": "chelis-shell.invariant-surface",
   "schema_version": "1.0",
   "pkg": "shoals",
-  "pkg_version": "0.23.1",
+  "pkg_version": "0.24.0",
   "chelis_pin": "0.16.1",
-  "generated_note": "Producer manifest for the C Note characterization engine (frozen contract characterization_contract_v1.md sec 1). Also published as the release asset shoals-0.23.1.invariants.json (byte-identical). v0.23.0 adds the MODEL-FREE canon: kind-scoped invariants (target_model: null, anchor_model names the proving ground) that reference the output fn DIRECTLY via goal_pattern, so the engine instantiates them against any pricer of the kind -- a european_call no-arbitrage family (nonneg / upper bound C<=s / intrinsic lower bound / bull spread / butterfly) anchored on the risk-neutral tr_crr_call_2step_rn, and a discrete-compounding finance.fixed_income.* family (discount factor / bond PV / price-yield monotonicity / convexity) anchored on a 2-period bond, both genuinely proven over the reals, plus a defective undiscounted bond. Tiers are grounded in the Phase-0 dischargeability record record.chelis-0.14.0.json; every below-proven tier cites a tier_upgrade_trigger and a dischargeability_probe. v0.23.1 bumps the pin to 0.16.1 (latest upstream, published 2026-07-12), re-validated for this canon by the prove gate at the bump; tier history per pin is kept in each invariant's expected_tier_per_pin.",
+  "generated_note": "Producer manifest for the C Note characterization engine (frozen contract characterization_contract_v1.md sec 1). Also published as the release asset shoals-0.24.0.invariants.json (byte-identical). v0.24.0 adds Canon Breadth on top of the 0.23.1 pin bump (chelis 0.16.1): the GREEK SIGN family (vega-sign monotone in u, disc-sensitivity monotone in disc, gamma-sign convexity in spot) on the free-parameter tr_crr_call_2step, all proven over the reals at Tier B; plus deferred BS Greek-sign stubs (bs_vega_sign, bs_rho_sign, bs_gamma_sign) gated on chelis#637/chelis#659, VaR/quantile coherence stubs gated on the chelis-std quantile primitive, general-size promotion stubs gated on the induction tier, and a parametric_var risk model. The MODEL-FREE canon (v0.23.0): kind-scoped invariants (target_model: null, anchor_model) referencing output fn DIRECTLY via goal_pattern -- european_call no-arbitrage family anchored on tr_crr_call_2step_rn, and discrete-compounding fixed_income family on a 2-period bond. Tiers grounded in record.chelis-0.16.1.json; every below-proven tier cites a tier_upgrade_trigger and a dischargeability_probe.",
   "models": [
     {
       "id": "bs_call",
@@ -148,6 +148,22 @@
       "sensitivities": [],
       "defective": true,
       "notes": "DEFECTIVE reference model (sprint in-region-break deliverable, rates analogue of tr_crr_call_2step_nodisc). Identical cashflows to fi_bond2 but summed with NO discounting -- returns the nominal sum c+(1+c) and ignores the yield, a real and common rates bug. It conforms to the coupon_bond kind yet VIOLATES strict price-yield monotonicity inside its valid region (its price is constant in y, so DV01/duration is understated to zero). See invariant shoals.inv.fi_bond_pv_monotone_in_yield.nodisc_defect.v1."
+    },
+    {
+      "id": "parametric_var",
+      "kind": "finance.risk_measure.parametric",
+      "module": "Shoals.Risk",
+      "output_fn": "parametric_var",
+      "sig": "(losses: tensor[n, f32], confidence: f32) -> f32",
+      "params": [
+        {"name": "losses", "meaning": "loss distribution sample", "unit": "currency", "domain": {}, "sweep_default": null},
+        {"name": "confidence", "meaning": "confidence level", "unit": "probability", "domain": {"gt": 0.0, "lt": 1.0}, "sweep_default": {"min": 0.9, "max": 0.99, "value": 0.95}}
+      ],
+      "salient_dims": ["confidence"],
+      "output": {"meaning": "parametric value-at-risk (Gaussian)", "unit": "currency"},
+      "sensitivities": [],
+      "defective": false,
+      "notes": "Parametric (Gaussian) VaR: mu + sigma * Phi^{-1}(alpha). Uses normal_inv_cdf which is not cvc5-lowerable (transcendental), so invariants over this model route to fuzz or are deferred. The canonical risk-measure model for the VaR/quantile coherence invariant family."
     }
   ],
   "invariants": [
@@ -547,6 +563,91 @@
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "reports zero rate sensitivity: the undiscounted bond prices at 3.0 whether the yield is 0.0 or 1.0 (dP/dy = 0, DV01 understated to zero)",
       "fuzz_domain_note": "polynomial (constant) break; cvc5 refutes strict dP/dy<0 and the witness re-executes at f32 (in_region_defect, not reals-hedged)"
+    },
+    {
+      "id": "shoals.inv.crr_call_vega_sign.v1",
+      "kind_applies_to": ["finance.lattice_pricer.european_call_fixed_depth"],
+      "target_model": "tr_crr_call_2step",
+      "property": {"file": "properties/canongreeks.ch", "name": "crr_call_vega_sign", "module": "Shoals.Properties.CanonGreeks"},
+      "binding": {"mechanism": "direct-call", "references_output_fn": "direct", "goal_pattern": "({{output_fn}}(s, k, u2, d, q, disc) >= {{output_fn}}(s, k, u1, d, q, disc))", "contracts": []},
+      "preconditions": [
+        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "u1", "op": "gt", "rhs": {"const": 1.0}},
+        {"lhs": "u2", "op": "gt", "rhs": {"input": "u1"}},
+        {"lhs": "d", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "d", "op": "lt", "rhs": {"const": 1.0}},
+        {"lhs": "q", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "q", "op": "lt", "rhs": {"const": 1.0}},
+        {"lhs": "disc", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "disc", "op": "lte", "rhs": {"const": 1.0}}
+      ],
+      "controls": {
+        "satisfying": {"name": "crr_call_vega_sign", "expected": "passed"},
+        "violating": {"name": "crr_call_vega_sign_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "non_vacuity_witness": "crr_call_vega_guards_satisfiable",
+      "expected_tier_per_pin": {"0.14.0": "proven", "0.16.1": "proven"},
+      "dischargeability_probe": "p14_crr_two_step",
+      "violation_text": "the lattice call price falls when the up-move factor increases -- a vega-sign violation (wider volatility decreases the option value)",
+      "fuzz_domain_note": "proven over the reals at Tier B (no fuzz); the lattice analog of vega >= 0"
+    },
+    {
+      "id": "shoals.inv.crr_call_disc_sensitivity.v1",
+      "kind_applies_to": ["finance.lattice_pricer.european_call_fixed_depth"],
+      "target_model": "tr_crr_call_2step",
+      "property": {"file": "properties/canongreeks.ch", "name": "crr_call_disc_sensitivity", "module": "Shoals.Properties.CanonGreeks"},
+      "binding": {"mechanism": "direct-call", "references_output_fn": "direct", "goal_pattern": "({{output_fn}}(s, k, u, d, q, disc2) >= {{output_fn}}(s, k, u, d, q, disc1))", "contracts": []},
+      "preconditions": [
+        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "u", "op": "gt", "rhs": {"const": 1.0}},
+        {"lhs": "d", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "d", "op": "lt", "rhs": {"const": 1.0}},
+        {"lhs": "q", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "q", "op": "lt", "rhs": {"const": 1.0}},
+        {"lhs": "disc1", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "disc2", "op": "gt", "rhs": {"input": "disc1"}},
+        {"lhs": "disc2", "op": "lte", "rhs": {"const": 1.0}}
+      ],
+      "controls": {
+        "satisfying": {"name": "crr_call_disc_sensitivity", "expected": "passed"},
+        "violating": {"name": "crr_call_disc_sensitivity_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "non_vacuity_witness": "crr_call_disc_guards_satisfiable",
+      "expected_tier_per_pin": {"0.14.0": "proven", "0.16.1": "proven"},
+      "dischargeability_probe": "p14_crr_two_step",
+      "violation_text": "the lattice call price falls when the discount factor increases -- the call value should rise with less discounting",
+      "fuzz_domain_note": "proven over the reals at Tier B (no fuzz); C = disc^2 * nonneg_stuff so monotone in disc"
+    },
+    {
+      "id": "shoals.inv.crr_call_gamma_sign.v1",
+      "kind_applies_to": ["finance.lattice_pricer.european_call_fixed_depth"],
+      "target_model": "tr_crr_call_2step",
+      "property": {"file": "properties/canongreeks.ch", "name": "crr_call_gamma_sign", "module": "Shoals.Properties.CanonGreeks"},
+      "binding": {"mechanism": "direct-call", "references_output_fn": "direct", "goal_pattern": "((({{output_fn}}(s+h, ...) + {{output_fn}}(s-h, ...)) - 2*{{output_fn}}(s, ...)) >= 0.0)", "contracts": []},
+      "preconditions": [
+        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "h", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "s", "op": "gt", "rhs": {"input": "h"}},
+        {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "u", "op": "gt", "rhs": {"const": 1.0}},
+        {"lhs": "d", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "d", "op": "lt", "rhs": {"const": 1.0}},
+        {"lhs": "q", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "q", "op": "lt", "rhs": {"const": 1.0}},
+        {"lhs": "disc", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "disc", "op": "lte", "rhs": {"const": 1.0}}
+      ],
+      "controls": {
+        "satisfying": {"name": "crr_call_gamma_sign", "expected": "passed"},
+        "violating": {"name": "crr_call_gamma_sign_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "non_vacuity_witness": "crr_call_gamma_guards_satisfiable",
+      "expected_tier_per_pin": {"0.14.0": "proven", "0.16.1": "proven"},
+      "dischargeability_probe": "p14_crr_two_step",
+      "violation_text": "the lattice call price is concave in spot -- a gamma-sign violation (the second derivative in spot is negative)",
+      "fuzz_domain_note": "proven over the reals at Tier B (no fuzz); the lattice analog of gamma >= 0 (convexity in spot via three-point second difference)"
     }
   ],
   "deferred_invariants": [
@@ -575,6 +676,56 @@
       "id": "shoals.inv.bs_vega_nonneg_grad.v1",
       "reason": "grad-in-property sign invariants (vega/delta/gamma) do NOT lower through a cross-module import of the pricer (prove hangs; economoist docs/issue_drafts/dependency_edges_imports.md) and grad through bs_call_scalar hits the f32/f64 precision-mismatch across the grad boundary (research/proof-infra/report.md sec 5). grad never lowers to SMT (fuzz-only), and the fuzz lane over the real pricer is intractable at 0.14.0. Not characterizable at this pin; no expected tier.",
       "trigger": "an inlined equivalent-form grad body proved from a scratch dir outside the package (own change set), gated once the fuzz-sampler cost (chelis#659) is addressed."
+    },
+    {
+      "id": "shoals.inv.bs_vega_sign.v1",
+      "reason": "Two-point monotonicity in sigma against the real transcendental bs_call_scalar (the Black-Scholes analog of crr_call_vega_sign). NOT characterizable at 0.14.0: (proven) free-variable abstraction of normal_cdf discards the coupling between d1, sigma, and the price -- the abstracted residual does not encode vega-sign (chelis#637). (fuzz) evaluates the pricer twice per sample; intractable at 0.14.0 (chelis#659). The CRR anchor proves the lattice analog (crr_call_vega_sign.v1) genuinely; this deferred entry records the intent to promote the same invariant on the flagship pricer when the gate fires.",
+      "trigger": "(a) FUZZ feasibility (chelis#659), or (b) PROVEN via chelis#637 (relational abstraction preserving the sigma-d1-price coupling)."
+    },
+    {
+      "id": "shoals.inv.bs_rho_sign.v1",
+      "reason": "Two-point monotonicity in r against the real transcendental bs_call_scalar (rho >= 0 for a European call). NOT characterizable at 0.14.0: (proven) the abstracted residual does not encode the r-disc-forward coupling that makes rho positive (chelis#637). (fuzz) evaluates the pricer twice per sample; intractable at 0.14.0 (chelis#659). The CRR anchor proves the lattice analog (crr_call_disc_sensitivity.v1) as monotone-in-disc; this records the intent to prove the real rho on the flagship.",
+      "trigger": "(a) FUZZ feasibility (chelis#659), or (b) PROVEN via chelis#637 (relational abstraction)."
+    },
+    {
+      "id": "shoals.inv.bs_gamma_sign.v1",
+      "reason": "Convexity in spot (three-point second difference) against the real transcendental bs_call_scalar (gamma >= 0). NOT characterizable at 0.14.0: (proven) the abstracted residual does not encode the convexity structure of N(d1(s)) in spot (chelis#637; the coupling between s and d1 is discarded). (fuzz) evaluates the pricer three times per sample (s+h, s, s-h); intractable at 0.14.0 (chelis#659). The CRR anchor proves the lattice analog (crr_call_gamma_sign.v1) genuinely; this records the intent to promote.",
+      "trigger": "(a) FUZZ feasibility (chelis#659), or (b) PROVEN via chelis#637 (relational abstraction preserving the s-d1-N(d1) coupling)."
+    },
+    {
+      "id": "shoals.inv.var_monotone_in_confidence.v1",
+      "reason": "VaR monotonicity in confidence level against the real parametric_var (which calls normal_inv_cdf, a transcendental). NOT characterizable at 0.14.0: (proven) normal_inv_cdf is not cvc5-lowerable. (fuzz) tensor-valued forall quantification + the normal_inv_cdf body under the sampler is untested at this pin; the property is authored in properties/canonrisk.ch as the shape-ready stub. No expected tier until a fuzz probe demonstrates one.",
+      "trigger": "(a) FUZZ feasibility over tensor-quantified properties (chelis#659 + property-system tensor support), or (b) a chelis-std quantile/inv_cdf contract analogous to std.normal_cdf enabling SMT abstraction."
+    },
+    {
+      "id": "shoals.inv.cvar_dominates_var.v1",
+      "reason": "CVaR >= VaR (expected shortfall dominance) against the real parametric_cvar and parametric_var. Same ceiling as var_monotone: normal_inv_cdf is not cvc5-lowerable, and fuzz over the real risk bodies is untested. Property authored in properties/canonrisk.ch.",
+      "trigger": "(a) FUZZ feasibility (chelis#659), or (b) chelis-std quantile contract enabling SMT abstraction."
+    },
+    {
+      "id": "shoals.inv.var_nonneg_positive_mean.v1",
+      "reason": "VaR > 0 for positive-mean losses at confidence > 0.5 against parametric_var. Same ceiling: normal_inv_cdf not lowerable, fuzz untested. Property authored in properties/canonrisk.ch.",
+      "trigger": "(a) FUZZ feasibility (chelis#659), or (b) chelis-std quantile contract."
+    },
+    {
+      "id": "shoals.inv.crr_general_nonneg.v1",
+      "reason": "Non-negativity of the n-step CRR European call (tr_binom_european_call_generic). The fold-based body requires induction/fixed-point reasoning over the lattice backward-induction traversal; Tier B cannot inline fold iterations (it inlines calls to depth 3, not loop bodies), and Tier C is intractable for n > ~3 (the terminal vector has n+1 elements, each sample evaluates the full backward fold). Property authored at n=5 in properties/canongeneral.ch. Proven at fixed size n=2 as crr_call_nonneg/crr_rn_call_nonneg.",
+      "trigger": "chelis induction tier (fold/fixed-point reasoning over list traversal) enabling structural induction on the backward-induction step."
+    },
+    {
+      "id": "shoals.inv.crr_general_monotone_in_s.v1",
+      "reason": "Monotonicity in spot (delta sign) of the n-step CRR European call. Same ceiling as crr_general_nonneg: fold body requires induction. Property authored at n=5 in properties/canongeneral.ch. Proven at fixed size n=2 as crr_call_monotone_in_s.",
+      "trigger": "chelis induction tier."
+    },
+    {
+      "id": "shoals.inv.fi_bond_general_monotone_in_yield.v1",
+      "reason": "Price-yield monotonicity (duration sign) of the n-period coupon bond (fi_bond_general). The fold-based cashflow summation requires induction over the period index to prove dP/dy < 0 at general n; Tier B handles it at n=2 (fi_bond_pv_monotone_in_yield) but cannot inline the fold for n > 2. Property authored at n=5 in properties/canongeneral.ch.",
+      "trigger": "chelis induction tier (fold/fixed-point reasoning over cashflow summation)."
+    },
+    {
+      "id": "shoals.inv.fi_bond_general_pv_bounded.v1",
+      "reason": "PV bounded in (0, nominal] for the n-period coupon bond. Same ceiling: fold body requires induction. Proven at fixed size n=2 as fi_bond_pv_bounded. Property authored at n=5 in properties/canongeneral.ch.",
+      "trigger": "chelis induction tier."
     }
   ]
 }
