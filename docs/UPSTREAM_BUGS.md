@@ -23,15 +23,15 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 ## Actively blocking
 
-None. The finance proof surface ships as documented in
-`research/proof-infra/report.md`: the economic / dynamic-programming properties
-reach the SMT tier with no transcendental contract; the derivatives structural
-properties (`properties/composites.ch`: upper bound, put–call parity with
-reflection, delta ∈ [0,1]) reach SMT as **composites** — structure proven for
-any `N` satisfying its contract, with that contract separately fuzz-validated on
-the real `n_cdf`. Nothing upstream blocks shipping the current surface; the real
-transcendental pricing bodies degrade **honestly** to fuzz (never a false
-proven — the coupled-subterm goals stay deferred, see chelis#637 below).
+- **None actively blocking.** The finance proof surface ships as documented in
+  `research/proof-infra/report.md`: the economic / dynamic-programming properties
+  reach the SMT tier with no transcendental contract; the derivatives structural
+  properties (`properties/composites.ch`: upper bound, put–call parity with
+  reflection, delta ∈ [0,1]) reach SMT as **composites** — structure proven for
+  any `N` satisfying its contract, with that contract separately fuzz-validated on
+  the real `n_cdf`. Nothing upstream blocks shipping the current surface; the real
+  transcendental pricing bodies degrade **honestly** to fuzz (never a false
+  proven — the coupled-subterm goals stay deferred, see chelis#637 below).
 
 ## Tracking
 
@@ -44,30 +44,30 @@ proven — the coupled-subterm goals stay deferred, see chelis#637 below).
   `d2 < d1`) is discarded and the residual is falsifiable in-abstraction:
   cvc5 answers SAT-in-abstraction and the honest verdict is
   `deferred_invariant`/`unsupported`, never a proof.
-  - **State at pin 0.16.1 (re-probed):** the direct-pricer positivity
-    invariant stays **deferred** (`deferred_invariants` in
-    `docs/cnote-import-surface.json`, dischargeability lane p08); the
-    identical intrinsic-lower-bound invariant PROVES on the CRR
-    risk-neutral anchor (`properties/canontrees.ch`
-    `crr_rn_call_intrinsic_lower_bound`) — the teaching exemplar of the
-    genuine-vs-deferred split (`src/trees.ch`).
-  - **Affected surface:** every `properties/` goal that would inline a real
-    `bs_call`/`normal_cdf` body and whose truth depends on subterm
-    coupling; `properties/canonpricing.ch` (expected tier stays
-    `fuzz_validated`); `references/blackscholes.ch`.
-  - **Workaround:** unchanged — abstract the transcendental to a bounded
-    free parameter carrying its contract (`nd1 = N(d1) ∈ [0,1]`, reflection
-    `N(-x)=1-N(x)`, `disc = exp(-r t) ∈ [0,1]`) so the goal is polynomial
-    (`properties/composites.ch`, report §3–§4); or re-anchor the invariant
-    on a rational-arithmetic pricer (`properties/canontrees.ch`).
-  - **Not expressible as a `tests_blocked/` probe** (prove-verdict surface;
-    see `tests_blocked/README.md` §cannot-be-probed) — re-probed by
-    `scripts/prove_gate.py` and manually at every bump.
-  - **Re-probe trigger:** any chelis release note naming coupled-subterm /
-    relational abstraction, whole-expression `BoxRange` interval
-    evaluation, or a chelis#637 close. Re-probe by proving
-    `bs_call_positive` on the un-abstracted body per-surface, not by
-    reading the changelog.
+    - **State at pin 0.16.1 (re-probed):** the direct-pricer positivity
+      invariant stays **deferred** (`deferred_invariants` in
+      `docs/cnote-import-surface.json`, dischargeability lane p08); the
+      identical intrinsic-lower-bound invariant PROVES on the CRR
+      risk-neutral anchor (`properties/canontrees.ch`
+      `crr_rn_call_intrinsic_lower_bound`) — the teaching exemplar of the
+      genuine-vs-deferred split (`src/trees.ch`).
+    - **Affected surface:** every `properties/` goal that would inline a real
+      `bs_call`/`normal_cdf` body and whose truth depends on subterm
+      coupling; `properties/canonpricing.ch` (expected tier stays
+      `fuzz_validated`); `references/blackscholes.ch`.
+    - **Workaround:** unchanged — abstract the transcendental to a bounded
+      free parameter carrying its contract (`nd1 = N(d1) ∈ [0,1]`, reflection
+      `N(-x)=1-N(x)`, `disc = exp(-r t) ∈ [0,1]`) so the goal is polynomial
+      (`properties/composites.ch`, report §3–§4); or re-anchor the invariant
+      on a rational-arithmetic pricer (`properties/canontrees.ch`).
+    - **Not expressible as a `tests_blocked/` probe** (prove-verdict surface;
+      see `tests_blocked/README.md` §cannot-be-probed) — re-probed by
+      `scripts/prove_gate.py` and manually at every bump.
+    - **Re-probe trigger:** any chelis release note naming coupled-subterm /
+      relational abstraction, whole-expression `BoxRange` interval
+      evaluation, or a chelis#637 close. Re-probe by proving
+      `bs_call_positive` on the un-abstracted body per-surface, not by
+      reading the changelog.
 
 - **chelis#659 — fuzz-tier proving cannot complete a single sample over a
   real f64 transcendental body within any usable budget.** A single
@@ -79,35 +79,41 @@ proven — the coupled-subterm goals stay deferred, see chelis#637 below).
   `docs/issue_drafts/fuzz_sampler_transcendental_cost.md`; sibling
   chelis#644 (fixed sampler domain box) starves realistic-magnitude
   guards.
-  - **State at pin 0.16.1 (re-probed):** still open upstream; no
-    0.15.x/0.16.x release note touches the fuzz sampler cost. The
-    direct-pricer positivity invariant stays in `deferred_invariants` on
-    the fuzz lane too (`AGENTS.md` §manifest).
-  - **Not expressible as a `tests_blocked/` probe** (a probe would hang the
-    suite, not fail it; see `tests_blocked/README.md` §cannot-be-probed).
-  - **Re-probe trigger:** any release note naming fuzz sampler cost /
-    budget / per-property domains (chelis#644), or a chelis#659 close.
-    Re-probe with a bounded `chelis prove --tier fuzz-only` run on p08.
+    - **State at pin 0.16.1 (re-probed):** still open upstream; no
+      0.15.x/0.16.x release note touches the fuzz sampler cost. The
+      direct-pricer positivity invariant stays in `deferred_invariants` on
+      the fuzz lane too (`AGENTS.md` §manifest).
+    - **Not expressible as a `tests_blocked/` probe** (a probe would hang the
+      suite, not fail it; see `tests_blocked/README.md` §cannot-be-probed).
+    - **Re-probe trigger:** any release note naming fuzz sampler cost /
+      budget / per-property domains (chelis#644), or a chelis#659 close.
+      Re-probe with a bounded `chelis prove --tier fuzz-only` run on p08.
 
-- **i64 `mod` f64-path precision drift (unfiled by design; probe-backed).**
-  Builtin `mod(big_i64, m)` loses precision once the operand exceeds f64's
-  53-bit mantissa (~9e15): the Park-Miller-shaped update
+- **i64 `mod`-path precision drift — the integer `mul`/`add` that build the
+  operand compute in f64 and lose precision above the 53-bit mantissa
+  (chelis#680; class META chelis#695).** Builtin `mod(big_i64, m)` returns a
+  wrong result once the operand exceeds f64's 53-bit mantissa (~9e15): the
+  Park-Miller-shaped update
   `mod(1103515245·1406938949 + 12345, 2147483647)` returns 178065920
-  instead of the exact 178066070 (re-verified at the 0.16.1 bump). Mirrors
-  the school shell's pinned probe of the same drift class (kept unfiled
-  there pending a Rust-side reproducer; shoals defers to that filing —
-  cite this entry, not a number, at narrowing sites until it exists).
-  - **Affected surface / workaround:** `Shoals.Rng` hand-rolls `i64_mod`
-    (`sub`/`mul`/`floor_div`) for the Sobol/xor bit walks instead of
-    calling the builtin — the hand-roll stays until the upstream path is
-    exact.
-  - **Probe:** `tests_blocked/runtime/mod_big_i64_precision.ch` (run by
-    `chelis test tests_blocked/ --expect blocked` in CI; FIX-detected =
-    follow the sidecar's de-narrowing instructions).
-  - **Re-probe trigger:** any chelis release touching the i64 `mod`
-    runtime (the probe re-probes mechanically on every CI run).
+  instead of the exact 178066070 (re-verified at the 0.16.1 bump). The `mod`
+  reduction itself is exact via `checked_int_binop`; the loss is upstream of
+  it, in the f64 `mul` that forms the operand — the
+  integer-arithmetic-in-f64 class chelis#680 tracks (read chelis#695 first).
+  Previously carried here unfiled, deferring to the school shell's pinned
+  probe of the same drift class; now cited to chelis#680.
+    - **Affected surface / workaround:** `Shoals.Rng` hand-rolls `i64_mod`
+      (`sub`/`mul`/`floor_div`) for the Sobol/xor bit walks instead of
+      calling the builtin — the hand-roll stays until the upstream path is
+      exact.
+    - **Probe:** `tests_blocked/runtime/mod_big_i64_precision.ch` (run by
+      `chelis test tests_blocked/ --expect blocked` in CI; FIX-detected =
+      follow the sidecar's de-narrowing instructions).
+    - **Re-probe trigger:** any chelis release touching the i64 `mod`
+      runtime or the integer-arithmetic-in-f64 path chelis#680 (the probe
+      re-probes mechanically on every CI run).
 
-- **Depth-3 SMT function-call inlining cap (constraint; probe pending).** The
+- **Depth-3 SMT function-call inlining cap (constraint; unfiled — draft
+  `docs/issue_drafts/tier_b_inline_depth_cap.md`; probe pending).** The
   Tier-B lowerer inlines nested function calls only to a fixed depth —
   `MAX_INLINE_DEPTH = 3` in `chelis-prove/src/tier_b_lower.rs` (present at
   v0.14.0). A goal whose discharge needs a call chain deeper than three

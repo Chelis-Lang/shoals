@@ -35,20 +35,19 @@ def fi_bond2(c: f32, y: f32) -> f32 = {
 -- witness that re-executes at f32 (in_region_defect). Rates analogue of
 -- Shoals.Trees.tr_crr_call_2step_nodisc.
 def fi_bond2_nodisc(c: f32, y: f32) -> f32 = (c + (1.0 + c))
-
 -- General n-period unit-face coupon bond: PV = sum_{i=1}^{n-1} c/(1+y)^i + (1+c)/(1+y)^n.
 -- This is the fold-based generalization of fi_bond2: it computes the discounted sum of
 -- n coupon cashflows plus the face repayment at maturity. At n=2 it should agree with
 -- fi_bond2 (c/(1+y) + (1+c)/(1+y)^2). At general n it requires induction/fold over the
 -- cashflow list to prove its canonical properties (monotonicity, convexity, bounded PV)
 -- -- that capability does not exist at chelis 0.14.0.
+-- v^i computed via exp(i * log(v)); for the canon this is equivalent to
+-- repeated multiplication, but avoids a nested fold for the power.
 def fi_bond_general(c: f32, y: f32, n: int64) -> f32 = {
   periods = range(cast(1, int64), add(n, cast(1, int64)))
   v = (1.0 / (1.0 + y))
   fold(fn (acc: f32, i: int64) -> {
     i_f = cast(i, f32)
-    -- v^i computed via exp(i * log(v)); for the canon this is equivalent to
-    -- repeated multiplication, but avoids a nested fold for the power.
     disc_i = exp(mul(i_f, log(v)))
     cf = if eq(i, n) then (1.0 + c) else c
     add(acc, mul(cf, disc_i))
