@@ -94,8 +94,8 @@ def trial_anti[n](template_a: tensor[n, f32], template_b: tensor[n, f32]) -> f32
 def test_antithetic_mean_reduces_variance() -> unit ! { Test } = {
   k_outer = cast(20, int64)
   k_idxs = range(cast(0, int64), k_outer)
-  plain_means = with seed(101) { map(fn (k: int64) -> trial_plain(make_zeros(cast(2000, int64))), k_idxs) }
-  anti_means = with seed(101) { map(fn (k: int64) -> trial_anti(make_zeros(cast(2000, int64)), make_zeros(cast(2000, int64))), k_idxs) }
+  plain_means = with seed(101i64) { map(fn (k: int64) -> trial_plain(make_zeros(cast(2000, int64))), k_idxs) }
+  anti_means = with seed(101i64) { map(fn (k: int64) -> trial_anti(make_zeros(cast(2000, int64)), make_zeros(cast(2000, int64))), k_idxs) }
   var_plain = variance_vec(to_tensor(plain_means), cast(1, int64))
   var_anti = variance_vec(to_tensor(anti_means), cast(1, int64))
   reduced = lt(var_anti, var_plain)

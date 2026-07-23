@@ -6,14 +6,14 @@ import Shoals.Heston (heston_call_carr_madan_panels, heston_put_carr_madan_panel
 def to01(b: bool) -> f32 = if b then cast(1.0, f32) else cast(0.0, f32)
 def abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 def test_heston_qe_variance_positivity_single_path() -> unit ! { Test } = {
-  out = with seed(7) { heston_qe_terminal(cast(100.0, f32), cast(0.04, f32), cast(0.0, f32), cast(0.5, f32), cast(0.04, f32), cast(1.0, f32), cast(-0.9, f32), cast(5.0, f32), cast(1000, int64)) }
+  out = with seed(7i64) { heston_qe_terminal(cast(100.0, f32), cast(0.04, f32), cast(0.0, f32), cast(0.5, f32), cast(0.04, f32), cast(1.0, f32), cast(-0.9, f32), cast(5.0, f32), cast(1000, int64)) }
   min_v = out.2
   ok = gte(min_v, cast(0.0, f32))
   assert_close(to01(ok), cast(1.0, f32), cast(0.001, f32), "Heston QE variance min along path stays non-negative over 1000 steps under Feller-violating params")
 }
 def test_heston_qe_variance_positivity_batched() -> unit ! { Test } = {
   template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(16, int64))))
-  out = with seed(11) { heston_qe_paths_terminal(template, cast(100.0, f32), cast(0.04, f32), cast(0.0, f32), cast(0.5, f32), cast(0.04, f32), cast(1.0, f32), cast(-0.9, f32), cast(5.0, f32), cast(260, int64)) }
+  out = with seed(11i64) { heston_qe_paths_terminal(template, cast(100.0, f32), cast(0.04, f32), cast(0.0, f32), cast(0.5, f32), cast(0.04, f32), cast(1.0, f32), cast(-0.9, f32), cast(5.0, f32), cast(260, int64)) }
   min_vs = to_list(out.2)
   init = true
   all_nonneg = fold(fn (acc: bool, mv: f32) -> and(acc, gte(mv, cast(0.0, f32))), init, min_vs)
@@ -25,7 +25,7 @@ def test_heston_qe_mean_reversion() -> unit ! { Test } = {
   theta = cast(0.04, f32)
   v0 = cast(0.1, f32)
   big_t = cast(100.0, f32)
-  out = with seed(13) { heston_qe_paths_terminal(template, cast(100.0, f32), v0, cast(0.0, f32), kappa, theta, cast(1.0, f32), cast(-0.9, f32), big_t, cast(200, int64)) }
+  out = with seed(13i64) { heston_qe_paths_terminal(template, cast(100.0, f32), v0, cast(0.0, f32), kappa, theta, cast(1.0, f32), cast(-0.9, f32), big_t, cast(200, int64)) }
   mean_v_t = mean_vec(out.1)
   diff = abs_f32(sub(mean_v_t, theta))
   assert_true(lt(diff, cast(0.05, f32)), "E[v_T] reverts toward theta after many mean-reversion timescales; tolerance 0.05 accommodates 32-path MC error of ~3-sigma at unconditional std sqrt(sigma^2*theta/(2*kappa)) ~ 0.2")
@@ -36,7 +36,7 @@ def test_heston_qe_low_volvol_deterministic_variance() -> unit ! { Test } = {
   theta = cast(0.04, f32)
   v0 = cast(0.1, f32)
   big_t = cast(1.0, f32)
-  out = with seed(17) { heston_qe_paths_terminal(template, cast(100.0, f32), v0, cast(0.0, f32), kappa, theta, cast(0.001, f32), cast(-0.9, f32), big_t, cast(200, int64)) }
+  out = with seed(17i64) { heston_qe_paths_terminal(template, cast(100.0, f32), v0, cast(0.0, f32), kappa, theta, cast(0.001, f32), cast(-0.9, f32), big_t, cast(200, int64)) }
   mean_v_t = mean_vec(out.1)
   expected = add(theta, mul(sub(v0, theta), exp(neg(mul(kappa, big_t)))))
   diff = abs_f32(sub(mean_v_t, expected))
@@ -48,7 +48,7 @@ def test_heston_qe_log_return_mean() -> unit ! { Test } = {
   v0 = cast(0.04, f32)
   mu = cast(0.0, f32)
   big_t = cast(0.25, f32)
-  out = with seed(29) { heston_qe_paths_terminal(template, s0, v0, mu, cast(0.5, f32), cast(0.04, f32), cast(0.01, f32), cast(-0.9, f32), big_t, cast(64, int64)) }
+  out = with seed(29i64) { heston_qe_paths_terminal(template, s0, v0, mu, cast(0.5, f32), cast(0.04, f32), cast(0.01, f32), cast(-0.9, f32), big_t, cast(64, int64)) }
   s_l = to_list(out.0)
   log_returns = to_tensor(map(fn (s: f32) -> log(div(s, s0)), s_l))
   mean_lr = mean_vec(log_returns)

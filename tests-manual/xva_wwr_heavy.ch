@@ -13,7 +13,7 @@ def test_wwr_at_zero_correlation_reduces_to_cva() -> unit ! { Test } = {
   cva_bare = cva_constant_hazard(xvaw_time_grid(), xvaw_epe(), hazard, recovery, rate)
   k_outer = cast(16, int64)
   k_idxs = range(cast(0, int64), k_outer)
-  wwr_means = with seed(101) { map(fn (k: int64) -> xva_cva_wwr_constant_hazard(xvaw_time_grid(), xvaw_epe(), hazard, recovery, rate, cast(0.0, f32), n_paths), k_idxs) }
+  wwr_means = with seed(101i64) { map(fn (k: int64) -> xva_cva_wwr_constant_hazard(xvaw_time_grid(), xvaw_epe(), hazard, recovery, rate, cast(0.0, f32), n_paths), k_idxs) }
   wwr_mean_tensor = to_tensor(wwr_means)
   est_mean = mean_vec(copy(wwr_mean_tensor))
   est_sd_across_runs = std_vec(wwr_mean_tensor, cast(1, int64))
@@ -29,8 +29,8 @@ def test_wwr_positive_correlation_increases_cva() -> unit ! { Test } = {
   recovery = cast(0.4, f32)
   rate = cast(0.03, f32)
   n_paths = cast(2048, int64)
-  cva_zero = with seed(11) { xva_cva_wwr_constant_hazard(xvaw_time_grid(), xvaw_epe(), hazard, recovery, rate, cast(0.0, f32), n_paths) }
-  cva_pos = with seed(11) { xva_cva_wwr_constant_hazard(xvaw_time_grid(), xvaw_epe(), hazard, recovery, rate, cast(0.7, f32), n_paths) }
+  cva_zero = with seed(11i64) { xva_cva_wwr_constant_hazard(xvaw_time_grid(), xvaw_epe(), hazard, recovery, rate, cast(0.0, f32), n_paths) }
+  cva_pos = with seed(11i64) { xva_cva_wwr_constant_hazard(xvaw_time_grid(), xvaw_epe(), hazard, recovery, rate, cast(0.7, f32), n_paths) }
   assert_true(gt(cva_pos, cva_zero), "rho=0.7 WWR-CVA strictly exceeds rho=0 (sign-of-effect probe for WWR coupling)")
 }
 def test_wwr_negative_correlation_reduces_cva() -> unit ! { Test } = {
@@ -38,8 +38,8 @@ def test_wwr_negative_correlation_reduces_cva() -> unit ! { Test } = {
   recovery = cast(0.4, f32)
   rate = cast(0.03, f32)
   n_paths = cast(2048, int64)
-  cva_zero = with seed(13) { xva_cva_wwr_constant_hazard(xvaw_time_grid(), xvaw_epe(), hazard, recovery, rate, cast(0.0, f32), n_paths) }
-  cva_neg = with seed(13) { xva_cva_wwr_constant_hazard(xvaw_time_grid(), xvaw_epe(), hazard, recovery, rate, cast(-0.5, f32), n_paths) }
+  cva_zero = with seed(13i64) { xva_cva_wwr_constant_hazard(xvaw_time_grid(), xvaw_epe(), hazard, recovery, rate, cast(0.0, f32), n_paths) }
+  cva_neg = with seed(13i64) { xva_cva_wwr_constant_hazard(xvaw_time_grid(), xvaw_epe(), hazard, recovery, rate, cast(-0.5, f32), n_paths) }
   assert_true(lt(cva_neg, cva_zero), "rho=-0.5 WWR-CVA strictly less than rho=0 (right-way-risk sign-of-effect probe)")
 }
 def test_wwr_finite_at_extreme_correlation() -> unit ! { Test } = {
@@ -47,7 +47,7 @@ def test_wwr_finite_at_extreme_correlation() -> unit ! { Test } = {
   recovery = cast(0.4, f32)
   rate = cast(0.03, f32)
   n_paths = cast(256, int64)
-  cva_extreme = with seed(17) { xva_cva_wwr_constant_hazard(xvaw_time_grid(), xvaw_epe(), hazard, recovery, rate, cast(0.99, f32), n_paths) }
+  cva_extreme = with seed(17i64) { xva_cva_wwr_constant_hazard(xvaw_time_grid(), xvaw_epe(), hazard, recovery, rate, cast(0.99, f32), n_paths) }
   is_finite = and(gt(cva_extreme, cast(0.0, f32)), lt(cva_extreme, cast(1000000000.0, f32)))
   assert_close(to01(is_finite), cast(1.0, f32), cast(0.001, f32), "rho=0.99 WWR-CVA is finite and strictly positive (no NaN/Inf at extreme correlation)")
 }
