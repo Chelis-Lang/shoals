@@ -29,12 +29,7 @@ def test_crr_200step_converges_to_bs() -> unit ! { Test } = {
   abs_diff = if lt(diff, cast(0.0, f32)) then neg(diff) else diff
   rel = div(abs_diff, bs_px)
   ok = lt(rel, cast(0.005, f32))
-  assert_close(
-    if ok then cast(1.0, f32) else cast(0.0, f32),
-    cast(1.0, f32),
-    cast(0.001, f32),
-    "200-step CRR converges to BS within 0.5% (S=100 K=100 r=5% sigma=20% T=1Y)"
-  )
+  assert_close(if ok then cast(1.0, f32) else cast(0.0, f32), cast(1.0, f32), cast(0.001, f32), "200-step CRR converges to BS within 0.5% (S=100 K=100 r=5% sigma=20% T=1Y)")
 }
 -- ===========================================================================
 -- (2) 60-PERIOD (30Y SEMIANNUAL) COUPON BOND: PV a 30-year semiannual 5%
@@ -43,12 +38,12 @@ def test_crr_200step_converges_to_bs() -> unit ! { Test } = {
 -- where c = 2.5% (semiannual coupon on a 5% annual rate), y = 2% (semiannual
 -- yield on a 4% annual), n = 60 periods. Expected PV ≈ 1.1725 (bond trades
 -- above par because coupon > yield).
+-- Analytic formula: PV = (c/y)*(1 - v^n) + v^n where v = 1/(1+y)
 def test_bond_60period_semiannual() -> unit ! { Test } = {
   c_semi = cast(0.025, f32)
   y_semi = cast(0.02, f32)
   n = cast(60, int64)
   pv = fi_bond_general(c_semi, y_semi, n)
-  -- Analytic formula: PV = (c/y)*(1 - v^n) + v^n where v = 1/(1+y)
   v = div(cast(1.0, f32), add(cast(1.0, f32), y_semi))
   v_n = exp(mul(cast(60.0, f32), log(v)))
   analytic = add(mul(div(c_semi, y_semi), sub(cast(1.0, f32), v_n)), v_n)
@@ -56,12 +51,7 @@ def test_bond_60period_semiannual() -> unit ! { Test } = {
   abs_diff = if lt(diff, cast(0.0, f32)) then neg(diff) else diff
   rel = div(abs_diff, analytic)
   ok = lt(rel, cast(0.01, f32))
-  assert_close(
-    if ok then cast(1.0, f32) else cast(0.0, f32),
-    cast(1.0, f32),
-    cast(0.001, f32),
-    "60-period bond PV within 1% of analytic (30Y semiannual, c=5% y=4%)"
-  )
+  assert_close(if ok then cast(1.0, f32) else cast(0.0, f32), cast(1.0, f32), cast(0.001, f32), "60-period bond PV within 1% of analytic (30Y semiannual, c=5% y=4%)")
 }
 -- ===========================================================================
 -- (3) 10,000-PATH MONTE CARLO: price a 1Y ATM European call with 10,000 GBM
@@ -81,10 +71,5 @@ def test_mc_10k_converges_to_bs() -> unit ! { Test } = {
   abs_diff = if lt(diff, cast(0.0, f32)) then neg(diff) else diff
   rel = div(abs_diff, bs_px)
   ok = lt(rel, cast(0.02, f32))
-  assert_close(
-    if ok then cast(1.0, f32) else cast(0.0, f32),
-    cast(1.0, f32),
-    cast(0.001, f32),
-    "10K-path MC converges to BS within 2% (S=100 K=100 r=5% sigma=20% T=1Y)"
-  )
+  assert_close(if ok then cast(1.0, f32) else cast(0.0, f32), cast(1.0, f32), cast(0.001, f32), "10K-path MC converges to BS within 2% (S=100 K=100 r=5% sigma=20% T=1Y)")
 }
