@@ -75,10 +75,9 @@ in code that is CLOSED upstream but not sitting in §Archived.
   release binary, so the honest `fuzz_validated` lane for the real
   transcendental pricers is un-gateable (this is why there is NO nightly
   canon fuzz gate — see the comment in `.github/workflows/nightly.yml`).
-  Filed 2026-07-10 from the measurements in
-  `docs/issue_drafts/fuzz_sampler_transcendental_cost.md`; sibling
-  chelis#644 (fixed sampler domain box) starves realistic-magnitude
-  guards.
+  Filed 2026-07-10; the measurements and reproducer now live in the
+  chelis#659 body. Sibling chelis#644 (fixed sampler domain box) starves
+  realistic-magnitude guards.
     - **State at pin 0.16.1 (re-probed):** still open upstream; no
       0.15.x/0.16.x release note touches the fuzz sampler cost. The
       direct-pricer positivity invariant stays in `deferred_invariants` on
@@ -112,18 +111,24 @@ in code that is CLOSED upstream but not sitting in §Archived.
       runtime or the integer-arithmetic-in-f64 path chelis#680 (the probe
       re-probes mechanically on every CI run).
 
-- **Depth-3 SMT function-call inlining cap (constraint; unfiled — draft
-  `docs/issue_drafts/tier_b_inline_depth_cap.md`; probe pending).** The
-  Tier-B lowerer inlines nested function calls only to a fixed depth —
-  `MAX_INLINE_DEPTH = 3` in `chelis-prove/src/tier_b_lower.rs` (present at
-  v0.14.0). A goal whose discharge needs a call chain deeper than three
-  inlinings routes to Tier C rather than lowering. No shoals property is known
-  to hit this today (the composites goals inline one level). This is a documented
-  capacity limit, not a filed bug: **the c-note-side probe `p07` will pin its
-  exact behavior — probe pending.** If a shoals property is authored that needs
-  deeper inlining and hits the cap, file upstream and cite the issue here in the
-  same change set (narrowing-citation rule). Re-probe trigger: `p07` landing, or
-  any release note on Tier-B inlining depth.
+- **chelis#846 — Depth-3 SMT function-call inlining cap (capacity limit).**
+  The Tier-B lowerer inlines nested function calls only to a fixed depth —
+  `MAX_INLINE_DEPTH = 3` in `chelis-prove/src/tier_b_lower.rs`
+  (source-confirmed present through v0.17.1: the guard `depth < MAX_INLINE_DEPTH`
+  at `tier_b_lower.rs:484` rebuilds a deeper call as an opaque `app` with no
+  cvc5 term). A goal whose discharge needs a call chain deeper than three
+  inlinings leaves the deepest application un-inlined and routes to Tier C
+  rather than lowering. No shoals property is known to hit this today (the
+  composites goals inline one level); it gates nothing on the current surface.
+  Filed 2026-07-23 as a forward-looking capacity limit — the residual of the
+  now-closed chelis#425 (which made nested goal-site calls inline at all); the
+  ask is to make the cap configurable, emit a distinct depth-cap diagnostic, or
+  document it with a clean Tier-C fallback contract. The c-note-side probe `p07`
+  is expected to pin the exact behavior upstream — probe pending. If a shoals
+  property is later authored that needs deeper inlining and hits the cap, add a
+  `tests_blocked/` probe citing chelis#846 in the same change set
+  (narrowing-citation rule). Re-probe trigger: `p07` landing, a chelis#846
+  close, or any release note on Tier-B inlining depth.
 
 ## Parked
 
