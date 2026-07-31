@@ -1243,7 +1243,7 @@
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the european-call pricer returns a negative price -- free money at these inputs",
-      "fuzz_domain_note": "proven over the reals at Tier B (no fuzz); model-free (binds to any european_call output fn), genuinely proven on the CRR anchor and deferred on the transcendental Black-Scholes flagship (chelis#637)"
+      "fuzz_domain_note": "proven over the reals at Tier B (no fuzz) on the CRR anchor. For the direct transcendental Black-Scholes/Black-76 pricers, the corresponding non-negativity claim is separately active at fuzz_validated; only exact promotion remains blocked by chelis#637."
     },
     {
       "id": "shoals.inv.crr_rn_call_upper_bounded_by_spot.v1",

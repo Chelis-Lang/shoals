@@ -51,7 +51,9 @@ import Shoals.Trees (tr_crr_call_2step, tr_crr_call_2step_nodisc, tr_crr_call_2s
 -- engine instantiates them against ANY european-call pricer's output fn via the
 -- manifest goal_pattern. All discharge unqualified at Tier B
 -- (proven_modulo_real_arithmetic) over the reals; on the transcendental
--- Black-Scholes flagship the same invariants are deferred (chelis#637). Each
+-- Black-Scholes flagship, non-negativity is separately observed at
+-- fuzz_validated while exact promotion and the other model-free invariants
+-- remain deferred (chelis#637). Each
 -- ships a corrupted twin that cvc5 must refute with an in-domain witness and a
 -- `_guards_satisfiable` non-vacuity witness that cvc5 refutes with a
 -- guard-satisfying model.
