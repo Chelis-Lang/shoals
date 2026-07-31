@@ -35,6 +35,22 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 ## Tracking
 
+- **chelis#408 — the `modelfit_bfgs_heavy` BFGS path kills a constrained
+  2-vCPU GitHub-hosted runner.** The Rosenbrock 500-iteration path with a
+  per-step finite-difference Jacobian and CG solve repeatedly ends in runner
+  shutdown/lost communication with no Chelis diagnostic, including with
+  `--jobs 1` and a 1500-second per-test budget. The same fixture passes
+  locally in roughly 170–200 seconds, so this is not a failed numerical
+  assertion and must not be represented as one.
+    - **Affected surface / narrowing:** the weekly hosted and release-equivalent
+      local heavy matrices exclude only `tests-manual/modelfit_bfgs_heavy.ch`;
+      all other reviewed manual shards remain present. The exclusion is locked
+      by `scripts/test_release_workflow.py`.
+    - **Re-probe trigger:** a chelis#408 close or a Chelis release naming
+      evaluator BFGS resource usage, worker memory, or constrained-host
+      supervision. Re-enable the exact fixture on a 2-vCPU hosted runner and
+      require a complete test report before removing the exclusion.
+
 - **chelis#637 — the certified-envelope discharge cannot express
   coupled-subterm dependencies (`N(d1)`/`N(d2)`): BS positivity / intrinsic
   lower bound unreachable by free-variable abstraction.** The 0.16.0
@@ -74,9 +90,9 @@ in code that is CLOSED upstream but not sitting in §Archived.
       `bs_call_positive` on the un-abstracted body per-surface, not by
       reading the changelog.
 
-- **i64 `mod`-path precision drift — the integer `mul`/`add` that build the
-  operand compute in f64 and lose precision above the 53-bit mantissa
-  (chelis#680; class META chelis#695).** Builtin `mod(big_i64, m)` returns a
+- **chelis#680 — i64 `mod`-path precision drift: the integer `mul`/`add` that
+  build the operand compute in f64 and lose precision above the 53-bit
+  mantissa (class META chelis#695).** Builtin `mod(big_i64, m)` returns a
   wrong result once the operand exceeds f64's 53-bit mantissa (~9e15): the
   Park-Miller-shaped update
   `mod(1103515245·1406938949 + 12345, 2147483647)` returns 178065920

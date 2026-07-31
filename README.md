@@ -77,36 +77,31 @@ ground-truth oracles that `Shoals.Pricing`, `Shoals.Risk`, and
 ## Properties
 
 `properties/` ships function bodies for the canonical finance
-properties (put-call parity, call-bounded-by-spot, finite-difference
-delta/vega smoke, MC-reproducibility, bull/butterfly-spread
-no-arbitrage). Status: mixed. The pinned compiler includes `chelis prove`,
-but Shoals has not yet wired a first-class property gate into this repo;
-the property bodies are written as plain `def name(...) -> bool` and
-are exercised through `tests/properties.ch`. See `spec/phase3l.md`
-and the upstream proof/fuzz specs for the plan. `Shoals.Pricing`
-still exposes grad-derived Greek functions, but
-the default executable test suite uses finite differences. The
-upstream `grad-eval-host-runtime` bug closed (chelis 2026-05-07);
-host-runtime `grad` is supported. Whether Shoals's specific pricing
-body (which uses `to_list` + `map` over a host-lane list combinator)
-lowers cleanly under `grad` is unverified at M0 — a future milestone
-that adds grad-derived Greek properties re-evaluates.
+properties. The release manifest currently carries 20 active invariants and
+13 explicitly deferred candidates. `scripts/prove_gate.py` verifies every
+active tier against the pinned release compiler, including corrupted controls
+and compiler-owned dependency attribution. Direct Black-Scholes and Black-76
+call-price positivity are observed at `fuzz_validated`; they are not presented
+as proofs. CRR and fixed-income arithmetic anchors reach SMT-backed tiers, while
+unobserved monotonicity, Greek, and risk families remain deferred with cited
+upgrade triggers. See `docs/CHELIS_SURFACE.md` and
+`docs/cnote-import-surface.json` for the exact current surface.
 
 ## Toolchain
 
-Pinned to `chelis v0.10.1` in `reef.toml`:
+Pinned to `chelis v0.17.4` in `reef.toml`:
 
 ```toml
 [package]
-compiler = "=0.10.1"
+compiler = "=0.17.4"
 ```
 
 Dependencies resolve via the local Reef registry (`~/.chelis/reef/`):
 
 * `chelis-std` 0.4.0 — standard library
-* `nautilus`   0.7.30 — distributions, special functions, stats,
+* `nautilus`   0.7.36 — distributions, special functions, stats,
   interpolation
-* `coral`      0.7.28 — dataframe runtime (transitively required for
+* `coral`      0.7.33 — dataframe runtime (transitively required for
   the same `nautilus` minor version)
 
 ## Build
@@ -223,7 +218,8 @@ runtime suite; the monorepo oracle remains a separate manual gate.
    for CI is a Chelis-side follow-up.
 3. **MC convergence rigor is split by tier.** The default 20 000-path
    test uses 2 % tolerance and runs in CI through
-   `chelis test tests/ --timeout 1200 --jobs auto`. The 100 000-path
+   `chelis test tests/ --timeout 1200 --suite-timeout 1500 --jobs auto`.
+   The 100 000-path
    / 1 % spec-rigor tier lives at `manual-gates/mc_rigorous.ch` and
    is invoked explicitly (see "Manual rigor gate" above).
 4. **Single-curve bootstrap only.** `bootstrap_zero_from_par`
@@ -245,9 +241,9 @@ directories alongside `src/`. Shoals adopted the canonical layout
 following the chelis-reef v0.4.1 multi-source-roots fix
 (`6b58030 feat(reef): multi-source-roots — additional_sources in reef.toml;
 bump v0.4.1`). The reef.toml declares
-`additional_sources = ["properties", "references"]`. v0.1.0 carries the
-canonical layout forward and pins chelis 0.10.1, nautilus 0.7.30, and
-coral 0.7.28. (References to the pre-reset v0.7.x numbering point at
+`additional_sources = ["properties", "references", "demos"]`. Shoals 0.24.2
+carries the canonical layout forward and pins Chelis 0.17.4, Nautilus 0.7.36,
+and Coral 0.7.33. (References to the pre-reset v0.7.x numbering point at
 the historical version track and remain valid as release-history
 records; current planning lives on Shoals's own track per
 `docs/plan-quant-surface.md`.)
@@ -258,9 +254,10 @@ The Chelis monorepo ships a `chelis-python` package
 (`bindings/python/chelis/`) that wraps the in-process evaluator and
 exposes `chelis.check(...)` and `chelis.eval(source, bindings)` to
 Python. The pre-reset v0.1.0-alpha release verified a Shoals-shaped
-program round-trips through that surface; the program shape is
-unchanged at v0.1.0, the verification remains valid, and re-running
-it under chelis 0.10.1 is a follow-up verification task.
+program round-trips through that surface. This is historical interop evidence,
+not part of the current Shoals release gate; the supported release path uses
+the checksummed Chelis 0.17.4 binary and Reef package artifacts described
+above.
 
 Setup (one-time):
 

@@ -24,14 +24,6 @@ gate report.
 
 ## §cannot-be-probed
 
-- **chelis#434 — transcendental SMT discharge for real finance bodies.**
-  The obstruction is a prove verdict (`unsupported` naming the
-  transcendental at `--tier smt-only`; honest fall to fuzz at `--tier
-  auto`) on any goal inlining a real `normal_cdf`/`bs_call` body. Verdicts
-  are not expressible as an expected-to-fail test case. Re-probed manually
-  per `docs/UPSTREAM_BUGS.md` §Tracking at every pin bump (last: 0.16.1 —
-  the certified-envelope discharge shipped in 0.16.0, residual is
-  chelis#637 below), and continuously by `scripts/prove_gate.py`.
 - **chelis#637 — coupled-subterm envelope obstruction (BS positivity /
   intrinsic lower bound).** The abstract-subterm envelope path abstracts
   `N(d1)`/`N(d2)` into independent fresh variables, discarding the coupling

@@ -80,15 +80,15 @@ the site; an uncited narrowing is invisible to de-narrowing.
   (skips the upstream check with a warning if `gh` is unavailable; never fails
   closed on the network). Run it at every pin bump, not per-PR.
 
-### Deferred conformance artifacts (contract §5/§6)
+### Conformance artifacts (contract §5/§6)
 
-`tests_neg/` (negative-test parity) and `tests_blocked/` (expected-to-fail
-upstream-blocker probes) with their runners are **deferred** for Shoals as of
-2026-07-10. Trigger to land them: the **first shoals-side negative fixture or
-mechanically-expressible blocked probe** (e.g. a shoals property that hits the
-chelis#434 transcendental boundary or the depth-3 inlining cap in a way the
-harness can express as a pinned-diagnostic reproducer). Until then the
-UPSTREAM_BUGS entries are re-probed manually at each bump. Recorded on shoals#4.
+`tests_neg/` carries negative-test parity and `tests_blocked/` carries
+expected-to-fail upstream-blocker probes. Both run in the local and hosted
+gates. A blocked probe passing is FIX-detected: follow its `.expect`
+de-narrowing instructions, promote it to a real test, and archive the cited
+`docs/UPSTREAM_BUGS.md` entry in the same change set. Prove-verdict capability
+gaps such as chelis#637 cannot be represented by `chelis test --expect`; the
+canon proof gate re-probes those per surface instead.
 
 ## Characterization Contract (producer obligations)
 
