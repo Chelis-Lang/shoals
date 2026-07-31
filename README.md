@@ -6,15 +6,16 @@ Ships as a reef package under the `Shoals` module prefix.
 
 ## Status
 
-v0.24.2 release candidate on Chelis 0.17.4. The M0-M9 quantitative
+v0.24.3 release candidate on Chelis 0.17.4. The M0-M9 quantitative
 surface is implemented across pricing, curves, volatility, stochastic models,
 Greeks, XVA, calibration, and risk. The release also ships a first-class
-characterization manifest and proof gate: 20 active invariants are checked at
+characterization manifest and proof gate: 24 active invariants are checked at
 their declared method-attributed tiers, compiler-owned dependency records bind
 each result to its implementation, and satisfying/violating controls prevent
 vacuous green results. The direct Black-Scholes and Black-76 positivity family
-is honestly `fuzz_validated`; exact closed-form promotion remains blocked by
-the coupled-subterm limitation chelis#637. The module table below is the
+and direct Black-Scholes spot-monotonicity/delta, vega, rho, and gamma
+comparisons are honestly `fuzz_validated`; exact closed-form promotion remains
+blocked by the coupled-subterm limitation chelis#637. The module table below is the
 current package surface; `docs/CHELIS_SURFACE.md` is the versioned capability
 inventory.
 
@@ -51,14 +52,16 @@ ground-truth oracles that `Shoals.Pricing`, `Shoals.Risk`, and
 ## Properties
 
 `properties/` ships function bodies for the canonical finance
-properties. The release manifest currently carries 20 active invariants and
-13 explicitly deferred candidates. `scripts/prove_gate.py` verifies every
+properties. The release manifest currently carries 24 active invariants and
+9 explicitly deferred candidates. `scripts/prove_gate.py` verifies every
 active tier against the pinned release compiler, including corrupted controls
 and compiler-owned dependency attribution. Direct Black-Scholes and Black-76
-call-price positivity are observed at `fuzz_validated`; they are not presented
-as proofs. CRR and fixed-income arithmetic anchors reach SMT-backed tiers, while
-unobserved monotonicity, Greek, and risk families remain deferred with cited
-upgrade triggers. See `docs/CHELIS_SURFACE.md` and
+call-price positivity plus direct Black-Scholes spot-monotonicity/delta, vega,
+rho, and gamma comparisons are observed at `fuzz_validated`; they are not
+presented as proofs. The Greek family is re-run over seeds 0, 1, and 2. CRR and
+fixed-income arithmetic anchors reach SMT-backed tiers, while the unobserved
+direct intrinsic-bound, grad-in-property, risk, and general-size families
+remain deferred with cited upgrade triggers. See `docs/CHELIS_SURFACE.md` and
 `docs/cnote-import-surface.json` for the exact current surface.
 
 ## Toolchain
@@ -151,7 +154,7 @@ violation per `crates/chelis-lint/` rules; advisory warnings are
 non-blocking.
 
 Runtime gate expected success condition: the fast `tests/` unit
-suite passes at v0.24.2. The suite unions the M0-M9 + Milestone A
+suite passes at v0.24.3. The suite unions the M0-M9 + Milestone A
 SDE/PDE/XVA coverage with the FlukeBall currency-tag tests; the
 heavy MC / PDE / Fourier / optimization files live in
 `tests-manual/` and are exercised by the milestone manual-gate
@@ -185,7 +188,7 @@ default PR scope includes `chelis reef build` and the fast conformance
 surface described above; the long-running runtime suite is nightly. The
 monorepo oracle remains a separate manual gate.
 
-## Known limitations and architecture notes in v0.24.2
+## Known limitations and architecture notes in v0.24.3
 
 1. **Closed-form exact proof remains limited.** The direct Black-Scholes and
    Black-76 positivity family is observed at `fuzz_validated`, with corrupt
@@ -194,7 +197,7 @@ monorepo oracle remains a separate manual gate.
    abstraction context.
 2. **The shipped manifest is the characterization contract, not a
    `chelis manifest` CLI product.** Shoals publishes
-   `shoals-0.24.2.invariants.json` byte-for-byte from
+   `shoals-0.24.3.invariants.json` byte-for-byte from
    `docs/cnote-import-surface.json`; CI validates its schema, pins, tiers, and
    model bindings. MC reproducibility is separately enforced by the `Random`
    effect, which rejects unseeded random operations at type-check time.
@@ -224,7 +227,7 @@ directories alongside `src/`. Shoals adopted the canonical layout
 following the chelis-reef v0.4.1 multi-source-roots fix
 (`6b58030 feat(reef): multi-source-roots — additional_sources in reef.toml;
 bump v0.4.1`). The reef.toml declares
-`additional_sources = ["properties", "references", "demos"]`. Shoals 0.24.2
+`additional_sources = ["properties", "references", "demos"]`. Shoals 0.24.3
 carries the canonical layout forward and pins Chelis 0.17.4, Nautilus 0.7.36,
 and Coral 0.7.33. (References to the pre-reset v0.7.x numbering point at
 the historical version track and remain valid as release-history

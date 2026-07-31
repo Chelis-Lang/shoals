@@ -21,11 +21,13 @@ in spot) on `tr_crr_call_2step`. All pure arithmetic + ITE, expected to
 discharge at Tier B (proven over the reals). Each ships corrupted twin +
 guards_satisfiable + manifest entry.
 
-### 2. Black-Scholes Promotion Gate Stubs (deferred)
+### 2. Black-Scholes Direct Greek Comparisons (fuzz-validated)
 
-Add `deferred_invariants` entries for bs_vega_sign, bs_rho_sign, bs_gamma_sign
-— the transcendental-pricer versions that promote when chelis#637 (Beacon /
-BoxRange) lands. No @property bodies pre-staged (the plan forbids it).
+The former spot-monotonicity, vega-sign, rho-sign, and gamma-sign stubs are
+active against the real `bs_call_scalar` body at `fuzz_validated`. Satisfying
+and corrupted controls run over three deterministic seeds. Their upgrade to a
+global proven tier remains deferred to chelis#637 (relational / BoxRange
+abstraction); the separate grad-in-property candidate remains deferred.
 
 ### 3. VaR / Quantile Coherence Stubs (deferred or fuzz_validated)
 
@@ -33,6 +35,13 @@ Author `properties/canonrisk.ch` with VaR-monotonicity, CVaR-dominance, and
 VaR-nonneg invariants targeting `src/risk.ch`. Tier classification is honest:
 if fuzz completes they enter active invariants; if intractable they go deferred
 with trigger "chelis-std quantile primitive".
+
+Current verdict for shoals#37: explicitly deferred. Chelis#977's
+constraint-directed sampler is not in the pinned release, and chelis#979's
+source-level contract binding to the real Nautilus quantile implementation has
+not landed. The existing parametric probes remain characterization evidence,
+but activating them alone would not satisfy the issue's distinct parametric and
+historical acceptance surface.
 
 ### 4. General-Size Promotion Stubs (deferred)
 

@@ -43,3 +43,36 @@ import Shoals.PricingExtended (black_call)
   (black_call(f, k, sigma, t, df) >= 0.0)
 @property b76_call_price_nonneg_corrupted forall(f: f32, k: f32, sigma: f32, t: f32, df: f32) where (f > 0.0), (k > 0.0), (sigma > 0.0), (t > 0.0), (df > 0.0):
   (black_call(f, k, sigma, t, df) >= 5.0)
+-- Direct Black-Scholes Greek-sign family. These compare the real
+-- transcendental bs_call_scalar body at two or three input points. They do not
+-- differentiate a surrogate and they are not the structural normal-CDF
+-- composites in properties/composites.ch. At Chelis 0.17.4 they are observed
+-- only at fuzz_validated; chelis#637 remains the trigger for a global proof.
+-- To keep the rejection-sampled box dense at this compiler pin (shoals#38),
+-- delta/vega/gamma use the desk baseline r=5%, while rho uses t=1y. Their
+-- comparison axes and every other displayed nuisance input remain sampled.
+--
+-- Spot monotonicity is the finite-comparison form of non-negative call delta.
+-- The corrupted twin asserts a strict decrease with a material margin.
+@property bs_call_monotone_in_s forall(s: f32, ds: f32, k: f32, sigma: f32, t: f32) where (s > 0.0), (ds > 0.0), (k > 0.0), (sigma > 0.0), (t > 0.0):
+  (bs_call_scalar((s + ds), k, 0.05, sigma, t) >= bs_call_scalar(s, k, 0.05, sigma, t))
+@property bs_call_monotone_in_s_corrupted forall(s: f32, ds: f32, k: f32, sigma: f32, t: f32) where (s > 0.0), (ds > 0.0), (k > 0.0), (sigma > 0.0), (t > 0.0):
+  (bs_call_scalar((s + ds), k, 0.05, sigma, t) <= (bs_call_scalar(s, k, 0.05, sigma, t) - 0.01))
+-- Vega sign: increasing volatility does not decrease a European call price.
+@property bs_call_vega_sign forall(s: f32, k: f32, sigma: f32, dsigma: f32, t: f32) where (s > 0.0), (k > 0.0), (sigma > 0.0), (dsigma > 0.0), (t > 0.0):
+  (bs_call_scalar(s, k, 0.05, (sigma + dsigma), t) >= bs_call_scalar(s, k, 0.05, sigma, t))
+@property bs_call_vega_sign_corrupted forall(s: f32, k: f32, sigma: f32, dsigma: f32, t: f32) where (s > 0.0), (k > 0.0), (sigma > 0.0), (dsigma > 0.0), (t > 0.0):
+  (bs_call_scalar(s, k, 0.05, (sigma + dsigma), t) <= (bs_call_scalar(s, k, 0.05, sigma, t) - 0.01))
+-- Call rho sign: at t=1y, increasing a non-negative risk-free rate does not
+-- decrease the non-dividend-paying European call price.
+@property bs_call_rho_sign forall(s: f32, k: f32, r: f32, dr: f32, sigma: f32) where (s > 0.0), (k > 0.0), (r >= 0.0), (dr > 0.0), (sigma > 0.0):
+  (bs_call_scalar(s, k, (r + dr), sigma, 1.0) >= bs_call_scalar(s, k, r, sigma, 1.0))
+@property bs_call_rho_sign_corrupted forall(s: f32, k: f32, r: f32, dr: f32, sigma: f32) where (s > 0.0), (k > 0.0), (r >= 0.0), (dr > 0.0), (sigma > 0.0):
+  (bs_call_scalar(s, k, (r + dr), sigma, 1.0) <= (bs_call_scalar(s, k, r, sigma, 1.0) - 0.01))
+-- Gamma sign: a centered spot butterfly is non-negative. The -1e-5 floor is
+-- an explicit f32 output-rounding allowance; it is not a proof tolerance. The
+-- corrupted twin requires material concavity and must produce a witness.
+@property bs_call_gamma_sign forall(s: f32, h: f32, k: f32, sigma: f32, t: f32) where (s > 0.0), (h > 0.0), (k > 0.0), (sigma > 0.0), (t > 0.0):
+  (((bs_call_scalar((s + (2.0 * h)), k, 0.05, sigma, t) + bs_call_scalar(s, k, 0.05, sigma, t)) - (2.0 * bs_call_scalar((s + h), k, 0.05, sigma, t))) >= (0.0 - 0.00001))
+@property bs_call_gamma_sign_corrupted forall(s: f32, h: f32, k: f32, sigma: f32, t: f32) where (s > 0.0), (h > 0.0), (k > 0.0), (sigma > 0.0), (t > 0.0):
+  (((bs_call_scalar((s + (2.0 * h)), k, 0.05, sigma, t) + bs_call_scalar(s, k, 0.05, sigma, t)) - (2.0 * bs_call_scalar((s + h), k, 0.05, sigma, t))) <= (0.0 - 0.01))

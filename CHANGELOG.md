@@ -6,6 +6,29 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Prepared the next candidate as 0.24.3. The published 0.24.2 package and
+  characterization asset retain their original bytes and identity; the Greek
+  characterization additions belong only to the new patch candidate.
+- Hardened the proof gate so fuzz counterexamples are checked against every
+  structured precondition exactly like SMT counterexamples. An adversarial
+  self-test prevents an out-of-domain fuzz witness from satisfying the corrupt
+  control oracle.
+- Added direct real-pricer Black-Scholes spot-monotonicity/delta, vega, rho,
+  and gamma comparison properties with corrupted twins. All four are reported
+  honestly as `fuzz_validated`, retain chelis#637 as the proven-tier trigger,
+  and are release-gated against compiler-owned `bs_call_scalar` dependency
+  edges over deterministic seeds 0, 1, and 2. The fixed 5% rate baseline for
+  delta/vega/gamma and 1y maturity baseline for rho keep the 0.17.4 rejection
+  sampler dense; every displayed comparison and nuisance axis is still sampled.
+- The characterization manifest now carries 24 active invariants and 9
+  explicit deferrals; the four activated Greek comparisons replace their old
+  uncharacterized stubs without upgrading any sampled result to a proof.
+- Shoals#37 remains explicitly deferred. The pinned Chelis 0.17.4 release does
+  not contain chelis#977's constraint-directed sampler, and chelis#979 has not
+  landed the real Nautilus quantile-contract consumer seam; activating only
+  the parametric half would not satisfy the issue's parametric/historical
+  acceptance contract.
+
 ## [0.24.2] - 2026-07-31
 
 - **Prepared Shoals 0.24.2 for the Chelis 0.17.4 cascade.** The compiler
