@@ -5,7 +5,7 @@ to this file so Claude-style and Codex-style entry points do not drift.
 
 ## Repo Identity
 
-<!-- BEGIN CHELIS MANAGED BLOCK: agents-inheritance chelis@0.17.1 (sha256:758a5eb9aefb5c7e) -->
+<!-- BEGIN CHELIS MANAGED BLOCK: agents-inheritance chelis@0.17.4 (sha256:758a5eb9aefb5c7e) -->
 This repository is a downstream **shell** of the Chelis compiler. Its upstream
 of truth is `Chelis-Lang/chelis`: the monorepo `AGENTS.md` applies verbatim
 (machine-local environment sections excepted), and
@@ -80,15 +80,15 @@ the site; an uncited narrowing is invisible to de-narrowing.
   (skips the upstream check with a warning if `gh` is unavailable; never fails
   closed on the network). Run it at every pin bump, not per-PR.
 
-### Deferred conformance artifacts (contract §5/§6)
+### Conformance artifacts (contract §5/§6)
 
-`tests_neg/` (negative-test parity) and `tests_blocked/` (expected-to-fail
-upstream-blocker probes) with their runners are **deferred** for Shoals as of
-2026-07-10. Trigger to land them: the **first shoals-side negative fixture or
-mechanically-expressible blocked probe** (e.g. a shoals property that hits the
-chelis#434 transcendental boundary or the depth-3 inlining cap in a way the
-harness can express as a pinned-diagnostic reproducer). Until then the
-UPSTREAM_BUGS entries are re-probed manually at each bump. Recorded on shoals#4.
+`tests_neg/` carries negative-test parity and `tests_blocked/` carries
+expected-to-fail upstream-blocker probes. Both run in the local and hosted
+gates. A blocked probe passing is FIX-detected: follow its `.expect`
+de-narrowing instructions, promote it to a real test, and archive the cited
+`docs/UPSTREAM_BUGS.md` entry in the same change set. Prove-verdict capability
+gaps such as chelis#637 cannot be represented by `chelis test --expect`; the
+canon proof gate re-probes those per surface instead.
 
 ## Characterization Contract (producer obligations)
 
@@ -99,29 +99,31 @@ C Note is the consumer. Shoals' local obligations:
 
 - `docs/cnote-import-surface.json` is the invariant-surface manifest
   (`chelis-shell.invariant-surface/1.0`): reference models with kinds/domains,
-  and an active invariant set that is entirely SMT-tier (`proven` CRR lane, the
+  and an active invariant set spanning the SMT tiers (`proven` CRR lane, the
   `proven_modulo_contract` composites lane, and the `disproved`
-  defective-model break) plus the `defective: true` in-region-break model. The
-  direct-pricer positivity lane is `deferred_invariants` (see below), not an
-  active tier. Every below-proven active tier cites a `tier_upgrade_trigger` and
+  defective-model break) plus a `fuzz_validated` direct-pricer positivity lane
+  and the `defective: true` in-region-break model. Every below-proven active
+  tier cites a `tier_upgrade_trigger` and
   a `dischargeability_probe`; tiers are grounded in the Phase-0 record
   (`c-note/fixtures/dischargeability/`). Published at release as
   `shoals-<ver>.invariants.json` (byte-identical).
 - `scripts/contract_gate.py` (offline: manifest resolvability + pin freshness)
   and `scripts/prove_gate.py` (keystone: expected-tier enforcement against the
   pinned release binary; classifies from `proof_tier`+qualifiers, **never** the
-  `composite_verdict` string; anti-vacuity via the prover goal string because
-  `dependency_edges` do not cross import boundaries). Both run in CI and the
-  local gate. The active canon is entirely SMT-tier (proven /
-  proven_modulo_contract / disproved), every invariant observed to pass against
-  the release binary. The direct-pricer positivity invariant is
-  **deferred** (`deferred_invariants`, no expected tier): not characterizable at
-  0.16.1 on either lane -- the proven lane is blocked by chelis#637 (free-variable
-  abstraction discards the N(d1)/N(d2) coupling; chelis#434's envelope does not
-  fix this), and the fuzz lane is intractable (one fuzz sample of one positivity
-  property did not complete in 200s; chelis#659,
-  p08). It re-enters `invariants` only when a run demonstrates a tier (prove_gate
-  carries the dormant fuzz machinery for that day).
+  `composite_verdict` string). From Chelis 0.17.2 onward, direct attribution
+  requires an exact linker-owned `dependency_graph` edge by package, module,
+  source file, kind, and name. Structural composites require the observed edge
+  to `chelis-std:Std.Contracts.normal_cdf` and deliberately do not claim an
+  edge to `bs_call_scalar`. Goal-string inspection is only a pre-0.17.2
+  compatibility oracle; metamorphic substitution remains the complementary
+  semantic anti-vacuity check. Both gates run in CI and the
+  local gate. Every active invariant is observed against the release binary.
+  At 0.17.4 the direct Black-Scholes and Black-76 call-price positivity
+  properties and their corrupted twins complete at `fuzz_validated`; this is
+  the only transcendental-pricer family promoted by that probe. Their upgrade
+  to `proven` remains blocked by chelis#637 because free-variable abstraction
+  discards the N(d1)/N(d2) coupling. Monotonicity, Greeks, and risk invariants
+  remain deferred until their own per-surface probes demonstrate a tier.
 - Additive-only within schema major 1; renames/removals need a major bump and a
   relayed heads-up (the master agent relays between repos; shells never read
   each other's manifest).
@@ -135,7 +137,7 @@ one change set (contract §7):
    literal `CHELIS_TAG` / `CHELIS_VERSION` env pair in each toolchain-installing
    workflow. Verify with `python3 scripts/audit_workarounds.py --pins-only`.
    Install via the pinned toolchain (the shared install action reads the pin).
-2. Run the blocked-probe suite once it exists (deferred today); FIX-detected →
+2. Run `chelis test tests_blocked/ --expect blocked`; FIX-detected →
    execute the sidecar de-narrowing instructions and promote the probe;
    DRIFTED → investigate before re-citing.
 3. Run `python3 scripts/audit_workarounds.py` (full mode); triage every
@@ -150,9 +152,13 @@ one change set (contract §7):
 7. Run the local gate before pushing: `python3 scripts/run_local_gate.py`
    (the per-PR CI mirror: pins audit + fmt + lint + `chelis reef build` +
    the `tests_neg/`/`tests_blocked/` expect suites + conform audit +
-   contract gate). At a pin bump, run it **once with `--full`** to add the
+   contract gate + oracle/release static tests; the origin-relative bump check
+   remains CI-only). At a pin bump, run it **once with `--full`** to add the
    nightly stages (fast `tests/` suite, heavy `tests-manual/` suite,
-   prove gate) — day-to-day pushes rely on nightly CI for those.
+   prove gate, and the chelis#924 cold/warm package-prove latency oracle) —
+   day-to-day pushes rely on nightly CI for those. The latency oracle installs
+   the just-built Shoals candidate, requires cold <=20s and warm <=5s, and
+   requires byte-identical NDJSON from both completed processes.
 
 ## Phase Spec
 

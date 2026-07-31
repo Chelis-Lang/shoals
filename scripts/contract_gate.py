@@ -56,10 +56,23 @@ def module_src_file(module: str) -> Path:
     return REPO / "src" / (module.split(".")[-1].lower() + ".ch")
 
 
+def declared_module(path: Path) -> str | None:
+    if not path.is_file():
+        return None
+    match = re.search(r"^\s*module\s+([A-Za-z_][A-Za-z0-9_.]*)\s*$",
+                      path.read_text(), re.M)
+    return match.group(1) if match else None
+
+
 def exports_of(module: str) -> set[str]:
     f = module_src_file(module)
     if not f.is_file():
         err(f"module {module}: source file {f.relative_to(REPO)} not found")
+        return set()
+    actual_module = declared_module(f)
+    if actual_module != module:
+        err(f"module {module}: {f.relative_to(REPO)} declares "
+            f"{actual_module!r}, not the manifest module")
         return set()
     m = re.search(r"export\s*\(([^)]*)\)", f.read_text())
     if not m:
@@ -74,8 +87,15 @@ def property_block(pfile: Path, name: str) -> str | None:
     if not pfile.is_file():
         return None
     text = pfile.read_text()
-    m = re.search(rf"@property\s+{re.escape(name)}\b[^\n]*", text)
-    return m.group(0) if m else None
+    matches = re.findall(rf"@property\s+{re.escape(name)}\b[^\n]*", text)
+    return matches[0] if len(matches) == 1 else None
+
+
+def property_count(pfile: Path, name: str) -> int:
+    if not pfile.is_file():
+        return 0
+    return len(re.findall(rf"@property\s+{re.escape(name)}\b",
+                          pfile.read_text()))
 
 
 def fmt_const(v) -> str:
@@ -184,6 +204,14 @@ def check_instantiation(inv: dict, inst: dict, models: dict) -> None:
     ctx = f"{inv['id']}"
     prop = inst["property"]
     pfile = REPO / prop["file"]
+    actual_module = declared_module(pfile)
+    if actual_module != prop.get("module"):
+        err(f"{ctx}: {prop['file']} declares module {actual_module!r}, "
+            f"not manifest module {prop.get('module')!r}")
+    if property_count(pfile, prop["name"]) != 1:
+        err(f"{ctx}: manifest property `{prop['name']}` resolves "
+            f"{property_count(pfile, prop['name'])} times in {prop['file']} "
+            "(expected exactly 1)")
     # controls + non-vacuity + edge names must all resolve to @property blocks.
     names = []
     for role in ("satisfying", "violating"):
@@ -196,10 +224,13 @@ def check_instantiation(inv: dict, inst: dict, models: dict) -> None:
         names.append(inv["edge_control"]["name"])
     where_block = None
     for nm in names:
+        count = property_count(pfile, nm)
+        if count != 1:
+            err(f"{ctx}: @property `{nm}` resolves {count} times in "
+                f"{prop['file']} (expected exactly 1)")
+            continue
         blk = property_block(pfile, nm)
-        if blk is None:
-            err(f"{ctx}: @property `{nm}` not found in {prop['file']}")
-        elif nm == inst["controls"].get("satisfying", {}).get("name") or \
+        if nm == inst["controls"].get("satisfying", {}).get("name") or \
                 (inv.get("defective_model") and nm == inst["controls"]["violating"]["name"]):
             where_block = blk
     # preconditions vs the satisfying (or defect) control's where-clause, BOTH
@@ -227,6 +258,12 @@ def main() -> None:
         err(f"chelis_pin={manifest.get('chelis_pin')} != reef.toml compiler pin {pin}")
 
     models = {m["id"]: m for m in manifest["models"]}
+    model_ids = [m.get("id") for m in manifest["models"]]
+    if len(model_ids) != len(set(model_ids)):
+        err("models contains duplicate IDs")
+    invariant_ids = [inv.get("id") for inv in manifest["invariants"]]
+    if len(invariant_ids) != len(set(invariant_ids)):
+        err("invariants contains duplicate IDs")
     for m in manifest["models"]:
         if m["output_fn"] not in exports_of(m["module"]):
             err(f"model {m['id']}: output_fn `{m['output_fn']}` not exported by {m['module']}")
@@ -244,6 +281,19 @@ def main() -> None:
             tier = inv["expected_tier_per_pin"][pin]
             if tier in BELOW_PROVEN and not inv.get("tier_upgrade_trigger"):
                 err(f"{inv['id']}: below-proven tier {tier} lacks tier_upgrade_trigger")
+        binding = inv.get("binding", {})
+        if binding.get("references_output_fn") == "structural":
+            dep = binding.get("compiler_dependency")
+            expected = {
+                "package": "chelis-std",
+                "module": "Std.Contracts",
+                "kind": "function",
+                "name": "normal_cdf",
+                "source_file": "src/contracts.ch",
+            }
+            if dep != expected:
+                err(f"{inv['id']}: structural compiler_dependency={dep!r}; "
+                    f"expected exact {expected!r}")
         check_instantiation(inv, inv, models)
         for inst in inv.get("also_instantiated_for", []):
             if inst.get("target_model") not in models:

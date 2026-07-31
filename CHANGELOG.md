@@ -6,6 +6,35 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.24.2] - 2026-07-31
+
+- **Prepared Shoals 0.24.2 for the Chelis 0.17.4 cascade.** The compiler
+  pin and all workflow pins move together with Nautilus 0.7.36 and Coral
+  0.7.33. The characterization manifest is restamped for Shoals 0.24.2 /
+  Chelis 0.17.4. The candidate is gated against the official checksummed
+  Chelis 0.17.4, Nautilus 0.7.36, and Coral 0.7.33 release artifacts.
+- **Retained the chelis#924 release oracle.** A cold package prove must finish
+  within 20 seconds, a warm repeat within 5 seconds, and both invocations must
+  exit zero with byte-identical NDJSON and no delayed worker lifetime.
+- **Aligned long-running test budgets with Chelis 0.17.4 supervision.** The
+  reviewed nightly shards now set both the per-test timeout and the independent
+  whole-suite timeout, so the suite watchdog cannot kill a still-valid SABR
+  shard after its earlier assertions pass.
+- **Closed the demonstrated chelis#659 narrowing.** Chelis 0.17.4 now completes
+  the direct Black-Scholes and Black-76 call-price positivity properties and
+  their corrupted twins at `fuzz_validated`; the manifest promotes that one
+  observed invariant family (20 active, 13 deferred). Compiler-reported
+  dependency edges bind each property to its exact pricer. Monotonicity, Greeks,
+  and risk invariants remain deferred until their own per-surface probes observe
+  a tier; `chelis#637` still blocks promotion of the direct positivity family to
+  a proven tier.
+
+## [0.24.1] - 2026-07-23
+
+- Completed the Chelis 0.17.1 cascade with Nautilus 0.7.35 and Coral 0.7.32.
+- Suffixed seed literals with `i64` so the stricter 0.17.1 checker accepts the
+  published package without changing its numerical behavior.
+
 ## [0.24.0] - 2026-07-22
 
 Canon Breadth. Extends the verification canon from the small-lattice /

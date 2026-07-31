@@ -9,13 +9,18 @@ RELEASE binary. For every manifest invariant:
      de-narrowing motion"). Tier is classified from proof_tier + qualifiers,
      NEVER from the composite_verdict string (contract rule; verdict strings
      may demote, never promote).
-  2. Anti-vacuity, TWO layers:
-     (a) syntactic (fast necessary condition): the prover-emitted GOAL string
-         names the output fn (direct) or the abstracted contract symbol
-         (structural). dependency_edges is NOT used -- it is [] across import
-         boundaries. This alone is FORGEABLE (a canceling call f(x)-f(x)<c or
+  2. Anti-vacuity, THREE layers:
+     (a) compiler attribution (mandatory since Chelis 0.17.2): the summary
+         dependency graph is complete and reports an edge from the exact
+         package/module/file/name property declaration to the exact
+         package/module/name output function (direct lane), or to
+         Std.Contracts.normal_cdf (structural lane). No dependency is
+         reconstructed from source text.
+     (b) syntactic (fast necessary condition): the prover-emitted GOAL string
+         names the output fn (direct) or the abstracted contract symbol.
+         This alone is FORGEABLE (a canceling call f(x)-f(x)<c or
          reflexive f(x)==f(x) names the fn but is model-independent).
-     (b) metamorphic (the real bar): re-prove the goal with the referenced body
+     (c) metamorphic (the real bar): re-prove the goal with the referenced body
          (direct lane) or abstracted contract (structural lane) SUBSTITUTED by
          several alternatives, and require the outcome to flip under AT LEAST
          ONE -- only a goal whose truth depends on the model survives. A
@@ -139,20 +144,25 @@ def honesty_self_test() -> bool:
 
 
 def run_prove(binary: str, file: str, fuzz: bool, samples: int) -> dict:
-    """Run prove on one canon file; return {property_name: record}."""
+    """Run prove on one canon file, preserving compiler attribution evidence.
+
+    Property records are keyed by name only after duplicate detection. The
+    compiler graph is accepted only from the single summary record; callers
+    fail closed when it is absent, duplicated, malformed, or incomplete.
+    """
     cmd = [binary, "prove", file, "--json"]
     if fuzz:
-        # fuzz-only, NOT auto: the transcendental pricers cannot lower to SMT
-        # (chelis#434), and --tier auto burns an unbounded SMT-lowering attempt
-        # (no --smt-timeout applies to the auto escalation) BEFORE degrading to
-        # fuzz. fuzz-only samples directly. Cost is still ~17s per accepted
-        # sample (p08), so the satisfying controls dominate: keep the nightly
-        # sample budget (FUZZ_SAMPLES) small and measured.
+        # fuzz-only, NOT auto: chelis#637 still prevents a proven discharge, so
+        # fuzz-only avoids spending time on the known-unreachable SMT lane.
+        # Chelis 0.17.4 made direct-pricer sampling tractable; keep the nightly
+        # sample budget (FUZZ_SAMPLES) explicit and measured.
         cmd += ["--tier", "fuzz-only", "--samples", str(samples), "--seed", FUZZ_SEED]
     else:
         cmd += ["--tier", "smt-only", "--smt-timeout", SMT_TIMEOUT_MS]
     out = subprocess.run(cmd, cwd=REPO, capture_output=True, text=True)
     recs: dict[str, dict] = {}
+    duplicate_records: list[str] = []
+    summaries: list[dict] = []
     for line in out.stdout.splitlines():
         line = line.strip()
         if not line.startswith("{"):
@@ -162,11 +172,223 @@ def run_prove(binary: str, file: str, fuzz: bool, samples: int) -> dict:
         except json.JSONDecodeError:
             continue
         if obj.get("kind") == "property" and "name" in obj and "status" in obj:
-            recs[obj["name"]] = obj
+            name = obj["name"]
+            if name in recs:
+                duplicate_records.append(name)
+            else:
+                recs[name] = obj
         elif obj.get("kind") == "summary":
-            for name, s in (obj.get("summary") or {}).items():
-                recs.setdefault(name, {**s, "name": name})
-    return recs
+            summaries.append(obj)
+    if len(summaries) == 1:
+        for name, summary in (summaries[0].get("summary") or {}).items():
+            recs.setdefault(name, {**summary, "name": name})
+    return {
+        "records": recs,
+        "duplicate_records": duplicate_records,
+        "summary_count": len(summaries),
+        "dependency_graph": summaries[0].get("dependency_graph")
+        if len(summaries) == 1 else None,
+        "returncode": out.returncode,
+    }
+
+
+def parse_version(pin: str) -> tuple[int, int, int] | None:
+    try:
+        parts = tuple(int(x) for x in pin.split("."))
+    except (TypeError, ValueError):
+        return None
+    return parts if len(parts) == 3 else None
+
+
+def version_at_least(pin: str, floor: tuple[int, int, int]) -> bool:
+    parsed = parse_version(pin)
+    return parsed is not None and parsed >= floor
+
+
+def compiler_graph_directly_references(
+        graph: object, *, property_name: str, property_module: str,
+        property_file: str, target_name: str, target_module: str,
+        target_package: str, package: str,
+        target_file: str | None = None) -> tuple[bool, str]:
+    """Validate one exact compiler-reported declaration edge.
+
+    Identity is namespace-aware. A same-name declaration in another module,
+    package, or source file cannot satisfy the check, and duplicate exact
+    declarations/IDs fail closed instead of making attribution ambiguous.
+    """
+    if not isinstance(graph, dict) or graph.get("status") != "complete":
+        return False, "dependency_graph missing or status is not complete"
+    declarations = graph.get("declarations")
+    edges = graph.get("edges")
+    if not isinstance(declarations, list) or not isinstance(edges, list):
+        return False, "dependency_graph declarations/edges are malformed"
+    if not all(isinstance(d, dict) and isinstance(d.get("id"), str)
+               for d in declarations):
+        return False, "dependency_graph contains malformed declarations"
+    ids = [d["id"] for d in declarations]
+    if len(ids) != len(set(ids)):
+        return False, "dependency_graph contains duplicate declaration IDs"
+
+    def source_matches(d: dict) -> bool:
+        src = d.get("source")
+        return (
+            d.get("kind") == "property"
+            and d.get("package") == package
+            and d.get("module") == property_module
+            and d.get("name") == property_name
+            and isinstance(src, dict)
+            and src.get("file") == property_file
+        )
+
+    def target_matches(d: dict) -> bool:
+        identity_matches = (
+            d.get("kind") == "function"
+            and d.get("package") == target_package
+            and d.get("module") == target_module
+            and d.get("name") == target_name
+        )
+        if not identity_matches or target_file is None:
+            return identity_matches
+        src = d.get("source")
+        return isinstance(src, dict) and src.get("file") == target_file
+
+    sources = [d for d in declarations if source_matches(d)]
+    targets = [d for d in declarations if target_matches(d)]
+    if len(sources) != 1:
+        return False, f"exact property declaration count is {len(sources)}, expected 1"
+    if len(targets) != 1:
+        return False, f"exact dependency declaration count is {len(targets)}, expected 1"
+    valid_ids = set(ids)
+    normalized_edges: set[tuple[str, str]] = set()
+    for edge in edges:
+        if not isinstance(edge, dict):
+            return False, "dependency_graph contains a malformed edge"
+        from_id, to_id = edge.get("from"), edge.get("to")
+        if not isinstance(from_id, str) or not isinstance(to_id, str):
+            return False, "dependency_graph contains an edge without string endpoints"
+        if from_id not in valid_ids or to_id not in valid_ids:
+            return False, "dependency_graph edge refers to an unknown declaration ID"
+        normalized_edges.add((from_id, to_id))
+    wanted = (sources[0]["id"], targets[0]["id"])
+    if wanted not in normalized_edges:
+        return False, "exact compiler-reported dependency edge is absent"
+    return True, "exact compiler-reported dependency edge present"
+
+
+def dependency_binding_references(
+        rec: dict, graph: object, inv: dict, *, pin: str, output_fn: str,
+        output_module: str, package: str,
+        property_name: str | None = None) -> tuple[bool, str]:
+    """Require compiler attribution on modern pins; legacy pins use the goal."""
+    parsed_pin = parse_version(pin)
+    if parsed_pin is None:
+        return False, f"malformed Chelis pin {pin!r}"
+    if parsed_pin < (0, 17, 2):
+        return (goal_names_ref(rec.get("goal", ""), {**inv, "_output_fn": output_fn}),
+                "legacy pre-0.17.2 goal fallback")
+    binding = inv["binding"]
+    if binding["references_output_fn"] == "structural":
+        target = binding.get("compiler_dependency")
+        if not isinstance(target, dict):
+            return False, "structural binding lacks compiler_dependency metadata"
+        target_name = target.get("name")
+        target_module = target.get("module")
+        target_package = target.get("package")
+        target_file = target.get("source_file")
+    else:
+        target_name = output_fn
+        target_module = output_module
+        target_package = package
+        target_file = None
+    return compiler_graph_directly_references(
+        graph,
+        property_name=property_name or inv["property"]["name"],
+        property_module=inv["property"]["module"],
+        property_file=inv["property"]["file"],
+        target_name=target_name,
+        target_module=target_module,
+        target_package=target_package,
+        package=package,
+        target_file=target_file,
+    )
+
+
+def dependency_graph_self_test() -> bool:
+    """Lock fail-closed namespace-aware attribution against graph forgeries."""
+    prop = {
+        "id": "p", "kind": "property", "package": "shoals",
+        "module": "Shoals.Properties.CanonTrees", "name": "crr_call_nonneg",
+        "source": {"file": "properties/canontrees.ch"},
+    }
+    fn = {
+        "id": "f", "kind": "function", "package": "shoals",
+        "module": "Shoals.Trees", "name": "tr_crr_call_2step",
+        "source": {"file": "src/trees.ch"},
+    }
+    kwargs = {
+        "property_name": prop["name"], "property_module": prop["module"],
+        "property_file": prop["source"]["file"], "target_name": fn["name"],
+        "target_module": fn["module"], "target_package": fn["package"],
+        "package": "shoals",
+    }
+
+    def bound(g: object) -> bool:
+        return compiler_graph_directly_references(g, **kwargs)[0]
+
+    good = {"status": "complete", "declarations": [prop, fn],
+            "edges": [{"from": "p", "to": "f"}]}
+    wrong_fn = {
+        **good,
+        "declarations": [prop, fn, {**fn, "id": "attacker-f",
+                                   "module": "Attacker.Decoy"}],
+        "edges": [{"from": "p", "to": "attacker-f"}],
+    }
+    wrong_prop = {
+        **good,
+        "declarations": [prop, fn, {**prop, "id": "attacker-p",
+                                   "module": "Attacker.Decoy",
+                                   "source": {"file": "attacker.ch"}}],
+        "edges": [{"from": "attacker-p", "to": "f"}],
+    }
+    cases = [
+        ("exact edge accepted", bound(good)),
+        ("unavailable graph rejected", not bound(None)),
+        ("incomplete graph rejected", not bound({**good, "status": "partial"})),
+        ("malformed graph rejected",
+         not bound({"status": "complete", "declarations": {}, "edges": []})),
+        ("wrong edge rejected", not bound({**good, "edges": []})),
+        ("same-name function decoy rejected", not bound(wrong_fn)),
+        ("same-name property decoy rejected", not bound(wrong_prop)),
+        ("duplicate declaration ID rejected",
+         not bound({**good, "declarations": [prop, {**fn, "id": "p"}]})),
+    ]
+    legacy_inv = {
+        "property": {"name": prop["name"], "module": prop["module"],
+                     "file": prop["source"]["file"]},
+        "binding": {"references_output_fn": "direct"},
+    }
+    legacy_rec = {"goal": "tr_crr_call_2step(s, k, u, d, q, disc) >= 0.0"}
+    legacy = dependency_binding_references(
+        legacy_rec, None, legacy_inv, pin="0.17.1", output_fn=fn["name"],
+        output_module=fn["module"], package="shoals")[0]
+    modern_missing = dependency_binding_references(
+        legacy_rec, None, legacy_inv, pin="0.17.4", output_fn=fn["name"],
+        output_module=fn["module"], package="shoals")[0]
+    malformed_pin = dependency_binding_references(
+        legacy_rec, good, legacy_inv, pin="0.17.x", output_fn=fn["name"],
+        output_module=fn["module"], package="shoals")[0]
+    cases += [
+        ("pre-0.17.2 goal fallback accepted", legacy),
+        ("modern missing graph rejected", not modern_missing),
+        ("malformed pin rejected", not malformed_pin),
+    ]
+    failed = [name for name, passed in cases if not passed]
+    if failed:
+        for name in failed:
+            fail(f"dependency graph self-test: {name}")
+        return False
+    print(f"  dependency graph self-test: PASS ({len(cases)} adversarial cases)")
+    return True
 
 
 def smt_value(v: str) -> float | None:
@@ -214,7 +436,7 @@ def witness_in_domain(cx: dict, preconditions: list) -> tuple[bool, str]:
 
 
 def goal_names_ref(goal: str, invariant: dict) -> bool:
-    """Anti-vacuity via the goal string (dependency_edges are [] across imports).
+    """Supplemental call-site check; never the modern ownership oracle.
 
     Match the output fn at a CALL SITE (`fn(`), not as a bare substring, so a fn
     name that is a prefix of another (tr_crr_call_2step vs
@@ -243,11 +465,25 @@ def check_control(recs, name, want_status, label) -> tuple[bool, dict | None]:
     return ok, rec
 
 
-def check_instantiation(recs, inv, inst, pin, output_fn) -> bool:
+def check_instantiation(recs, graph, inv, inst, pin, model, package) -> bool:
     ok = True
     exp_tier = inv["expected_tier_per_pin"].get(pin)
     controls = inst["controls"]
-    inv_with_fn = {**inv, "_output_fn": output_fn}
+    output_fn = model["output_fn"]
+    effective = {**inv, "property": inst.get("property", inv["property"])}
+    inv_with_fn = {**effective, "_output_fn": output_fn}
+
+    def check_dependency(rec: dict, control_name: str, label: str) -> bool:
+        bound, why = dependency_binding_references(
+            rec, graph, effective, pin=pin, output_fn=output_fn,
+            output_module=model["module"], package=package,
+            property_name=control_name)
+        if not bound:
+            fail(f"{label} `{control_name}` compiler attribution: {why}")
+            return False
+        if version_at_least(pin, (0, 17, 2)):
+            print(f"    compiler attribution `{control_name}`: {why}")
+        return True
 
     # Defective-model invariants have only a violating control (the break).
     if inv.get("defective_model"):
@@ -255,6 +491,7 @@ def check_instantiation(recs, inv, inst, pin, output_fn) -> bool:
         okc, rec = check_control(recs, vg["name"], "failed", "defect")
         ok = okc and ok
         if rec:
+            ok = check_dependency(rec, vg["name"], "defect") and ok
             got = classify_tier(rec)
             if got != exp_tier:
                 fail(f"defect `{vg['name']}` tier {got} != expected {exp_tier}")
@@ -277,6 +514,7 @@ def check_instantiation(recs, inv, inst, pin, output_fn) -> bool:
     okc, rec = check_control(recs, sg["name"], "passed", "satisfying")
     ok = okc and ok
     if rec:
+        ok = check_dependency(rec, sg["name"], "satisfying") and ok
         got = classify_tier(rec)
         if got != exp_tier:
             fail(f"TIER DRIFT: `{sg['name']}` achieved {got}, expected {exp_tier} "
@@ -291,6 +529,8 @@ def check_instantiation(recs, inv, inst, pin, output_fn) -> bool:
     vg = controls["violating"]
     okc, vrec = check_control(recs, vg["name"], vg["expected"], "violating")
     ok = okc and ok
+    if vrec:
+        ok = check_dependency(vrec, vg["name"], "violating") and ok
     if vrec and vg["expected"] == "failed":
         cx = vrec.get("counterexample")
         if vg.get("witness_required") and not cx:
@@ -497,10 +737,10 @@ def check_metamorphic(inv: dict, models: dict, binary: str) -> bool:
     if not flipped:
         fail(f"metamorphic VACUITY: {inv['id']} [{lane}] goal outcome "
              f"'{orig_out}' is INVARIANT under every substitution "
-             f"{[(l, o) for l, _, o in results]} -- its truth is independent of "
+             f"{[(label, result) for label, _, result in results]} -- its truth is independent of "
              "the model (a canceling/reflexive forge would pass a syntactic check)")
         return False
-    flips = [l for l, _, o in results if o != orig_out]
+    flips = [label for label, _, result in results if result != orig_out]
     print(f"    metamorphic [{lane}] `{ctrl_name}`: orig={orig_out}; "
           f"outcome flips under {flips}")
     return True
@@ -537,7 +777,8 @@ def metamorphic_self_test(binary: str) -> bool:
         flipped, results = metamorphic_flips(binary, block, "proved", False, fn=fn, sig=sig)
         if flipped != should_flip:
             fail(f"metamorphic self-test: {stem} flipped={flipped}, expected "
-                 f"{should_flip} (results {[(l, o) for l, _, o in results]})")
+                 f"{should_flip} (results "
+                 f"{[(label, result) for label, _, result in results]})")
             ok = False
     print(f"  metamorphic self-test: {'PASS' if ok else 'FAIL'} "
           "(canceling+reflexive rejected, legit green survives)")
@@ -563,13 +804,10 @@ def main() -> None:
     models = {m["id"]: m for m in manifest["models"]}
     binary = resolve_bin()
     samples = int(os.environ.get("FUZZ_SAMPLES", DEFAULT_FUZZ_SAMPLES))
-    # The active canon carries NO fuzz_validated invariants at 0.14.0: the real
-    # transcendental pricers cannot be fuzzed within any budget (one fuzz sample
-    # of one positivity property did not complete in 200s -- chelis#434 / p08),
-    # so the direct-pricer positivity invariant is deferred/unverified in the
-    # manifest. This fuzz-lane machinery (fuzz-only, gated() below) stays dormant
-    # and ready: when a run demonstrates the tier, move the invariant back into
-    # `invariants` and run with PROVE_GATE_FUZZ=1.
+    # The direct Black-Scholes and Black-76 call-price positivity surfaces are
+    # active at fuzz_validated from 0.17.4. Keep them off the default lean path;
+    # nightly/full release validation enables PROVE_GATE_FUZZ=1. No other
+    # transcendental-pricer family is promoted without its own observed probe.
     include_fuzz = os.environ.get("PROVE_GATE_FUZZ") == "1"
     print(f"prove_gate: binary={binary} pin={pin} fuzz_samples={samples} "
           f"fuzz_lane={'on' if include_fuzz else 'off (nightly)'}")
@@ -578,6 +816,7 @@ def main() -> None:
         return include_fuzz or inv["expected_tier_per_pin"].get(pin) != "fuzz_validated"
 
     ok = honesty_self_test()
+    ok = dependency_graph_self_test() and ok
     ok = metamorphic_self_test(binary) and ok
 
     canon_files = [REPO / "properties" / "canonpricing.ch",
@@ -605,7 +844,23 @@ def main() -> None:
     for fname in sorted(by_file):
         is_fuzz = fname in fuzz_files
         print(f"\n== proving {fname} ({'fuzz' if is_fuzz else 'smt-only'}) ==")
-        recs_by_file[fname] = run_prove(binary, fname, is_fuzz, samples)
+        result = run_prove(binary, fname, is_fuzz, samples)
+        recs_by_file[fname] = result
+        # `chelis prove` exits 1 when any property is disproved. Every canon
+        # file deliberately includes corrupted twins, so 1 is expected and the
+        # record-level checks below decide whether those failures are the right
+        # ones. Exit >=2 remains an invocation/compiler failure.
+        if result["returncode"] not in (0, 1):
+            fail(f"{fname}: compiler exited {result['returncode']}")
+            ok = False
+        if result["summary_count"] != 1:
+            fail(f"{fname}: compiler emitted {result['summary_count']} summary "
+                 "records, expected exactly 1")
+            ok = False
+        if result["duplicate_records"]:
+            fail(f"{fname}: duplicate proof records for "
+                 f"{sorted(set(result['duplicate_records']))}")
+            ok = False
 
     skipped = [inv["id"] for inv in manifest["invariants"] if not gated(inv)]
     if skipped:
@@ -627,13 +882,15 @@ def main() -> None:
         # Model-free (kind-scoped) invariants set target_model: null and name the
         # proving-ground model in anchor_model; model-pinned ones use target_model.
         anchor = inv.get("target_model") or inv.get("anchor_model")
-        output_fn = models[anchor]["output_fn"]
-        recs = recs_by_file[inv["property"]["file"]]
+        proof_result = recs_by_file[inv["property"]["file"]]
+        recs = proof_result["records"]
         print(f"  [{inv['id']}] expected {exp}")
-        i_ok = check_instantiation(recs, inv,
-                                   {"controls": inv["controls"],
-                                    "preconditions": inv.get("preconditions", [])},
-                                   pin, output_fn)
+        i_ok = check_instantiation(
+            recs, proof_result["dependency_graph"], inv,
+            {"controls": inv["controls"],
+             "preconditions": inv.get("preconditions", []),
+             "property": inv["property"]},
+            pin, models[anchor], manifest["pkg"])
         i_ok = check_non_vacuity(recs, inv) and i_ok
         # Metamorphic anti-vacuity (SMT lanes): substitute the model body /
         # abstracted contract and require the outcome to flip. The syntactic
@@ -642,10 +899,12 @@ def main() -> None:
         if exp != "fuzz_validated":
             i_ok = check_metamorphic(inv, models, binary) and i_ok
         for inst in inv.get("also_instantiated_for", []):
-            of = models[inst["target_model"]]["output_fn"]
-            irecs = recs_by_file[inst["property"]["file"]]
+            inst_result = recs_by_file[inst["property"]["file"]]
+            irecs = inst_result["records"]
             print(f"    also-instantiated: {inst['target_model']}")
-            i_ok = check_instantiation(irecs, inv, inst, pin, of) and i_ok
+            i_ok = check_instantiation(
+                irecs, inst_result["dependency_graph"], inv, inst, pin,
+                models[inst["target_model"]], manifest["pkg"]) and i_ok
         ok = i_ok and ok
 
     print()

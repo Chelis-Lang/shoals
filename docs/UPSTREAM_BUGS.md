@@ -12,8 +12,8 @@ changelog claim is not a verification — re-probe the reproducer per-surface);
 **parked** entries when their gating dependency ships or a concrete need
 appears; **archived** entries are historical and are not re-probed. Where a
 blocker is mechanically expressible it graduates to an executable probe under
-`tests_blocked/` (deferred — see the trigger in `AGENTS.md` §Pin Bump
-Checklist); items that cannot be probed in-package are re-probed manually here.
+`tests_blocked/`; items that cannot be probed in-package are re-probed manually
+here.
 
 Suspected chelis bugs are filed in `Chelis-Lang/chelis` and cited as
 `chelis#NNN` (own-repo items as `shoals#NNN`), **never by a prose name**, so a
@@ -35,6 +35,22 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 ## Tracking
 
+- **chelis#408 — the `modelfit_bfgs_heavy` BFGS path kills a constrained
+  2-vCPU GitHub-hosted runner.** The Rosenbrock 500-iteration path with a
+  per-step finite-difference Jacobian and CG solve repeatedly ends in runner
+  shutdown/lost communication with no Chelis diagnostic, including with
+  `--jobs 1` and a 1500-second per-test budget. The same fixture passes
+  locally in roughly 170–200 seconds, so this is not a failed numerical
+  assertion and must not be represented as one.
+    - **Affected surface / narrowing:** the weekly hosted and release-equivalent
+      local heavy matrices exclude only `tests-manual/modelfit_bfgs_heavy.ch`;
+      all other reviewed manual shards remain present. The exclusion is locked
+      by `scripts/test_release_workflow.py`.
+    - **Re-probe trigger:** a chelis#408 close or a Chelis release naming
+      evaluator BFGS resource usage, worker memory, or constrained-host
+      supervision. Re-enable the exact fixture on a 2-vCPU hosted runner and
+      require a complete test report before removing the exclusion.
+
 - **chelis#637 — the certified-envelope discharge cannot express
   coupled-subterm dependencies (`N(d1)`/`N(d2)`): BS positivity / intrinsic
   lower bound unreachable by free-variable abstraction.** The 0.16.0
@@ -44,11 +60,16 @@ in code that is CLOSED upstream but not sitting in §Archived.
   `d2 < d1`) is discarded and the residual is falsifiable in-abstraction:
   cvc5 answers SAT-in-abstraction and the honest verdict is
   `deferred_invariant`/`unsupported`, never a proof.
-    - **State at pin 0.16.1 (re-probed):** the direct-pricer positivity
-      invariant stays **deferred** (`deferred_invariants` in
-      `docs/cnote-import-surface.json`, dischargeability lane p08); the
-      identical intrinsic-lower-bound invariant PROVES on the CRR
-      risk-neutral anchor (`properties/canontrees.ch`
+    - **State at pin 0.17.4 (re-probed 2026-07-31):** still blocked on the
+      SMT surface. Running
+      `chelis prove properties/canonpricing.ch --json --tier smt-only
+      --smt-timeout 20000 --package .` with the 0.17.4 release binary returns
+      `unsupported` / `property does not lower to Tier B (smt-only)` for all
+      four real-pricer properties, including `bs_call_price_nonneg`; no
+      property is reported proven. The direct-pricer invariant therefore
+      stays deferred on the proven lane. The identical intrinsic-lower-bound
+      invariant remains proven on the CRR risk-neutral anchor
+      (`properties/canontrees.ch`
       `crr_rn_call_intrinsic_lower_bound`) — the teaching exemplar of the
       genuine-vs-deferred split (`src/trees.ch`).
     - **Affected surface:** every `properties/` goal that would inline a real
@@ -69,32 +90,15 @@ in code that is CLOSED upstream but not sitting in §Archived.
       `bs_call_positive` on the un-abstracted body per-surface, not by
       reading the changelog.
 
-- **chelis#659 — fuzz-tier proving cannot complete a single sample over a
-  real f64 transcendental body within any usable budget.** A single
-  accepted fuzz sample of one BS positivity property exceeds 200s on the
-  release binary, so the honest `fuzz_validated` lane for the real
-  transcendental pricers is un-gateable (this is why there is NO nightly
-  canon fuzz gate — see the comment in `.github/workflows/nightly.yml`).
-  Filed 2026-07-10; the measurements and reproducer now live in the
-  chelis#659 body. Sibling chelis#644 (fixed sampler domain box) starves
-  realistic-magnitude guards.
-    - **State at pin 0.16.1 (re-probed):** still open upstream; no
-      0.15.x/0.16.x release note touches the fuzz sampler cost. The
-      direct-pricer positivity invariant stays in `deferred_invariants` on
-      the fuzz lane too (`AGENTS.md` §manifest).
-    - **Not expressible as a `tests_blocked/` probe** (a probe would hang the
-      suite, not fail it; see `tests_blocked/README.md` §cannot-be-probed).
-    - **Re-probe trigger:** any release note naming fuzz sampler cost /
-      budget / per-property domains (chelis#644), or a chelis#659 close.
-      Re-probe with a bounded `chelis prove --tier fuzz-only` run on p08.
-
-- **i64 `mod`-path precision drift — the integer `mul`/`add` that build the
-  operand compute in f64 and lose precision above the 53-bit mantissa
-  (chelis#680; class META chelis#695).** Builtin `mod(big_i64, m)` returns a
+- **chelis#680 — i64 `mod`-path precision drift: the integer `mul`/`add` that
+  build the operand compute in f64 and lose precision above the 53-bit
+  mantissa (class META chelis#695).** Builtin `mod(big_i64, m)` returns a
   wrong result once the operand exceeds f64's 53-bit mantissa (~9e15): the
   Park-Miller-shaped update
   `mod(1103515245·1406938949 + 12345, 2147483647)` returns 178065920
-  instead of the exact 178066070 (re-verified at the 0.16.1 bump). The `mod`
+  instead of the exact 178066070 (re-verified with the 0.17.4 release binary
+  on 2026-07-31: `chelis test tests_blocked/ --expect blocked` reports the
+  probe `OK` in blocked mode, so it still fails as expected). The `mod`
   reduction itself is exact via `checked_int_binop`; the loss is upstream of
   it, in the f64 `mul` that forms the operand — the
   integer-arithmetic-in-f64 class chelis#680 tracks (read chelis#695 first).
@@ -112,13 +116,14 @@ in code that is CLOSED upstream but not sitting in §Archived.
       re-probes mechanically on every CI run).
 
 - **chelis#846 — Depth-3 SMT function-call inlining cap (capacity limit).**
-  The Tier-B lowerer inlines nested function calls only to a fixed depth —
-  `MAX_INLINE_DEPTH = 3` in `chelis-prove/src/tier_b_lower.rs`
-  (source-confirmed present through v0.17.1: the guard `depth < MAX_INLINE_DEPTH`
-  at `tier_b_lower.rs:484` rebuilds a deeper call as an opaque `app` with no
-  cvc5 term). A goal whose discharge needs a call chain deeper than three
-  inlinings leaves the deepest application un-inlined and routes to Tier C
-  rather than lowering. No shoals property is known to hit this today (the
+  The Tier-B lowerer inlines nested function calls only to a fixed depth. The
+  cap remains observable in the 0.17.4 release binary (re-probed 2026-07-31
+  with a disposable two-property source): a depth-3 identity
+  `level3(x) == x + 3` is `passed` at `proof_tier=smt`, while the otherwise
+  identical depth-4 identity `level4(x) == x + 4` is `unsupported` with
+  `property does not lower to Tier B (smt-only)`. Command:
+  `chelis prove /tmp/shoals-846-0174.ch --json --tier smt-only
+  --smt-timeout 20000`. No Shoals property is known to hit this today (the
   composites goals inline one level); it gates nothing on the current surface.
   Filed 2026-07-23 as a forward-looking capacity limit — the residual of the
   now-closed chelis#425 (which made nested goal-site calls inline at all); the
@@ -148,6 +153,37 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 ## Archived
 
+- **chelis#924 — Reef package-graph preparation added ~111s to a trivial
+  Shoals consumer proof.**
+  - **Resolution:** CLOSED upstream and re-probed against the 0.17.4 release
+    binary on 2026-07-31. The release oracle installed official Nautilus
+    v0.7.36 and Coral v0.7.33 assets plus the exact Shoals 0.24.2 candidate
+    into a fresh isolated Reef registry and XDG cache. Its trivial consumer
+    property completed in **0.389s cold** and **0.183s warm** (limits: 20s /
+    5s). Both completed processes
+    returned `passed` at `proof_tier=smt`, and their NDJSON was byte-identical
+    (`sha256:bce0930113cfe12175a54d7b20294d635c65dec612cdda515166d30b0298b74d`).
+    Command: `CHELIS_BIN=~/.local/share/chelis/0.17.4/bin/chelis python3
+    scripts/check_package_prove_latency.py`.
+
+- **chelis#659 — fuzz-tier proving could not complete a single sample over a
+  real f64 transcendental body within a usable budget.**
+  - **Resolution observed at pin 0.17.4 (2026-07-31):** the performance
+    obstruction is fixed even though the upstream issue was still open when
+    re-probed. Running
+    `chelis prove properties/canonpricing.ch --json --tier fuzz-only
+    --samples 1 --seed 0 --package .` completed all four real-pricer
+    properties in under one second. A 25-sample run completed in **20.499s**:
+    `bs_call_price_nonneg` and `b76_call_price_nonneg` passed at
+    `proof_tier=fuzz`, while both corrupted twins failed with in-domain
+    counterexamples after 2 and 4 samples respectively.
+  - **De-narrowing required:** remove the obsolete “fuzz is intractable”
+    narrowing at its manifest/workflow/documentation sites and promote the
+    real-pricer invariants only with an explicit observed fuzz tier and an
+    appropriate release-gate sample budget. This archive records the compiler
+    capability result; it does not itself claim that the downstream
+    de-narrowing has landed.
+
 - **chelis#434 — the SMT tier cannot discharge a transcendental finance body
   (Black–Scholes positivity through `log`/`exp`/`sqrt`).** `log` had no cvc5
   kind, so no goal inlining a real `normal_cdf`/`bs_call` body could be built
@@ -164,9 +200,10 @@ in code that is CLOSED upstream but not sitting in §Archived.
   - **Residual (live tracker chelis#637, §Tracking):** the flagship BS
     positivity / intrinsic-lower-bound goals are structurally unreachable by
     independent-subterm abstraction (the `N(d1)`/`N(d2)` coupling is
-    discarded), so the direct-pricer invariants stay deferred and
-    `properties/canonpricing.ch` keeps `fuzz_validated` as its expected
-    tier. Code citations at those narrowing sites now cite chelis#637.
+    discarded), so they cannot reach an exact proven tier. Direct BS/B76
+    call-price positivity is observed at `fuzz_validated`; the direct
+    intrinsic-lower-bound candidate stays deferred. Code citations at those
+    narrowing sites now cite chelis#637.
   - **Retained discipline:** the contract-abstraction method in
     `properties/composites.ch` (bounded free parameter + separately
     fuzz-validated contract) remains the canonical pattern for

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Run the Shoals local acceptance gate.
 
-Default mode mirrors the **lean per-PR CI** (`.github/workflows/ci.yml`)
-and nothing more — the real-chelis/real-SMT nightly stages do NOT run
-unless you pass ``--full``:
+Default mode mirrors every locally meaningful stage of the **lean per-PR CI**
+(``.github/workflows/ci.yml``). The origin-relative conformance bump check
+remains CI-only because a stale local ``origin/main`` can false-fail it. The
+real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
 
   1. ``python3 scripts/audit_workarounds.py --pins-only`` (the
      hard-rule-guard job: offline pin consistency).
@@ -20,21 +21,31 @@ unless you pass ``--full``:
      a stale local ``origin/main`` would make it false-fail, and CI runs
      it authoritatively on every PR.
   8. ``scripts/contract_gate.py`` — offline manifest resolvability + pin
-     freshness (also a per-PR CI gate).
+      freshness (also a per-PR CI gate).
+  9. ``scripts/test_check_package_prove_latency.py`` — negative-parity tests
+      for the chelis#924 release oracle.
+  10. ``scripts/test_release_workflow.py`` — static release/toolchain and
+      hosted/local matrix integrity contracts.
 
 ``--full`` appends the stages CI runs in ``.github/workflows/nightly.yml``
 (scheduled, NOT per-PR) — run this at least once at a pin bump
 (``AGENTS.md`` §Pin Bump Checklist) or before a release tag:
 
-  9.  ``chelis test tests/ --timeout 1200 --jobs auto`` — the fast unit
+  11. ``chelis test tests/ --timeout 1200 --suite-timeout 1500 --jobs auto`` — the fast unit
       suite (~13 min of real-chelis wall; nightly in CI).
-  10. ``chelis test tests-manual/ --timeout 1200 --jobs auto`` — the heavy
-      MC / PDE / Fourier / optimization-benchmark suite (weekly nightly
-      ``heavy`` matrix in CI, sharded one leg per file; the milestone
-      manual-gate scripts under ``scripts/manual_gates/`` exercise these
-      files by explicit path).
-  11. ``scripts/prove_gate.py`` — the keystone canon self-audit against
+  12. The weekly nightly ``heavy`` matrix, one ``tests-manual/<file>.ch`` at
+      a time with ``--timeout 1500 --suite-timeout 1650 --jobs 1``. This
+      explicitly raises Chelis 0.17.4's separate 600-second whole-suite
+      watchdog without weakening any test oracle. It deliberately excludes
+      ``modelfit_bfgs_heavy`` pending chelis#408, exactly like hosted nightly;
+      an all-directory batch both over-scopes the release gate and hits the
+      compiler's whole-suite timeout before completing the reviewed matrix.
+  13. ``scripts/prove_gate.py`` — the keystone canon self-audit against
       the release binary (real SMT, ~8.6 min; nightly in CI).
+  14. ``scripts/check_package_prove_latency.py`` — the chelis#924 release
+      oracle: install the just-built Shoals candidate, then require a cold
+      trivial package prove in <=20s and an unchanged warm prove in <=5s with
+      byte-identical NDJSON.
 
 Exits 0 only if all requested stages succeed.
 
@@ -67,6 +78,28 @@ LINT_DIRS = [
     "tests_blocked/",
 ]
 
+NIGHTLY_MANUAL_FILES = [
+    "composites_binding_heavy",
+    "greeks_secondorder",
+    "heston",
+    "heston_heavy",
+    "hull_white",
+    "hull_white_heavy",
+    "lsm_heavy",
+    "modelfit_bfgs",
+    # modelfit_bfgs_heavy is excluded pending chelis#408; keep this list
+    # byte-for-byte aligned with the hosted nightly matrix.
+    "modelfit_pipeline",
+    "modelfit_pipeline_heavy",
+    "pde_heavy",
+    "rng_heavy",
+    "sabrpaths_heavy",
+    "stochastic_kou_heavy",
+    "trees",
+    "trees_heavy",
+    "xva_wwr_heavy",
+]
+
 
 def run(cmd: list[str], *, quiet: bool, stream: bool = False) -> int:
     """Run a subprocess, return its exit code.
@@ -93,7 +126,8 @@ def main() -> int:
         "--full",
         action="store_true",
         help="also run the nightly-CI stages (unit suite, heavy suite, "
-        "prove gate) — required once at a pin bump / before a release tag",
+        "prove gate, package-prove latency oracle) — required once at a pin "
+        "bump / before a release tag",
     )
     args = parser.parse_args()
     quiet = args.quiet
@@ -130,19 +164,42 @@ def main() -> int:
             "contract_gate (offline manifest resolvability + pin freshness)",
             ["python3", "scripts/contract_gate.py"],
         ),
+        (
+            "chelis#924 latency-oracle unit tests",
+            ["python3", "scripts/test_check_package_prove_latency.py"],
+        ),
+        (
+            "release workflow integrity tests",
+            ["python3", "scripts/test_release_workflow.py"],
+        ),
     ]
     nightly_stages: list[tuple[str, list[str]]] = [
         (
             "chelis test tests/ --jobs auto",
-            ["chelis", "test", "tests/", "--timeout", "1200", "--jobs", "auto"],
+            [
+                "chelis", "test", "tests/", "--timeout", "1200",
+                "--suite-timeout", "1500", "--jobs", "auto",
+            ],
         ),
-        (
-            "chelis test tests-manual/ --jobs auto",
-            ["chelis", "test", "tests-manual/", "--timeout", "1200", "--jobs", "auto"],
-        ),
+        *[
+            (
+                f"chelis test tests-manual/{stem}.ch --jobs 1",
+                [
+                    "chelis", "test", f"tests-manual/{stem}.ch",
+                    "--timeout", "1500", "--suite-timeout", "1650",
+                    "--jobs", "1",
+                ],
+            )
+            for stem in NIGHTLY_MANUAL_FILES
+        ],
         (
             "prove_gate (canon self-audit against the release binary)",
-            ["python3", "scripts/prove_gate.py"],
+            ["/usr/bin/env", "PROVE_GATE_FUZZ=1",
+             "python3", "scripts/prove_gate.py"],
+        ),
+        (
+            "chelis#924 package prove latency oracle",
+            ["python3", "scripts/check_package_prove_latency.py"],
         ),
     ]
 
