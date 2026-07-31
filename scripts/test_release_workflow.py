@@ -93,6 +93,10 @@ class ReleaseWorkflowTests(unittest.TestCase):
             '"--timeout", "1500", "--suite-timeout", "1650",',
             local_source,
         )
+        self.assertIn(
+            '["python3", "scripts/test_release_workflow.py"]',
+            local_source,
+        )
 
 
 if __name__ == "__main__":

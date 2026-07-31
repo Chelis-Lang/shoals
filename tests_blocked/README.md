@@ -27,8 +27,9 @@ gate report.
 - **chelis#637 — coupled-subterm envelope obstruction (BS positivity /
   intrinsic lower bound).** The abstract-subterm envelope path abstracts
   `N(d1)`/`N(d2)` into independent fresh variables, discarding the coupling
-  that positivity depends on, so the flagship goals stay
-  `deferred_invariant` — again a prove verdict, not a test diagnostic.
+  that exact proof depends on. Direct BS/B76 call-price positivity is therefore
+  only `fuzz_validated`, and the direct intrinsic-lower-bound candidate remains
+  `deferred_invariant` — prove verdicts, not test diagnostics.
   Teaching exemplar: the identical intrinsic-lower-bound invariant PROVES
   on the CRR anchor (`properties/canontrees.ch`) and defers on
   Black–Scholes. Re-probe on any release naming coupled-subterm /

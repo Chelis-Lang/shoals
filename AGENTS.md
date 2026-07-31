@@ -152,7 +152,8 @@ one change set (contract §7):
 7. Run the local gate before pushing: `python3 scripts/run_local_gate.py`
    (the per-PR CI mirror: pins audit + fmt + lint + `chelis reef build` +
    the `tests_neg/`/`tests_blocked/` expect suites + conform audit +
-   contract gate). At a pin bump, run it **once with `--full`** to add the
+   contract gate + oracle/release static tests; the origin-relative bump check
+   remains CI-only). At a pin bump, run it **once with `--full`** to add the
    nightly stages (fast `tests/` suite, heavy `tests-manual/` suite,
    prove gate, and the chelis#924 cold/warm package-prove latency oracle) —
    day-to-day pushes rely on nightly CI for those. The latency oracle installs

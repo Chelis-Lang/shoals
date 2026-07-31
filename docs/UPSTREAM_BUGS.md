@@ -200,9 +200,10 @@ in code that is CLOSED upstream but not sitting in §Archived.
   - **Residual (live tracker chelis#637, §Tracking):** the flagship BS
     positivity / intrinsic-lower-bound goals are structurally unreachable by
     independent-subterm abstraction (the `N(d1)`/`N(d2)` coupling is
-    discarded), so the direct-pricer invariants stay deferred and
-    `properties/canonpricing.ch` keeps `fuzz_validated` as its expected
-    tier. Code citations at those narrowing sites now cite chelis#637.
+    discarded), so they cannot reach an exact proven tier. Direct BS/B76
+    call-price positivity is observed at `fuzz_validated`; the direct
+    intrinsic-lower-bound candidate stays deferred. Code citations at those
+    narrowing sites now cite chelis#637.
   - **Retained discipline:** the contract-abstraction method in
     `properties/composites.ch` (bounded free parameter + separately
     fuzz-validated contract) remains the canonical pattern for

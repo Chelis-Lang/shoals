@@ -143,8 +143,9 @@ The long-running lanes — `chelis test tests/ --timeout 1200
 `scripts/prove_gate.py`, and the live cold/warm package-prove oracle — run in
 the **nightly** CI gate (`.github/workflows/nightly.yml`, scheduled +
 workflow_dispatch), not per-PR. `python3 scripts/run_local_gate.py` mirrors the
-per-PR gate; `python3 scripts/run_local_gate.py --full` adds those nightly
-lanes and is required at pin bumps and before a release tag.
+locally meaningful per-PR stages; the origin-relative conform bump check stays
+CI-only. `python3 scripts/run_local_gate.py --full` adds those nightly lanes and
+is required at pin bumps and before a release tag.
 The `chelis lint --check` step blocks on any blocking nomenclature
 violation per `crates/chelis-lint/` rules; advisory warnings are
 non-blocking.

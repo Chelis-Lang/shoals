@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Run the Shoals local acceptance gate.
 
-Default mode mirrors the **lean per-PR CI** (`.github/workflows/ci.yml`)
-and nothing more — the real-chelis/real-SMT nightly stages do NOT run
-unless you pass ``--full``:
+Default mode mirrors every locally meaningful stage of the **lean per-PR CI**
+(``.github/workflows/ci.yml``). The origin-relative conformance bump check
+remains CI-only because a stale local ``origin/main`` can false-fail it. The
+real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
 
   1. ``python3 scripts/audit_workarounds.py --pins-only`` (the
      hard-rule-guard job: offline pin consistency).
@@ -23,23 +24,25 @@ unless you pass ``--full``:
       freshness (also a per-PR CI gate).
   9. ``scripts/test_check_package_prove_latency.py`` — negative-parity tests
       for the chelis#924 release oracle.
+  10. ``scripts/test_release_workflow.py`` — static release/toolchain and
+      hosted/local matrix integrity contracts.
 
 ``--full`` appends the stages CI runs in ``.github/workflows/nightly.yml``
 (scheduled, NOT per-PR) — run this at least once at a pin bump
 (``AGENTS.md`` §Pin Bump Checklist) or before a release tag:
 
-  10. ``chelis test tests/ --timeout 1200 --suite-timeout 1500 --jobs auto`` — the fast unit
+  11. ``chelis test tests/ --timeout 1200 --suite-timeout 1500 --jobs auto`` — the fast unit
       suite (~13 min of real-chelis wall; nightly in CI).
-  11. The weekly nightly ``heavy`` matrix, one ``tests-manual/<file>.ch`` at
+  12. The weekly nightly ``heavy`` matrix, one ``tests-manual/<file>.ch`` at
       a time with ``--timeout 1500 --suite-timeout 1650 --jobs 1``. This
       explicitly raises Chelis 0.17.4's separate 600-second whole-suite
       watchdog without weakening any test oracle. It deliberately excludes
       ``modelfit_bfgs_heavy`` pending chelis#408, exactly like hosted nightly;
       an all-directory batch both over-scopes the release gate and hits the
       compiler's whole-suite timeout before completing the reviewed matrix.
-  12. ``scripts/prove_gate.py`` — the keystone canon self-audit against
+  13. ``scripts/prove_gate.py`` — the keystone canon self-audit against
       the release binary (real SMT, ~8.6 min; nightly in CI).
-  13. ``scripts/check_package_prove_latency.py`` — the chelis#924 release
+  14. ``scripts/check_package_prove_latency.py`` — the chelis#924 release
       oracle: install the just-built Shoals candidate, then require a cold
       trivial package prove in <=20s and an unchanged warm prove in <=5s with
       byte-identical NDJSON.
@@ -164,6 +167,10 @@ def main() -> int:
         (
             "chelis#924 latency-oracle unit tests",
             ["python3", "scripts/test_check_package_prove_latency.py"],
+        ),
+        (
+            "release workflow integrity tests",
+            ["python3", "scripts/test_release_workflow.py"],
         ),
     ]
     nightly_stages: list[tuple[str, list[str]]] = [
