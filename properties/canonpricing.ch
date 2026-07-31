@@ -7,10 +7,11 @@ import Shoals.PricingExtended (black_call)
 -- independent envelope-bounded variable, but these goals depend on the
 -- COUPLING between `N(d1)`/`N(d2)` abstractions of the same quantity, which
 -- free-variable abstraction discards (chelis#637) -- so `--tier auto` still
--- degrades HONESTLY to fuzz, never a false proven. Expected tier at 0.16.1:
--- fuzz_validated; tier_upgrade_trigger chelis#637 (coupled-subterm /
--- relational abstraction). Dischargeability lane p08 (real bs_call
--- positivity).
+-- degrades HONESTLY to fuzz, never a false proven. At Chelis 0.17.4 the fuzz
+-- lane is observed and gated as fuzz_validated for both direct-call positivity
+-- properties and their corrupted twins. The upgrade to a proven tier remains
+-- blocked by chelis#637 (coupled-subterm / relational abstraction).
+-- Dischargeability lane p08 (real bs_call positivity).
 --
 -- Guard authoring (p11 fuzz-box rule): the prover samples a fixed [-10,10]^n box
 -- with rejection, so every guard region must intersect the box with usable

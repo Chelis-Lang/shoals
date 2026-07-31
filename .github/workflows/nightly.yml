@@ -39,8 +39,8 @@ concurrency:
 # scripts/audit_workarounds.py --pins-only enforces it offline. The extract
 # step re-derives the pin from reef.toml only to assert this has not drifted.
 env:
-  CHELIS_TAG: v0.17.1
-  CHELIS_VERSION: 0.17.1
+  CHELIS_TAG: v0.17.4
+  CHELIS_VERSION: 0.17.4
 
 jobs:
   # The fast deterministic unit suite (tests/) — moved off the per-PR path.
@@ -103,21 +103,18 @@ jobs:
 
       - name: chelis test (tests/ fast unit suite)
         timeout-minutes: 30
-        run: chelis test tests/ --timeout 1200 --jobs auto
+        run: chelis test tests/ --timeout 1200 --suite-timeout 1500 --jobs auto
 
   # The keystone canon self-audit against the pinned RELEASE binary — moved
   # off the per-PR path. Real-SMT ~8.6 min (the reef package load alone is
   # multi-minute; prove_gate has no cheap subset to smoke). Runs DAILY (and on
   # workflow_dispatch).
   #
-  # The active canon is entirely SMT-tier (proven / proven_modulo_contract /
-  # disproved) so this gate is deterministic. There is NO nightly canon fuzz
-  # gate: the direct-pricer positivity invariant is deferred/unverified
-  # (docs/cnote-import-surface.json deferred_invariants) — the real
-  # transcendental pricers cannot be fuzzed within any budget at 0.16.1 (one
-  # fuzz sample of one positivity property did not complete in 200s, chelis#659
-  # / p08). prove_gate keeps dormant fuzz machinery (PROVE_GATE_FUZZ / --tier
-  # fuzz-only) for the day that deferred invariant becomes observable.
+  # This is the complete active canon: deterministic SMT lanes plus the
+  # explicitly seeded fuzz-validated direct-pricer lane promoted when
+  # chelis#659 closed at 0.17.4. The fuzz lane's expected tier, controls,
+  # compiler attribution, sample budget, and counterexamples are enforced by
+  # prove_gate; it is never presented as a proof.
   prove:
     name: prove-gate (canon self-audit)
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 3 * * *'
@@ -163,8 +160,13 @@ jobs:
       - name: chelis reef build
         run: chelis reef build
 
-      - name: prove_gate (SMT lanes -- the entire active canon)
+      - name: prove_gate (complete SMT and fuzz-validated canon)
+        env:
+          PROVE_GATE_FUZZ: "1"
         run: python3 scripts/prove_gate.py
+
+      - name: Verify package prove latency and deterministic output (chelis#924)
+        run: python3 scripts/check_package_prove_latency.py
 
   heavy:
     name: heavy ${{ matrix.file }}
@@ -259,12 +261,14 @@ jobs:
       # cannot be shrunk without weakening their numerical/statistical oracle.
       #
       # Step ceiling 30 min: a heavy leg builds + tests in ~7-23 min, and the
-      # 1500s (25-min) per-test timeout is the real guard against a wedged run,
-      # so 30 covers build + the longest test with headroom. A rare overrun
-      # surfaces via the report job rather than being masked by a huge ceiling.
+      # Chelis 0.17.4 also has an independent 600s whole-suite watchdog. Set it
+      # to 1650s so the reviewed long-running tests can complete, while keeping
+      # it below the 30-minute step ceiling. The 1500s per-test bound still
+      # guards every individual oracle. A rare overrun surfaces via the report
+      # job rather than being masked by a huge ceiling.
       - name: chelis test (tests-manual/${{ matrix.file }}.ch)
         timeout-minutes: 30
-        run: chelis test "tests-manual/${{ matrix.file }}.ch" --timeout 1500 --jobs 1
+        run: chelis test "tests-manual/${{ matrix.file }}.ch" --timeout 1500 --suite-timeout 1650 --jobs 1
 
   # Surface a nightly failure as a tracking issue (opens on failure, closes
   # on green) so a red nightly is impossible to miss — scheduled-run

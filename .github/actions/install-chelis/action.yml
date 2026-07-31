@@ -16,9 +16,11 @@ inputs:
     description: Bare version for the `chelis --version` assertion, e.g. 0.9.0.
     required: true
   platform:
-    description: Toolchain platform slug (linux-x86_64 or darwin-arm64).
+    description: >-
+      Toolchain platform slug (linux-x86_64-glibc2.31 by default, or
+      darwin-arm64 for the macOS smoke lane).
     required: false
-    default: linux-x86_64
+    default: linux-x86_64-glibc2.31
   gh-token:
     description: Token with contents:read on Chelis-Lang/chelis (for the cache-miss download).
     required: true
@@ -45,7 +47,7 @@ runs:
       uses: actions/cache@v4
       with:
         path: /tmp/chelis-toolchain
-        key: chelis-toolchain-${{ inputs.chelis-tag }}-${{ inputs.platform }}
+        key: chelis-toolchain-sha256-v1-${{ inputs.chelis-tag }}-${{ inputs.platform }}
 
     - name: Download chelis toolchain (cache miss)
       if: steps.toolchain-cache.outputs.cache-hit != 'true'
@@ -55,11 +57,22 @@ runs:
       run: |
         set -euo pipefail
         rm -rf /tmp/chelis-toolchain
+        mkdir -p /tmp/chelis-toolchain
+        asset="chelis-${{ inputs.chelis-tag }}-${{ inputs.platform }}.tar.gz"
         gh release download "${{ inputs.chelis-tag }}" \
           --repo Chelis-Lang/chelis \
-          --pattern "chelis-${{ inputs.chelis-tag }}-${{ inputs.platform }}.tar.gz" \
+          --pattern "$asset" \
+          --pattern "$asset.sha256" \
           --dir /tmp/chelis-toolchain
-        tar -xzf "/tmp/chelis-toolchain/chelis-${{ inputs.chelis-tag }}-${{ inputs.platform }}.tar.gz" \
+        (
+          cd /tmp/chelis-toolchain
+          if [ "${{ inputs.platform }}" = "darwin-arm64" ]; then
+            shasum -a 256 -c "$asset.sha256"
+          else
+            sha256sum -c "$asset.sha256"
+          fi
+        )
+        tar -xzf "/tmp/chelis-toolchain/$asset" \
           -C /tmp/chelis-toolchain
 
     - name: Put chelis on PATH
@@ -78,4 +91,4 @@ runs:
       uses: actions/cache@v4
       with:
         path: ~/.chelis/reef
-        key: chelis-reef-${{ inputs.platform }}-${{ inputs.reef-cache-key }}
+        key: chelis-reef-${{ inputs.platform }}-${{ inputs.chelis-tag }}-${{ inputs.reef-cache-key }}

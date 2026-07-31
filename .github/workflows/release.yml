@@ -14,8 +14,8 @@ env:
   # Literal chelis pin. MUST equal reef.toml `compiler = "=X.Y.Z"`;
   # scripts/audit_workarounds.py --pins-only enforces it offline. The extract
   # step re-derives from reef.toml only to assert this has not drifted.
-  CHELIS_TAG: v0.17.1
-  CHELIS_VERSION: 0.17.1
+  CHELIS_TAG: v0.17.4
+  CHELIS_VERSION: 0.17.4
 
 jobs:
   build-reef-assets:
@@ -52,13 +52,22 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
         run: |
+          set -euo pipefail
+          asset="chelis-${CHELIS_TAG}-linux-x86_64-glibc2.31.tar.gz"
+          rm -rf /tmp/chelis-toolchain
+          mkdir -p /tmp/chelis-toolchain
           gh release download "${CHELIS_TAG}" \
             --repo Chelis-Lang/chelis \
-            --pattern "chelis-${CHELIS_TAG}-linux-x86_64.tar.gz" \
+            --pattern "$asset" \
+            --pattern "$asset.sha256" \
             --dir /tmp/chelis-toolchain
-          tar -xzf "/tmp/chelis-toolchain/chelis-${CHELIS_TAG}-linux-x86_64.tar.gz" \
+          (
+            cd /tmp/chelis-toolchain
+            sha256sum -c "$asset.sha256"
+          )
+          tar -xzf "/tmp/chelis-toolchain/$asset" \
             -C /tmp/chelis-toolchain
-          echo "/tmp/chelis-toolchain/chelis-${CHELIS_TAG}-linux-x86_64/bin" >> "$GITHUB_PATH"
+          echo "/tmp/chelis-toolchain/chelis-${CHELIS_TAG}-linux-x86_64-glibc2.31/bin" >> "$GITHUB_PATH"
 
       - name: Verify toolchain
         run: test "$(chelis --version)" = "chelis ${CHELIS_VERSION}"
@@ -77,6 +86,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
         run: chelis reef build
 
+      - name: Verify complete SMT and fuzz-validated canon
+        env:
+          PROVE_GATE_FUZZ: "1"
+        run: python3 scripts/prove_gate.py
+
+      - name: Verify package prove latency and deterministic output (chelis#924)
+        run: python3 scripts/check_package_prove_latency.py
+
       - name: Publish the invariant-surface manifest as a release asset
         run: |
           set -euo pipefail
@@ -88,6 +105,29 @@ jobs:
           cp docs/cnote-import-surface.json \
             "dist/${PACKAGE_NAME}-${PACKAGE_VERSION}.invariants.json"
 
+      - name: Seal and validate the complete release payload
+        run: |
+          set -euo pipefail
+          archive="dist/${PACKAGE_NAME}-${PACKAGE_VERSION}.tar.zst"
+          shell="dist/${PACKAGE_NAME}-${PACKAGE_VERSION}.chb"
+          invariant="dist/${PACKAGE_NAME}-${PACKAGE_VERSION}.invariants.json"
+          chelis reef verify-artifact --archive "$archive" --shell "$shell"
+          (
+            cd dist
+            sha256sum \
+              "${PACKAGE_NAME}-${PACKAGE_VERSION}.chb" \
+              "${PACKAGE_NAME}-${PACKAGE_VERSION}.invariants.json" \
+              "${PACKAGE_NAME}-${PACKAGE_VERSION}.tar.zst" \
+              > "${PACKAGE_NAME}-${PACKAGE_VERSION}.sha256"
+          )
+          chelis reef build
+          cmp docs/cnote-import-surface.json "$invariant"
+          (
+            cd dist
+            sha256sum -c "${PACKAGE_NAME}-${PACKAGE_VERSION}.sha256"
+          )
+          chelis reef verify-artifact --archive "$archive" --shell "$shell"
+
       - name: Verify release assets
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         run: |
@@ -95,6 +135,7 @@ jobs:
           test -f "dist/${PACKAGE_NAME}-${PACKAGE_VERSION}.tar.zst"
           test -f "dist/${PACKAGE_NAME}-${PACKAGE_VERSION}.chb"
           test -f "dist/${PACKAGE_NAME}-${PACKAGE_VERSION}.invariants.json"
+          test -f "dist/${PACKAGE_NAME}-${PACKAGE_VERSION}.sha256"
 
       - name: Publish GitHub Release
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
@@ -104,5 +145,7 @@ jobs:
             dist/${{ env.PACKAGE_NAME }}-${{ env.PACKAGE_VERSION }}.tar.zst
             dist/${{ env.PACKAGE_NAME }}-${{ env.PACKAGE_VERSION }}.chb
             dist/${{ env.PACKAGE_NAME }}-${{ env.PACKAGE_VERSION }}.invariants.json
+            dist/${{ env.PACKAGE_NAME }}-${{ env.PACKAGE_VERSION }}.sha256
           generate_release_notes: true
           fail_on_unmatched_files: true
+          overwrite_files: true

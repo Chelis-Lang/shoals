@@ -2,9 +2,9 @@
   "schema_id": "chelis-shell.invariant-surface",
   "schema_version": "1.0",
   "pkg": "shoals",
-  "pkg_version": "0.24.1",
-  "chelis_pin": "0.17.1",
-  "generated_note": "Producer manifest for the C Note characterization engine (frozen contract characterization_contract_v1.md sec 1). Also published as the release asset shoals-0.24.0.invariants.json (byte-identical). v0.24.0 adds Canon Breadth on top of the 0.23.1 pin bump (chelis 0.16.1): the GREEK SIGN family (vega-sign monotone in u, disc-sensitivity monotone in disc, gamma-sign convexity in spot) on the free-parameter tr_crr_call_2step, all proven over the reals at Tier B; plus deferred BS Greek-sign stubs (bs_vega_sign, bs_rho_sign, bs_gamma_sign) gated on chelis#637/chelis#659, VaR/quantile coherence stubs gated on the chelis-std quantile primitive, general-size promotion stubs gated on the induction tier, and a parametric_var risk model. The MODEL-FREE canon (v0.23.0): kind-scoped invariants (target_model: null, anchor_model) referencing output fn DIRECTLY via goal_pattern -- european_call no-arbitrage family anchored on tr_crr_call_2step_rn, and discrete-compounding fixed_income family on a 2-period bond. Tiers grounded in record.chelis-0.16.1.json; every below-proven tier cites a tier_upgrade_trigger and a dischargeability_probe.",
+  "pkg_version": "0.24.2",
+  "chelis_pin": "0.17.4",
+  "generated_note": "Producer manifest for the C Note characterization engine (frozen contract characterization_contract_v1.md sec 1). The Shoals 0.24.2 release will publish this byte-for-byte as shoals-0.24.2.invariants.json; its Chelis 0.17.4 / Nautilus 0.7.36 / Coral 0.7.33 upstream release cascade is published and checksummed. Canon Breadth includes the Tier-B GREEK SIGN family on tr_crr_call_2step, fuzz-validated direct Black-Scholes and Black-76 call-price positivity, deferred Black-Scholes monotonicity/Greek-sign stubs awaiting their own per-surface probes or chelis#637, VaR/quantile coherence stubs gated on a dedicated risk probe or quantile contract, general-size promotion stubs gated on induction, and the parametric_var risk model. The MODEL-FREE canon carries kind-scoped direct-output-function invariants for the CRR european_call no-arbitrage family and discrete-compounding fixed_income family. Since Chelis 0.17.2 every active binding is validated from the compiler summary dependency graph: direct lanes require the exact property-to-anchor-model edge; structural composites require the exact property-to-chelis-std/Std.Contracts.normal_cdf edge and deliberately make no property-to-bs_call_scalar claim. Tiers are revalidated at chelis 0.17.4; every below-proven tier cites a tier_upgrade_trigger and a dischargeability_probe.",
   "models": [
     {
       "id": "bs_call",
@@ -726,7 +726,8 @@
       "expected_tier_per_pin": {
         "0.14.0": "proven",
         "0.16.1": "proven",
-        "0.17.1": "proven"
+        "0.17.1": "proven",
+        "0.17.4": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice pricer returns a negative call price -- free money at these inputs",
@@ -836,7 +837,8 @@
       "expected_tier_per_pin": {
         "0.14.0": "proven",
         "0.16.1": "proven",
-        "0.17.1": "proven"
+        "0.17.1": "proven",
+        "0.17.4": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price falls when spot rises -- a monotonicity (delta-sign) violation",
@@ -936,7 +938,8 @@
       "expected_tier_per_pin": {
         "0.14.0": "disproved",
         "0.16.1": "disproved",
-        "0.17.1": "disproved"
+        "0.17.1": "disproved",
+        "0.17.4": "disproved"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "admits arbitrage: the undiscounted model prices the call at 1.125 when the underlying spot is only 1.0 (C > s)",
@@ -959,7 +962,14 @@
         "goal_pattern": null,
         "contracts": [
           "std.normal_cdf.reflection"
-        ]
+        ],
+        "compiler_dependency": {
+          "package": "chelis-std",
+          "module": "Std.Contracts",
+          "kind": "function",
+          "name": "normal_cdf",
+          "source_file": "src/contracts.ch"
+        }
       },
       "preconditions": [
         {
@@ -1005,7 +1015,8 @@
       "expected_tier_per_pin": {
         "0.14.0": "proven_modulo_contract",
         "0.16.1": "proven_modulo_contract",
-        "0.17.1": "proven_modulo_contract"
+        "0.17.1": "proven_modulo_contract",
+        "0.17.4": "proven_modulo_contract"
       },
       "tier_upgrade_trigger": "chelis#434",
       "dischargeability_probe": "p12_shoals_published_composites",
@@ -1029,7 +1040,14 @@
         "goal_pattern": null,
         "contracts": [
           "std.normal_cdf.range"
-        ]
+        ],
+        "compiler_dependency": {
+          "package": "chelis-std",
+          "module": "Std.Contracts",
+          "kind": "function",
+          "name": "normal_cdf",
+          "source_file": "src/contracts.ch"
+        }
       },
       "preconditions": [
         {
@@ -1075,7 +1093,8 @@
       "expected_tier_per_pin": {
         "0.14.0": "proven_modulo_contract",
         "0.16.1": "proven_modulo_contract",
-        "0.17.1": "proven_modulo_contract"
+        "0.17.1": "proven_modulo_contract",
+        "0.17.4": "proven_modulo_contract"
       },
       "tier_upgrade_trigger": "chelis#434",
       "dischargeability_probe": "p12_shoals_published_composites",
@@ -1099,7 +1118,14 @@
         "goal_pattern": null,
         "contracts": [
           "std.normal_cdf.range"
-        ]
+        ],
+        "compiler_dependency": {
+          "package": "chelis-std",
+          "module": "Std.Contracts",
+          "kind": "function",
+          "name": "normal_cdf",
+          "source_file": "src/contracts.ch"
+        }
       },
       "preconditions": [],
       "controls": {
@@ -1120,7 +1146,8 @@
       "expected_tier_per_pin": {
         "0.14.0": "proven_modulo_contract",
         "0.16.1": "proven_modulo_contract",
-        "0.17.1": "proven_modulo_contract"
+        "0.17.1": "proven_modulo_contract",
+        "0.17.4": "proven_modulo_contract"
       },
       "tier_upgrade_trigger": "chelis#434",
       "dischargeability_probe": "p12_shoals_published_composites",
@@ -1211,7 +1238,8 @@
       "expected_tier_per_pin": {
         "0.14.0": "proven",
         "0.16.1": "proven",
-        "0.17.1": "proven"
+        "0.17.1": "proven",
+        "0.17.4": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the european-call pricer returns a negative price -- free money at these inputs",
@@ -1301,7 +1329,8 @@
       "expected_tier_per_pin": {
         "0.14.0": "proven",
         "0.16.1": "proven",
-        "0.17.1": "proven"
+        "0.17.1": "proven",
+        "0.17.4": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the call is priced above the underlying spot -- admits arbitrage",
@@ -1391,7 +1420,8 @@
       "expected_tier_per_pin": {
         "0.14.0": "proven",
         "0.16.1": "proven",
-        "0.17.1": "proven"
+        "0.17.1": "proven",
+        "0.17.4": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the call is priced below its discounted intrinsic value s - k*disc^2 -- admits arbitrage (buy and exercise)",
@@ -1488,7 +1518,8 @@
       "expected_tier_per_pin": {
         "0.14.0": "proven",
         "0.16.1": "proven",
-        "0.17.1": "proven"
+        "0.17.1": "proven",
+        "0.17.4": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "a lower-strike call is worth less than a higher-strike call -- a bull-spread (strike-monotonicity) violation admitting arbitrage",
@@ -1585,7 +1616,8 @@
       "expected_tier_per_pin": {
         "0.14.0": "proven",
         "0.16.1": "proven",
-        "0.17.1": "proven"
+        "0.17.1": "proven",
+        "0.17.4": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "a long butterfly on equally-spaced strikes has negative value -- a convexity-in-strike violation admitting arbitrage",
@@ -1633,7 +1665,8 @@
       "expected_tier_per_pin": {
         "0.14.0": "proven",
         "0.16.1": "proven",
-        "0.17.1": "proven"
+        "0.17.1": "proven",
+        "0.17.4": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the multi-period discount factor falls outside (0, 1] -- discounting a non-negative yield either creates value or turns it negative",
@@ -1688,7 +1721,8 @@
       "expected_tier_per_pin": {
         "0.14.0": "proven",
         "0.16.1": "proven",
-        "0.17.1": "proven"
+        "0.17.1": "proven",
+        "0.17.4": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond PV is non-positive or exceeds the undiscounted sum of its cashflows -- not a proper present value",
@@ -1750,7 +1784,8 @@
       "expected_tier_per_pin": {
         "0.14.0": "proven",
         "0.16.1": "proven",
-        "0.17.1": "proven"
+        "0.17.1": "proven",
+        "0.17.4": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond price rises as yield rises -- a duration/DV01 sign violation",
@@ -1812,7 +1847,8 @@
       "expected_tier_per_pin": {
         "0.14.0": "proven",
         "0.16.1": "proven",
-        "0.17.1": "proven"
+        "0.17.1": "proven",
+        "0.17.4": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond price is concave in yield -- a negative-convexity violation",
@@ -1883,7 +1919,8 @@
       "expected_tier_per_pin": {
         "0.14.0": "disproved",
         "0.16.1": "disproved",
-        "0.17.1": "disproved"
+        "0.17.1": "disproved",
+        "0.17.4": "disproved"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "reports zero rate sensitivity: the undiscounted bond prices at 3.0 whether the yield is 0.0 or 1.0 (dP/dy = 0, DV01 understated to zero)",
@@ -1993,7 +2030,8 @@
       "expected_tier_per_pin": {
         "0.14.0": "proven",
         "0.16.1": "proven",
-        "0.17.1": "proven"
+        "0.17.1": "proven",
+        "0.17.4": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price falls when the up-move factor increases -- a vega-sign violation (wider volatility decreases the option value)",
@@ -2103,7 +2141,8 @@
       "expected_tier_per_pin": {
         "0.14.0": "proven",
         "0.16.1": "proven",
-        "0.17.1": "proven"
+        "0.17.1": "proven",
+        "0.17.4": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price falls when the discount factor increases -- the call value should rise with less discounting",
@@ -2220,43 +2259,152 @@
       "expected_tier_per_pin": {
         "0.14.0": "proven",
         "0.16.1": "proven",
-        "0.17.1": "proven"
+        "0.17.1": "proven",
+        "0.17.4": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price is concave in spot -- a gamma-sign violation (the second derivative in spot is negative)",
       "fuzz_domain_note": "proven over the reals at Tier B (no fuzz); the lattice analog of gamma >= 0 (convexity in spot via three-point second difference)"
-    }
-  ],
-  "deferred_invariants": [
+    },
     {
       "id": "shoals.inv.call_price_nonneg.v1",
       "kind_applies_to": [
         "finance.option_pricer.european_call",
         "finance.option_pricer.european_call_forward"
       ],
-      "target_models": [
-        "bs_call",
-        "b76_call"
-      ],
+      "target_model": "bs_call",
       "property": {
         "file": "properties/canonpricing.ch",
         "name": "bs_call_price_nonneg",
         "module": "Shoals.Properties.CanonPricing"
       },
-      "mirror_property": {
-        "file": "properties/canonpricing.ch",
-        "name": "b76_call_price_nonneg",
-        "module": "Shoals.Properties.CanonPricing"
+      "binding": {
+        "mechanism": "direct-call",
+        "references_output_fn": "direct",
+        "goal_pattern": "({{output_fn}}(s, k, r, sigma, t) >= 0.0)",
+        "contracts": []
       },
+      "preconditions": [
+        {
+          "lhs": "s",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "k",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "sigma",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "t",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "r",
+          "op": "gte",
+          "rhs": {
+            "const": 0.0
+          }
+        }
+      ],
+      "controls": {
+        "satisfying": {
+          "name": "bs_call_price_nonneg",
+          "expected": "passed"
+        },
+        "violating": {
+          "name": "bs_call_price_nonneg_corrupted",
+          "expected": "failed",
+          "witness_required": true
+        }
+      },
+      "also_instantiated_for": [
+        {
+          "target_model": "b76_call",
+          "property": {
+            "file": "properties/canonpricing.ch",
+            "name": "b76_call_price_nonneg",
+            "module": "Shoals.Properties.CanonPricing"
+          },
+          "preconditions": [
+            {
+              "lhs": "f",
+              "op": "gt",
+              "rhs": {
+                "const": 0.0
+              }
+            },
+            {
+              "lhs": "k",
+              "op": "gt",
+              "rhs": {
+                "const": 0.0
+              }
+            },
+            {
+              "lhs": "sigma",
+              "op": "gt",
+              "rhs": {
+                "const": 0.0
+              }
+            },
+            {
+              "lhs": "t",
+              "op": "gt",
+              "rhs": {
+                "const": 0.0
+              }
+            },
+            {
+              "lhs": "df",
+              "op": "gt",
+              "rhs": {
+                "const": 0.0
+              }
+            }
+          ],
+          "controls": {
+            "satisfying": {
+              "name": "b76_call_price_nonneg",
+              "expected": "passed"
+            },
+            "violating": {
+              "name": "b76_call_price_nonneg_corrupted",
+              "expected": "failed",
+              "witness_required": true
+            }
+          }
+        }
+      ],
+      "expected_tier_per_pin": {
+        "0.17.4": "fuzz_validated"
+      },
+      "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p08_pkg_bs_positive",
-      "reason": "Direct-call positivity against the real transcendental pricers (bs_call_scalar, black_call). NOT characterizable at 0.14.0, on BOTH lanes: (proven) chelis#434's certified-envelope discharge abstracts each normal_cdf call to a free bounded variable, which discards the N(d1)/N(d2) moneyness coupling; the abstracted residual is then falsifiable (e.g. N(d1)=0, N(d2)=1), so BS positivity is NOT provable even with the envelope -- that ceiling is chelis#637 (relational / whole-expression abstraction, the Beacon BoxRange shape). (fuzz) the tier could not be OBSERVED at 0.14.0: measured on the pinned release binary with --tier fuzz-only, one accepted fuzz sample of a SINGLE positivity property does not complete in 200s (the 4-property file at N=5 emitted zero verdicts in 20min) -- the interpreted f64 erf/exp/log/sqrt body under the sampler is intractable. Per the no-unobserved-tier / no-expected-tier-for-deferred rule this entry carries no expected_tier_per_pin. The property + a fast-refuting corrupted twin stay in properties/canonpricing.ch as the reproducer; contract_gate does not gate deferred invariants.",
-      "trigger": "un-deferring is a de-narrowing event on EITHER lane: (a) FUZZ -- a chelis fuzz-performance / compiled-eval improvement that makes sampling the real transcendental pricer tractable (evidence: chelis#659; related: c-note docs/issue_drafts/reef_package_prove_load_time.md); or (b) PROVEN -- chelis#637 (relational/whole-expression abstraction preserving the N(d1)/N(d2) coupling), NOT chelis#434. Then move back to `invariants` with the observed tier."
-    },
+      "violation_text": "the direct call pricer returns a negative present value on its positive-input domain",
+      "fuzz_domain_note": "observed at Chelis 0.17.4 with --tier fuzz-only for both direct Black-Scholes and Black-76 positivity properties; corrupted twins refute with in-domain fuzz witnesses. Proven-tier promotion still requires chelis#637."
+    }
+  ],
+  "deferred_invariants": [
     {
       "id": "shoals.inv.call_monotone_in_s.bs.v1",
       "dischargeability_probe": "p08_pkg_bs_positive",
-      "reason": "Two-point monotonicity against the real transcendental bs_call_scalar. Same ceiling as call_price_nonneg: free-variable abstraction of the normal_cdf calls discards the coupling (chelis#637), and the fuzz lane is intractable at 0.14.0 (evaluates the pricer twice per sample). Not characterizable at this pin; no expected tier.",
-      "trigger": "(a) FUZZ feasibility (chelis#659), or (b) PROVEN via chelis#637 (relational abstraction)."
+      "reason": "Two-point monotonicity against the real transcendental bs_call_scalar. The 0.17.4 de-narrowing probe covered only direct call-price positivity, not this two-evaluation monotonicity surface. The proven lane still loses the normal_cdf coupling under free-variable abstraction (chelis#637). No expected tier until a dedicated per-surface fuzz probe observes one.",
+      "trigger": "a dedicated 0.17.4-or-later fuzz probe of the monotonicity property and corrupted twin, or proven discharge via chelis#637."
     },
     {
       "id": "shoals.inv.bs_intrinsic_lower_bound.v1",
@@ -2265,38 +2413,38 @@
     },
     {
       "id": "shoals.inv.bs_vega_nonneg_grad.v1",
-      "reason": "grad-in-property sign invariants (vega/delta/gamma) do NOT lower through a cross-module import of the pricer (prove hangs; economoist docs/issue_drafts/dependency_edges_imports.md) and grad through bs_call_scalar hits the f32/f64 precision-mismatch across the grad boundary (research/proof-infra/report.md sec 5). grad never lowers to SMT (fuzz-only), and the fuzz lane over the real pricer is intractable at 0.14.0. Not characterizable at this pin; no expected tier.",
-      "trigger": "an inlined equivalent-form grad body proved from a scratch dir outside the package (own change set), gated once the fuzz-sampler cost (chelis#659) is addressed."
+      "reason": "grad-in-property sign invariants (vega/delta/gamma) do NOT lower through a cross-module import of the pricer (prove hangs; economoist docs/issue_drafts/dependency_edges_imports.md) and grad through bs_call_scalar hits the f32/f64 precision-mismatch across the grad boundary (research/proof-infra/report.md sec 5). grad never lowers to SMT (fuzz-only). This surface was not included in the 0.17.4 direct-positivity probe, so it remains uncharacterized.",
+      "trigger": "resolve the cross-module grad and f32/f64 boundary defects, then demonstrate the inlined equivalent-form grad body and corrupted twin in a dedicated fuzz probe."
     },
     {
       "id": "shoals.inv.bs_vega_sign.v1",
-      "reason": "Two-point monotonicity in sigma against the real transcendental bs_call_scalar (the Black-Scholes analog of crr_call_vega_sign). NOT characterizable at 0.14.0: (proven) free-variable abstraction of normal_cdf discards the coupling between d1, sigma, and the price -- the abstracted residual does not encode vega-sign (chelis#637). (fuzz) evaluates the pricer twice per sample; intractable at 0.14.0 (chelis#659). The CRR anchor proves the lattice analog (crr_call_vega_sign.v1) genuinely; this deferred entry records the intent to promote the same invariant on the flagship pricer when the gate fires.",
-      "trigger": "(a) FUZZ feasibility (chelis#659), or (b) PROVEN via chelis#637 (relational abstraction preserving the sigma-d1-price coupling)."
+      "reason": "Two-point monotonicity in sigma against the real transcendental bs_call_scalar (the Black-Scholes analog of crr_call_vega_sign). Free-variable abstraction discards the d1/sigma/price coupling (chelis#637), and the 0.17.4 direct-positivity probe did not exercise this two-evaluation surface. The CRR anchor proves the lattice analog genuinely.",
+      "trigger": "a dedicated 0.17.4-or-later fuzz probe of the vega-sign property and corrupted twin, or proven discharge via chelis#637."
     },
     {
       "id": "shoals.inv.bs_rho_sign.v1",
-      "reason": "Two-point monotonicity in r against the real transcendental bs_call_scalar (rho >= 0 for a European call). NOT characterizable at 0.14.0: (proven) the abstracted residual does not encode the r-disc-forward coupling that makes rho positive (chelis#637). (fuzz) evaluates the pricer twice per sample; intractable at 0.14.0 (chelis#659). The CRR anchor proves the lattice analog (crr_call_disc_sensitivity.v1) as monotone-in-disc; this records the intent to prove the real rho on the flagship.",
-      "trigger": "(a) FUZZ feasibility (chelis#659), or (b) PROVEN via chelis#637 (relational abstraction)."
+      "reason": "Two-point monotonicity in r against the real transcendental bs_call_scalar (rho >= 0 for a European call). The abstracted residual does not encode the r/disc/forward coupling (chelis#637), and the 0.17.4 direct-positivity probe did not exercise this two-evaluation surface.",
+      "trigger": "a dedicated 0.17.4-or-later fuzz probe of the rho-sign property and corrupted twin, or proven discharge via chelis#637."
     },
     {
       "id": "shoals.inv.bs_gamma_sign.v1",
-      "reason": "Convexity in spot (three-point second difference) against the real transcendental bs_call_scalar (gamma >= 0). NOT characterizable at 0.14.0: (proven) the abstracted residual does not encode the convexity structure of N(d1(s)) in spot (chelis#637; the coupling between s and d1 is discarded). (fuzz) evaluates the pricer three times per sample (s+h, s, s-h); intractable at 0.14.0 (chelis#659). The CRR anchor proves the lattice analog (crr_call_gamma_sign.v1) genuinely; this records the intent to promote.",
-      "trigger": "(a) FUZZ feasibility (chelis#659), or (b) PROVEN via chelis#637 (relational abstraction preserving the s-d1-N(d1) coupling)."
+      "reason": "Convexity in spot (three-point second difference) against the real transcendental bs_call_scalar (gamma >= 0). The abstracted residual loses the s/d1/N(d1) coupling (chelis#637), and the 0.17.4 direct-positivity probe did not exercise this three-evaluation surface.",
+      "trigger": "a dedicated 0.17.4-or-later fuzz probe of the gamma-sign property and corrupted twin, or proven discharge via chelis#637."
     },
     {
       "id": "shoals.inv.var_monotone_in_confidence.v1",
-      "reason": "VaR monotonicity in confidence level against the real parametric_var (which calls normal_inv_cdf, a transcendental). NOT characterizable at 0.14.0: (proven) normal_inv_cdf is not cvc5-lowerable. (fuzz) tensor-valued forall quantification + the normal_inv_cdf body under the sampler is untested at this pin; the property is authored in properties/canonrisk.ch as the shape-ready stub. No expected tier until a fuzz probe demonstrates one.",
-      "trigger": "(a) FUZZ feasibility over tensor-quantified properties (chelis#659 + property-system tensor support), or (b) a chelis-std quantile/inv_cdf contract analogous to std.normal_cdf enabling SMT abstraction."
+      "reason": "VaR monotonicity in confidence level against the real parametric_var remains uncharacterized. The dedicated Chelis 0.17.4 fuzz re-probe on 2026-07-31 exhausted 100 generator attempts with zero accepted samples because the ordered alpha1/alpha2 guards starved; unlike the two one-confidence risk properties, it did not produce a tier. The proven lane also lacks a certified normal_inv_cdf quantile contract.",
+      "trigger": "a guard-aware generator or revised sound sampling shape that demonstrates both the property and corrupted twin, or a chelis-std quantile/inv_cdf contract enabling SMT abstraction."
     },
     {
       "id": "shoals.inv.cvar_dominates_var.v1",
-      "reason": "CVaR >= VaR (expected shortfall dominance) against the real parametric_cvar and parametric_var. Same ceiling as var_monotone: normal_inv_cdf is not cvc5-lowerable, and fuzz over the real risk bodies is untested. Property authored in properties/canonrisk.ch.",
-      "trigger": "(a) FUZZ feasibility (chelis#659), or (b) chelis-std quantile contract enabling SMT abstraction."
+      "reason": "CVaR >= VaR against the real parametric_cvar/parametric_var produced a one-sample fuzz_validated result and a corrupted-twin witness on Chelis 0.17.4 (2026-07-31), but is not stable at the release gate's larger sample budget: a five-sample combined re-probe exits 3 in the risk file. It therefore remains deferred rather than overclaiming a durable tier; normal_inv_cdf also lacks an SMT contract.",
+      "trigger": "a dedicated multi-sample fuzz probe that completes repeatedly at the release budget, or a chelis-std quantile contract enabling SMT abstraction."
     },
     {
       "id": "shoals.inv.var_nonneg_positive_mean.v1",
-      "reason": "VaR > 0 for positive-mean losses at confidence > 0.5 against parametric_var. Same ceiling: normal_inv_cdf not lowerable, fuzz untested. Property authored in properties/canonrisk.ch.",
-      "trigger": "(a) FUZZ feasibility (chelis#659), or (b) chelis-std quantile contract."
+      "reason": "Positive-mean VaR produced a one-sample fuzz_validated result and a corrupted-twin witness on Chelis 0.17.4 (2026-07-31), but at five samples the satisfying property errors and the compiler exits 3. The one-sample observation is insufficient for the release canon, so this remains deferred; normal_inv_cdf also lacks an SMT contract.",
+      "trigger": "a dedicated multi-sample fuzz probe whose satisfying and corrupted controls complete repeatedly at the release budget, or a chelis-std quantile contract."
     },
     {
       "id": "shoals.inv.crr_general_nonneg.v1",

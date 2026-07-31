@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+"""Static contracts for Shoals toolchain and release workflows."""
+
+from __future__ import annotations
+
+import ast
+import re
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class ReleaseWorkflowTests(unittest.TestCase):
+    def test_toolchain_download_verifies_the_publisher_sidecar(self) -> None:
+        action = (ROOT / ".github/actions/install-chelis/action.yml").read_text()
+        self.assertIn("default: linux-x86_64-glibc2.31", action)
+        self.assertIn("chelis-toolchain-sha256-v1-", action)
+        self.assertIn('--pattern "$asset.sha256"', action)
+        self.assertIn('sha256sum -c "$asset.sha256"', action)
+        self.assertIn('shasum -a 256 -c "$asset.sha256"', action)
+        self.assertLess(
+            action.index('--pattern "$asset.sha256"'),
+            action.index('tar -xzf "/tmp/chelis-toolchain/$asset"'),
+        )
+        self.assertIn(
+            "inputs.platform }}-${{ inputs.chelis-tag }}-${{ inputs.reef-cache-key",
+            action,
+        )
+
+    def test_release_seals_every_payload_and_rebuilds_before_publish(self) -> None:
+        release = (ROOT / ".github/workflows/release.yml").read_text()
+        prove = release.index("python3 scripts/prove_gate.py")
+        copy_manifest = release.index("cp docs/cnote-import-surface.json")
+        seal = release.index("sha256sum \\\n", copy_manifest)
+        rebuild = release.index("chelis reef build", seal)
+        validate = release.index("sha256sum -c", rebuild)
+        publish = release.index("uses: softprops/action-gh-release@v2")
+        self.assertIn('PROVE_GATE_FUZZ: "1"', release[:copy_manifest])
+        self.assertLess(prove, copy_manifest)
+        self.assertLess(copy_manifest, seal)
+        self.assertLess(seal, rebuild)
+        self.assertLess(rebuild, validate)
+        self.assertLess(validate, publish)
+        for suffix in ("chb", "tar.zst", "invariants.json", "sha256"):
+            self.assertIn(
+                f"dist/${{{{ env.PACKAGE_NAME }}}}-${{{{ env.PACKAGE_VERSION }}}}.{suffix}",
+                release[publish:],
+            )
+        self.assertIn("overwrite_files: true", release[publish:])
+
+    def test_nightly_executes_the_latency_oracle(self) -> None:
+        nightly = (ROOT / ".github/workflows/nightly.yml").read_text()
+        prove_job = nightly[nightly.index("  prove:") : nightly.index("  heavy:")]
+        self.assertIn('PROVE_GATE_FUZZ: "1"', prove_job)
+        self.assertIn("python3 scripts/prove_gate.py", prove_job)
+        self.assertIn("python3 scripts/check_package_prove_latency.py", prove_job)
+
+    def test_local_full_gate_matches_hosted_manual_matrix(self) -> None:
+        nightly = (ROOT / ".github/workflows/nightly.yml").read_text()
+        matrix_start = nightly.index("        file:", nightly.index("  heavy:"))
+        matrix_end = nightly.index("    steps:", matrix_start)
+        hosted = re.findall(
+            r"^\s+- ([a-z0-9_]+)\s*$",
+            nightly[matrix_start:matrix_end],
+            flags=re.MULTILINE,
+        )
+
+        local_tree = ast.parse((ROOT / "scripts/run_local_gate.py").read_text())
+        assignment = next(
+            node for node in local_tree.body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name)
+                and target.id == "NIGHTLY_MANUAL_FILES"
+                for target in node.targets
+            )
+        )
+        local = ast.literal_eval(assignment.value)
+        self.assertEqual(local, hosted)
+        self.assertNotIn("modelfit_bfgs_heavy", local)
+        hosted_command = nightly[
+            nightly.index(
+                'run: chelis test "tests-manual/${{ matrix.file }}.ch"',
+                matrix_end,
+            ) :
+        ]
+        self.assertIn("--timeout 1500 --suite-timeout 1650 --jobs 1", hosted_command)
+
+        local_source = (ROOT / "scripts/run_local_gate.py").read_text()
+        self.assertIn(
+            '"--timeout", "1500", "--suite-timeout", "1650",',
+            local_source,
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

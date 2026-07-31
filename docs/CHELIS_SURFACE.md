@@ -1,4 +1,4 @@
-<!-- BEGIN CHELIS MANAGED BLOCK: chelis-surface-header chelis@0.17.1 (sha256:28011bed9ccb5778) -->
+<!-- BEGIN CHELIS MANAGED BLOCK: chelis-surface-header chelis@0.17.4 (sha256:28011bed9ccb5778) -->
 This file is a domain-scoped view of the canonical Chelis capability surface,
 generated for the pinned toolchain. Each capability row is marked `@pin` (usable
 at the current pin) or `@upstream` (lands at the next bump). **Read it before
@@ -15,12 +15,30 @@ quantitative-finance domain this shell touches — numerical methods, pricing,
 Greeks, and the proof surface over them. **Read this before designing around a
 suspected language gap.**
 
-> **Pinned:** chelis 0.16.1 (chelis-std 0.4.0, bundled; nautilus 0.7.34,
-> coral 0.7.31) · **Latest upstream:** 0.16.1 (published 2026-07-12) ·
-> **Last refreshed:** 2026-07-15
+> **Pinned release:** chelis 0.17.4 (chelis-std 0.4.0, bundled;
+> nautilus 0.7.36, coral 0.7.33) · **Latest installable upstream:** chelis
+> 0.17.4 (published 2026-07-31) · **Last refreshed:** 2026-07-31
 
-Rows are marked `@pin` (usable today at 0.16.1) or `@upstream` (expected at the
-next bump). Refresh this table at every pin bump (`AGENTS.md` §Pin Bump
+The official `v0.17.4` tag resolves to Chelis commit
+`0b0c92f9916163b05a483fba70473496923730e6`. The downloaded
+`linux-x86_64-glibc2.31` archive has SHA-256
+`6b7f477d65b2dea4e85b5107a51ae5714a5113138a6791361b74205f9448a121`;
+its `chelis` binary has SHA-256
+`d08ebfe67fed11f4458251d47e732de3249d93a3d700c87991a39e219887cc7e`.
+The release sidecar verifies the archive before installation.
+The official Nautilus `v0.7.36` tag resolves to commit
+`2c434a9dfefca79c371b4c66af62b121a47841d6`; its canonical CHB and archive
+SHA-256 values are
+`2db566d8b381fd4d49acef62f875420a59c397961954a7c27cb02b79cb3f12e4`
+and `412e24ec26f1828db394f6bed6ef8f4a9c93a7b104e020a457c93ec0a5b96572`.
+The official Coral `v0.7.33` tag resolves to commit
+`7bda6af8210a4dc128147e64cdb82019d27308f3`; its canonical CHB and archive
+SHA-256 values are
+`a3e04e308eb7d35c34fe4d6075c7e7626c57a6a9957fc6cf9926467b5787ec6c`
+and `fe41f1617b118eb1600d02518319a96780c77195cce4c836ec43776bd69e08b0`.
+
+Rows are marked `@pin` (verified on the exact 0.17.4 release) or
+`@upstream` (expected at a later bump). Refresh this table at every pin bump (`AGENTS.md` §Pin Bump
 Checklist). The authoritative depth reference for the proof reachability map is
 `research/proof-infra/report.md`; the source-of-truth for the cvc5-lowerable set
 is chelis `crates/chelis-prove/src/tier_b.rs` (`CVC5_LOWERABLE`).

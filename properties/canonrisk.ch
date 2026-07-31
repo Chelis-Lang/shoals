@@ -6,9 +6,11 @@ import Shoals.Risk (parametric_var, parametric_cvar)
 -- but their bodies call normal_inv_cdf (a transcendental) so SMT returns
 -- unsupported, and the fuzz lane must evaluate mean_vec + std_vec + normal_inv_cdf
 -- over a tensor. Tier classification is honest: if fuzz completes at a small
--- sample count they enter active invariants at fuzz_validated; if intractable
--- they go to deferred_invariants with trigger "chelis-std quantile primitive or
--- fuzz-sampler improvement (chelis#659)".
+-- sample count they enter active invariants at fuzz_validated. The 2026-07-31
+-- 0.17.4 probes produced one-sample greens for CVaR dominance and positive-
+-- mean VaR, but did not survive a five-sample release-budget check; confidence
+-- monotonicity exhausted its ordered-alpha guards. All three therefore remain
+-- deferred pending a stable multi-sample observation or quantile contract.
 --
 -- The @property surface quantifies over scalar f32 values that are then packed
 -- into a fixed 3-element tensor inside the goal body. This is the smallest size
