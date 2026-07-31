@@ -41,8 +41,10 @@ composite_verdict classifies as fuzz_validated, never proven).
 
 Stdlib-only. Resolves the binary env-first (CHELIS_SMT_BIN / CHELIS_BIN) then
 the pin-derived ~/.local/share/chelis/<pin>/ then PATH. Fuzz sample count is
-FUZZ_SAMPLES (default from the manifest run_samples); CI dials it down and the
-full-sample sweep runs in nightly.
+FUZZ_SAMPLES controls the primary seed budget. Direct Black-Scholes Greek-sign
+invariants additionally run two deterministic seeds at a capped five-sample
+budget, so their multi-seed characterization is a release oracle rather than a
+one-off manual observation.
 """
 
 from __future__ import annotations
@@ -59,6 +61,14 @@ MANIFEST = REPO / "docs" / "cnote-import-surface.json"
 SMT_TIMEOUT_MS = "20000"
 DEFAULT_FUZZ_SAMPLES = 25
 FUZZ_SEED = "0"
+EXTRA_GREEK_FUZZ_SEEDS = ("1", "2")
+EXTRA_GREEK_FUZZ_SAMPLE_CAP = 5
+GREEK_FUZZ_INVARIANT_IDS = {
+    "shoals.inv.call_monotone_in_s.bs.v1",
+    "shoals.inv.bs_vega_sign.v1",
+    "shoals.inv.bs_rho_sign.v1",
+    "shoals.inv.bs_gamma_sign.v1",
+}
 
 # Contract sec 1 tier vocabulary.
 TIERS = {"proven", "proven_modulo_contract", "sound_approximate",
@@ -143,7 +153,8 @@ def honesty_self_test() -> bool:
     return ok
 
 
-def run_prove(binary: str, file: str, fuzz: bool, samples: int) -> dict:
+def run_prove(binary: str, file: str, fuzz: bool, samples: int,
+              seed: str = FUZZ_SEED) -> dict:
     """Run prove on one canon file, preserving compiler attribution evidence.
 
     Property records are keyed by name only after duplicate detection. The
@@ -156,7 +167,7 @@ def run_prove(binary: str, file: str, fuzz: bool, samples: int) -> dict:
         # fuzz-only avoids spending time on the known-unreachable SMT lane.
         # Chelis 0.17.4 made direct-pricer sampling tractable; keep the nightly
         # sample budget (FUZZ_SAMPLES) explicit and measured.
-        cmd += ["--tier", "fuzz-only", "--samples", str(samples), "--seed", FUZZ_SEED]
+        cmd += ["--tier", "fuzz-only", "--samples", str(samples), "--seed", seed]
     else:
         cmd += ["--tier", "smt-only", "--smt-timeout", SMT_TIMEOUT_MS]
     out = subprocess.run(cmd, cwd=REPO, capture_output=True, text=True)
@@ -798,6 +809,63 @@ def name_lint(files: list[Path]) -> bool:
     return ok
 
 
+def check_extra_greek_fuzz_seeds(binary: str, manifest: dict, models: dict,
+                                 package: str, pin: str,
+                                 primary_samples: int) -> bool:
+    """Require the issue-38 real-pricer family to survive multiple seeds.
+
+    The primary release sweep already checks seed 0 at FUZZ_SAMPLES. Seeds 1
+    and 2 use a bounded five-sample budget: enough to change every generated
+    point while keeping the nightly/release oracle proportional. Each run still
+    proves the whole source file against the real imported pricer body, and the
+    normal instantiation checker re-applies tier, compiler-attribution, corrupt
+    twin, and witness requirements.
+    """
+    greek_invs = [
+        inv for inv in manifest["invariants"]
+        if inv.get("dischargeability_probe") == "p15_bs_greeks_multi_seed"
+    ]
+    greek_ids = {inv.get("id") for inv in greek_invs}
+    if greek_ids != GREEK_FUZZ_INVARIANT_IDS:
+        fail("multi-seed Greek gate: p15 invariant set drifted; expected "
+             f"{sorted(GREEK_FUZZ_INVARIANT_IDS)}, got {sorted(greek_ids)}")
+        return False
+    files = {inv["property"]["file"] for inv in greek_invs}
+    if files != {"properties/canonpricing.ch"}:
+        fail(f"multi-seed Greek gate: expected canonpricing.ch only, got {sorted(files)}")
+        return False
+
+    samples = min(primary_samples, EXTRA_GREEK_FUZZ_SAMPLE_CAP)
+    ok = True
+    for seed in EXTRA_GREEK_FUZZ_SEEDS:
+        print(f"\n== multi-seed Greek probe: seed={seed} samples={samples} ==")
+        result = run_prove(binary, "properties/canonpricing.ch", True,
+                           samples, seed=seed)
+        if result["returncode"] not in (0, 1):
+            fail(f"multi-seed Greek probe seed {seed}: compiler exited "
+                 f"{result['returncode']}")
+            ok = False
+        if result["summary_count"] != 1:
+            fail(f"multi-seed Greek probe seed {seed}: emitted "
+                 f"{result['summary_count']} summary records, expected 1")
+            ok = False
+        if result["duplicate_records"]:
+            fail(f"multi-seed Greek probe seed {seed}: duplicate records "
+                 f"{sorted(set(result['duplicate_records']))}")
+            ok = False
+        for inv in greek_invs:
+            anchor = inv.get("target_model") or inv.get("anchor_model")
+            print(f"  [{inv['id']}] seed {seed}")
+            i_ok = check_instantiation(
+                result["records"], result["dependency_graph"], inv,
+                {"controls": inv["controls"],
+                 "preconditions": inv.get("preconditions", []),
+                 "property": inv["property"]},
+                pin, models[anchor], package)
+            ok = i_ok and ok
+    return ok
+
+
 def main() -> None:
     manifest = json.loads(MANIFEST.read_text())
     pin = manifest["chelis_pin"]
@@ -906,6 +974,10 @@ def main() -> None:
                 irecs, inst_result["dependency_graph"], inv, inst, pin,
                 models[inst["target_model"]], manifest["pkg"]) and i_ok
         ok = i_ok and ok
+
+    if include_fuzz:
+        ok = check_extra_greek_fuzz_seeds(
+            binary, manifest, models, manifest["pkg"], pin, samples) and ok
 
     print()
     if ok:

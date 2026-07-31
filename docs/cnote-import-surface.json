@@ -4,7 +4,7 @@
   "pkg": "shoals",
   "pkg_version": "0.24.2",
   "chelis_pin": "0.17.4",
-  "generated_note": "Producer manifest for the C Note characterization engine (frozen contract characterization_contract_v1.md sec 1). The Shoals 0.24.2 release will publish this byte-for-byte as shoals-0.24.2.invariants.json; its Chelis 0.17.4 / Nautilus 0.7.36 / Coral 0.7.33 upstream release cascade is published and checksummed. Canon Breadth includes the Tier-B GREEK SIGN family on tr_crr_call_2step, fuzz-validated direct Black-Scholes and Black-76 call-price positivity, deferred Black-Scholes monotonicity/Greek-sign stubs awaiting their own per-surface probes or chelis#637, VaR/quantile coherence stubs gated on a dedicated risk probe or quantile contract, general-size promotion stubs gated on induction, and the parametric_var risk model. The MODEL-FREE canon carries kind-scoped direct-output-function invariants for the CRR european_call no-arbitrage family and discrete-compounding fixed_income family. Since Chelis 0.17.2 every active binding is validated from the compiler summary dependency graph: direct lanes require the exact property-to-anchor-model edge; structural composites require the exact property-to-chelis-std/Std.Contracts.normal_cdf edge and deliberately make no property-to-bs_call_scalar claim. Tiers are revalidated at chelis 0.17.4; every below-proven tier cites a tier_upgrade_trigger and a dischargeability_probe.",
+  "generated_note": "Producer manifest for the C Note characterization engine (frozen contract characterization_contract_v1.md sec 1). The Shoals 0.24.2 release will publish this byte-for-byte as shoals-0.24.2.invariants.json; its Chelis 0.17.4 / Nautilus 0.7.36 / Coral 0.7.33 upstream release cascade is published and checksummed. Canon Breadth includes the Tier-B GREEK SIGN family on tr_crr_call_2step, fuzz-validated direct Black-Scholes and Black-76 call-price positivity, and fuzz-validated direct Black-Scholes spot-monotonicity/delta, vega, rho, and gamma comparisons. The direct Greek family is release-gated over seeds 0, 1, and 2; global proven promotion remains blocked by chelis#637. VaR/quantile coherence stubs remain gated on a dedicated risk probe or quantile contract, general-size promotion stubs remain gated on induction, and the parametric_var risk model is included. The MODEL-FREE canon carries kind-scoped direct-output-function invariants for the CRR european_call no-arbitrage family and discrete-compounding fixed_income family. Since Chelis 0.17.2 every active binding is validated from the compiler summary dependency graph: direct lanes require the exact property-to-anchor-model edge; structural composites require the exact property-to-chelis-std/Std.Contracts.normal_cdf edge and deliberately make no property-to-bs_call_scalar claim. Tiers are revalidated at chelis 0.17.4; every below-proven tier cites a tier_upgrade_trigger and a dischargeability_probe.",
   "models": [
     {
       "id": "bs_call",
@@ -2397,15 +2397,137 @@
       "dischargeability_probe": "p08_pkg_bs_positive",
       "violation_text": "the direct call pricer returns a negative present value on its positive-input domain",
       "fuzz_domain_note": "observed at Chelis 0.17.4 with --tier fuzz-only for both direct Black-Scholes and Black-76 positivity properties; corrupted twins refute with in-domain fuzz witnesses. Proven-tier promotion still requires chelis#637."
+    },
+    {
+      "id": "shoals.inv.call_monotone_in_s.bs.v1",
+      "kind_applies_to": ["finance.option_pricer.european_call"],
+      "target_model": "bs_call",
+      "property": {
+        "file": "properties/canonpricing.ch",
+        "name": "bs_call_monotone_in_s",
+        "module": "Shoals.Properties.CanonPricing"
+      },
+      "binding": {
+        "mechanism": "direct-call",
+        "references_output_fn": "direct",
+        "goal_pattern": "({{output_fn}}(s + ds, k, 0.05, sigma, t) >= {{output_fn}}(s, k, 0.05, sigma, t))",
+        "contracts": []
+      },
+      "preconditions": [
+        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "ds", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "sigma", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "t", "op": "gt", "rhs": {"const": 0.0}}
+      ],
+      "controls": {
+        "satisfying": {"name": "bs_call_monotone_in_s", "expected": "passed"},
+        "violating": {"name": "bs_call_monotone_in_s_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "expected_tier_per_pin": {"0.17.4": "fuzz_validated"},
+      "tier_upgrade_trigger": "chelis#637",
+      "dischargeability_probe": "p15_bs_greeks_multi_seed",
+      "violation_text": "the real Black-Scholes call price decreases as spot increases",
+      "fuzz_domain_note": "observed against the real bs_call_scalar body across deterministic seeds 0, 1, and 2 at r=0.05; this is sampled spot monotonicity (delta sign), not a global proof"
+    },
+    {
+      "id": "shoals.inv.bs_vega_sign.v1",
+      "kind_applies_to": ["finance.option_pricer.european_call"],
+      "target_model": "bs_call",
+      "property": {
+        "file": "properties/canonpricing.ch",
+        "name": "bs_call_vega_sign",
+        "module": "Shoals.Properties.CanonPricing"
+      },
+      "binding": {
+        "mechanism": "direct-call",
+        "references_output_fn": "direct",
+        "goal_pattern": "({{output_fn}}(s, k, 0.05, sigma + dsigma, t) >= {{output_fn}}(s, k, 0.05, sigma, t))",
+        "contracts": []
+      },
+      "preconditions": [
+        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "sigma", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "dsigma", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "t", "op": "gt", "rhs": {"const": 0.0}}
+      ],
+      "controls": {
+        "satisfying": {"name": "bs_call_vega_sign", "expected": "passed"},
+        "violating": {"name": "bs_call_vega_sign_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "expected_tier_per_pin": {"0.17.4": "fuzz_validated"},
+      "tier_upgrade_trigger": "chelis#637",
+      "dischargeability_probe": "p15_bs_greeks_multi_seed",
+      "violation_text": "the real Black-Scholes call price decreases as volatility increases",
+      "fuzz_domain_note": "observed against the real bs_call_scalar body across deterministic seeds 0, 1, and 2 at r=0.05; sampled vega sign, not a global proof"
+    },
+    {
+      "id": "shoals.inv.bs_rho_sign.v1",
+      "kind_applies_to": ["finance.option_pricer.european_call"],
+      "target_model": "bs_call",
+      "property": {
+        "file": "properties/canonpricing.ch",
+        "name": "bs_call_rho_sign",
+        "module": "Shoals.Properties.CanonPricing"
+      },
+      "binding": {
+        "mechanism": "direct-call",
+        "references_output_fn": "direct",
+        "goal_pattern": "({{output_fn}}(s, k, r + dr, sigma, 1.0) >= {{output_fn}}(s, k, r, sigma, 1.0))",
+        "contracts": []
+      },
+      "preconditions": [
+        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "r", "op": "gte", "rhs": {"const": 0.0}},
+        {"lhs": "dr", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "sigma", "op": "gt", "rhs": {"const": 0.0}}
+      ],
+      "controls": {
+        "satisfying": {"name": "bs_call_rho_sign", "expected": "passed"},
+        "violating": {"name": "bs_call_rho_sign_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "expected_tier_per_pin": {"0.17.4": "fuzz_validated"},
+      "tier_upgrade_trigger": "chelis#637",
+      "dischargeability_probe": "p15_bs_greeks_multi_seed",
+      "violation_text": "the real Black-Scholes call price decreases as the non-negative risk-free rate increases",
+      "fuzz_domain_note": "observed against the real bs_call_scalar body across deterministic seeds 0, 1, and 2 at t=1.0; sampled call rho sign, not a global proof"
+    },
+    {
+      "id": "shoals.inv.bs_gamma_sign.v1",
+      "kind_applies_to": ["finance.option_pricer.european_call"],
+      "target_model": "bs_call",
+      "property": {
+        "file": "properties/canonpricing.ch",
+        "name": "bs_call_gamma_sign",
+        "module": "Shoals.Properties.CanonPricing"
+      },
+      "binding": {
+        "mechanism": "direct-call",
+        "references_output_fn": "direct",
+        "goal_pattern": "(({{output_fn}}(s + 2.0*h, k, 0.05, sigma, t) + {{output_fn}}(s, k, 0.05, sigma, t)) - (2.0 * {{output_fn}}(s + h, k, 0.05, sigma, t)) >= -0.00001)",
+        "contracts": []
+      },
+      "preconditions": [
+        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "h", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "sigma", "op": "gt", "rhs": {"const": 0.0}},
+        {"lhs": "t", "op": "gt", "rhs": {"const": 0.0}}
+      ],
+      "controls": {
+        "satisfying": {"name": "bs_call_gamma_sign", "expected": "passed"},
+        "violating": {"name": "bs_call_gamma_sign_corrupted", "expected": "failed", "witness_required": true}
+      },
+      "expected_tier_per_pin": {"0.17.4": "fuzz_validated"},
+      "tier_upgrade_trigger": "chelis#637",
+      "dischargeability_probe": "p15_bs_greeks_multi_seed",
+      "violation_text": "the real Black-Scholes call price is materially concave in spot",
+      "fuzz_domain_note": "observed against the real bs_call_scalar body across deterministic seeds 0, 1, and 2 at r=0.05; sampled convexity with an explicit f32 roundoff allowance, not a global gamma proof"
     }
   ],
   "deferred_invariants": [
-    {
-      "id": "shoals.inv.call_monotone_in_s.bs.v1",
-      "dischargeability_probe": "p08_pkg_bs_positive",
-      "reason": "Two-point monotonicity against the real transcendental bs_call_scalar. The 0.17.4 de-narrowing probe covered only direct call-price positivity, not this two-evaluation monotonicity surface. The proven lane still loses the normal_cdf coupling under free-variable abstraction (chelis#637). No expected tier until a dedicated per-surface fuzz probe observes one.",
-      "trigger": "a dedicated 0.17.4-or-later fuzz probe of the monotonicity property and corrupted twin, or proven discharge via chelis#637."
-    },
     {
       "id": "shoals.inv.bs_intrinsic_lower_bound.v1",
       "reason": "C >= s - k*disc is not reachable via value-level (free-variable) abstraction -- it needs the moneyness coupling between d1, d2 and s vs k*disc that the abstraction discards (research/proof-infra/report.md sec 4 negative-space finding). The relational/whole-expression abstraction that preserves the coupling is chelis#637 (the Beacon BoxRange shape). Not characterizable at this pin; no expected tier.",
@@ -2415,21 +2537,6 @@
       "id": "shoals.inv.bs_vega_nonneg_grad.v1",
       "reason": "grad-in-property sign invariants (vega/delta/gamma) do NOT lower through a cross-module import of the pricer (prove hangs; economoist docs/issue_drafts/dependency_edges_imports.md) and grad through bs_call_scalar hits the f32/f64 precision-mismatch across the grad boundary (research/proof-infra/report.md sec 5). grad never lowers to SMT (fuzz-only). This surface was not included in the 0.17.4 direct-positivity probe, so it remains uncharacterized.",
       "trigger": "resolve the cross-module grad and f32/f64 boundary defects, then demonstrate the inlined equivalent-form grad body and corrupted twin in a dedicated fuzz probe."
-    },
-    {
-      "id": "shoals.inv.bs_vega_sign.v1",
-      "reason": "Two-point monotonicity in sigma against the real transcendental bs_call_scalar (the Black-Scholes analog of crr_call_vega_sign). Free-variable abstraction discards the d1/sigma/price coupling (chelis#637), and the 0.17.4 direct-positivity probe did not exercise this two-evaluation surface. The CRR anchor proves the lattice analog genuinely.",
-      "trigger": "a dedicated 0.17.4-or-later fuzz probe of the vega-sign property and corrupted twin, or proven discharge via chelis#637."
-    },
-    {
-      "id": "shoals.inv.bs_rho_sign.v1",
-      "reason": "Two-point monotonicity in r against the real transcendental bs_call_scalar (rho >= 0 for a European call). The abstracted residual does not encode the r/disc/forward coupling (chelis#637), and the 0.17.4 direct-positivity probe did not exercise this two-evaluation surface.",
-      "trigger": "a dedicated 0.17.4-or-later fuzz probe of the rho-sign property and corrupted twin, or proven discharge via chelis#637."
-    },
-    {
-      "id": "shoals.inv.bs_gamma_sign.v1",
-      "reason": "Convexity in spot (three-point second difference) against the real transcendental bs_call_scalar (gamma >= 0). The abstracted residual loses the s/d1/N(d1) coupling (chelis#637), and the 0.17.4 direct-positivity probe did not exercise this three-evaluation surface.",
-      "trigger": "a dedicated 0.17.4-or-later fuzz probe of the gamma-sign property and corrupted twin, or proven discharge via chelis#637."
     },
     {
       "id": "shoals.inv.var_monotone_in_confidence.v1",

@@ -21,11 +21,13 @@ in spot) on `tr_crr_call_2step`. All pure arithmetic + ITE, expected to
 discharge at Tier B (proven over the reals). Each ships corrupted twin +
 guards_satisfiable + manifest entry.
 
-### 2. Black-Scholes Promotion Gate Stubs (deferred)
+### 2. Black-Scholes Direct Greek Comparisons (fuzz-validated)
 
-Add `deferred_invariants` entries for bs_vega_sign, bs_rho_sign, bs_gamma_sign
-— the transcendental-pricer versions that promote when chelis#637 (Beacon /
-BoxRange) lands. No @property bodies pre-staged (the plan forbids it).
+The former spot-monotonicity, vega-sign, rho-sign, and gamma-sign stubs are
+active against the real `bs_call_scalar` body at `fuzz_validated`. Satisfying
+and corrupted controls run over three deterministic seeds. Their upgrade to a
+global proven tier remains deferred to chelis#637 (relational / BoxRange
+abstraction); the separate grad-in-property candidate remains deferred.
 
 ### 3. VaR / Quantile Coherence Stubs (deferred or fuzz_validated)
 

@@ -9,12 +9,13 @@ Ships as a reef package under the `Shoals` module prefix.
 v0.24.2 release candidate on Chelis 0.17.4. The M0-M9 quantitative
 surface is implemented across pricing, curves, volatility, stochastic models,
 Greeks, XVA, calibration, and risk. The release also ships a first-class
-characterization manifest and proof gate: 20 active invariants are checked at
+characterization manifest and proof gate: 24 active invariants are checked at
 their declared method-attributed tiers, compiler-owned dependency records bind
 each result to its implementation, and satisfying/violating controls prevent
 vacuous green results. The direct Black-Scholes and Black-76 positivity family
-is honestly `fuzz_validated`; exact closed-form promotion remains blocked by
-the coupled-subterm limitation chelis#637. The module table below is the
+and direct Black-Scholes spot-monotonicity/delta, vega, rho, and gamma
+comparisons are honestly `fuzz_validated`; exact closed-form promotion remains
+blocked by the coupled-subterm limitation chelis#637. The module table below is the
 current package surface; `docs/CHELIS_SURFACE.md` is the versioned capability
 inventory.
 
@@ -51,14 +52,16 @@ ground-truth oracles that `Shoals.Pricing`, `Shoals.Risk`, and
 ## Properties
 
 `properties/` ships function bodies for the canonical finance
-properties. The release manifest currently carries 20 active invariants and
-13 explicitly deferred candidates. `scripts/prove_gate.py` verifies every
+properties. The release manifest currently carries 24 active invariants and
+9 explicitly deferred candidates. `scripts/prove_gate.py` verifies every
 active tier against the pinned release compiler, including corrupted controls
 and compiler-owned dependency attribution. Direct Black-Scholes and Black-76
-call-price positivity are observed at `fuzz_validated`; they are not presented
-as proofs. CRR and fixed-income arithmetic anchors reach SMT-backed tiers, while
-unobserved monotonicity, Greek, and risk families remain deferred with cited
-upgrade triggers. See `docs/CHELIS_SURFACE.md` and
+call-price positivity plus direct Black-Scholes spot-monotonicity/delta, vega,
+rho, and gamma comparisons are observed at `fuzz_validated`; they are not
+presented as proofs. The Greek family is re-run over seeds 0, 1, and 2. CRR and
+fixed-income arithmetic anchors reach SMT-backed tiers, while the unobserved
+direct intrinsic-bound, grad-in-property, risk, and general-size families
+remain deferred with cited upgrade triggers. See `docs/CHELIS_SURFACE.md` and
 `docs/cnote-import-surface.json` for the exact current surface.
 
 ## Toolchain

@@ -52,8 +52,8 @@ in code that is CLOSED upstream but not sitting in §Archived.
       require a complete test report before removing the exclusion.
 
 - **chelis#637 — the certified-envelope discharge cannot express
-  coupled-subterm dependencies (`N(d1)`/`N(d2)`): BS positivity / intrinsic
-  lower bound unreachable by free-variable abstraction.** The 0.16.0
+  coupled-subterm dependencies (`N(d1)`/`N(d2)`): exact BS price and Greek
+  properties are unreachable by free-variable abstraction.** The 0.16.0
   envelope path (chelis#434, §Archived) abstracts each transcendental
   subterm to an INDEPENDENT fresh variable over its certified hull, so the
   quantitative coupling `bs_call = s·N(d1) − k·e^{−rt}·N(d2)` (with
@@ -64,10 +64,11 @@ in code that is CLOSED upstream but not sitting in §Archived.
       SMT surface. Running
       `chelis prove properties/canonpricing.ch --json --tier smt-only
       --smt-timeout 20000 --package .` with the 0.17.4 release binary returns
-      `unsupported` / `property does not lower to Tier B (smt-only)` for all
-      four real-pricer properties, including `bs_call_price_nonneg`; no
-      property is reported proven. The direct-pricer invariant therefore
-      stays deferred on the proven lane. The identical intrinsic-lower-bound
+      `unsupported` / `property does not lower to Tier B (smt-only)` for the
+      real-pricer properties, including `bs_call_price_nonneg`; no direct
+      property is reported proven. Price positivity and the direct Greek
+      comparisons therefore remain fuzz-validated on the active lane and
+      deferred on the proven lane. The identical intrinsic-lower-bound
       invariant remains proven on the CRR risk-neutral anchor
       (`properties/canontrees.ch`
       `crr_rn_call_intrinsic_lower_bound`) — the teaching exemplar of the
@@ -197,11 +198,11 @@ in code that is CLOSED upstream but not sitting in §Archived.
     discharges as **`proven_modulo_certified_envelope`** (a strictly weaker,
     disclosed verdict class; fail-closed on unboundable arguments).
     Re-probed at the 0.16.1 bump per-surface via `scripts/prove_gate.py`.
-  - **Residual (live tracker chelis#637, §Tracking):** the flagship BS
-    positivity / intrinsic-lower-bound goals are structurally unreachable by
-    independent-subterm abstraction (the `N(d1)`/`N(d2)` coupling is
-    discarded), so they cannot reach an exact proven tier. Direct BS/B76
-    call-price positivity is observed at `fuzz_validated`; the direct
+  - **Residual (live tracker chelis#637, §Tracking):** the flagship BS price
+    and Greek goals are structurally unreachable by independent-subterm
+    abstraction because their coupled pricing terms are discarded. Direct
+    BS/B76 call-price positivity and direct BS spot-monotonicity/delta, vega,
+    rho, and gamma comparisons are observed at `fuzz_validated`; the direct
     intrinsic-lower-bound candidate stays deferred. Code citations at those
     narrowing sites now cite chelis#637.
   - **Retained discipline:** the contract-abstraction method in
