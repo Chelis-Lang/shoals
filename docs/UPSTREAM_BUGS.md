@@ -12,8 +12,8 @@ changelog claim is not a verification — re-probe the reproducer per-surface);
 **parked** entries when their gating dependency ships or a concrete need
 appears; **archived** entries are historical and are not re-probed. Where a
 blocker is mechanically expressible it graduates to an executable probe under
-`tests_blocked/` (deferred — see the trigger in `AGENTS.md` §Pin Bump
-Checklist); items that cannot be probed in-package are re-probed manually here.
+`tests_blocked/`; items that cannot be probed in-package are re-probed manually
+here.
 
 Suspected chelis bugs are filed in `Chelis-Lang/chelis` and cited as
 `chelis#NNN` (own-repo items as `shoals#NNN`), **never by a prose name**, so a

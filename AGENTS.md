@@ -137,7 +137,7 @@ one change set (contract §7):
    literal `CHELIS_TAG` / `CHELIS_VERSION` env pair in each toolchain-installing
    workflow. Verify with `python3 scripts/audit_workarounds.py --pins-only`.
    Install via the pinned toolchain (the shared install action reads the pin).
-2. Run the blocked-probe suite once it exists (deferred today); FIX-detected →
+2. Run `chelis test tests_blocked/ --expect blocked`; FIX-detected →
    execute the sidecar de-narrowing instructions and promote the probe;
    DRIFTED → investigate before re-citing.
 3. Run `python3 scripts/audit_workarounds.py` (full mode); triage every
