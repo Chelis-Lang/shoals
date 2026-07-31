@@ -446,6 +446,56 @@ def witness_in_domain(cx: dict, preconditions: list) -> tuple[bool, str]:
     return True, "in-domain"
 
 
+def failed_witness_in_domain(rec: dict, preconditions: list,
+                             witness_required: bool) -> tuple[bool, str]:
+    """Validate any emitted counterexample, independent of proof tier."""
+    cx = rec.get("counterexample")
+    if not cx:
+        if witness_required:
+            return False, "required counterexample is absent"
+        return True, "no witness required or emitted"
+    return witness_in_domain(cx, preconditions)
+
+
+def witness_domain_self_test() -> bool:
+    """An out-of-domain fuzz witness must never satisfy the corrupt oracle."""
+    preconditions = [
+        {"lhs": "alpha", "op": "gt", "rhs": {"const": 0.5}},
+        {"lhs": "alpha", "op": "lt", "rhs": {"const": 1.0}},
+    ]
+    cases = [
+        (
+            "valid fuzz witness accepted",
+            failed_witness_in_domain(
+                {"proof_tier": "fuzz", "counterexample": {"alpha": "0.75"}},
+                preconditions,
+                True,
+            )[0],
+        ),
+        (
+            "out-of-domain fuzz witness rejected",
+            not failed_witness_in_domain(
+                {"proof_tier": "fuzz", "counterexample": {"alpha": "0.25"}},
+                preconditions,
+                True,
+            )[0],
+        ),
+        (
+            "missing required fuzz witness rejected",
+            not failed_witness_in_domain(
+                {"proof_tier": "fuzz"}, preconditions, True
+            )[0],
+        ),
+    ]
+    failed = [name for name, passed in cases if not passed]
+    for name in failed:
+        fail(f"witness-domain self-test: {name}")
+    ok = not failed
+    print(f"  witness-domain self-test: {'PASS' if ok else 'FAIL'} "
+          f"({len(cases)} cases; fuzz has no domain-check bypass)")
+    return ok
+
+
 def goal_names_ref(goal: str, invariant: dict) -> bool:
     """Supplemental call-site check; never the modern ownership oracle.
 
@@ -543,17 +593,14 @@ def check_instantiation(recs, graph, inv, inst, pin, model, package) -> bool:
     if vrec:
         ok = check_dependency(vrec, vg["name"], "violating") and ok
     if vrec and vg["expected"] == "failed":
-        cx = vrec.get("counterexample")
-        if vg.get("witness_required") and not cx:
-            fail(f"violating `{vg['name']}` requires a witness but has none")
+        ind, why = failed_witness_in_domain(
+            vrec,
+            inst.get("preconditions", []),
+            bool(vg.get("witness_required")),
+        )
+        if not ind:
+            fail(f"violating `{vg['name']}` witness not in-domain: {why}")
             ok = False
-        elif cx:
-            ind, why = witness_in_domain(cx, inst.get("preconditions", []))
-            # fuzz counterexamples are in-domain f32 by construction; SMT ones
-            # are checked against the structured preconditions.
-            if not ind and vrec.get("proof_tier") != "fuzz":
-                fail(f"violating `{vg['name']}` witness not in-domain: {why}")
-                ok = False
     return ok
 
 
@@ -884,6 +931,7 @@ def main() -> None:
         return include_fuzz or inv["expected_tier_per_pin"].get(pin) != "fuzz_validated"
 
     ok = honesty_self_test()
+    ok = witness_domain_self_test() and ok
     ok = dependency_graph_self_test() and ok
     ok = metamorphic_self_test(binary) and ok
 

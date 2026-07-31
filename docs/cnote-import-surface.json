@@ -2,9 +2,9 @@
   "schema_id": "chelis-shell.invariant-surface",
   "schema_version": "1.0",
   "pkg": "shoals",
-  "pkg_version": "0.24.2",
+  "pkg_version": "0.24.3",
   "chelis_pin": "0.17.4",
-  "generated_note": "Producer manifest for the C Note characterization engine (frozen contract characterization_contract_v1.md sec 1). The Shoals 0.24.2 release will publish this byte-for-byte as shoals-0.24.2.invariants.json; its Chelis 0.17.4 / Nautilus 0.7.36 / Coral 0.7.33 upstream release cascade is published and checksummed. Canon Breadth includes the Tier-B GREEK SIGN family on tr_crr_call_2step, fuzz-validated direct Black-Scholes and Black-76 call-price positivity, and fuzz-validated direct Black-Scholes spot-monotonicity/delta, vega, rho, and gamma comparisons. The direct Greek family is release-gated over seeds 0, 1, and 2; global proven promotion remains blocked by chelis#637. VaR/quantile coherence stubs remain gated on a dedicated risk probe or quantile contract, general-size promotion stubs remain gated on induction, and the parametric_var risk model is included. The MODEL-FREE canon carries kind-scoped direct-output-function invariants for the CRR european_call no-arbitrage family and discrete-compounding fixed_income family. Since Chelis 0.17.2 every active binding is validated from the compiler summary dependency graph: direct lanes require the exact property-to-anchor-model edge; structural composites require the exact property-to-chelis-std/Std.Contracts.normal_cdf edge and deliberately make no property-to-bs_call_scalar claim. Tiers are revalidated at chelis 0.17.4; every below-proven tier cites a tier_upgrade_trigger and a dischargeability_probe.",
+  "generated_note": "Producer manifest for the C Note characterization engine (frozen contract characterization_contract_v1.md sec 1). The Shoals 0.24.3 release will publish this byte-for-byte as shoals-0.24.3.invariants.json; its Chelis 0.17.4 / Nautilus 0.7.36 / Coral 0.7.33 upstream release cascade is published and checksummed. Canon Breadth includes the Tier-B GREEK SIGN family on tr_crr_call_2step, fuzz-validated direct Black-Scholes and Black-76 call-price positivity, and fuzz-validated direct Black-Scholes spot-monotonicity/delta, vega, rho, and gamma comparisons. The direct Greek family is release-gated over seeds 0, 1, and 2; global proven promotion remains blocked by chelis#637. Shoals#37 VaR/quantile coherence remains deferred: chelis#977 is not in the pinned release and chelis#979 has not landed the real Nautilus quantile-contract consumer seam. General-size promotion stubs remain gated on induction, and the parametric_var risk model is included without implying the missing historical surface. The MODEL-FREE canon carries kind-scoped direct-output-function invariants for the CRR european_call no-arbitrage family and discrete-compounding fixed_income family. Since Chelis 0.17.2 every active binding is validated from the compiler summary dependency graph: direct lanes require the exact property-to-anchor-model edge; structural composites require the exact property-to-chelis-std/Std.Contracts.normal_cdf edge and deliberately make no property-to-bs_call_scalar claim. Tiers are revalidated at chelis 0.17.4; every below-proven tier cites a tier_upgrade_trigger and a dischargeability_probe.",
   "models": [
     {
       "id": "bs_call",
@@ -2540,18 +2540,18 @@
     },
     {
       "id": "shoals.inv.var_monotone_in_confidence.v1",
-      "reason": "VaR monotonicity in confidence level against the real parametric_var remains uncharacterized. The dedicated Chelis 0.17.4 fuzz re-probe on 2026-07-31 exhausted 100 generator attempts with zero accepted samples because the ordered alpha1/alpha2 guards starved; unlike the two one-confidence risk properties, it did not produce a tier. The proven lane also lacks a certified normal_inv_cdf quantile contract.",
-      "trigger": "a guard-aware generator or revised sound sampling shape that demonstrates both the property and corrupted twin, or a chelis-std quantile/inv_cdf contract enabling SMT abstraction."
+      "reason": "Shoals#37 remains blocked for VaR monotonicity against the real parametric_var. The dedicated Chelis 0.17.4 fuzz re-probe on 2026-07-31 exhausted 100 generator attempts with zero accepted samples because the ordered alpha1/alpha2 guards starved; chelis#977 is only a candidate and is not in the pinned release. The proven and historical lanes also lack chelis#979's source-level contract binding to the real Nautilus quantile implementation.",
+      "trigger": "land chelis#977 in a pinned release and demonstrate the parametric property plus corrupted twin across multiple seeds; land chelis#979 before activating the distinct historical quantile claim required by shoals#37."
     },
     {
       "id": "shoals.inv.cvar_dominates_var.v1",
-      "reason": "CVaR >= VaR against the real parametric_cvar/parametric_var produced a one-sample fuzz_validated result and a corrupted-twin witness on Chelis 0.17.4 (2026-07-31), but is not stable at the release gate's larger sample budget: a five-sample combined re-probe exits 3 in the risk file. It therefore remains deferred rather than overclaiming a durable tier; normal_inv_cdf also lacks an SMT contract.",
-      "trigger": "a dedicated multi-sample fuzz probe that completes repeatedly at the release budget, or a chelis-std quantile contract enabling SMT abstraction."
+      "reason": "Shoals#37 remains blocked for CVaR >= VaR. The real parametric_cvar/parametric_var produced a one-sample fuzz_validated result and corrupted-twin witness on Chelis 0.17.4 (2026-07-31), but a five-sample combined re-probe exits 3. Chelis#977 is not in the pinned release, and chelis#979 has not bound a source-level contract to the real Nautilus quantile implementation needed for the distinct historical claim.",
+      "trigger": "after chelis#977 lands in the pin, complete a repeatable multi-seed parametric probe at the release budget; land chelis#979 and separately validate the historical ES/VaR claim before closing shoals#37."
     },
     {
       "id": "shoals.inv.var_nonneg_positive_mean.v1",
-      "reason": "Positive-mean VaR produced a one-sample fuzz_validated result and a corrupted-twin witness on Chelis 0.17.4 (2026-07-31), but at five samples the satisfying property errors and the compiler exits 3. The one-sample observation is insufficient for the release canon, so this remains deferred; normal_inv_cdf also lacks an SMT contract.",
-      "trigger": "a dedicated multi-sample fuzz probe whose satisfying and corrupted controls complete repeatedly at the release budget, or a chelis-std quantile contract."
+      "reason": "Shoals#37 remains blocked for positive-mean VaR. A one-sample parametric probe and corrupted twin completed on Chelis 0.17.4 (2026-07-31), but at five samples the satisfying property errors and the compiler exits 3. Chelis#977 is not in the pinned release; chelis#979's real Nautilus quantile seam is also unlanded, so the issue's historical half cannot be substituted by this partial observation.",
+      "trigger": "after chelis#977 lands in the pin, complete satisfying and corrupted parametric controls repeatedly at the release budget; land chelis#979 and separately validate historical non-negativity before closing shoals#37."
     },
     {
       "id": "shoals.inv.crr_general_nonneg.v1",

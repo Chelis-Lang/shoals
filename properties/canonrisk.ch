@@ -10,7 +10,11 @@ import Shoals.Risk (parametric_var, parametric_cvar)
 -- 0.17.4 probes produced one-sample greens for CVaR dominance and positive-
 -- mean VaR, but did not survive a five-sample release-budget check; confidence
 -- monotonicity exhausted its ordered-alpha guards. All three therefore remain
--- deferred pending a stable multi-sample observation or quantile contract.
+-- deferred under shoals#37: chelis#977's constraint-directed sampler is only
+-- a candidate (not in the pinned release), and chelis#979's real Nautilus
+-- quantile-contract consumer seam has not landed. Activating only these
+-- parametric probes would not satisfy the separate historical-model acceptance
+-- surface, so no partial invariant is promoted.
 --
 -- The @property surface quantifies over scalar f32 values that are then packed
 -- into a fixed 3-element tensor inside the goal body. This is the smallest size

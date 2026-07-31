@@ -36,6 +36,13 @@ VaR-nonneg invariants targeting `src/risk.ch`. Tier classification is honest:
 if fuzz completes they enter active invariants; if intractable they go deferred
 with trigger "chelis-std quantile primitive".
 
+Current verdict for shoals#37: explicitly deferred. Chelis#977's
+constraint-directed sampler is not in the pinned release, and chelis#979's
+source-level contract binding to the real Nautilus quantile implementation has
+not landed. The existing parametric probes remain characterization evidence,
+but activating them alone would not satisfy the issue's distinct parametric and
+historical acceptance surface.
+
 ### 4. General-Size Promotion Stubs (deferred)
 
 Author `properties/canongeneral.ch` naming the fold-based
