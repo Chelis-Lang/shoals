@@ -100,6 +100,9 @@ jobs:
       - name: chelis reef build
         run: chelis reef build
 
+      - name: Validate Black-Scholes WireDag root (shoals#19)
+        run: python3 scripts/validate_bs_wire_root.py
+
       # Contract §5/§6 expected-failure suites: seconds each (per-file
       # isolated), so they stay on the lean per-PR path.
       - name: Negative tests

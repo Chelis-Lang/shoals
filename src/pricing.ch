@@ -1,6 +1,6 @@
 module Shoals.Pricing
 import Nautilus.Distributions (normal_sample)
-export (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, call_prices, put_prices, call_total, put_total, deltas_call, deltas_put, vegas_call, rhos_call, thetas_call, gammas_call, volgas_call, vannas_call, mc_call_price)
+export (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_wire_f64, call_prices, put_prices, call_total, put_total, deltas_call, deltas_put, vegas_call, rhos_call, thetas_call, gammas_call, volgas_call, vannas_call, mc_call_price)
 -- One normal CDF behind both price and Greeks. erf is the Abramowitz-Stegun
 -- 7.1.26 rational approximation in f64 -- byte-for-byte the same coefficients as
 -- Nautilus.Special.erf, reimplemented in f64 because the package symbol is
@@ -68,6 +68,51 @@ def spot_col[n](spots: tensor[n, f32]) -> tensor[n, 1, f64] = {
 def f64_col[n](xs: tensor[n, f64]) -> tensor[n, 1, f64] = {
   nn = cast(shape(copy(xs), cast(0, int32)), int64)
   reshape(xs, [nn, cast(1, int64)])
+}
+-- Pure tensor-DAG Black-Scholes helpers for the Beacon seam (shoals#19).
+-- Constants are point-valued tensor inputs because introducing them through
+-- host-only shape/vmap plumbing would erase the named WireDag root. The
+-- arithmetic and both erf branches mirror `erf64` above in f64.
+def pricing_wire_select_f64[n](mask: &tensor[n, f64], a: tensor[n, f64], b: tensor[n, f64], half: &tensor[n, f64]) -> tensor[n, f64] = {
+  one = add(copy(half), copy(half))
+  add(mul(copy(mask), a), mul(sub(one, copy(mask)), b))
+}
+def pricing_wire_abs_f64[n](x: &tensor[n, f64], half: &tensor[n, f64]) -> tensor[n, f64] = {
+  neg_mask = cast(lt(copy(x), cast(0.0, f64)), f64)
+  pricing_wire_select_f64(&neg_mask, neg(copy(x)), copy(x), half)
+}
+def pricing_wire_erf_f64[n](x: &tensor[n, f64], a1: &tensor[n, f64], a2: &tensor[n, f64], a3: &tensor[n, f64], a4: &tensor[n, f64], a5: &tensor[n, f64], p: &tensor[n, f64], two_over_sqrt_pi: &tensor[n, f64], small: &tensor[n, f64], half: &tensor[n, f64]) -> tensor[n, f64] = {
+  one = add(copy(half), copy(half))
+  ax = pricing_wire_abs_f64(x, half)
+  linear = mul(copy(x), copy(two_over_sqrt_pi))
+  t_v = div(copy(&one), add(copy(&one), mul(copy(p), copy(&ax))))
+  poly = mul(copy(&t_v), add(copy(a1), mul(copy(&t_v), add(copy(a2), mul(copy(&t_v), add(copy(a3), mul(copy(&t_v), add(copy(a4), mul(copy(&t_v), copy(a5))))))))))
+  y = sub(one, mul(poly, exp(neg(mul(copy(&ax), copy(&ax))))))
+  neg_mask = cast(lt(copy(x), cast(0.0, f64)), f64)
+  signed = pricing_wire_select_f64(&neg_mask, neg(copy(&y)), y, half)
+  small_mask = cast(lt(mul(copy(x), copy(x)), mul(copy(small), copy(small))), f64)
+  pricing_wire_select_f64(&small_mask, linear, signed, half)
+}
+def pricing_wire_normal_cdf_f64[n](x: &tensor[n, f64], half: &tensor[n, f64], inv_sqrt_2: &tensor[n, f64], a1: &tensor[n, f64], a2: &tensor[n, f64], a3: &tensor[n, f64], a4: &tensor[n, f64], a5: &tensor[n, f64], p: &tensor[n, f64], two_over_sqrt_pi: &tensor[n, f64], small: &tensor[n, f64]) -> tensor[n, f64] = {
+  one = add(copy(half), copy(half))
+  neg_scaled = neg(mul(copy(x), copy(inv_sqrt_2)))
+  erf_v = pricing_wire_erf_f64(&neg_scaled, a1, a2, a3, a4, a5, p, two_over_sqrt_pi, small, half)
+  mul(copy(half), sub(one, erf_v))
+}
+def pricing_wire_d1_f64[n](s: &tensor[n, f64], k: &tensor[n, f64], r: &tensor[n, f64], sigma: &tensor[n, f64], t: &tensor[n, f64], half: &tensor[n, f64]) -> tensor[n, f64] = {
+  num = add(log(div(copy(s), copy(k))), mul(add(copy(r), mul(copy(half), mul(copy(sigma), copy(sigma)))), copy(t)))
+  div(num, mul(copy(sigma), sqrt(copy(t))))
+}
+-- A producer-clean tensor entry for content-addressed WireDag consumers.
+-- It deliberately contains no `vmap`, `shape`, scalar conversion, or host
+-- list operation. Beacon binds the coefficient inputs to point intervals.
+def bs_call_wire_f64[n](s: tensor[n, f64], k: tensor[n, f64], r: tensor[n, f64], sigma: tensor[n, f64], t: tensor[n, f64], half: tensor[n, f64], inv_sqrt_2: tensor[n, f64], a1: tensor[n, f64], a2: tensor[n, f64], a3: tensor[n, f64], a4: tensor[n, f64], a5: tensor[n, f64], p: tensor[n, f64], two_over_sqrt_pi: tensor[n, f64], small: tensor[n, f64]) -> tensor[n, f64] = {
+  d1_v = pricing_wire_d1_f64(&s, &k, &r, &sigma, &t, &half)
+  d2_v = sub(copy(&d1_v), mul(copy(&sigma), sqrt(copy(&t))))
+  nd1 = pricing_wire_normal_cdf_f64(&d1_v, &half, &inv_sqrt_2, &a1, &a2, &a3, &a4, &a5, &p, &two_over_sqrt_pi, &small)
+  nd2 = pricing_wire_normal_cdf_f64(&d2_v, &half, &inv_sqrt_2, &a1, &a2, &a3, &a4, &a5, &p, &two_over_sqrt_pi, &small)
+  disc = exp(neg(mul(copy(&r), copy(&t))))
+  sub(mul(s, nd1), mul(k, mul(disc, nd2)))
 }
 def bs_call_f64_vector[n](spots: tensor[n, f64], strikes: tensor[n, f64], rates: tensor[n, f64], sigmas: tensor[n, f64], times: tensor[n, f64]) -> tensor[n, f64] = {
   sc = f64_col(spots)

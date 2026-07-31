@@ -22,6 +22,8 @@ automatic-differentiation derivative of that displayed price, so the delta belon
 number.
 
 - `bs_call_scalar`, `bs_put_scalar`: scalar f32 price.
+- `bs_call_wire_f64`: pure-tensor f64 Black-Scholes call entry with a
+  compiler-owned WireDag root for bounded-domain verification consumers.
 - `call_prices`, `put_prices`: price tensors over a spot tensor (tensor lane, grad-able).
 - `call_total`, `put_total`: reduced totals.
 - First-order Greeks (AD): `deltas_call`, `deltas_put`, `vegas_call`, `rhos_call`,

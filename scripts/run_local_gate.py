@@ -13,36 +13,38 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
      ``tests-manual/``, ``tests_neg/``, ``tests_blocked/``.
   3. ``chelis lint --check`` over those directories + ``manual-gates/``.
   4. ``chelis reef build`` for package-level compiler validation.
-  5. ``chelis test tests_neg/ --expect neg`` (contract §6).
-  6. ``chelis test tests_blocked/ --expect blocked`` (contract §5 —
+  5. ``scripts/validate_bs_wire_root.py`` — lower the real pure-tensor
+     Black-Scholes entry and require its named WireDag root (shoals#19).
+  6. ``chelis test tests_neg/ --expect neg`` (contract §6).
+  7. ``chelis test tests_blocked/ --expect blocked`` (contract §5 —
      a pass here is FIX-detected and fails loudly by design).
-  7. ``chelis reef conform audit`` (contract §11). The per-PR CI also runs
+  8. ``chelis reef conform audit`` (contract §11). The per-PR CI also runs
      ``conform bump-check --base origin/main``; that step is CI-only —
      a stale local ``origin/main`` would make it false-fail, and CI runs
      it authoritatively on every PR.
-  8. ``scripts/contract_gate.py`` — offline manifest resolvability + pin
+  9. ``scripts/contract_gate.py`` — offline manifest resolvability + pin
       freshness (also a per-PR CI gate).
-  9. ``scripts/test_check_package_prove_latency.py`` — negative-parity tests
+  10. ``scripts/test_check_package_prove_latency.py`` — negative-parity tests
       for the chelis#924 release oracle.
-  10. ``scripts/test_release_workflow.py`` — static release/toolchain and
+  11. ``scripts/test_release_workflow.py`` — static release/toolchain and
       hosted/local matrix integrity contracts.
 
 ``--full`` appends the stages CI runs in ``.github/workflows/nightly.yml``
 (scheduled, NOT per-PR) — run this at least once at a pin bump
 (``AGENTS.md`` §Pin Bump Checklist) or before a release tag:
 
-  11. ``chelis test tests/ --timeout 1200 --suite-timeout 1500 --jobs auto`` — the fast unit
+  12. ``chelis test tests/ --timeout 1200 --suite-timeout 1500 --jobs auto`` — the fast unit
       suite (~13 min of real-chelis wall; nightly in CI).
-  12. The weekly nightly ``heavy`` matrix, one ``tests-manual/<file>.ch`` at
+  13. The weekly nightly ``heavy`` matrix, one ``tests-manual/<file>.ch`` at
       a time with ``--timeout 1500 --suite-timeout 1650 --jobs 1``. This
       explicitly raises Chelis 0.17.4's separate 600-second whole-suite
       watchdog without weakening any test oracle. It deliberately excludes
       ``modelfit_bfgs_heavy`` pending chelis#408, exactly like hosted nightly;
       an all-directory batch both over-scopes the release gate and hits the
       compiler's whole-suite timeout before completing the reviewed matrix.
-  13. ``scripts/prove_gate.py`` — the keystone canon self-audit against
+  14. ``scripts/prove_gate.py`` — the keystone canon self-audit against
       the release binary (real SMT, ~8.6 min; nightly in CI).
-  14. ``scripts/check_package_prove_latency.py`` — the chelis#924 release
+  15. ``scripts/check_package_prove_latency.py`` — the chelis#924 release
       oracle: install the just-built Shoals candidate, then require a cold
       trivial package prove in <=20s and an unchanged warm prove in <=5s with
       byte-identical NDJSON.
@@ -151,6 +153,10 @@ def main() -> int:
         ("chelis fmt --check", []),  # expanded per-file below
         ("chelis lint --check", ["chelis", "lint", "--check", *LINT_DIRS]),
         ("chelis reef build", ["chelis", "reef", "build"]),
+        (
+            "Shoals Black-Scholes WireDag root (shoals#19)",
+            ["python3", "scripts/validate_bs_wire_root.py"],
+        ),
         (
             "chelis test tests_neg/ --expect neg",
             ["chelis", "test", "tests_neg/", "--expect", "neg"],

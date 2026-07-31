@@ -32,6 +32,28 @@ pp = bs_put_scalar(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2
 
 These two satisfy put-call parity: `c - p == s - k * exp(-r * t)`.
 
+## Content-addressed WireDag entry
+
+`bs_call_wire_f64` is the pure-tensor entry for bounded-domain verification
+consumers such as Beacon. It accepts same-length f64 tensors for the five market
+inputs and for the A-S constants. The constants are explicit point-valued
+inputs because host-side broadcasting (`vmap`, `shape`, scalar conversion, or
+list mapping) would erase the compiler-owned WireDag root. Its arithmetic and
+small-x/sign branches mirror `bs_call_f64`; representative deep-OTM, ATM, and
+deep-ITM rows are checked against that scalar pricer with a scale-aware bound.
+The executable comparison uses `1e-5 + 1e-8 * abs(expected)`, retaining the
+absolute floor near zero while remaining scale-aware for large prices, and
+covers both three-row and shape-one inputs.
+
+`python3 scripts/validate_bs_wire_root.py` enforces the `reef.toml` Chelis pin,
+compares raw artifacts from independent cold Tide processes, and validates
+schema 3, graph integrity, the named f64 tensor root, its exact reachable input
+set, its compiler-reported operation closure, and the reviewed raw SHA/root/node
+commitment. Any compiler or source change must deliberately refresh that
+commitment instead of accepting a merely plausible redirected graph. The result
+is a content-addressable compiler artifact; it does not itself claim a global
+Black-Scholes theorem.
+
 ## Vectorized prices
 
 ```chelis
