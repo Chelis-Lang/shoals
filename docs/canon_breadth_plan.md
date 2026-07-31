@@ -29,19 +29,20 @@ and corrupted controls run over three deterministic seeds. Their upgrade to a
 global proven tier remains deferred to chelis#637 (relational / BoxRange
 abstraction); the separate grad-in-property candidate remains deferred.
 
-### 3. VaR / Quantile Coherence Stubs (deferred or fuzz_validated)
+### 3. VaR / Quantile Coherence (fuzz_validated)
 
 Author `properties/canonrisk.ch` with VaR-monotonicity, CVaR-dominance, and
 VaR-nonneg invariants targeting `src/risk.ch`. Tier classification is honest:
 if fuzz completes they enter active invariants; if intractable they go deferred
 with trigger "chelis-std quantile primitive".
 
-Current verdict for shoals#37: explicitly deferred. Chelis#977's
-constraint-directed sampler is not in the pinned release, and chelis#979's
-source-level contract binding to the real Nautilus quantile implementation has
-not landed. The existing parametric probes remain characterization evidence,
-but activating them alone would not satisfy the issue's distinct parametric and
-historical acceptance surface.
+Current verdict for shoals#37: active at `fuzz_validated`. The parametric
+inverse-CDF and historical empirical-quantile families are distinct. Each
+covers confidence monotonicity, ES dominance, and positivity against the real
+exported bodies over 25 accepted constraint-directed samples at seeds 0, 1,
+and 2. Corrupt twins fail with in-domain witnesses. The release gate consumes
+only compiler-owned dependency edges and requires both function edges in each
+ES/VaR relation; no dependency is reconstructed from source text.
 
 ### 4. General-Size Promotion Stubs (deferred)
 

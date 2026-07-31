@@ -6,10 +6,10 @@ Ships as a reef package under the `Shoals` module prefix.
 
 ## Status
 
-v0.24.3 release candidate on Chelis 0.17.4. The M0-M9 quantitative
+v0.24.3 release candidate on Chelis 0.17.5. The M0-M9 quantitative
 surface is implemented across pricing, curves, volatility, stochastic models,
 Greeks, XVA, calibration, and risk. The release also ships a first-class
-characterization manifest and proof gate: 24 active invariants are checked at
+characterization manifest and proof gate: 30 active invariants are checked at
 their declared method-attributed tiers, compiler-owned dependency records bind
 each result to its implementation, and satisfying/violating controls prevent
 vacuous green results. The direct Black-Scholes and Black-76 positivity family
@@ -52,25 +52,29 @@ ground-truth oracles that `Shoals.Pricing`, `Shoals.Risk`, and
 ## Properties
 
 `properties/` ships function bodies for the canonical finance
-properties. The release manifest currently carries 24 active invariants and
-9 explicitly deferred candidates. `scripts/prove_gate.py` verifies every
+properties. The release manifest currently carries 30 active invariants and
+6 explicitly deferred candidates. `scripts/prove_gate.py` verifies every
 active tier against the pinned release compiler, including corrupted controls
 and compiler-owned dependency attribution. Direct Black-Scholes and Black-76
 call-price positivity plus direct Black-Scholes spot-monotonicity/delta, vega,
 rho, and gamma comparisons are observed at `fuzz_validated`; they are not
 presented as proofs. The Greek family is re-run over seeds 0, 1, and 2. CRR and
-fixed-income arithmetic anchors reach SMT-backed tiers, while the unobserved
-direct intrinsic-bound, grad-in-property, risk, and general-size families
-remain deferred with cited upgrade triggers. See `docs/CHELIS_SURFACE.md` and
+fixed-income arithmetic anchors reach SMT-backed tiers. Distinct parametric
+inverse-CDF and historical empirical-quantile VaR/ES families cover confidence
+monotonicity, ES dominance, and positivity at `fuzz_validated`, each over 25
+accepted samples at seeds 0, 1, and 2 with corrupt witnesses and exact compiler
+dependency attribution. The unobserved direct intrinsic-bound,
+grad-in-property, and general-size families remain deferred with cited upgrade
+triggers. See `docs/CHELIS_SURFACE.md` and
 `docs/cnote-import-surface.json` for the exact current surface.
 
 ## Toolchain
 
-Pinned to `chelis v0.17.4` in `reef.toml`:
+Pinned to `chelis v0.17.5` in `reef.toml`:
 
 ```toml
 [package]
-compiler = "=0.17.4"
+compiler = "=0.17.5"
 ```
 
 Dependencies resolve via the local Reef registry (`~/.chelis/reef/`):
@@ -228,7 +232,7 @@ following the chelis-reef v0.4.1 multi-source-roots fix
 (`6b58030 feat(reef): multi-source-roots — additional_sources in reef.toml;
 bump v0.4.1`). The reef.toml declares
 `additional_sources = ["properties", "references", "demos"]`. Shoals 0.24.3
-carries the canonical layout forward and pins Chelis 0.17.4, Nautilus 0.7.36,
+carries the canonical layout forward and pins Chelis 0.17.5, Nautilus 0.7.36,
 and Coral 0.7.33. (References to the pre-reset v0.7.x numbering point at
 the historical version track and remain valid as release-history
 records; current planning lives on Shoals's own track per
@@ -242,7 +246,7 @@ exposes `chelis.check(...)` and `chelis.eval(source, bindings)` to
 Python. The pre-reset v0.1.0-alpha release verified a Shoals-shaped
 program round-trips through that surface. This is historical interop evidence,
 not part of the current Shoals release gate; the supported release path uses
-the checksummed Chelis 0.17.4 binary and Reef package artifacts described
+the checksummed pinned Chelis binary and Reef package artifacts described
 above.
 
 Setup (one-time):

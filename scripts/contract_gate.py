@@ -80,6 +80,29 @@ def exports_of(module: str) -> set[str]:
     return {x.strip() for x in m.group(1).split(",") if x.strip()}
 
 
+def additional_dependency_errors(dep: object) -> list[str]:
+    """Fail closed on an additive exact compiler-dependency declaration."""
+    required = {"package", "module", "kind", "name", "source_file"}
+    if not isinstance(dep, dict) or set(dep) != required:
+        return ["metadata must contain exactly package/module/kind/name/source_file"]
+    out: list[str] = []
+    if dep["package"] != "shoals" or dep["kind"] != "function":
+        out.append("only an exact shoals function dependency is supported")
+    source = module_src_file(dep["module"])
+    expected_source = str(source.relative_to(REPO))
+    if dep["source_file"] != expected_source:
+        out.append(f"source_file={dep['source_file']!r}, expected {expected_source!r}")
+    if not source.is_file() or declared_module(source) != dep["module"]:
+        out.append(f"module {dep['module']!r} does not resolve to its declared source")
+    else:
+        text = source.read_text()
+        match = re.search(r"export\s*\(([^)]*)\)", text)
+        exports = {x.strip() for x in match.group(1).split(",")} if match else set()
+        if dep["name"] not in exports:
+            out.append(f"function {dep['name']!r} is not exported by {dep['module']}")
+    return out
+
+
 def property_block(pfile: Path, name: str) -> str | None:
     """The `@property <name> ...:` HEADER line (params + where-guards). The
     canonically-formatted header is one line ending in `:`, the goal on the
@@ -282,6 +305,9 @@ def main() -> None:
             if tier in BELOW_PROVEN and not inv.get("tier_upgrade_trigger"):
                 err(f"{inv['id']}: below-proven tier {tier} lacks tier_upgrade_trigger")
         binding = inv.get("binding", {})
+        for dep in binding.get("additional_compiler_dependencies", []):
+            for detail in additional_dependency_errors(dep):
+                err(f"{inv['id']}: additional_compiler_dependency: {detail}")
         if binding.get("references_output_fn") == "structural":
             dep = binding.get("compiler_dependency")
             expected = {

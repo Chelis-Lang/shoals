@@ -3,8 +3,8 @@
   "schema_version": "1.0",
   "pkg": "shoals",
   "pkg_version": "0.24.3",
-  "chelis_pin": "0.17.4",
-  "generated_note": "Producer manifest for the C Note characterization engine (frozen contract characterization_contract_v1.md sec 1). The Shoals 0.24.3 release will publish this byte-for-byte as shoals-0.24.3.invariants.json; its Chelis 0.17.4 / Nautilus 0.7.36 / Coral 0.7.33 upstream release cascade is published and checksummed. Canon Breadth includes the Tier-B GREEK SIGN family on tr_crr_call_2step, fuzz-validated direct Black-Scholes and Black-76 call-price positivity, and fuzz-validated direct Black-Scholes spot-monotonicity/delta, vega, rho, and gamma comparisons. The direct Greek family is release-gated over seeds 0, 1, and 2; global proven promotion remains blocked by chelis#637. Shoals#37 VaR/quantile coherence remains deferred: chelis#977 is not in the pinned release and chelis#979 has not landed the real Nautilus quantile-contract consumer seam. General-size promotion stubs remain gated on induction, and the parametric_var risk model is included without implying the missing historical surface. The MODEL-FREE canon carries kind-scoped direct-output-function invariants for the CRR european_call no-arbitrage family and discrete-compounding fixed_income family. Since Chelis 0.17.2 every active binding is validated from the compiler summary dependency graph: direct lanes require the exact property-to-anchor-model edge; structural composites require the exact property-to-chelis-std/Std.Contracts.normal_cdf edge and deliberately make no property-to-bs_call_scalar claim. Tiers are revalidated at chelis 0.17.4; every below-proven tier cites a tier_upgrade_trigger and a dischargeability_probe.",
+  "chelis_pin": "0.17.5",
+  "generated_note": "Producer manifest for the C Note characterization engine (frozen contract characterization_contract_v1.md sec 1). The Shoals 0.24.3 release will publish this byte-for-byte as shoals-0.24.3.invariants.json. This candidate is evaluated against Chelis 0.17.5 with Nautilus 0.7.36 and Coral 0.7.33; publication checksums are a release-gate obligation, not claimed here. Canon Breadth includes the Tier-B GREEK SIGN family on tr_crr_call_2step, fuzz-validated direct Black-Scholes and Black-76 call-price positivity, and fuzz-validated direct Black-Scholes spot-monotonicity/delta, vega, rho, and gamma comparisons. The direct Greek family is release-gated over seeds 0, 1, and 2; global proven promotion remains blocked by chelis#637. Shoals#37 activates distinct parametric inverse-CDF and historical empirical-quantile VaR/ES coherence families. Each family covers confidence monotonicity, ES dominance, and non-negativity at 25 accepted constraint-directed samples for deterministic seeds 0, 1, and 2, with corrupt controls and compiler-owned dependency edges to every risk function named by a goal. General-size promotion stubs remain gated on induction. The MODEL-FREE canon carries kind-scoped direct-output-function invariants for the CRR european_call no-arbitrage family and discrete-compounding fixed_income family. Since Chelis 0.17.2 every active binding is validated from the compiler summary dependency graph: direct lanes require exact property-to-model edges, multi-function relations require every declared extra edge, and structural composites require the exact property-to-chelis-std/Std.Contracts.normal_cdf edge. Tiers are revalidated at chelis 0.17.5; every below-proven tier cites a tier_upgrade_trigger and a dischargeability_probe.",
   "models": [
     {
       "id": "bs_call",
@@ -625,10 +625,439 @@
       },
       "sensitivities": [],
       "defective": false,
-      "notes": "Parametric (Gaussian) VaR: mu + sigma * Phi^{-1}(alpha). Uses normal_inv_cdf which is not cvc5-lowerable (transcendental), so invariants over this model route to fuzz or are deferred. The canonical risk-measure model for the VaR/quantile coherence invariant family."
+      "notes": "Parametric (Gaussian) VaR: mu + sigma * Phi^{-1}(alpha). Uses normal_inv_cdf, so its active coherence invariants are separately fuzz-validated against the real parametric body."
+    },
+    {
+      "id": "historical_var",
+      "kind": "finance.risk_measure.historical",
+      "module": "Shoals.Risk",
+      "output_fn": "historical_var",
+      "sig": "(losses: tensor[n, f32], confidence: f32) -> f32",
+      "params": [
+        {
+          "name": "losses",
+          "meaning": "historical loss distribution sample",
+          "unit": "currency",
+          "domain": {},
+          "sweep_default": null
+        },
+        {
+          "name": "confidence",
+          "meaning": "empirical quantile confidence level",
+          "unit": "probability",
+          "domain": {
+            "gte": 0.0,
+            "lte": 1.0
+          },
+          "sweep_default": {
+            "min": 0.9,
+            "max": 0.99,
+            "value": 0.95
+          }
+        }
+      ],
+      "salient_dims": [
+        "confidence"
+      ],
+      "output": {
+        "meaning": "historical value-at-risk (empirical quantile)",
+        "unit": "currency"
+      },
+      "sensitivities": [],
+      "defective": false,
+      "notes": "Historical VaR delegates to Nautilus.Stats.quantile_vec. Its coherence family is observed separately from the Gaussian inverse-CDF family, with compiler-owned edges to the real historical_var and historical_cvar declarations."
     }
   ],
   "invariants": [
+    {
+      "id": "shoals.inv.var_monotone_in_confidence.v1",
+      "kind_applies_to": [
+        "finance.risk_measure.parametric"
+      ],
+      "target_model": "parametric_var",
+      "property": {
+        "file": "properties/canonrisk.ch",
+        "name": "var_monotone_in_confidence",
+        "module": "Shoals.Properties.CanonRisk"
+      },
+      "binding": {
+        "mechanism": "direct-call",
+        "references_output_fn": "direct",
+        "goal_pattern": "{{output_fn}}(losses, alpha2) >= {{output_fn}}(losses, alpha1)",
+        "contracts": []
+      },
+      "preconditions": [
+        {
+          "lhs": "alpha1",
+          "op": "gt",
+          "rhs": {
+            "const": 0.5
+          }
+        },
+        {
+          "lhs": "alpha2",
+          "op": "gt",
+          "rhs": {
+            "input": "alpha1"
+          }
+        },
+        {
+          "lhs": "alpha2",
+          "op": "lt",
+          "rhs": {
+            "const": 1.0
+          }
+        }
+      ],
+      "controls": {
+        "satisfying": {
+          "name": "var_monotone_in_confidence",
+          "expected": "passed"
+        },
+        "violating": {
+          "name": "var_monotone_in_confidence_corrupted",
+          "expected": "failed",
+          "witness_required": true
+        }
+      },
+      "non_vacuity_witness": "var_monotone_guards_satisfiable",
+      "expected_tier_per_pin": {
+        "0.17.5": "fuzz_validated"
+      },
+      "tier_upgrade_trigger": "prove a sound monotonic contract for Nautilus.Distributions.normal_inv_cdf through the real parametric_var body",
+      "dischargeability_probe": "shoals37_risk_multi_seed",
+      "violation_text": "parametric VaR decreases as confidence increases",
+      "fuzz_domain_note": "real parametric_var body; 25 accepted constraint-directed samples at each deterministic seed 0, 1, and 2; sampled characterization, not a global proof"
+    },
+    {
+      "id": "shoals.inv.cvar_dominates_var.v1",
+      "kind_applies_to": [
+        "finance.risk_measure.parametric"
+      ],
+      "target_model": "parametric_var",
+      "property": {
+        "file": "properties/canonrisk.ch",
+        "name": "cvar_dominates_var",
+        "module": "Shoals.Properties.CanonRisk"
+      },
+      "binding": {
+        "mechanism": "direct-call",
+        "references_output_fn": "direct",
+        "goal_pattern": "parametric_cvar(losses, alpha) >= {{output_fn}}(losses, alpha)",
+        "contracts": [],
+        "additional_compiler_dependencies": [
+          {
+            "package": "shoals",
+            "module": "Shoals.Risk",
+            "kind": "function",
+            "name": "parametric_cvar",
+            "source_file": "src/risk.ch"
+          }
+        ]
+      },
+      "preconditions": [
+        {
+          "lhs": "alpha",
+          "op": "gt",
+          "rhs": {
+            "const": 0.5
+          }
+        },
+        {
+          "lhs": "alpha",
+          "op": "lt",
+          "rhs": {
+            "const": 1.0
+          }
+        }
+      ],
+      "controls": {
+        "satisfying": {
+          "name": "cvar_dominates_var",
+          "expected": "passed"
+        },
+        "violating": {
+          "name": "cvar_dominates_var_corrupted",
+          "expected": "failed",
+          "witness_required": true
+        }
+      },
+      "non_vacuity_witness": "cvar_dominance_guards_satisfiable",
+      "expected_tier_per_pin": {
+        "0.17.5": "fuzz_validated"
+      },
+      "tier_upgrade_trigger": "prove the Gaussian inverse-CDF and tail-ratio relation through the real parametric_var and parametric_cvar bodies",
+      "dischargeability_probe": "shoals37_risk_multi_seed",
+      "violation_text": "parametric expected shortfall falls below parametric VaR",
+      "fuzz_domain_note": "real parametric_var and parametric_cvar bodies, both compiler-attributed; 25 accepted constraint-directed samples at each deterministic seed 0, 1, and 2"
+    },
+    {
+      "id": "shoals.inv.var_nonneg_positive_mean.v1",
+      "kind_applies_to": [
+        "finance.risk_measure.parametric"
+      ],
+      "target_model": "parametric_var",
+      "property": {
+        "file": "properties/canonrisk.ch",
+        "name": "var_nonneg_positive_mean",
+        "module": "Shoals.Properties.CanonRisk"
+      },
+      "binding": {
+        "mechanism": "direct-call",
+        "references_output_fn": "direct",
+        "goal_pattern": "{{output_fn}}(losses, alpha) > 0.0",
+        "contracts": []
+      },
+      "preconditions": [
+        {
+          "lhs": "x1",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "x2",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "x3",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "alpha",
+          "op": "gt",
+          "rhs": {
+            "const": 0.5
+          }
+        },
+        {
+          "lhs": "alpha",
+          "op": "lt",
+          "rhs": {
+            "const": 1.0
+          }
+        }
+      ],
+      "controls": {
+        "satisfying": {
+          "name": "var_nonneg_positive_mean",
+          "expected": "passed"
+        },
+        "violating": {
+          "name": "var_nonneg_positive_mean_corrupted",
+          "expected": "failed",
+          "witness_required": true
+        }
+      },
+      "non_vacuity_witness": "var_nonneg_guards_satisfiable",
+      "expected_tier_per_pin": {
+        "0.17.5": "fuzz_validated"
+      },
+      "tier_upgrade_trigger": "prove normal_inv_cdf(alpha) > 0 for alpha > 0.5 through the real parametric_var body",
+      "dischargeability_probe": "shoals37_risk_multi_seed",
+      "violation_text": "parametric VaR is non-positive for strictly positive losses above median confidence",
+      "fuzz_domain_note": "real parametric_var body; 25 accepted constraint-directed samples at each deterministic seed 0, 1, and 2"
+    },
+    {
+      "id": "shoals.inv.historical_var_monotone_in_confidence.v1",
+      "kind_applies_to": [
+        "finance.risk_measure.historical"
+      ],
+      "target_model": "historical_var",
+      "property": {
+        "file": "properties/canonriskhistorical.ch",
+        "name": "historical_var_monotone_in_confidence",
+        "module": "Shoals.Properties.CanonRiskHistorical"
+      },
+      "binding": {
+        "mechanism": "direct-call",
+        "references_output_fn": "direct",
+        "goal_pattern": "{{output_fn}}(losses, alpha1) <= {{output_fn}}(losses, alpha2)",
+        "contracts": []
+      },
+      "preconditions": [
+        {
+          "lhs": "alpha1",
+          "op": "gte",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "alpha2",
+          "op": "gt",
+          "rhs": {
+            "input": "alpha1"
+          }
+        },
+        {
+          "lhs": "alpha2",
+          "op": "lte",
+          "rhs": {
+            "const": 1.0
+          }
+        }
+      ],
+      "controls": {
+        "satisfying": {
+          "name": "historical_var_monotone_in_confidence",
+          "expected": "passed"
+        },
+        "violating": {
+          "name": "historical_var_monotone_in_confidence_corrupted",
+          "expected": "failed",
+          "witness_required": true
+        }
+      },
+      "expected_tier_per_pin": {
+        "0.17.5": "fuzz_validated"
+      },
+      "tier_upgrade_trigger": "bridge std.quantile.monotonicity through the exported Shoals.Risk.historical_var wrapper",
+      "dischargeability_probe": "shoals37_risk_multi_seed",
+      "violation_text": "historical VaR decreases as confidence increases",
+      "fuzz_domain_note": "real historical_var body and its Nautilus quantile implementation; 25 accepted constraint-directed samples at each deterministic seed 0, 1, and 2"
+    },
+    {
+      "id": "shoals.inv.historical_cvar_dominates_var.v1",
+      "kind_applies_to": [
+        "finance.risk_measure.historical"
+      ],
+      "target_model": "historical_var",
+      "property": {
+        "file": "properties/canonriskhistorical.ch",
+        "name": "historical_cvar_dominates_var",
+        "module": "Shoals.Properties.CanonRiskHistorical"
+      },
+      "binding": {
+        "mechanism": "direct-call",
+        "references_output_fn": "direct",
+        "goal_pattern": "historical_cvar(losses, alpha) >= {{output_fn}}(losses, alpha)",
+        "contracts": [],
+        "additional_compiler_dependencies": [
+          {
+            "package": "shoals",
+            "module": "Shoals.Risk",
+            "kind": "function",
+            "name": "historical_cvar",
+            "source_file": "src/risk.ch"
+          }
+        ]
+      },
+      "preconditions": [
+        {
+          "lhs": "alpha",
+          "op": "gt",
+          "rhs": {
+            "const": 0.5
+          }
+        },
+        {
+          "lhs": "alpha",
+          "op": "lt",
+          "rhs": {
+            "const": 1.0
+          }
+        }
+      ],
+      "controls": {
+        "satisfying": {
+          "name": "historical_cvar_dominates_var",
+          "expected": "passed"
+        },
+        "violating": {
+          "name": "historical_cvar_dominates_var_corrupted",
+          "expected": "failed",
+          "witness_required": true
+        }
+      },
+      "expected_tier_per_pin": {
+        "0.17.5": "fuzz_validated"
+      },
+      "tier_upgrade_trigger": "prove empirical tail-mean dominance through historical_var and historical_cvar",
+      "dischargeability_probe": "shoals37_risk_multi_seed",
+      "violation_text": "historical expected shortfall falls below historical VaR",
+      "fuzz_domain_note": "real historical_var and historical_cvar bodies, both compiler-attributed; 25 accepted constraint-directed samples at each deterministic seed 0, 1, and 2"
+    },
+    {
+      "id": "shoals.inv.historical_var_nonneg_positive_losses.v1",
+      "kind_applies_to": [
+        "finance.risk_measure.historical"
+      ],
+      "target_model": "historical_var",
+      "property": {
+        "file": "properties/canonriskhistorical.ch",
+        "name": "historical_var_nonneg_positive_losses",
+        "module": "Shoals.Properties.CanonRiskHistorical"
+      },
+      "binding": {
+        "mechanism": "direct-call",
+        "references_output_fn": "direct",
+        "goal_pattern": "{{output_fn}}(losses, alpha) > 0.0",
+        "contracts": []
+      },
+      "preconditions": [
+        {
+          "lhs": "x1",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "x2",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "x3",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "alpha",
+          "op": "gte",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "alpha",
+          "op": "lte",
+          "rhs": {
+            "const": 1.0
+          }
+        }
+      ],
+      "controls": {
+        "satisfying": {
+          "name": "historical_var_nonneg_positive_losses",
+          "expected": "passed"
+        },
+        "violating": {
+          "name": "historical_var_nonneg_positive_losses_corrupted",
+          "expected": "failed",
+          "witness_required": true
+        }
+      },
+      "expected_tier_per_pin": {
+        "0.17.5": "fuzz_validated"
+      },
+      "tier_upgrade_trigger": "prove quantile range preservation through the exported historical_var wrapper",
+      "dischargeability_probe": "shoals37_risk_multi_seed",
+      "violation_text": "historical VaR is non-positive for a strictly positive loss sample",
+      "fuzz_domain_note": "real historical_var body; 25 accepted constraint-directed samples at each deterministic seed 0, 1, and 2"
+    },
     {
       "id": "shoals.inv.crr_call_nonneg.v1",
       "kind_applies_to": [
@@ -727,7 +1156,7 @@
         "0.14.0": "proven",
         "0.16.1": "proven",
         "0.17.1": "proven",
-        "0.17.4": "proven"
+        "0.17.5": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice pricer returns a negative call price -- free money at these inputs",
@@ -838,7 +1267,7 @@
         "0.14.0": "proven",
         "0.16.1": "proven",
         "0.17.1": "proven",
-        "0.17.4": "proven"
+        "0.17.5": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price falls when spot rises -- a monotonicity (delta-sign) violation",
@@ -939,7 +1368,7 @@
         "0.14.0": "disproved",
         "0.16.1": "disproved",
         "0.17.1": "disproved",
-        "0.17.4": "disproved"
+        "0.17.5": "disproved"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "admits arbitrage: the undiscounted model prices the call at 1.125 when the underlying spot is only 1.0 (C > s)",
@@ -1016,7 +1445,7 @@
         "0.14.0": "proven_modulo_contract",
         "0.16.1": "proven_modulo_contract",
         "0.17.1": "proven_modulo_contract",
-        "0.17.4": "proven_modulo_contract"
+        "0.17.5": "proven_modulo_contract"
       },
       "tier_upgrade_trigger": "chelis#434",
       "dischargeability_probe": "p12_shoals_published_composites",
@@ -1094,7 +1523,7 @@
         "0.14.0": "proven_modulo_contract",
         "0.16.1": "proven_modulo_contract",
         "0.17.1": "proven_modulo_contract",
-        "0.17.4": "proven_modulo_contract"
+        "0.17.5": "proven_modulo_contract"
       },
       "tier_upgrade_trigger": "chelis#434",
       "dischargeability_probe": "p12_shoals_published_composites",
@@ -1147,7 +1576,7 @@
         "0.14.0": "proven_modulo_contract",
         "0.16.1": "proven_modulo_contract",
         "0.17.1": "proven_modulo_contract",
-        "0.17.4": "proven_modulo_contract"
+        "0.17.5": "proven_modulo_contract"
       },
       "tier_upgrade_trigger": "chelis#434",
       "dischargeability_probe": "p12_shoals_published_composites",
@@ -1239,7 +1668,7 @@
         "0.14.0": "proven",
         "0.16.1": "proven",
         "0.17.1": "proven",
-        "0.17.4": "proven"
+        "0.17.5": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the european-call pricer returns a negative price -- free money at these inputs",
@@ -1330,7 +1759,7 @@
         "0.14.0": "proven",
         "0.16.1": "proven",
         "0.17.1": "proven",
-        "0.17.4": "proven"
+        "0.17.5": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the call is priced above the underlying spot -- admits arbitrage",
@@ -1421,7 +1850,7 @@
         "0.14.0": "proven",
         "0.16.1": "proven",
         "0.17.1": "proven",
-        "0.17.4": "proven"
+        "0.17.5": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the call is priced below its discounted intrinsic value s - k*disc^2 -- admits arbitrage (buy and exercise)",
@@ -1519,7 +1948,7 @@
         "0.14.0": "proven",
         "0.16.1": "proven",
         "0.17.1": "proven",
-        "0.17.4": "proven"
+        "0.17.5": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "a lower-strike call is worth less than a higher-strike call -- a bull-spread (strike-monotonicity) violation admitting arbitrage",
@@ -1617,7 +2046,7 @@
         "0.14.0": "proven",
         "0.16.1": "proven",
         "0.17.1": "proven",
-        "0.17.4": "proven"
+        "0.17.5": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "a long butterfly on equally-spaced strikes has negative value -- a convexity-in-strike violation admitting arbitrage",
@@ -1666,7 +2095,7 @@
         "0.14.0": "proven",
         "0.16.1": "proven",
         "0.17.1": "proven",
-        "0.17.4": "proven"
+        "0.17.5": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the multi-period discount factor falls outside (0, 1] -- discounting a non-negative yield either creates value or turns it negative",
@@ -1722,7 +2151,7 @@
         "0.14.0": "proven",
         "0.16.1": "proven",
         "0.17.1": "proven",
-        "0.17.4": "proven"
+        "0.17.5": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond PV is non-positive or exceeds the undiscounted sum of its cashflows -- not a proper present value",
@@ -1785,7 +2214,7 @@
         "0.14.0": "proven",
         "0.16.1": "proven",
         "0.17.1": "proven",
-        "0.17.4": "proven"
+        "0.17.5": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond price rises as yield rises -- a duration/DV01 sign violation",
@@ -1848,7 +2277,7 @@
         "0.14.0": "proven",
         "0.16.1": "proven",
         "0.17.1": "proven",
-        "0.17.4": "proven"
+        "0.17.5": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond price is concave in yield -- a negative-convexity violation",
@@ -1920,7 +2349,7 @@
         "0.14.0": "disproved",
         "0.16.1": "disproved",
         "0.17.1": "disproved",
-        "0.17.4": "disproved"
+        "0.17.5": "disproved"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "reports zero rate sensitivity: the undiscounted bond prices at 3.0 whether the yield is 0.0 or 1.0 (dP/dy = 0, DV01 understated to zero)",
@@ -2031,7 +2460,7 @@
         "0.14.0": "proven",
         "0.16.1": "proven",
         "0.17.1": "proven",
-        "0.17.4": "proven"
+        "0.17.5": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price falls when the up-move factor increases -- a vega-sign violation (wider volatility decreases the option value)",
@@ -2142,7 +2571,7 @@
         "0.14.0": "proven",
         "0.16.1": "proven",
         "0.17.1": "proven",
-        "0.17.4": "proven"
+        "0.17.5": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price falls when the discount factor increases -- the call value should rise with less discounting",
@@ -2260,7 +2689,7 @@
         "0.14.0": "proven",
         "0.16.1": "proven",
         "0.17.1": "proven",
-        "0.17.4": "proven"
+        "0.17.5": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price is concave in spot -- a gamma-sign violation (the second derivative in spot is negative)",
@@ -2391,16 +2820,18 @@
         }
       ],
       "expected_tier_per_pin": {
-        "0.17.4": "fuzz_validated"
+        "0.17.5": "fuzz_validated"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p08_pkg_bs_positive",
       "violation_text": "the direct call pricer returns a negative present value on its positive-input domain",
-      "fuzz_domain_note": "observed at Chelis 0.17.4 with --tier fuzz-only for both direct Black-Scholes and Black-76 positivity properties; corrupted twins refute with in-domain fuzz witnesses. Proven-tier promotion still requires chelis#637."
+      "fuzz_domain_note": "observed at Chelis 0.17.5 with --tier fuzz-only for both direct Black-Scholes and Black-76 positivity properties; corrupted twins refute with in-domain fuzz witnesses. Proven-tier promotion still requires chelis#637."
     },
     {
       "id": "shoals.inv.call_monotone_in_s.bs.v1",
-      "kind_applies_to": ["finance.option_pricer.european_call"],
+      "kind_applies_to": [
+        "finance.option_pricer.european_call"
+      ],
       "target_model": "bs_call",
       "property": {
         "file": "properties/canonpricing.ch",
@@ -2414,17 +2845,56 @@
         "contracts": []
       },
       "preconditions": [
-        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "ds", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "sigma", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "t", "op": "gt", "rhs": {"const": 0.0}}
+        {
+          "lhs": "s",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "ds",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "k",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "sigma",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "t",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        }
       ],
       "controls": {
-        "satisfying": {"name": "bs_call_monotone_in_s", "expected": "passed"},
-        "violating": {"name": "bs_call_monotone_in_s_corrupted", "expected": "failed", "witness_required": true}
+        "satisfying": {
+          "name": "bs_call_monotone_in_s",
+          "expected": "passed"
+        },
+        "violating": {
+          "name": "bs_call_monotone_in_s_corrupted",
+          "expected": "failed",
+          "witness_required": true
+        }
       },
-      "expected_tier_per_pin": {"0.17.4": "fuzz_validated"},
+      "expected_tier_per_pin": {
+        "0.17.5": "fuzz_validated"
+      },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p15_bs_greeks_multi_seed",
       "violation_text": "the real Black-Scholes call price decreases as spot increases",
@@ -2432,7 +2902,9 @@
     },
     {
       "id": "shoals.inv.bs_vega_sign.v1",
-      "kind_applies_to": ["finance.option_pricer.european_call"],
+      "kind_applies_to": [
+        "finance.option_pricer.european_call"
+      ],
       "target_model": "bs_call",
       "property": {
         "file": "properties/canonpricing.ch",
@@ -2446,17 +2918,56 @@
         "contracts": []
       },
       "preconditions": [
-        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "sigma", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "dsigma", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "t", "op": "gt", "rhs": {"const": 0.0}}
+        {
+          "lhs": "s",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "k",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "sigma",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "dsigma",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "t",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        }
       ],
       "controls": {
-        "satisfying": {"name": "bs_call_vega_sign", "expected": "passed"},
-        "violating": {"name": "bs_call_vega_sign_corrupted", "expected": "failed", "witness_required": true}
+        "satisfying": {
+          "name": "bs_call_vega_sign",
+          "expected": "passed"
+        },
+        "violating": {
+          "name": "bs_call_vega_sign_corrupted",
+          "expected": "failed",
+          "witness_required": true
+        }
       },
-      "expected_tier_per_pin": {"0.17.4": "fuzz_validated"},
+      "expected_tier_per_pin": {
+        "0.17.5": "fuzz_validated"
+      },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p15_bs_greeks_multi_seed",
       "violation_text": "the real Black-Scholes call price decreases as volatility increases",
@@ -2464,7 +2975,9 @@
     },
     {
       "id": "shoals.inv.bs_rho_sign.v1",
-      "kind_applies_to": ["finance.option_pricer.european_call"],
+      "kind_applies_to": [
+        "finance.option_pricer.european_call"
+      ],
       "target_model": "bs_call",
       "property": {
         "file": "properties/canonpricing.ch",
@@ -2478,17 +2991,56 @@
         "contracts": []
       },
       "preconditions": [
-        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "r", "op": "gte", "rhs": {"const": 0.0}},
-        {"lhs": "dr", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "sigma", "op": "gt", "rhs": {"const": 0.0}}
+        {
+          "lhs": "s",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "k",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "r",
+          "op": "gte",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "dr",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "sigma",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        }
       ],
       "controls": {
-        "satisfying": {"name": "bs_call_rho_sign", "expected": "passed"},
-        "violating": {"name": "bs_call_rho_sign_corrupted", "expected": "failed", "witness_required": true}
+        "satisfying": {
+          "name": "bs_call_rho_sign",
+          "expected": "passed"
+        },
+        "violating": {
+          "name": "bs_call_rho_sign_corrupted",
+          "expected": "failed",
+          "witness_required": true
+        }
       },
-      "expected_tier_per_pin": {"0.17.4": "fuzz_validated"},
+      "expected_tier_per_pin": {
+        "0.17.5": "fuzz_validated"
+      },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p15_bs_greeks_multi_seed",
       "violation_text": "the real Black-Scholes call price decreases as the non-negative risk-free rate increases",
@@ -2496,7 +3048,9 @@
     },
     {
       "id": "shoals.inv.bs_gamma_sign.v1",
-      "kind_applies_to": ["finance.option_pricer.european_call"],
+      "kind_applies_to": [
+        "finance.option_pricer.european_call"
+      ],
       "target_model": "bs_call",
       "property": {
         "file": "properties/canonpricing.ch",
@@ -2510,17 +3064,56 @@
         "contracts": []
       },
       "preconditions": [
-        {"lhs": "s", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "h", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "k", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "sigma", "op": "gt", "rhs": {"const": 0.0}},
-        {"lhs": "t", "op": "gt", "rhs": {"const": 0.0}}
+        {
+          "lhs": "s",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "h",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "k",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "sigma",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "t",
+          "op": "gt",
+          "rhs": {
+            "const": 0.0
+          }
+        }
       ],
       "controls": {
-        "satisfying": {"name": "bs_call_gamma_sign", "expected": "passed"},
-        "violating": {"name": "bs_call_gamma_sign_corrupted", "expected": "failed", "witness_required": true}
+        "satisfying": {
+          "name": "bs_call_gamma_sign",
+          "expected": "passed"
+        },
+        "violating": {
+          "name": "bs_call_gamma_sign_corrupted",
+          "expected": "failed",
+          "witness_required": true
+        }
       },
-      "expected_tier_per_pin": {"0.17.4": "fuzz_validated"},
+      "expected_tier_per_pin": {
+        "0.17.5": "fuzz_validated"
+      },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p15_bs_greeks_multi_seed",
       "violation_text": "the real Black-Scholes call price is materially concave in spot",
@@ -2535,23 +3128,8 @@
     },
     {
       "id": "shoals.inv.bs_vega_nonneg_grad.v1",
-      "reason": "grad-in-property sign invariants (vega/delta/gamma) do NOT lower through a cross-module import of the pricer (prove hangs; economoist docs/issue_drafts/dependency_edges_imports.md) and grad through bs_call_scalar hits the f32/f64 precision-mismatch across the grad boundary (research/proof-infra/report.md sec 5). grad never lowers to SMT (fuzz-only). This surface was not included in the 0.17.4 direct-positivity probe, so it remains uncharacterized.",
+      "reason": "grad-in-property sign invariants (vega/delta/gamma) do NOT lower through a cross-module import of the pricer (prove hangs; economoist docs/issue_drafts/dependency_edges_imports.md) and grad through bs_call_scalar hits the f32/f64 precision-mismatch across the grad boundary (research/proof-infra/report.md sec 5). grad never lowers to SMT (fuzz-only). This surface was not included in the 0.17.5 direct-positivity probe, so it remains uncharacterized.",
       "trigger": "resolve the cross-module grad and f32/f64 boundary defects, then demonstrate the inlined equivalent-form grad body and corrupted twin in a dedicated fuzz probe."
-    },
-    {
-      "id": "shoals.inv.var_monotone_in_confidence.v1",
-      "reason": "Shoals#37 remains blocked for VaR monotonicity against the real parametric_var. The dedicated Chelis 0.17.4 fuzz re-probe on 2026-07-31 exhausted 100 generator attempts with zero accepted samples because the ordered alpha1/alpha2 guards starved; chelis#977 is only a candidate and is not in the pinned release. The proven and historical lanes also lack chelis#979's source-level contract binding to the real Nautilus quantile implementation.",
-      "trigger": "land chelis#977 in a pinned release and demonstrate the parametric property plus corrupted twin across multiple seeds; land chelis#979 before activating the distinct historical quantile claim required by shoals#37."
-    },
-    {
-      "id": "shoals.inv.cvar_dominates_var.v1",
-      "reason": "Shoals#37 remains blocked for CVaR >= VaR. The real parametric_cvar/parametric_var produced a one-sample fuzz_validated result and corrupted-twin witness on Chelis 0.17.4 (2026-07-31), but a five-sample combined re-probe exits 3. Chelis#977 is not in the pinned release, and chelis#979 has not bound a source-level contract to the real Nautilus quantile implementation needed for the distinct historical claim.",
-      "trigger": "after chelis#977 lands in the pin, complete a repeatable multi-seed parametric probe at the release budget; land chelis#979 and separately validate the historical ES/VaR claim before closing shoals#37."
-    },
-    {
-      "id": "shoals.inv.var_nonneg_positive_mean.v1",
-      "reason": "Shoals#37 remains blocked for positive-mean VaR. A one-sample parametric probe and corrupted twin completed on Chelis 0.17.4 (2026-07-31), but at five samples the satisfying property errors and the compiler exits 3. Chelis#977 is not in the pinned release; chelis#979's real Nautilus quantile seam is also unlanded, so the issue's historical half cannot be substituted by this partial observation.",
-      "trigger": "after chelis#977 lands in the pin, complete satisfying and corrupted parametric controls repeatedly at the release budget; land chelis#979 and separately validate historical non-negativity before closing shoals#37."
     },
     {
       "id": "shoals.inv.crr_general_nonneg.v1",

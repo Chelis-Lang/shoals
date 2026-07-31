@@ -32,14 +32,14 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   edges over deterministic seeds 0, 1, and 2. The fixed 5% rate baseline for
   delta/vega/gamma and 1y maturity baseline for rho keep the 0.17.4 rejection
   sampler dense; every displayed comparison and nuisance axis is still sampled.
-- The characterization manifest now carries 24 active invariants and 9
-  explicit deferrals; the four activated Greek comparisons replace their old
-  uncharacterized stubs without upgrading any sampled result to a proof.
-- Shoals#37 remains explicitly deferred. The pinned Chelis 0.17.4 release does
-  not contain chelis#977's constraint-directed sampler, and chelis#979 has not
-  landed the real Nautilus quantile-contract consumer seam; activating only
-  the parametric half would not satisfy the issue's parametric/historical
-  acceptance contract.
+- The characterization manifest now carries 30 active invariants and 6
+  explicit deferrals. Shoals#37 activates separate parametric inverse-CDF and
+  historical empirical-quantile families for confidence monotonicity,
+  ES-dominates-VaR, and positivity. Each real-body control accepts 25
+  constraint-directed samples at seeds 0, 1, and 2; each corrupt twin emits an
+  in-domain witness. Compiler-owned graph edges bind every VaR/CVaR function
+  named by the relation, including the second dependency in each ES/VaR goal.
+  These are `fuzz_validated` observations, not global proofs.
 
 ## [0.24.2] - 2026-07-31
 
