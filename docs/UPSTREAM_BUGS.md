@@ -138,21 +138,17 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 ## Parked
 
-- **shoals#19 — expose a tensor Black–Scholes entry as a `WireDag` root for
-  Beacon.** Beacon's real Black–Scholes seam is blocked because `bs_call_scalar`
-  is a scalar host function, not a tensor `WireDag` root (post-`chelis#449` the
-  root-count probe still reports zero roots for the scalar entry). Acceptance
-  (from shoals#19): a producer-clean, vectorized elementwise BS tensor entry
-  that becomes a Chelis `WireDag` root; computes the same pricing core as
-  `Shoals.Pricing.bs_call_scalar` over tensor inputs; no scalar-lane `vmap` /
-  host-only scalar plumbing that leaves zero roots; preserves the real `erf64`
-  A–S implementation and branch structure; carries a numerics-equivalence
-  regression against the scalar pricer. Parked because it depends on the tensor
-  BS body work, not on a further upstream fix. Re-probe trigger: the tensor BS
-  entry landing, or Beacon becoming available in a release
-  (`beacon_available=false` in the release binary; `CHELIS_BEACON_BIN`-gated).
+No parked entries.
 
 ## Archived
+
+- **shoals#19 — real Black-Scholes tensor `WireDag` producer seam.** Resolved
+  by `Shoals.Pricing.bs_call_wire_f64`: a pure f64 tensor-DAG entry with the
+  same A-S coefficients and branch structure as `bs_call_f64`, no host/vmap
+  bridge, and representative scalar-equivalence coverage. The executable
+  `scripts/validate_bs_wire_root.py` gate lowers the real source with Chelis
+  0.17.4 and observes a non-empty named root. Beacon's bounded-domain consumer
+  and report contract remain tracked by Beacon#74.
 
 - **chelis#924 — Reef package-graph preparation added ~111s to a trivial
   Shoals consumer proof.**

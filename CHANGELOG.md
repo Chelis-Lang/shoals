@@ -6,6 +6,13 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Closed Shoals#19 with `Shoals.Pricing.bs_call_wire_f64`, a producer-clean
+  f64 tensor Black-Scholes entry whose real source lowers to a non-empty named
+  Chelis WireDag root. The entry mirrors the shipped scalar pricer's A-S
+  coefficients and small-x/sign branches, carries representative numerical
+  equivalence tests, and is guarded against host-only `vmap`/shape/list seams.
+  This supplies Beacon's content-addressed producer artifact without claiming
+  the bounded-domain result tracked by Beacon#74.
 - Prepared the next candidate as 0.24.3. The published 0.24.2 package and
   characterization asset retain their original bytes and identity; the Greek
   characterization additions belong only to the new patch candidate.

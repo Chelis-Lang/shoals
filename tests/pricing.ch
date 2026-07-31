@@ -1,6 +1,6 @@
 module Shoals.Tests.Pricing
 import Std.Test (assert_close, assert_true)
-import Shoals.Pricing (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, call_prices, put_prices, call_total, mc_call_price)
+import Shoals.Pricing (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_wire_f64, call_prices, put_prices, call_total, mc_call_price)
 def abs_f64_test(x: f64) -> f64 = if lt(x, cast(0.0, f64)) then neg(x) else x
 def assert_close_f64(actual: f64, expected: f64, tol: f64, label: string) -> unit ! { Test } = {
   diff = abs_f64_test(sub(actual, expected))
@@ -71,6 +71,18 @@ def test_bs_call_f64_vector_matches_scalar_desk_rows() -> unit ! { Test } = {
   _ = assert_close_f64(index(prices, cast(4, int64)), bs_call_f64(cast(120.0, f64), cast(100.0, f64), cast(0.01, f64), cast(0.1, f64), cast(0.25, f64)), cast(0.0, f64), "f64 vector row 4 equals scalar")
   _ = assert_close_f64(index(prices, cast(5, int64)), bs_call_f64(cast(50.0, f64), cast(100.0, f64), cast(0.0, f64), cast(0.05, f64), cast(0.01, f64)), cast(0.0, f64), "f64 vector row 5 equals scalar")
   assert_close_f64(index(prices, cast(6, int64)), bs_call_f64(cast(150.0, f64), cast(100.0, f64), cast(0.1, f64), cast(0.8, f64), cast(2.0, f64)), cast(0.0, f64), "f64 vector row 6 equals scalar")
+}
+def wire_constant_3(v: f64) -> tensor[3, f64] = to_tensor([v, v, v])
+def test_bs_call_wire_f64_matches_real_scalar_pricer() -> unit ! { Test } = {
+  spots = to_tensor([cast(60.0, f64), cast(100.0, f64), cast(140.0, f64)])
+  strikes = to_tensor([cast(130.0, f64), cast(100.0, f64), cast(70.0, f64)])
+  rates = to_tensor([cast(0.01, f64), cast(0.05, f64), cast(0.1, f64)])
+  sigmas = to_tensor([cast(0.1, f64), cast(0.2, f64), cast(0.8, f64)])
+  times = to_tensor([cast(0.25, f64), cast(1.0, f64), cast(2.0, f64)])
+  prices = to_list(bs_call_wire_f64(spots, strikes, rates, sigmas, times, wire_constant_3(cast(0.5, f64)), wire_constant_3(cast(0.7071067811865476, f64)), wire_constant_3(cast(0.254829592, f64)), wire_constant_3(cast(-0.284496736, f64)), wire_constant_3(cast(1.421413741, f64)), wire_constant_3(cast(-1.453152027, f64)), wire_constant_3(cast(1.061405429, f64)), wire_constant_3(cast(0.3275911, f64)), wire_constant_3(cast(1.1283791670955126, f64)), wire_constant_3(cast(0.00001, f64))))
+  _ = assert_close_f64(index(prices, cast(0, int64)), bs_call_f64(cast(60.0, f64), cast(130.0, f64), cast(0.01, f64), cast(0.1, f64), cast(0.25, f64)), cast(0.00001, f64), "WireDag OTM row matches scalar")
+  _ = assert_close_f64(index(prices, cast(1, int64)), bs_call_f64(cast(100.0, f64), cast(100.0, f64), cast(0.05, f64), cast(0.2, f64), cast(1.0, f64)), cast(0.00001, f64), "WireDag ATM row matches scalar")
+  assert_close_f64(index(prices, cast(2, int64)), bs_call_f64(cast(140.0, f64), cast(70.0, f64), cast(0.1, f64), cast(0.8, f64), cast(2.0, f64)), cast(0.00001, f64), "WireDag ITM row matches scalar")
 }
 def test_fd_delta_matches_analytic() -> unit ! { Test } = {
   s_v = cast(100.0, f32)
