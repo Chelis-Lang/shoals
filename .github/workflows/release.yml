@@ -92,6 +92,9 @@ jobs:
         run: python3 scripts/prove_gate.py
 
       - name: Verify package prove latency and deterministic output (chelis#924)
+        env:
+          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
+          GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
         run: python3 scripts/check_package_prove_latency.py
 
       - name: Publish the invariant-surface manifest as a release asset

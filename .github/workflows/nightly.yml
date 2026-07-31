@@ -166,6 +166,9 @@ jobs:
         run: python3 scripts/prove_gate.py
 
       - name: Verify package prove latency and deterministic output (chelis#924)
+        env:
+          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
         run: python3 scripts/check_package_prove_latency.py
 
   heavy:

@@ -56,6 +56,22 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn('PROVE_GATE_FUZZ: "1"', prove_job)
         self.assertIn("python3 scripts/prove_gate.py", prove_job)
         self.assertIn("python3 scripts/check_package_prove_latency.py", prove_job)
+        oracle_step = prove_job[
+            prove_job.index(
+                "Verify package prove latency and deterministic output"
+            ) :
+        ]
+        self.assertIn("GH_TOKEN:", oracle_step)
+        self.assertIn("GITHUB_TOKEN:", oracle_step)
+
+        release = (ROOT / ".github/workflows/release.yml").read_text()
+        release_oracle = release[
+            release.index(
+                "Verify package prove latency and deterministic output"
+            ) :
+        ]
+        self.assertIn("GH_TOKEN:", release_oracle)
+        self.assertIn("GITHUB_TOKEN:", release_oracle)
 
     def test_local_full_gate_matches_hosted_manual_matrix(self) -> None:
         nightly = (ROOT / ".github/workflows/nightly.yml").read_text()
