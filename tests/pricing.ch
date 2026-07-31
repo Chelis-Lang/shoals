@@ -6,6 +6,10 @@ def assert_close_f64(actual: f64, expected: f64, tol: f64, label: string) -> uni
   diff = abs_f64_test(sub(actual, expected))
   assert_true(lte(diff, tol), label)
 }
+def assert_close_f64_scaled(actual: f64, expected: f64, label: string) -> unit ! { Test } = {
+  tol = add(cast(0.00001, f64), mul(cast(0.00000001, f64), abs_f64_test(expected)))
+  assert_close_f64(actual, expected, tol, label)
+}
 def test_bs_call_atm() -> unit ! { Test } = {
   px = bs_call_scalar(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
   assert_close(px, cast(10.4506, f32), cast(0.001, f32), "ATM call ~ 10.4506")
@@ -73,6 +77,7 @@ def test_bs_call_f64_vector_matches_scalar_desk_rows() -> unit ! { Test } = {
   assert_close_f64(index(prices, cast(6, int64)), bs_call_f64(cast(150.0, f64), cast(100.0, f64), cast(0.1, f64), cast(0.8, f64), cast(2.0, f64)), cast(0.0, f64), "f64 vector row 6 equals scalar")
 }
 def wire_constant_3(v: f64) -> tensor[3, f64] = to_tensor([v, v, v])
+def wire_constant_1(v: f64) -> tensor[1, f64] = to_tensor([v])
 def test_bs_call_wire_f64_matches_real_scalar_pricer() -> unit ! { Test } = {
   spots = to_tensor([cast(60.0, f64), cast(100.0, f64), cast(140.0, f64)])
   strikes = to_tensor([cast(130.0, f64), cast(100.0, f64), cast(70.0, f64)])
@@ -80,9 +85,14 @@ def test_bs_call_wire_f64_matches_real_scalar_pricer() -> unit ! { Test } = {
   sigmas = to_tensor([cast(0.1, f64), cast(0.2, f64), cast(0.8, f64)])
   times = to_tensor([cast(0.25, f64), cast(1.0, f64), cast(2.0, f64)])
   prices = to_list(bs_call_wire_f64(spots, strikes, rates, sigmas, times, wire_constant_3(cast(0.5, f64)), wire_constant_3(cast(0.7071067811865476, f64)), wire_constant_3(cast(0.254829592, f64)), wire_constant_3(cast(-0.284496736, f64)), wire_constant_3(cast(1.421413741, f64)), wire_constant_3(cast(-1.453152027, f64)), wire_constant_3(cast(1.061405429, f64)), wire_constant_3(cast(0.3275911, f64)), wire_constant_3(cast(1.1283791670955126, f64)), wire_constant_3(cast(0.00001, f64))))
-  _ = assert_close_f64(index(prices, cast(0, int64)), bs_call_f64(cast(60.0, f64), cast(130.0, f64), cast(0.01, f64), cast(0.1, f64), cast(0.25, f64)), cast(0.00001, f64), "WireDag OTM row matches scalar")
-  _ = assert_close_f64(index(prices, cast(1, int64)), bs_call_f64(cast(100.0, f64), cast(100.0, f64), cast(0.05, f64), cast(0.2, f64), cast(1.0, f64)), cast(0.00001, f64), "WireDag ATM row matches scalar")
-  assert_close_f64(index(prices, cast(2, int64)), bs_call_f64(cast(140.0, f64), cast(70.0, f64), cast(0.1, f64), cast(0.8, f64), cast(2.0, f64)), cast(0.00001, f64), "WireDag ITM row matches scalar")
+  _ = assert_close_f64_scaled(index(prices, cast(0, int64)), bs_call_f64(cast(60.0, f64), cast(130.0, f64), cast(0.01, f64), cast(0.1, f64), cast(0.25, f64)), "WireDag OTM row matches scalar")
+  _ = assert_close_f64_scaled(index(prices, cast(1, int64)), bs_call_f64(cast(100.0, f64), cast(100.0, f64), cast(0.05, f64), cast(0.2, f64), cast(1.0, f64)), "WireDag ATM row matches scalar")
+  assert_close_f64_scaled(index(prices, cast(2, int64)), bs_call_f64(cast(140.0, f64), cast(70.0, f64), cast(0.1, f64), cast(0.8, f64), cast(2.0, f64)), "WireDag ITM row matches scalar")
+}
+def test_bs_call_wire_f64_scale_robust_extreme_itm_shape_one() -> unit ! { Test } = {
+  prices = to_list(bs_call_wire_f64(to_tensor([cast(1000.0, f64)]), to_tensor([cast(1.0, f64)]), to_tensor([cast(0.2, f64)]), to_tensor([cast(1.0, f64)]), to_tensor([cast(10.0, f64)]), wire_constant_1(cast(0.5, f64)), wire_constant_1(cast(0.7071067811865476, f64)), wire_constant_1(cast(0.254829592, f64)), wire_constant_1(cast(-0.284496736, f64)), wire_constant_1(cast(1.421413741, f64)), wire_constant_1(cast(-1.453152027, f64)), wire_constant_1(cast(1.061405429, f64)), wire_constant_1(cast(0.3275911, f64)), wire_constant_1(cast(1.1283791670955126, f64)), wire_constant_1(cast(0.00001, f64))))
+  expected = bs_call_f64(cast(1000.0, f64), cast(1.0, f64), cast(0.2, f64), cast(1.0, f64), cast(10.0, f64))
+  assert_close_f64_scaled(index(prices, cast(0, int64)), expected, "WireDag extreme ITM shape-one row matches scalar with abs+relative tolerance")
 }
 def test_fd_delta_matches_analytic() -> unit ! { Test } = {
   s_v = cast(100.0, f32)

@@ -11,6 +11,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   Chelis WireDag root. The entry mirrors the shipped scalar pricer's A-S
   coefficients and small-x/sign branches, carries representative numerical
   equivalence tests, and is guarded against host-only `vmap`/shape/list seams.
+  Its executable boundary gate rejects compiler-pin/schema drift, malformed or
+  host-only reachable graphs, and cold-process byte nondeterminism; numerical
+  equivalence uses an absolute-plus-relative tolerance across multiple shapes.
   This supplies Beacon's content-addressed producer artifact without claiming
   the bounded-domain result tracked by Beacon#74.
 - Prepared the next candidate as 0.24.3. The published 0.24.2 package and

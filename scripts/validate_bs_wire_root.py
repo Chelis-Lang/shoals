@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -16,7 +18,252 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENTRY = "bs_call_wire_f64"
-FORBIDDEN_HOST_TOKENS = ("vmap(", "shape(", "to_list(", "map(", "tensor_to_scalar(")
+FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
+EXPECTED_LOADS = {
+    "a1",
+    "a2",
+    "a3",
+    "a4",
+    "a5",
+    "half",
+    "inv_sqrt_2",
+    "k",
+    "p",
+    "r",
+    "s",
+    "sigma",
+    "small",
+    "t",
+    "two_over_sqrt_pi",
+}
+WIRE_DAG_SCHEMA_VERSION = 3
+WIRE_OPS = {
+    "add",
+    "cast",
+    "cmp_lt",
+    "const",
+    "copy",
+    "div",
+    "drop",
+    "exp",
+    "load",
+    "log",
+    "mul",
+    "neg",
+    "sqrt",
+}
+
+
+class ValidationError(ValueError):
+    """The lowering response is not the promised WireDag boundary."""
+
+
+def pinned_compiler() -> str:
+    manifest = (ROOT / "reef.toml").read_text(encoding="utf-8")
+    match = re.search(r'^compiler\s*=\s*"=([^"]+)"', manifest, re.MULTILINE)
+    if match is None:
+        raise ValidationError("reef.toml omitted its exact compiler pin")
+    return match.group(1)
+
+
+def require_pinned_chelis(chelis: str) -> None:
+    expected = pinned_compiler()
+    completed = subprocess.run(
+        [chelis, "--version"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    observed = completed.stdout.strip()
+    if completed.returncode != 0 or observed != f"chelis {expected}":
+        raise ValidationError(
+            f"compiler mismatch: reef.toml pins chelis {expected}, observed {observed!r}"
+        )
+
+
+def validate_response(
+    response: object,
+    expected_loads: set[str] = EXPECTED_LOADS,
+    expected_root_op: str = "add",
+) -> tuple[int, int]:
+    if not isinstance(response, dict) or response.get("ok") is not True:
+        raise ValidationError(
+            f"Chelis rejected {ENTRY}: {json.dumps(response, sort_keys=True)}"
+        )
+    result = response.get("result")
+    if not isinstance(result, dict):
+        raise ValidationError("Chelis lower response omitted its result")
+    dag = result.get("dag")
+    named_roots = result.get("named_roots")
+    if not isinstance(dag, dict) or not isinstance(named_roots, dict):
+        raise ValidationError("Chelis lower response omitted dag/named_roots")
+    if dag.get("schema_version") != WIRE_DAG_SCHEMA_VERSION:
+        raise ValidationError(
+            f"unexpected WireDag schema {dag.get('schema_version')!r}; "
+            f"expected {WIRE_DAG_SCHEMA_VERSION}"
+        )
+
+    nodes = dag.get("nodes")
+    roots = dag.get("roots")
+    root = named_roots.get(ENTRY)
+    if not isinstance(nodes, list) or not nodes:
+        raise ValidationError("WireDag is empty")
+    if not isinstance(roots, list) or any(
+        not isinstance(item, int) or isinstance(item, bool) for item in roots
+    ):
+        raise ValidationError("WireDag roots must be integer node IDs")
+    if len(roots) != len(set(roots)):
+        raise ValidationError("WireDag roots contain duplicates")
+    if not isinstance(root, int) or isinstance(root, bool) or root not in roots:
+        raise ValidationError(f"{ENTRY} is not an addressable WireDag root")
+
+    by_id: dict[int, dict[str, object]] = {}
+    for node in nodes:
+        if not isinstance(node, dict):
+            raise ValidationError("WireDag contains a non-object node")
+        node_id = node.get("id")
+        if not isinstance(node_id, int) or isinstance(node_id, bool):
+            raise ValidationError("WireDag node omitted an integer ID")
+        if node_id in by_id:
+            raise ValidationError(f"WireDag contains duplicate node ID {node_id}")
+        by_id[node_id] = node
+    missing_roots = sorted(set(roots) - set(by_id))
+    if missing_roots:
+        raise ValidationError(f"WireDag roots reference missing nodes {missing_roots}")
+    for name, named_root in named_roots.items():
+        if (
+            not isinstance(name, str)
+            or not isinstance(named_root, int)
+            or isinstance(named_root, bool)
+        ):
+            raise ValidationError(
+                "WireDag named roots must map names to integer node IDs"
+            )
+        if named_root not in roots or named_root not in by_id:
+            raise ValidationError(f"WireDag named root {name!r} is dangling")
+
+    for node_id, node in by_id.items():
+        inputs = node.get("inputs")
+        if not isinstance(inputs, list) or any(
+            not isinstance(item, int) or isinstance(item, bool) for item in inputs
+        ):
+            raise ValidationError(f"WireDag node {node_id} has invalid inputs")
+        missing_inputs = sorted(set(inputs) - set(by_id))
+        if missing_inputs:
+            raise ValidationError(
+                f"WireDag node {node_id} references missing inputs {missing_inputs}"
+            )
+        non_topological = [item for item in inputs if item >= node_id]
+        if non_topological:
+            raise ValidationError(
+                f"WireDag node {node_id} has non-topological inputs {non_topological}"
+            )
+
+    reachable: set[int] = set()
+    reachable_loads: set[str] = set()
+    pending = [root]
+    while pending:
+        node_id = pending.pop()
+        if node_id in reachable:
+            continue
+        reachable.add(node_id)
+        node = by_id[node_id]
+        op = node.get("op")
+        kind = op.get("kind") if isinstance(op, dict) else None
+        if kind not in WIRE_OPS:
+            raise ValidationError(
+                f"{ENTRY} reaches unsupported/host-only op {kind!r} at node {node_id}"
+            )
+        if kind == "load":
+            name = op.get("name")
+            if not isinstance(name, str):
+                raise ValidationError(f"WireDag load {node_id} omitted its name")
+            reachable_loads.add(name)
+        pending.extend(node["inputs"])
+
+    if reachable_loads != expected_loads:
+        missing = sorted(expected_loads - reachable_loads)
+        unexpected = sorted(reachable_loads - expected_loads)
+        raise ValidationError(
+            f"{ENTRY} reachable loads drifted: missing={missing}, unexpected={unexpected}"
+        )
+
+    output_type = by_id[root].get("output_type")
+    expected_dim = {"kind": "named", "name": "n", "size": None}
+    if not isinstance(output_type, dict) or output_type.get("precision") != "f64":
+        raise ValidationError(f"{ENTRY} root is not f64")
+    if output_type.get("dims") != [expected_dim]:
+        raise ValidationError(f"{ENTRY} root is not tensor[n, f64]")
+    root_op = by_id[root].get("op")
+    root_kind = root_op.get("kind") if isinstance(root_op, dict) else None
+    if root_kind != expected_root_op:
+        raise ValidationError(
+            f"{ENTRY} root op drifted: expected {expected_root_op!r}, got {root_kind!r}"
+        )
+    return root, len(nodes)
+
+
+def validate_corruption_controls() -> None:
+    valid = {
+        "ok": True,
+        "result": {
+            "dag": {
+                "schema_version": WIRE_DAG_SCHEMA_VERSION,
+                "nodes": [
+                    {
+                        "id": 7,
+                        "op": {"kind": "load", "name": "spot"},
+                        "inputs": [],
+                        "output_type": {
+                            "dims": [{"kind": "named", "name": "n", "size": None}],
+                            "precision": "f64",
+                        },
+                    }
+                ],
+                "roots": [7],
+            },
+            "named_roots": {ENTRY: 7},
+        },
+    }
+    corruptions = []
+    for label in (
+        "schema",
+        "dangling-root",
+        "duplicate-node",
+        "host-op",
+        "dangling-input",
+        "non-topological-input",
+        "unexpected-load",
+    ):
+        candidate = json.loads(json.dumps(valid))
+        if label == "schema":
+            candidate["result"]["dag"]["schema_version"] = 999
+        elif label == "dangling-root":
+            candidate["result"]["dag"]["roots"] = [42]
+            candidate["result"]["named_roots"][ENTRY] = 42
+        elif label == "duplicate-node":
+            candidate["result"]["dag"]["nodes"].append(
+                json.loads(json.dumps(candidate["result"]["dag"]["nodes"][0]))
+            )
+        elif label == "host-op":
+            candidate["result"]["dag"]["nodes"][0]["op"] = {"kind": "host_only"}
+        elif label == "dangling-input":
+            candidate["result"]["dag"]["nodes"][0]["inputs"] = [42]
+        elif label == "non-topological-input":
+            candidate["result"]["dag"]["nodes"][0]["inputs"] = [7]
+        else:
+            candidate["result"]["dag"]["nodes"][0]["op"]["name"] = "invented"
+        corruptions.append((label, candidate))
+    for label, candidate in corruptions:
+        try:
+            validate_response(
+                candidate, expected_loads={"spot"}, expected_root_op="load"
+            )
+        except ValidationError:
+            continue
+        raise ValidationError(f"validator accepted its {label} corruption control")
 
 
 def fail(message: str, server_log: str = "") -> int:
@@ -26,22 +273,7 @@ def fail(message: str, server_log: str = "") -> int:
     return 1
 
 
-def main() -> int:
-    chelis = os.environ.get("CHELIS_BIN") or shutil.which("chelis")
-    if not chelis:
-        return fail("chelis binary not found (set CHELIS_BIN or PATH)")
-
-    source = (ROOT / "src/pricing.ch").read_text(encoding="utf-8")
-    marker = "-- Pure tensor-DAG Black-Scholes helpers for the Beacon seam"
-    start = source.find(marker)
-    end = source.find("def bs_call_f64_vector", start)
-    if start < 0 or end < 0:
-        return fail("could not isolate the WireDag entry closure")
-    closure = source[start:end]
-    found = [token for token in FORBIDDEN_HOST_TOKENS if token in closure]
-    if found:
-        return fail(f"host-only token(s) entered the WireDag closure: {found}")
-
+def lower_once(chelis: str, source: str) -> bytes:
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
         port = probe.getsockname()[1]
@@ -60,21 +292,20 @@ def main() -> int:
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    response: dict[str, object] | None = None
     try:
         deadline = time.monotonic() + 15.0
         while time.monotonic() < deadline:
             if process.poll() is not None:
                 log = process.stdout.read() if process.stdout else ""
-                return fail("chelis tide exited before accepting requests", log)
+                raise ValidationError(
+                    f"chelis tide exited before accepting requests\n{log}"
+                )
             try:
                 with urllib.request.urlopen(request, timeout=5.0) as handle:
-                    response = json.load(handle)
-                break
+                    return handle.read()
             except (urllib.error.URLError, ConnectionError):
                 time.sleep(0.05)
-        if response is None:
-            return fail("timed out waiting for the Chelis lower endpoint")
+        raise ValidationError("timed out waiting for the Chelis lower endpoint")
     finally:
         process.terminate()
         try:
@@ -83,26 +314,48 @@ def main() -> int:
             process.kill()
             process.wait(timeout=5.0)
 
-    if response.get("ok") is not True:
-        return fail(f"Chelis rejected {ENTRY}: {json.dumps(response, sort_keys=True)}")
-    result = response.get("result")
-    if not isinstance(result, dict):
-        return fail("Chelis lower response omitted its result")
-    dag = result.get("dag")
-    named_roots = result.get("named_roots")
-    if not isinstance(dag, dict) or not isinstance(named_roots, dict):
-        return fail("Chelis lower response omitted dag/named_roots")
-    nodes = dag.get("nodes")
-    roots = dag.get("roots")
-    root = named_roots.get(ENTRY)
-    if not isinstance(nodes, list) or not nodes:
-        return fail("WireDag is empty")
-    if not isinstance(roots, list) or root not in roots:
-        return fail(f"{ENTRY} is not an addressable WireDag root")
+
+def main() -> int:
+    chelis = os.environ.get("CHELIS_BIN") or shutil.which("chelis")
+    if not chelis:
+        return fail("chelis binary not found (set CHELIS_BIN or PATH)")
+    try:
+        require_pinned_chelis(chelis)
+        validate_corruption_controls()
+    except (OSError, subprocess.SubprocessError, ValidationError) as error:
+        return fail(str(error))
+
+    source = (ROOT / "src/pricing.ch").read_text(encoding="utf-8")
+    marker = "-- Pure tensor-DAG Black-Scholes helpers for the Beacon seam"
+    start = source.find(marker)
+    end = source.find("def bs_call_f64_vector", start)
+    if start < 0 or end < 0:
+        return fail("could not isolate the WireDag entry closure")
+    closure = source[start:end]
+    found = [
+        name
+        for name in FORBIDDEN_HOST_NAMES
+        if re.search(rf"\b{re.escape(name)}\s*\(", closure)
+    ]
+    if found:
+        return fail(f"host-only construct(s) entered the WireDag closure: {found}")
+
+    try:
+        raw_responses = [lower_once(chelis, source), lower_once(chelis, source)]
+    except (OSError, subprocess.SubprocessError, ValidationError) as error:
+        return fail(str(error))
+    if raw_responses[0] != raw_responses[1]:
+        return fail("independent cold lowerings were not byte-deterministic")
+    try:
+        response = json.loads(raw_responses[0])
+        root, node_count = validate_response(response)
+    except (json.JSONDecodeError, ValidationError) as error:
+        return fail(str(error))
+    digest = hashlib.sha256(raw_responses[0]).hexdigest()
 
     print(
         f"Shoals WireDag OK: entry={ENTRY} root={root} "
-        f"nodes={len(nodes)} schema={dag.get('schema_version')}"
+        f"nodes={node_count} schema={WIRE_DAG_SCHEMA_VERSION} sha256={digest}"
     )
     return 0
 

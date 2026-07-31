@@ -40,12 +40,17 @@ inputs and for the A-S constants. The constants are explicit point-valued
 inputs because host-side broadcasting (`vmap`, `shape`, scalar conversion, or
 list mapping) would erase the compiler-owned WireDag root. Its arithmetic and
 small-x/sign branches mirror `bs_call_f64`; representative deep-OTM, ATM, and
-deep-ITM rows are checked against that scalar pricer to `1e-5`.
+deep-ITM rows are checked against that scalar pricer with a scale-aware bound.
+The executable comparison uses `1e-5 + 1e-8 * abs(expected)`, retaining the
+absolute floor near zero while remaining scale-aware for large prices, and
+covers both three-row and shape-one inputs.
 
-`python3 scripts/validate_bs_wire_root.py` lowers the real exported source via
-Chelis 0.17.4 and requires `bs_call_wire_f64` to be a non-empty named root. The
-result is a content-addressable compiler artifact; it does not itself claim a
-global Black-Scholes theorem.
+`python3 scripts/validate_bs_wire_root.py` enforces the `reef.toml` Chelis pin,
+compares raw artifacts from independent cold Tide processes, and validates
+schema 3, graph integrity, the named f64 tensor root, its exact reachable input
+set, and its compiler-reported operation closure. The result is a
+content-addressable compiler artifact; it does not itself claim a global
+Black-Scholes theorem.
 
 ## Vectorized prices
 
