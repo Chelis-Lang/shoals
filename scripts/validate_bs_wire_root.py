@@ -18,6 +18,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENTRY = "bs_call_wire_f64"
+EXPECTED_ENTRY_ROOT = 535
+EXPECTED_NODE_COUNT = 1018
+EXPECTED_RAW_SHA256 = "39db5ba76af6f83643da14110f93d2973d38d24add43978a4091036fe00b7932"
 FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
 EXPECTED_LOADS = {
     "a1",
@@ -87,6 +90,8 @@ def validate_response(
     response: object,
     expected_loads: set[str] = EXPECTED_LOADS,
     expected_root_op: str = "add",
+    expected_entry_root: int = EXPECTED_ENTRY_ROOT,
+    expected_node_count: int = EXPECTED_NODE_COUNT,
 ) -> tuple[int, int]:
     if not isinstance(response, dict) or response.get("ok") is not True:
         raise ValidationError(
@@ -110,6 +115,10 @@ def validate_response(
     root = named_roots.get(ENTRY)
     if not isinstance(nodes, list) or not nodes:
         raise ValidationError("WireDag is empty")
+    if len(nodes) != expected_node_count:
+        raise ValidationError(
+            f"WireDag node count drifted: expected {expected_node_count}, got {len(nodes)}"
+        )
     if not isinstance(roots, list) or any(
         not isinstance(item, int) or isinstance(item, bool) for item in roots
     ):
@@ -118,6 +127,10 @@ def validate_response(
         raise ValidationError("WireDag roots contain duplicates")
     if not isinstance(root, int) or isinstance(root, bool) or root not in roots:
         raise ValidationError(f"{ENTRY} is not an addressable WireDag root")
+    if root != expected_entry_root:
+        raise ValidationError(
+            f"{ENTRY} root drifted: expected {expected_entry_root}, got {root}"
+        )
 
     by_id: dict[int, dict[str, object]] = {}
     for node in nodes:
@@ -236,6 +249,7 @@ def validate_corruption_controls() -> None:
         "dangling-input",
         "non-topological-input",
         "unexpected-load",
+        "redirected-root",
     ):
         candidate = json.loads(json.dumps(valid))
         if label == "schema":
@@ -253,13 +267,25 @@ def validate_corruption_controls() -> None:
             candidate["result"]["dag"]["nodes"][0]["inputs"] = [42]
         elif label == "non-topological-input":
             candidate["result"]["dag"]["nodes"][0]["inputs"] = [7]
-        else:
+        elif label == "unexpected-load":
             candidate["result"]["dag"]["nodes"][0]["op"]["name"] = "invented"
+        else:
+            redirected = json.loads(json.dumps(candidate["result"]["dag"]["nodes"][0]))
+            redirected["id"] = 8
+            redirected["op"] = {"kind": "add"}
+            redirected["inputs"] = [7, 7]
+            candidate["result"]["dag"]["nodes"].append(redirected)
+            candidate["result"]["dag"]["roots"].append(8)
+            candidate["result"]["named_roots"][ENTRY] = 8
         corruptions.append((label, candidate))
     for label, candidate in corruptions:
         try:
             validate_response(
-                candidate, expected_loads={"spot"}, expected_root_op="load"
+                candidate,
+                expected_loads={"spot"},
+                expected_root_op="load",
+                expected_entry_root=7,
+                expected_node_count=1,
             )
         except ValidationError:
             continue
@@ -352,6 +378,10 @@ def main() -> int:
     except (json.JSONDecodeError, ValidationError) as error:
         return fail(str(error))
     digest = hashlib.sha256(raw_responses[0]).hexdigest()
+    if digest != EXPECTED_RAW_SHA256:
+        return fail(
+            f"WireDag raw artifact drifted: expected {EXPECTED_RAW_SHA256}, got {digest}"
+        )
 
     print(
         f"Shoals WireDag OK: entry={ENTRY} root={root} "

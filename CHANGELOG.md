@@ -14,6 +14,8 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   Its executable boundary gate rejects compiler-pin/schema drift, malformed or
   host-only reachable graphs, and cold-process byte nondeterminism; numerical
   equivalence uses an absolute-plus-relative tolerance across multiple shapes.
+  The reviewed raw SHA/root/node commitment rejects semantically redirected
+  named roots even when the replacement graph remains structurally plausible.
   This supplies Beacon's content-addressed producer artifact without claiming
   the bounded-domain result tracked by Beacon#74.
 - Prepared the next candidate as 0.24.3. The published 0.24.2 package and

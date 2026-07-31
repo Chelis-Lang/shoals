@@ -48,8 +48,10 @@ covers both three-row and shape-one inputs.
 `python3 scripts/validate_bs_wire_root.py` enforces the `reef.toml` Chelis pin,
 compares raw artifacts from independent cold Tide processes, and validates
 schema 3, graph integrity, the named f64 tensor root, its exact reachable input
-set, and its compiler-reported operation closure. The result is a
-content-addressable compiler artifact; it does not itself claim a global
+set, its compiler-reported operation closure, and the reviewed raw SHA/root/node
+commitment. Any compiler or source change must deliberately refresh that
+commitment instead of accepting a merely plausible redirected graph. The result
+is a content-addressable compiler artifact; it does not itself claim a global
 Black-Scholes theorem.
 
 ## Vectorized prices
