@@ -52,3 +52,6 @@ constraint-directed samples at each deterministic seed 0, 1, and 2, not global
 proofs. Every family has a corrupt twin with an in-domain counterexample, and
 the gate accepts dependency identity only from the compiler summary graph. An
 ES/VaR relation must report edges to both functions it calls.
+
+For 0.24.4 these are release-gated observations against the official,
+sidecar-verified Chelis 0.17.5, Nautilus 0.7.37, and Coral 0.7.34 artifacts.

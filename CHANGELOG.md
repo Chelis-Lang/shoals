@@ -18,9 +18,12 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   named roots even when the replacement graph remains structurally plausible.
   This supplies Beacon's content-addressed producer artifact without claiming
   the bounded-domain result tracked by Beacon#74.
-- Prepared the next candidate as 0.24.3. The published 0.24.2 package and
-  characterization asset retain their original bytes and identity; the Greek
-  characterization additions belong only to the new patch candidate.
+- Prepared the next release as 0.24.4. The published 0.24.2 and 0.24.3
+  packages and characterization assets retain their original bytes and
+  identities; the WireDag producer and VaR/ES characterization additions
+  belong only to the new patch release. Its manifest and release gate consume
+  the complete published, sidecar-verified Chelis 0.17.5, Nautilus 0.7.37,
+  and Coral 0.7.34 dependency chain.
 - Hardened the proof gate so fuzz counterexamples are checked against every
   structured precondition exactly like SMT counterexamples. An adversarial
   self-test prevents an out-of-domain fuzz witness from satisfying the corrupt
@@ -39,7 +42,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   constraint-directed samples at seeds 0, 1, and 2; each corrupt twin emits an
   in-domain witness. Compiler-owned graph edges bind every VaR/CVaR function
   named by the relation, including the second dependency in each ES/VaR goal.
-  These are `fuzz_validated` observations, not global proofs.
+  These are `fuzz_validated` observations, not global proofs. The 0.24.4
+  release gate reproduces them on the official Chelis 0.17.5 / Nautilus
+  0.7.37 / Coral 0.7.34 artifacts.
 
 ## [0.24.2] - 2026-07-31
 

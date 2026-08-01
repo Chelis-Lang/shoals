@@ -4,9 +4,12 @@ This is the frozen surface C Note vendors and resolves in its no-network sandbox
 pinned so C Note builds against a stable contract while Shoals internals evolve. The
 machine-readable manifest is `docs/cnote-import-surface.json`.
 
-Pins: chelis `0.10.1`, shoals `0.21.2`.
+Pins: Chelis `0.17.5`, Shoals `0.24.4`, Nautilus `0.7.37`, and Coral `0.7.34`.
+The exact dependency chain is published and sidecar-verified. The
+machine-readable manifest records only observations reproduced by the final
+official-asset gate.
 
-Scope: the full graduation has landed on chelis 0.10.1. First-order and second-order AD
+Scope: first-order and second-order AD
 Greeks are shipped and validated, and the SMT composite derivatives-property corpus
 (parity, the upper bound, the delta bounds) is proven via the bundled `Std.Contracts`
 normal-CDF contracts. The no-arbitrage properties that refused value-level abstraction
@@ -38,11 +41,12 @@ second-order grad assertions in `tests-manual/greeks_secondorder.ch`).
 
 ## Composite property corpus (`Shoals.Properties.Composites`)
 
-Proven via chelis 0.10.1's contract mechanism: a `@property ... with contract =
-"std.normal_cdf.*"` abstracts calls to the bundled `Std.Contracts.normal_cdf` into SMT
-symbols carrying the declared contract, proves the structure, and emits a composite
-verdict. The contract is auto fuzz-discharged (8192 samples, tolerance 1e-10) with a cvc5
-non-vacuity check.
+Proven on the pinned 0.17.5 release via the contract mechanism: a
+`@property ... with contract = "std.normal_cdf.*"` abstracts calls to the
+bundled `Std.Contracts.normal_cdf` into SMT symbols carrying the declared
+contract, proves the structure, and emits a composite verdict. The contract is
+auto fuzz-discharged (8192 samples, tolerance 1e-10) with a cvc5 non-vacuity
+check.
 
 - `put_call_parity_reflection`, `call_upper_bounded_by_spot`, `delta_in_unit_interval`:
   each `proven_modulo_fuzz_validated_contract` (SMT base proof + fuzz-validated
@@ -51,9 +55,11 @@ non-vacuity check.
   coupling flips the verdict) and `delta_unknown_contract` (unsupported: an unknown
   contract id is not a pass).
 
-Run the corpus via `scripts/manual_gates/phase3l_shoals_oracle_composite_corpus.py` with
-an SMT-enabled chelis 0.10.1. Do not run `chelis prove .` on the whole package: that
-re-runs the starving fuzz demos and hangs; the gate proves the corpus targeted.
+Run the corpus via
+`scripts/manual_gates/phase3l_shoals_oracle_composite_corpus.py` with the exact
+release compiler. Do not run
+`chelis prove .` on the whole package: that re-runs the starving fuzz demos and
+hangs; the gate proves the corpus targeted.
 
 ### What a composite green means, and the binding (the honest scoping)
 
@@ -81,8 +87,18 @@ Shipped verification predicates C Note can surface: `Shoals.Properties.Pricing`,
 `Shoals.Properties.Greeks`, `Shoals.Properties.NoArbitrage`, and the contract-bound
 `Shoals.Properties.Composites` (see the manifest for the full ID list).
 
+Shoals 0.24.4 adds six `fuzz_validated` VaR/ES entries split across
+the parametric inverse-CDF and historical empirical-quantile kinds. Each kind
+has confidence-monotonicity, ES-dominates-VaR, and positivity controls. The
+release gate requires 25 accepted constraint-directed samples at seeds 0, 1,
+and 2, an in-domain corrupt witness, the compiler-owned property-to-output
+edge, and—on each dominance relation—the additional edge to the corresponding
+CVaR function. The release gate reproduces this evidence against the official
+0.17.5 / 0.7.37 / 0.7.34 chain.
+
 ## Dependency tree
 
-C Note vendors the resolved tree from `reef.lock`: `chelis-std 0.4.0` (bundled),
-`coral 0.7.28`, `nautilus 0.7.30`, all under compiler `0.10.1`. SHA-256 pins are in the
-manifest.
+The 0.24.4 manifest targets `chelis-std 0.4.0` (bundled), Coral 0.7.34,
+Nautilus 0.7.37, and compiler 0.17.5. Release identities and hashes come from
+independently downloaded, sidecar-verified official assets; they are never
+inferred from local checkouts.

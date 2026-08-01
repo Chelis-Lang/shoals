@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import copy
 import importlib.util
+import json
 import unittest
 from pathlib import Path
 
@@ -21,6 +23,61 @@ CONTRACT_SPEC.loader.exec_module(CONTRACT_GATE)
 
 
 class RiskInvariantGateTests(unittest.TestCase):
+    def test_manifest_locks_exact_two_kind_six_invariant_contract(self) -> None:
+        manifest = json.loads(
+            (ROOT / "docs/cnote-import-surface.json").read_text()
+        )
+        self.assertEqual(
+            CONTRACT_GATE.risk_family_errors(manifest, manifest["chelis_pin"]),
+            [],
+        )
+        self.assertEqual(
+            CONTRACT_GATE.generated_note_errors(
+                manifest, manifest["pkg_version"], manifest["chelis_pin"]
+            ),
+            [],
+        )
+
+        missing = copy.deepcopy(manifest)
+        missing["invariants"] = [
+            inv for inv in missing["invariants"]
+            if inv.get("id") != "shoals.inv.var_monotone_in_confidence.v1"
+        ]
+        self.assertTrue(CONTRACT_GATE.risk_family_errors(missing, "0.17.5"))
+
+        forged = copy.deepcopy(manifest)
+        monotone = next(
+            inv for inv in forged["invariants"]
+            if inv.get("id") == "shoals.inv.var_monotone_in_confidence.v1"
+        )
+        monotone["binding"]["additional_compiler_dependencies"] = [{
+            "package": "shoals", "module": "Shoals.Risk",
+            "kind": "function", "name": "parametric_cvar",
+            "source_file": "src/risk.ch",
+        }]
+        errors = CONTRACT_GATE.risk_family_errors(forged, "0.17.5")
+        self.assertTrue(
+            any("additional compiler dependencies" in e for e in errors)
+        )
+
+        for invariant_id in (
+            "shoals.inv.cvar_dominates_var.v1",
+            "shoals.inv.historical_cvar_dominates_var.v1",
+        ):
+            missing_second_edge = copy.deepcopy(manifest)
+            dominance = next(
+                inv for inv in missing_second_edge["invariants"]
+                if inv.get("id") == invariant_id
+            )
+            dominance["binding"]["additional_compiler_dependencies"] = []
+            errors = CONTRACT_GATE.risk_family_errors(
+                missing_second_edge, "0.17.5"
+            )
+            self.assertTrue(
+                any("additional compiler dependencies" in e for e in errors),
+                invariant_id,
+            )
+
     def test_additional_dependency_requires_exact_compiler_edge(self) -> None:
         prop = {
             "id": "p", "kind": "property", "package": "shoals",

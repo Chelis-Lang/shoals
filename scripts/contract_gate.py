@@ -36,6 +36,56 @@ BELOW_PROVEN = {"proven_modulo_contract", "sound_approximate", "fuzz_validated"}
 OP = {"gt": ">", "gte": ">=", "lt": "<", "lte": "<=", "eq": "=="}
 # where-clause comparison operator -> contract op token (longest first).
 SYM2TOK = {">=": "gte", "<=": "lte", "==": "eq", ">": "gt", "<": "lt"}
+RISK_PROBE = "shoals37_risk_multi_seed"
+RISK_FAMILY = {
+    "shoals.inv.var_monotone_in_confidence.v1": (
+        "finance.risk_measure.parametric", "parametric_var",
+        "properties/canonrisk.ch", "var_monotone_in_confidence", None,
+    ),
+    "shoals.inv.cvar_dominates_var.v1": (
+        "finance.risk_measure.parametric", "parametric_var",
+        "properties/canonrisk.ch", "cvar_dominates_var", "parametric_cvar",
+    ),
+    "shoals.inv.var_nonneg_positive_mean.v1": (
+        "finance.risk_measure.parametric", "parametric_var",
+        "properties/canonrisk.ch", "var_nonneg_positive_mean", None,
+    ),
+    "shoals.inv.historical_var_monotone_in_confidence.v1": (
+        "finance.risk_measure.historical", "historical_var",
+        "properties/canonriskhistorical.ch",
+        "historical_var_monotone_in_confidence", None,
+    ),
+    "shoals.inv.historical_cvar_dominates_var.v1": (
+        "finance.risk_measure.historical", "historical_var",
+        "properties/canonriskhistorical.ch",
+        "historical_cvar_dominates_var", "historical_cvar",
+    ),
+    "shoals.inv.historical_var_nonneg_positive_losses.v1": (
+        "finance.risk_measure.historical", "historical_var",
+        "properties/canonriskhistorical.ch",
+        "historical_var_nonneg_positive_losses", None,
+    ),
+}
+RISK_GOAL_PATTERNS = {
+    "shoals.inv.var_monotone_in_confidence.v1": (
+        "{{output_fn}}(losses, alpha2) >= {{output_fn}}(losses, alpha1)"
+    ),
+    "shoals.inv.cvar_dominates_var.v1": (
+        "parametric_cvar(losses, alpha) >= {{output_fn}}(losses, alpha)"
+    ),
+    "shoals.inv.var_nonneg_positive_mean.v1": (
+        "{{output_fn}}(losses, alpha) > 0.0"
+    ),
+    "shoals.inv.historical_var_monotone_in_confidence.v1": (
+        "{{output_fn}}(losses, alpha1) <= {{output_fn}}(losses, alpha2)"
+    ),
+    "shoals.inv.historical_cvar_dominates_var.v1": (
+        "historical_cvar(losses, alpha) >= {{output_fn}}(losses, alpha)"
+    ),
+    "shoals.inv.historical_var_nonneg_positive_losses.v1": (
+        "{{output_fn}}(losses, alpha) > 0.0"
+    ),
+}
 
 _errors: list[str] = []
 
@@ -49,6 +99,56 @@ def reef_pins() -> tuple[str, str]:
     ver = re.search(r'^\s*version\s*=\s*"([0-9.]+)"', t, re.M).group(1)
     pin = re.search(r'compiler\s*=\s*"=([0-9.]+)"', t).group(1)
     return ver, pin
+
+
+def reef_dependency_version(name: str) -> str:
+    text = (REPO / "reef.toml").read_text()
+    match = re.search(
+        rf"^\s*{re.escape(name)}\s*=\s*\{{[^}}]*\bversion\s*=\s*\"([0-9.]+)\"",
+        text,
+        re.M,
+    )
+    if not match:
+        raise RuntimeError(f"reef.toml has no exact {name} dependency version")
+    return match.group(1)
+
+
+def generated_note_errors(manifest: dict, version: str, pin: str) -> list[str]:
+    """Bind the producer note to observed official-chain release evidence."""
+    note = manifest.get("generated_note")
+    if not isinstance(note, str):
+        return ["generated_note must be a string"]
+    nautilus = reef_dependency_version("nautilus")
+    coral = reef_dependency_version("coral")
+    required = (
+        f"Shoals {version} release",
+        f"official Chelis {pin} / Nautilus {nautilus} / Coral {coral} chain",
+        "333cb4d3688573036d37828eba68416c11c5d1b4",
+        "65f5949a540a547aacbee9845b3d40d2a02d1b28e3c8d608fc7af140fafd6ccf",
+        "9728e7824cd5d8aba26daf5189f95b90c98f9636b8aa0b6ca2fe9cc286c44801",
+        "1b932d75ed4d03a53f90b2093f0801992e963050",
+        "daeb7a4a3cef0f3c98e06c048998cd207a9aa372d161e7c115e430068ecbdd1d",
+        "d5a861566850a0706aae07f68b21bc2eecdd0dfcedafbe26a0083447fa24143b",
+        "2ff17977ef5d3a9cb193c2be9dfee0151fda8146",
+        "97fcab7dc44f80e2d05b70dc117bf1d8276328e408593fe0d89729d00ffea4b1",
+        "da9b67fd475c26713e611c078969a342fa07bb1bbfaeccca34af6ddcdbcea68e",
+        "25 accepted constraint-directed samples",
+        "seeds 0, 1, and 2",
+        "compiler-owned dependency edges",
+    )
+    out = [
+        f"generated_note missing official evidence clause {phrase!r}"
+        for phrase in required if phrase not in note
+    ]
+    forbidden = (
+        "pre-release", "not yet published", "expected 0.17.5 release tier",
+        "must be reproduced against the official target artifacts",
+        "1dfa6ddd31a4fe167e204781a14021b7c84fc468",
+    )
+    for phrase in forbidden:
+        if phrase in note:
+            out.append(f"generated_note retains stale candidate clause {phrase!r}")
+    return out
 
 
 def module_src_file(module: str) -> Path:
@@ -100,6 +200,98 @@ def additional_dependency_errors(dep: object) -> list[str]:
         exports = {x.strip() for x in match.group(1).split(",")} if match else set()
         if dep["name"] not in exports:
             out.append(f"function {dep['name']!r} is not exported by {dep['module']}")
+    return out
+
+
+def risk_family_errors(manifest: dict, pin: str) -> list[str]:
+    """Lock Shoals#37's two-kind/six-invariant release contract exactly."""
+    out: list[str] = []
+    selected = {
+        inv.get("id"): inv for inv in manifest.get("invariants", [])
+        if inv.get("dischargeability_probe") == RISK_PROBE
+    }
+    expected_ids = set(RISK_FAMILY)
+    actual_ids = set(selected)
+    if actual_ids != expected_ids:
+        out.append(
+            f"{RISK_PROBE}: invariant set drifted; expected "
+            f"{sorted(expected_ids)}, got {sorted(actual_ids)}"
+        )
+
+    models = {model.get("id"): model for model in manifest.get("models", [])}
+    expected_models = {
+        "parametric_var": ("finance.risk_measure.parametric", "parametric_var"),
+        "historical_var": ("finance.risk_measure.historical", "historical_var"),
+    }
+    for model_id, (kind, output_fn) in expected_models.items():
+        model = models.get(model_id)
+        if not model:
+            out.append(f"{RISK_PROBE}: missing model {model_id}")
+            continue
+        if model.get("kind") != kind or model.get("output_fn") != output_fn:
+            out.append(
+                f"{RISK_PROBE}: model {model_id} must bind kind={kind!r} "
+                f"and output_fn={output_fn!r}"
+            )
+
+    for inv_id, expected in RISK_FAMILY.items():
+        kind, model_id, source, property_name, extra_fn = expected
+        inv = selected.get(inv_id)
+        if not inv:
+            continue
+        if inv.get("kind_applies_to") != [kind]:
+            out.append(f"{inv_id}: kind_applies_to must be exactly [{kind!r}]")
+        if inv.get("target_model") != model_id:
+            out.append(f"{inv_id}: target_model must be {model_id!r}")
+        prop = inv.get("property") or {}
+        if prop.get("file") != source or prop.get("name") != property_name:
+            out.append(
+                f"{inv_id}: property must be exactly {source}:{property_name}"
+            )
+        controls = inv.get("controls") or {}
+        satisfying = controls.get("satisfying") or {}
+        violating = controls.get("violating") or {}
+        if satisfying != {"name": property_name, "expected": "passed"}:
+            out.append(f"{inv_id}: satisfying control drifted")
+        expected_violating = {
+            "name": f"{property_name}_corrupted",
+            "expected": "failed",
+            "witness_required": True,
+        }
+        if violating != expected_violating:
+            out.append(f"{inv_id}: violating control drifted")
+        binding = inv.get("binding") or {}
+        if (
+            binding.get("mechanism") != "direct-call"
+            or binding.get("references_output_fn") != "direct"
+            or binding.get("contracts") != []
+            or binding.get("goal_pattern") != RISK_GOAL_PATTERNS[inv_id]
+        ):
+            out.append(f"{inv_id}: direct-call binding contract drifted")
+        if inv.get("expected_tier_per_pin", {}).get(pin) != "fuzz_validated":
+            out.append(f"{inv_id}: expected {pin} tier must be fuzz_validated")
+        if not inv.get("tier_upgrade_trigger"):
+            out.append(f"{inv_id}: missing tier_upgrade_trigger")
+        domain_note = inv.get("fuzz_domain_note", "")
+        for phrase in ("25 accepted", "seed", "0, 1, and 2"):
+            if phrase not in domain_note:
+                out.append(f"{inv_id}: fuzz_domain_note missing {phrase!r}")
+
+        dependencies = binding.get("additional_compiler_dependencies", [])
+        expected_dependencies = []
+        if extra_fn:
+            expected_dependencies = [{
+                "package": "shoals",
+                "module": "Shoals.Risk",
+                "kind": "function",
+                "name": extra_fn,
+                "source_file": "src/risk.ch",
+            }]
+        if dependencies != expected_dependencies:
+            out.append(
+                f"{inv_id}: additional compiler dependencies must be exactly "
+                f"{expected_dependencies!r}"
+            )
     return out
 
 
@@ -279,6 +471,8 @@ def main() -> None:
         err(f"pkg_version={manifest.get('pkg_version')} != reef.toml version {ver}")
     if manifest.get("chelis_pin") != pin:
         err(f"chelis_pin={manifest.get('chelis_pin')} != reef.toml compiler pin {pin}")
+    for detail in generated_note_errors(manifest, ver, pin):
+        err(detail)
 
     models = {m["id"]: m for m in manifest["models"]}
     model_ids = [m.get("id") for m in manifest["models"]]
@@ -287,6 +481,8 @@ def main() -> None:
     invariant_ids = [inv.get("id") for inv in manifest["invariants"]]
     if len(invariant_ids) != len(set(invariant_ids)):
         err("invariants contains duplicate IDs")
+    for detail in risk_family_errors(manifest, pin):
+        err(detail)
     for m in manifest["models"]:
         if m["output_fn"] not in exports_of(m["module"]):
             err(f"model {m['id']}: output_fn `{m['output_fn']}` not exported by {m['module']}")

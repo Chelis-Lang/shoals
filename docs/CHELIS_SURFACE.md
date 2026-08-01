@@ -15,14 +15,39 @@ quantitative-finance domain this shell touches — numerical methods, pricing,
 Greeks, and the proof surface over them. **Read this before designing around a
 suspected language gap.**
 
-> **Candidate pin:** chelis 0.17.5 (chelis-std 0.4.0, bundled;
-> nautilus 0.7.36, coral 0.7.33) · **Latest published upstream at authoring:**
-> chelis 0.17.4 (published 2026-07-31) · **Last refreshed:** 2026-07-31
+> **Pinned manifest:** Shoals 0.24.4; chelis 0.17.5 (chelis-std 0.4.0,
+> bundled), Nautilus 0.7.37, Coral 0.7.34 · **Last refreshed:** 2026-08-01
 
-The #37 probes were executed against local 0.17.5 candidate commit
-`1dfa6ddd31a4fe167e204781a14021b7c84fc468`; this document deliberately does
-not invent release archive checksums before publication. The release gate must
-replace this candidate evidence with the official tag and verified sidecars.
+The published Chelis `v0.17.5` tag resolves to commit
+`333cb4d3688573036d37828eba68416c11c5d1b4`. Release workflow `30663604946`
+completed successfully; the publisher-authenticated Linux glibc-2.31 archive
+has SHA-256 `65f5949a540a547aacbee9845b3d40d2a02d1b28e3c8d608fc7af140fafd6ccf`
+and its extracted compiler payload has SHA-256
+`9728e7824cd5d8aba26daf5189f95b90c98f9636b8aa0b6ca2fe9cc286c44801`.
+Nautilus 0.7.37 is published from commit
+`1b932d75ed4d03a53f90b2093f0801992e963050`; its sidecar-verified CHB has
+SHA-256 `daeb7a4a3cef0f3c98e06c048998cd207a9aa372d161e7c115e430068ecbdd1d`
+and its archive has SHA-256
+`d5a861566850a0706aae07f68b21bc2eecdd0dfcedafbe26a0083447fa24143b`.
+Coral 0.7.34 is published from commit
+`2ff17977ef5d3a9cb193c2be9dfee0151fda8146`; its sidecar-verified CHB has
+SHA-256 `97fcab7dc44f80e2d05b70dc117bf1d8276328e408593fe0d89729d00ffea4b1`
+and its archive has SHA-256
+`da9b67fd475c26713e611c078969a342fa07bb1bbfaeccca34af6ddcdbcea68e`.
+The 0.24.4 release proof gate completed successfully on this exact chain. Its
+Shoals#37 lanes observed both risk families at `fuzz_validated`: all six
+properties accepted 25 constraint-directed samples at each seed 0, 1, and 2;
+every corrupt control produced an in-domain witness; and the compiler summary
+graph supplied every direct function edge, including the second CVaR edge in
+both dominance relations.
+
+The previous validated Chelis `v0.17.4` baseline resolves to commit
+`0b0c92f9916163b05a483fba70473496923730e6`. Its downloaded
+`linux-x86_64-glibc2.31` archive has SHA-256
+`6b7f477d65b2dea4e85b5107a51ae5714a5113138a6791361b74205f9448a121`;
+its `chelis` binary has SHA-256
+`d08ebfe67fed11f4458251d47e732de3249d93a3d700c87991a39e219887cc7e`.
+The publisher sidecar verified the archive before installation.
 The official Nautilus `v0.7.36` tag resolves to commit
 `2c434a9dfefca79c371b4c66af62b121a47841d6`; its canonical CHB and archive
 SHA-256 values are
@@ -34,9 +59,10 @@ SHA-256 values are
 `a3e04e308eb7d35c34fe4d6075c7e7626c57a6a9957fc6cf9926467b5787ec6c`
 and `fe41f1617b118eb1600d02518319a96780c77195cce4c836ec43776bd69e08b0`.
 
-Rows are marked `@pin` (verified on the exact 0.17.5 candidate) or
-`@upstream` (expected at a later bump). Refresh this table at every pin bump (`AGENTS.md` §Pin Bump
-Checklist). The authoritative depth reference for the proof reachability map is
+Rows marked `@pin` carry official 0.17.5-chain evidence. `@upstream` remains a
+later capability that is not shipped at this pin. Refresh this table at every pin bump
+(`AGENTS.md` §Pin Bump Checklist). The authoritative depth reference for the
+proof reachability map is
 `research/proof-infra/report.md`; the source-of-truth for the cvc5-lowerable set
 is chelis `crates/chelis-prove/src/tier_b.rs` (`CVC5_LOWERABLE`).
 
@@ -58,8 +84,8 @@ tiers: **A** (type/dimension/linearity), **B** (SMT via cvc5 over the reals),
 | Function-call inlining depth for SMT | `@pin` | Nested calls inline to `MAX_INLINE_DEPTH = 3` (`chelis-prove/src/tier_b_lower.rs`); deeper chains route to Tier C. No shoals goal hits this today; c-note probe `p07` pending (`UPSTREAM_BUGS.md`). |
 | Beacon (large-scale concrete verification) | `@upstream` | `beacon_available=false` in the release binary; gated on `CHELIS_BEACON_BIN`. Shoals now provides the real-pricer `bs_call_wire_f64` tensor root (shoals#19); bounded-domain consumption remains Beacon#74. |
 | prove-side import resolution | `@pin` | `prove` resolves package imports, so a property targets the real exported function; standalone structural probes are self-contained (report §2). |
-| Constraint-directed property sampling | `@pin` | chelis#977 supplies guard-directed generation. Shoals#37 requires 25/25 accepted samples at each of seeds 0, 1, and 2 for both parametric and historical risk families; a starved or partially accepted run fails the gate. |
-| Linked Nautilus quantile contract identity | `@pin` | chelis#979 binds `std.quantile.monotonicity` only to the linker-owned `Nautilus.Stats.quantile_vec`. Shoals keeps historical wrapper claims at the observed `fuzz_validated` tier until that contract bridges through `Shoals.Risk.historical_var`; it does not infer the wrapper relation from source text. |
+| Constraint-directed property sampling | `@pin` | Chelis 0.17.5 ships chelis#977 guard-directed generation. Shoals#37 requires and observes 25/25 accepted samples at each of seeds 0, 1, and 2 for both parametric and historical risk families; a starved or partially accepted run fails the gate. |
+| Linked Nautilus quantile contract identity | `@pin` | Chelis 0.17.5 binds `std.quantile.monotonicity` only to the linker-owned `Nautilus.Stats.quantile_vec` (chelis#979). Shoals keeps historical wrapper claims at the observed `fuzz_validated` tier and never reconstructs the wrapper relation from source text. |
 
 ## Numeric & language primitives the domain uses
 

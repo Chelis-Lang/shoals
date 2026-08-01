@@ -8,6 +8,11 @@ and `coral` (the dataframe runtime). The dependency wiring is declared in
 
 ## Building
 
+Shoals 0.24.4 targets Chelis 0.17.5, Nautilus 0.7.37, and Coral 0.7.34.
+All three dependencies are published; their release sidecars authenticate the
+exact artifacts used by the release gate. Do not use source builds or local
+dependency checkouts as release evidence.
+
 The package gate is owned by the compiler:
 
 ```sh

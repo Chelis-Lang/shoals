@@ -28,7 +28,8 @@ is outside what these functions provide.
   and every Greek, so a Greek is the automatic-differentiation derivative of the
   price the same module returns. First-order: `deltas_call`, `deltas_put`,
   `vegas_call`, `rhos_call`, `thetas_call`. Second-order (via nested grad on
-  chelis 0.10.1): `gammas_call`, `volgas_call`, `vannas_call`. All are validated
+  the pinned 0.17.5 release): `gammas_call`, `volgas_call`,
+  `vannas_call`. All are validated
   against the analytic and finite-difference oracles by
   `scripts/oracle_greeks_gate.py` and carry in-suite `Std.Test` standing
   assertions (the heavy second-order grad assertions live in
@@ -93,9 +94,10 @@ is outside what these functions provide.
 
 ## Property checks
 
-The functions in `properties/` are written as plain boolean functions that
-the test suite calls on fixed input grids. They state the invariants the
-library is expected to satisfy and confirm them on those grids. They are not
-randomized or exhaustively searched within this checkout; treat them as a
-specification of intended behavior, checked at the sampled points the tests
-use.
+The ordinary functions in `properties/` are called by the test suite on fixed
+input grids. The canonical `@property` files have an additional proof-gate
+lane: SMT where supported and seeded fuzz otherwise. In particular, the six
+parametric/historical VaR and ES coherence entries require 25 accepted samples
+at each of seeds 0, 1, and 2 plus corrupt witnesses and compiler-owned function
+edges. That is sampled characterization, not exhaustive proof. For 0.24.4 it
+is reproduced by the release gate on the official target dependency chain.

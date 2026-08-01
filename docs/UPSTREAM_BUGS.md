@@ -21,6 +21,26 @@ mechanical staleness audit (`scripts/audit_workarounds.py`) can find them.
 `scripts/audit_workarounds.py` (full mode) flags any `chelis#NNN` cited here or
 in code that is CLOSED upstream but not sitting in §Archived.
 
+> **0.17.5 release status (2026-08-01):** the published Chelis tag points
+> to `333cb4d3688573036d37828eba68416c11c5d1b4`; its authenticated Linux
+> glibc-2.31 archive is `65f5949a540a547aacbee9845b3d40d2a02d1b28e3c8d608fc7af140fafd6ccf`
+> and its extracted compiler payload is
+> `9728e7824cd5d8aba26daf5189f95b90c98f9636b8aa0b6ca2fe9cc286c44801`.
+> Nautilus 0.7.37 is published from commit
+> `1b932d75ed4d03a53f90b2093f0801992e963050`; its sidecar verifies CHB
+> `daeb7a4a3cef0f3c98e06c048998cd207a9aa372d161e7c115e430068ecbdd1d`
+> and archive
+> `d5a861566850a0706aae07f68b21bc2eecdd0dfcedafbe26a0083447fa24143b`.
+> Coral 0.7.34 is published from commit
+> `2ff17977ef5d3a9cb193c2be9dfee0151fda8146`; its sidecar verifies CHB
+> `97fcab7dc44f80e2d05b70dc117bf1d8276328e408593fe0d89729d00ffea4b1`
+> and archive
+> `da9b67fd475c26713e611c078969a342fa07bb1bbfaeccca34af6ddcdbcea68e`.
+> The release proof gate completed on that exact official chain. Shoals#37's
+> six risk invariants observed 25/25 constraint-directed samples at seeds 0,
+> 1, and 2 with in-domain corrupt witnesses and exact compiler-owned function
+> edges, including both additional CVaR dependencies.
+
 ## Actively blocking
 
 - **None actively blocking.** The finance proof surface ships as documented in
@@ -60,10 +80,10 @@ in code that is CLOSED upstream but not sitting in §Archived.
   `d2 < d1`) is discarded and the residual is falsifiable in-abstraction:
   cvc5 answers SAT-in-abstraction and the honest verdict is
   `deferred_invariant`/`unsupported`, never a proof.
-    - **State at pin 0.17.4 (re-probed 2026-07-31):** still blocked on the
+    - **State at pin 0.17.5 (re-probed 2026-08-01):** still blocked on the
       SMT surface. Running
       `chelis prove properties/canonpricing.ch --json --tier smt-only
-      --smt-timeout 20000 --package .` with the 0.17.4 release binary returns
+      --smt-timeout 20000 --package .` with the 0.17.5 release binary returns
       `unsupported` / `property does not lower to Tier B (smt-only)` for the
       real-pricer properties, including `bs_call_price_nonneg`; no direct
       property is reported proven. Price positivity and the direct Greek
@@ -97,8 +117,8 @@ in code that is CLOSED upstream but not sitting in §Archived.
   wrong result once the operand exceeds f64's 53-bit mantissa (~9e15): the
   Park-Miller-shaped update
   `mod(1103515245·1406938949 + 12345, 2147483647)` returns 178065920
-  instead of the exact 178066070 (re-verified with the 0.17.4 release binary
-  on 2026-07-31: `chelis test tests_blocked/ --expect blocked` reports the
+  instead of the exact 178066070 (re-verified with the 0.17.5 release binary
+  on 2026-08-01: `chelis test tests_blocked/ --expect blocked` reports the
   probe `OK` in blocked mode, so it still fails as expected). The `mod`
   reduction itself is exact via `checked_int_binop`; the loss is upstream of
   it, in the f64 `mul` that forms the operand — the
@@ -147,20 +167,20 @@ No parked entries.
   same A-S coefficients and branch structure as `bs_call_f64`, no host/vmap
   bridge, and representative scalar-equivalence coverage. The executable
   `scripts/validate_bs_wire_root.py` gate lowers the real source with Chelis
-  0.17.4 and observes a non-empty named root. Beacon's bounded-domain consumer
+  0.17.5 and observes a non-empty named root. Beacon's bounded-domain consumer
   and report contract remain tracked by Beacon#74.
 
 - **chelis#924 — Reef package-graph preparation added ~111s to a trivial
   Shoals consumer proof.**
-  - **Resolution:** CLOSED upstream and re-probed against the 0.17.4 release
-    binary on 2026-07-31. The release oracle installed official Nautilus
-    v0.7.36 and Coral v0.7.33 assets plus the exact Shoals 0.24.2 candidate
+  - **Resolution:** CLOSED upstream and re-probed against the 0.17.5 release
+    binary on 2026-08-01. The release oracle installed official Nautilus
+    v0.7.37 and Coral v0.7.34 assets plus the exact Shoals 0.24.4 candidate
     into a fresh isolated Reef registry and XDG cache. Its trivial consumer
-    property completed in **0.389s cold** and **0.183s warm** (limits: 20s /
+    property completed in **0.430s cold** and **0.229s warm** (limits: 20s /
     5s). Both completed processes
     returned `passed` at `proof_tier=smt`, and their NDJSON was byte-identical
-    (`sha256:bce0930113cfe12175a54d7b20294d635c65dec612cdda515166d30b0298b74d`).
-    Command: `CHELIS_BIN=~/.local/share/chelis/0.17.4/bin/chelis python3
+    (`sha256:8b7d667da7915b0696acf7321c5f9dec078f26ebf6defbe1f3705a4dbc3d294a`).
+    Command: `CHELIS_BIN=~/.local/share/chelis/0.17.5/bin/chelis python3
     scripts/check_package_prove_latency.py`.
 
 - **chelis#659 — fuzz-tier proving could not complete a single sample over a

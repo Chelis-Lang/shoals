@@ -61,6 +61,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -78,6 +79,17 @@ CHELIS = os.environ.get("CHELIS_BIN") or os.environ.get("CHELIS_PROVE_BIN") or "
 # imports against the package regardless of the file's directory).
 GEN_TEST = REPO_ROOT / ".gate-tmp" / "_oracle_greeks_gate_generated.ch"
 TEST_TIMEOUT_S = int(os.environ.get("ORACLE_GATE_TIMEOUT_S", "600"))
+
+
+def compiler_pin() -> str:
+    match = re.search(
+        r'^\s*compiler\s*=\s*"=([0-9]+\.[0-9]+\.[0-9]+)"',
+        (REPO_ROOT / "reef.toml").read_text(),
+        re.M,
+    )
+    if not match:
+        raise RuntimeError("reef.toml has no exact compiler pin")
+    return match.group(1)
 
 # --------------------------------------------------------------------------
 # Reference math (Python). erf is A&S 7.1.26 -- the SAME coefficients as the
@@ -654,7 +666,11 @@ def chelis_available() -> tuple[bool, str]:
         return False, f"could not invoke {CHELIS!r}: {exc}"
     if proc.returncode != 0:
         return False, f"{CHELIS!r} --version exited {proc.returncode}: {proc.stderr.strip()}"
-    return True, (proc.stdout.strip() or proc.stderr.strip())
+    observed = proc.stdout.strip() or proc.stderr.strip()
+    expected = f"chelis {compiler_pin()}"
+    if observed != expected:
+        return False, f"compiler mismatch: observed {observed!r}, expected {expected!r}"
+    return True, observed
 
 
 def run_chelis_test(path: Path):
@@ -689,8 +705,8 @@ def main() -> int:
     if not ok:
         print(
             f"SKIP: oracle_greeks_gate -- configured chelis ({CHELIS!r}) unavailable: "
-            f"{detail}. Set CHELIS_BIN (or CHELIS_PROVE_BIN) to a chelis 0.10.1 that "
-            f"satisfies the reef.toml compiler pin to run this gate."
+            f"{detail}. Set CHELIS_BIN (or CHELIS_PROVE_BIN) to the exact "
+            f"reef.toml compiler pin ({compiler_pin()}) to run this gate."
         )
         return 0
 
@@ -774,8 +790,8 @@ def main() -> int:
         except ChelisUnavailable as exc:
             print(
                 f"SKIP: oracle_greeks_gate -- configured chelis ({CHELIS!r}) "
-                f"unavailable: {exc}. Set CHELIS_BIN (or CHELIS_PROVE_BIN) to a "
-                f"chelis 0.10.1 that satisfies the reef.toml compiler pin."
+                f"unavailable: {exc}. Set CHELIS_BIN (or CHELIS_PROVE_BIN) to "
+                f"the exact reef.toml compiler pin ({compiler_pin()})."
             )
             return 0
         return _finish(grid, refs, test_names, src, rc, per_test, summary, out, err,

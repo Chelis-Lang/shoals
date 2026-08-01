@@ -44,6 +44,11 @@ and 2. Corrupt twins fail with in-domain witnesses. The release gate consumes
 only compiler-owned dependency edges and requires both function edges in each
 ES/VaR relation; no dependency is reconstructed from source text.
 
+Evidence boundary: the 0.24.4 release gate reproduces these observations
+against the official, sidecar-verified Chelis 0.17.5 / Nautilus 0.7.37 /
+Coral 0.7.34 chain. The `fuzz_validated` tier is sampled characterization and
+does not promote either family to a global proof.
+
 ### 4. General-Size Promotion Stubs (deferred)
 
 Author `properties/canongeneral.ch` naming the fold-based
@@ -64,7 +69,9 @@ references. Update `docs/src/demos.md`.
 - Each tier claim is backed by a dischargeability probe against the shipped
   shell corpus.
 - Nothing carries a tier the gate cannot confirm.
-- Probes run against published chelis and published shell artifacts.
+- Release evidence runs against published chelis and published shell artifacts.
+  Local pre-release probes may inform preparation, but are labeled candidate
+  evidence and never satisfy the release acceptance gate.
 
 ## Verification
 
