@@ -54,8 +54,8 @@ only compiler-owned dependency edges and requires both function edges in each
 ES/VaR relation; no dependency is reconstructed from source text.
 
 Evidence boundary: the 0.24.5 release gate reproduces these observations
-against the official, sidecar-verified Chelis 0.17.5 / Nautilus 0.7.37 /
-Coral 0.7.34 chain. The `fuzz_validated` tier is sampled characterization and
+against the official, sidecar-verified Chelis 0.18.1 / Nautilus 0.7.38 /
+Coral 0.7.35 chain. The `fuzz_validated` tier is sampled characterization and
 does not promote either family to a global proof.
 
 ### 4. General-Size Promotion Stubs (deferred)

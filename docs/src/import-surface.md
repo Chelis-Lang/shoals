@@ -4,7 +4,7 @@ This is the frozen surface C Note vendors and resolves in its no-network sandbox
 pinned so C Note builds against a stable contract while Shoals internals evolve. The
 machine-readable manifest is `docs/cnote-import-surface.json`.
 
-Pins: Chelis `0.17.5`, Shoals `0.24.5`, Nautilus `0.7.37`, and Coral `0.7.34`.
+Pins: Chelis `0.18.1`, Shoals `0.24.5`, Nautilus `0.7.38`, and Coral `0.7.35`.
 The exact dependency chain is published and sidecar-verified. The
 machine-readable manifest records only observations reproduced by the final
 official-asset gate.
@@ -56,7 +56,7 @@ sign family nor these sampled records are relabeled as global AD correctness.
 
 ## Composite property corpus (`Shoals.Properties.Composites`)
 
-Proven on the pinned 0.17.5 release via the contract mechanism: a
+Proven on the pinned 0.18.1 release via the contract mechanism: a
 `@property ... with contract = "std.normal_cdf.*"` abstracts calls to the
 bundled `Std.Contracts.normal_cdf` into SMT symbols carrying the declared
 contract, proves the structure, and emits a composite verdict. The contract is
@@ -109,11 +109,11 @@ release gate requires 25 accepted constraint-directed samples at seeds 0, 1,
 and 2, an in-domain corrupt witness, the compiler-owned property-to-output
 edge, and—on each dominance relation—the additional edge to the corresponding
 CVaR function. The release gate reproduces this evidence against the official
-0.17.5 / 0.7.37 / 0.7.34 chain.
+0.18.1 / 0.7.38 / 0.7.35 chain.
 
 ## Dependency tree
 
-The 0.24.5 manifest targets `chelis-std 0.4.0` (bundled), Coral 0.7.34,
-Nautilus 0.7.37, and compiler 0.17.5. Release identities and hashes come from
+The 0.24.5 manifest targets `chelis-std 0.4.0` (bundled), Coral 0.7.35,
+Nautilus 0.7.38, and compiler 0.18.1. Release identities and hashes come from
 independently downloaded, sidecar-verified official assets; they are never
 inferred from local checkouts.
