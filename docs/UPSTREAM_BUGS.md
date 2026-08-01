@@ -55,6 +55,26 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 ## Tracking
 
+- **chelis#1002 — Reef preserves caller-provided GitHub owner casing in
+  `remote_origin`, making lock and package bytes registry-history-dependent.**
+  Reproduced against the 0.17.5 release binary on 2026-08-01 with identical
+  Shoals source and identical official Nautilus 0.7.37 / Coral 0.7.34 assets:
+  a registry installed through `Chelis-Lang/...` and a fresh registry resolved
+  through `chelis-lang/...` emitted different `reef.lock`, CHB, and archive
+  bytes solely because the origin strings differed in case.
+    - **Affected surface / narrowing:** every Shoals workflow and Python
+      installer uses canonical lowercase `chelis-lang/...` coordinates.
+      `scripts/build_release_assets.py` deliberately reinstalls both
+      dependencies immediately before building and rejects a non-canonical
+      generated lock. `scripts/check_release_artifact_determinism.py` release-
+      gates two fresh isolated Reef homes: one adversarially preseeded through
+      mixed-case manual installs and one clean, requiring byte-identical lock,
+      CHB, and archive payloads. This does not claim the compiler is fixed.
+    - **Re-probe trigger:** a Chelis release naming GitHub origin
+      canonicalization or a chelis#1002 close. Repeat the adversarial pair
+      without the reinstall workaround; remove the narrowing only when input
+      casing no longer affects registry metadata or release bytes.
+
 - **chelis#408 — the `modelfit_bfgs_heavy` BFGS path kills a constrained
   2-vCPU GitHub-hosted runner.** The Rosenbrock 500-iteration path with a
   per-step finite-difference Jacobian and CG solve repeatedly ends in runner

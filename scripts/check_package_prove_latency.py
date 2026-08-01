@@ -63,7 +63,8 @@ def dependency_releases() -> list[str]:
         version = spec.get("version") if isinstance(spec, dict) else None
         if not isinstance(version, str):
             raise RuntimeError(f"reef.toml has no exact {name} dependency version")
-        releases.append(f"Chelis-Lang/{name}@v{version}")
+        # Keep registry provenance canonical until chelis#1002 is fixed.
+        releases.append(f"chelis-lang/{name}@v{version}")
     return releases
 
 

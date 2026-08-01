@@ -167,7 +167,9 @@ The **lean per-PR** CI gate (`.github/workflows/ci.yml`) runs pin consistency,
 `chelis fmt --check`, lint, `chelis reef build`, the negative and blocked
 expected-failure suites, the conformance audit and pin-bump guard,
 `scripts/contract_gate.py`, the chelis#924 oracle unit tests, and release
-workflow integrity tests. `chelis reef build` is the compiler-owned package
+workflow integrity tests. The four adversarial risk-family self-tests in
+`scripts/test_risk_invariant_gate.py` are authoritative in the local, hosted,
+and release acceptance paths. `chelis reef build` is the compiler-owned package
 oracle: it resolves the Reef manifest, lowers the package, and rejects stale
 source or dependency wiring.
 
@@ -178,7 +180,10 @@ the **nightly** CI gate (`.github/workflows/nightly.yml`, scheduled +
 workflow_dispatch), not per-PR. `python3 scripts/run_local_gate.py` mirrors the
 locally meaningful per-PR stages; the origin-relative conform bump check stays
 CI-only. `python3 scripts/run_local_gate.py --full` adds those nightly lanes and
-is required at pin bumps and before a release tag.
+is required at pin bumps and before a release tag. The full gate also runs the
+chelis#1002 release-byte oracle across two fresh isolated Reef homes (a
+mixed-case manual preseed and a clean registry); both must converge on the same
+lock, CHB, and archive bytes through the canonical release builder.
 The `chelis lint --check` step blocks on any blocking nomenclature
 violation per `crates/chelis-lint/` rules; advisory warnings are
 non-blocking.
