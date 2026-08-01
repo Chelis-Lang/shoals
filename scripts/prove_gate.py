@@ -1128,8 +1128,17 @@ def check_extra_ad_greek_fuzz_seeds(binary: str, manifest: dict, models: dict,
         print(f"\n== multi-seed actual-AD Greek probe: seed={seed} samples={samples} ==")
         result = run_prove(binary, "properties/canonadgreeks.ch", True,
                            samples, seed=seed)
-        if result["returncode"] not in (0, 1) or result["summary_count"] != 1:
-            fail(f"multi-seed actual-AD probe seed {seed}: malformed compiler run")
+        if result["returncode"] not in (0, 1):
+            fail(f"multi-seed actual-AD probe seed {seed}: compiler exited "
+                 f"{result['returncode']}")
+            ok = False
+        if result["summary_count"] != 1:
+            fail(f"multi-seed actual-AD probe seed {seed}: emitted "
+                 f"{result['summary_count']} summary records, expected 1")
+            ok = False
+        if result["duplicate_records"]:
+            fail(f"multi-seed actual-AD probe seed {seed}: duplicate records "
+                 f"{sorted(set(result['duplicate_records']))}")
             ok = False
         for inv in invs:
             print(f"  [{inv['id']}] seed {seed}")

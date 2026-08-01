@@ -87,6 +87,7 @@ RISK_GOAL_PATTERNS = {
     ),
 }
 AD_GREEK_PROBE = "shoals42_ad_greeks_multi_seed"
+INLINE_GRAD_DEFERRED_ID = "shoals.inv.bs_vega_nonneg_grad.v1"
 AD_GREEK_FAMILY = {
     "shoals.inv.bs_ad_delta_fd_consistency.v1":
         ("bs_ad_delta_matches_displayed_price", "deltas_call", "s", 1),
@@ -324,6 +325,17 @@ def ad_greek_family_errors(manifest: dict, pin: str) -> list[str]:
         out.append(
             f"{AD_GREEK_PROBE}: invariant set drifted; expected "
             f"{sorted(AD_GREEK_FAMILY)}, got {sorted(selected)}"
+        )
+
+    deferred_ids = {
+        inv.get("id") for inv in manifest.get("deferred_invariants", [])
+        if isinstance(inv, dict)
+    }
+    if INLINE_GRAD_DEFERRED_ID not in deferred_ids:
+        out.append(
+            f"{AD_GREEK_PROBE}: additive schema-v1 deferred invariant "
+            f"{INLINE_GRAD_DEFERRED_ID!r} is missing; exported-AD consistency "
+            "does not replace the unsupported inline-grad sign claim"
         )
 
     models = {model.get("id"): model for model in manifest.get("models", [])}

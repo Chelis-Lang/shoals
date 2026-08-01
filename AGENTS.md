@@ -127,11 +127,15 @@ C Note is the consumer. Shoals' local obligations:
   pricing subterms. Shoals#37 adds distinct parametric inverse-CDF and
   historical empirical-quantile VaR/ES families, each covering confidence
   monotonicity, ES dominance, and positivity over 25 accepted samples at seeds
-  0, 1, and 2. The 0.24.4 release gate reproduces that evidence against the
+  0, 1, and 2. Shoals#42 adds a separate actual-AD consistency family: seven
+  records call the exported first- and second-order Greek vectors and the
+  displayed price, with compiler-owned edges from both to their shared price
+  body. The 0.24.5 release gate reproduces that evidence against the
   official, sidecar-verified Chelis 0.17.5 / Nautilus 0.7.37 / Coral 0.7.34
-  artifacts. The direct intrinsic-bound and
-  grad-in-property invariants remain deferred until their own per-surface
-  probes demonstrate a stable tier.
+  artifacts. The direct intrinsic-bound and inline `grad`-in-property sign
+  invariants remain deferred until their own per-surface probes demonstrate a
+  stable tier. That unsupported inline-`grad` claim is distinct from the active
+  records that call already-exported AD sensitivity functions.
 - Additive-only within schema major 1; renames/removals need a major bump and a
   relayed heads-up (the master agent relays between repos; shells never read
   each other's manifest).

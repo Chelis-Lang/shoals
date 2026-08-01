@@ -21,9 +21,10 @@ No unreleased changes.
   existing 63-cell runtime oracle, sampled fuzz characterization, deferred
   certified-box evidence, and deferred global verified-differentiation proof;
   no bumped-price result is relabeled as AD correctness.
-- Raised the characterization surface to 37 active invariants and reduced the
-  explicit deferrals to 5. Shoals#42 remains the explicit promotion tracker for
-  certified-box and global AD claims.
+- Raised the characterization surface to 37 active invariants while retaining
+  all 6 additive schema-v1 deferrals. The unsupported inline-`grad` sign claim
+  remains distinct from the new exported-AD consistency records. Shoals#42
+  remains the explicit promotion tracker for certified-box and global AD claims.
 
 ## [0.24.4] - 2026-08-01
 

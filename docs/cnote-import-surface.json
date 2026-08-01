@@ -3259,6 +3259,11 @@
       "trigger": "chelis#637 (relational / BoxRange abstraction), or a Beacon box-range validity proof of the coupled expression."
     },
     {
+      "id": "shoals.inv.bs_vega_nonneg_grad.v1",
+      "reason": "grad-in-property sign invariants (vega/delta/gamma) do NOT lower through a cross-module import of the pricer (prove hangs; economoist docs/issue_drafts/dependency_edges_imports.md) and grad through bs_call_scalar hits the f32/f64 precision-mismatch across the grad boundary (research/proof-infra/report.md sec 5). grad never lowers to SMT (fuzz-only). This surface was not included in the official 0.17.5 direct-positivity probe, so it remains uncharacterized.",
+      "trigger": "resolve the cross-module grad and f32/f64 boundary defects, then demonstrate the inlined equivalent-form grad body and corrupted twin in a dedicated fuzz probe."
+    },
+    {
       "id": "shoals.inv.crr_general_nonneg.v1",
       "reason": "Non-negativity of the n-step CRR European call (tr_binom_european_call_generic). The fold-based body requires induction/fixed-point reasoning over the lattice backward-induction traversal; Tier B cannot inline fold iterations (it inlines calls to depth 3, not loop bodies), and Tier C is intractable for n > ~3 (the terminal vector has n+1 elements, each sample evaluates the full backward fold). Property authored at n=5 in properties/canongeneral.ch. Proven at fixed size n=2 as crr_call_nonneg/crr_rn_call_nonneg.",
       "trigger": "chelis induction tier (fold/fixed-point reasoning over list traversal) enabling structural induction on the backward-induction step."

@@ -57,7 +57,7 @@ ground-truth oracles that `Shoals.Pricing`, `Shoals.Risk`, and
 
 `properties/` ships function bodies for the canonical finance
 properties. The 0.24.5 manifest carries 37 active invariants and
-5 explicitly deferred candidates. `scripts/prove_gate.py` must verify every
+6 explicitly deferred candidates. `scripts/prove_gate.py` must verify every
 active tier against the pinned release compiler, including corrupted
 controls and compiler-owned dependency attribution. Direct Black-Scholes and
 Black-76 call-price positivity plus direct Black-Scholes spot-monotonicity/delta, vega,
@@ -71,9 +71,10 @@ dependency attribution. The actual-AD family covers delta, vega, rho, theta,
 gamma, volga, and vanna over seeds 0, 1, and 2. Compiler-owned edges show that
 each AD function and `bs_call_scalar` reach the same `bs_call_f64` body; corrupt
 AD outputs refute in-domain. Runtime-oracle, fuzz, certified-box, and global
-evidence are reported separately. The unobserved direct intrinsic-bound and
-general-size families remain deferred with cited upgrade
-triggers. See `docs/CHELIS_SURFACE.md` and
+evidence are reported separately. The unsupported inline-`grad` sign candidate
+remains explicitly deferred and is distinct from these exported-AD calls. The
+unobserved direct intrinsic-bound and general-size families remain deferred
+with cited upgrade triggers. See `docs/CHELIS_SURFACE.md` and
 `docs/cnote-import-surface.json` for the exact current surface.
 
 The six VaR/ES entries are official-chain observations: the same 25-sample,
