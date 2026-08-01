@@ -21,22 +21,24 @@ mechanical staleness audit (`scripts/audit_workarounds.py`) can find them.
 `scripts/audit_workarounds.py` (full mode) flags any `chelis#NNN` cited here or
 in code that is CLOSED upstream but not sitting in §Archived.
 
-> **0.17.5 release status (2026-08-01):** the published Chelis tag points
-> to `333cb4d3688573036d37828eba68416c11c5d1b4`; its authenticated Linux
-> glibc-2.31 archive is `65f5949a540a547aacbee9845b3d40d2a02d1b28e3c8d608fc7af140fafd6ccf`
+> **0.18.1 release status (2026-08-01):** the published Chelis tag points
+> to `c8db387d06d538ce8039ac37645a43def48373c9`; its authenticated Linux
+> glibc-2.31 archive is `88a1a53b47b7168e4df614e66a6d9313176174b1dc3a25a43db5f73a3ee8f0cd`
 > and its extracted compiler payload is
-> `9728e7824cd5d8aba26daf5189f95b90c98f9636b8aa0b6ca2fe9cc286c44801`.
-> Nautilus 0.7.37 is published from commit
-> `1b932d75ed4d03a53f90b2093f0801992e963050`; its sidecar verifies CHB
-> `daeb7a4a3cef0f3c98e06c048998cd207a9aa372d161e7c115e430068ecbdd1d`
+> `0d7a46262b4ba2975702d5ed2def5d54b79b5d68258602da59069b6715cc690b`.
+> Nautilus 0.7.38 is published from commit
+> `6b4c10f19a2cd120c08ba3c7d9cb746c161106ec`; its sidecar verifies CHB
+> `cad8bd996ddeddb25f698496a394ab45388a120f9b870e7832cb5b87b5935740`
 > and archive
-> `d5a861566850a0706aae07f68b21bc2eecdd0dfcedafbe26a0083447fa24143b`.
-> Coral 0.7.34 is published from commit
-> `2ff17977ef5d3a9cb193c2be9dfee0151fda8146`; its sidecar verifies CHB
-> `97fcab7dc44f80e2d05b70dc117bf1d8276328e408593fe0d89729d00ffea4b1`
+> `39a81b079dfae2a00a907574954eeb48631757fb5fb1d0940def0c8a98adf4f6`.
+> Coral 0.7.35 is published from commit
+> `313c53f71650d24041287d329240b0cc2b26135e`; its sidecar verifies CHB
+> `457bc6a41246795f0ce77763e490b4869225faf837255d15e655fb3e709e9a8b`
 > and archive
-> `da9b67fd475c26713e611c078969a342fa07bb1bbfaeccca34af6ddcdbcea68e`.
-> The release proof gate completed on that exact official chain. Shoals#37's
+> `8a95c0bb412c86040cba5210d4a305034761d5a205291c30b472c324b78650f5`.
+> The release proof gate completed on that exact official chain. Active entries
+> below were re-probed against the 0.18.1 binary and this dependency chain;
+> archived paragraphs retain their historical pin evidence. Shoals#37's
 > six risk invariants observed 25/25 constraint-directed samples at seeds 0,
 > 1, and 2 with in-domain corrupt witnesses and exact compiler-owned function
 > edges, including both additional CVaR dependencies.
@@ -57,8 +59,8 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 - **chelis#1002 — Reef preserves caller-provided GitHub owner casing in
   `remote_origin`, making lock and package bytes registry-history-dependent.**
-  Reproduced against the 0.17.5 release binary on 2026-08-01 with identical
-  Shoals source and identical official Nautilus 0.7.37 / Coral 0.7.34 assets:
+  Reproduced against the 0.18.1 release binary on 2026-08-01 with identical
+  Shoals source and identical official Nautilus 0.7.38 / Coral 0.7.35 assets:
   a registry installed through `Chelis-Lang/...` and a fresh registry resolved
   through `chelis-lang/...` emitted different `reef.lock`, CHB, and archive
   bytes solely because the origin strings differed in case.
@@ -100,10 +102,10 @@ in code that is CLOSED upstream but not sitting in §Archived.
   `d2 < d1`) is discarded and the residual is falsifiable in-abstraction:
   cvc5 answers SAT-in-abstraction and the honest verdict is
   `deferred_invariant`/`unsupported`, never a proof.
-    - **State at pin 0.17.5 (re-probed 2026-08-01):** still blocked on the
+    - **State at pin 0.18.1 (re-probed 2026-08-01):** still blocked on the
       SMT surface. Running
       `chelis prove properties/canonpricing.ch --json --tier smt-only
-      --smt-timeout 20000 --package .` with the 0.17.5 release binary returns
+      --smt-timeout 20000 --package .` with the 0.18.1 release binary returns
       `unsupported` / `property does not lower to Tier B (smt-only)` for the
       real-pricer properties, including `bs_call_price_nonneg`; no direct
       property is reported proven. Price positivity and the direct Greek
@@ -137,7 +139,7 @@ in code that is CLOSED upstream but not sitting in §Archived.
   wrong result once the operand exceeds f64's 53-bit mantissa (~9e15): the
   Park-Miller-shaped update
   `mod(1103515245·1406938949 + 12345, 2147483647)` returns 178065920
-  instead of the exact 178066070 (re-verified with the 0.17.5 release binary
+    instead of the exact 178066070 (re-verified with the 0.18.1 release binary
   on 2026-08-01: `chelis test tests_blocked/ --expect blocked` reports the
   probe `OK` in blocked mode, so it still fails as expected). The `mod`
   reduction itself is exact via `checked_int_binop`; the loss is upstream of
@@ -158,12 +160,12 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 - **chelis#846 — Depth-3 SMT function-call inlining cap (capacity limit).**
   The Tier-B lowerer inlines nested function calls only to a fixed depth. The
-  cap remains observable in the 0.17.4 release binary (re-probed 2026-07-31
+  cap remains observable in the 0.18.1 release binary (re-probed 2026-08-01
   with a disposable two-property source): a depth-3 identity
   `level3(x) == x + 3` is `passed` at `proof_tier=smt`, while the otherwise
   identical depth-4 identity `level4(x) == x + 4` is `unsupported` with
   `property does not lower to Tier B (smt-only)`. Command:
-  `chelis prove /tmp/shoals-846-0174.ch --json --tier smt-only
+  `chelis prove /tmp/shoals-846-0181.ch --json --tier smt-only
   --smt-timeout 20000`. No Shoals property is known to hit this today (the
   composites goals inline one level); it gates nothing on the current surface.
   Filed 2026-07-23 as a forward-looking capacity limit — the residual of the
