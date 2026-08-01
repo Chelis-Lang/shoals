@@ -35,6 +35,12 @@ is outside what these functions provide.
   assertions (the heavy second-order grad assertions live in
   `tests-manual/greeks_secondorder.ch`). The finite-difference Greeks in
   `Shoals.Greeks` remain a separate, independently exercised oracle.
+- Shoals#42 adds sampled producer records for every shipped call Greek. A
+  record directly invokes the exported AD output and `bs_call_scalar`, while
+  compiler-owned dependency edges establish that both reach `bs_call_f64`.
+  Corrupt derivative controls fail in-domain. This establishes runtime-oracle
+  and fuzz consistency; certified-box and global verified-AD claims remain
+  explicitly deferred and are not implied by these greens.
 
 ## Curves
 
@@ -99,5 +105,5 @@ input grids. The canonical `@property` files have an additional proof-gate
 lane: SMT where supported and seeded fuzz otherwise. In particular, the six
 parametric/historical VaR and ES coherence entries require 25 accepted samples
 at each of seeds 0, 1, and 2 plus corrupt witnesses and compiler-owned function
-edges. That is sampled characterization, not exhaustive proof. For 0.24.4 it
+edges. That is sampled characterization, not exhaustive proof. For 0.24.5 it
 is reproduced by the release gate on the official target dependency chain.

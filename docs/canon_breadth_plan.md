@@ -27,7 +27,16 @@ The former spot-monotonicity, vega-sign, rho-sign, and gamma-sign stubs are
 active against the real `bs_call_scalar` body at `fuzz_validated`. Satisfying
 and corrupted controls run over three deterministic seeds. Their upgrade to a
 global proven tier remains deferred to chelis#637 (relational / BoxRange
-abstraction); the separate grad-in-property candidate remains deferred.
+abstraction). This bumped-price family remains distinct from actual AD output
+characterization.
+
+Shoals#42 now activates a distinct actual-AD family for all seven shipped call
+Greeks. Each property directly invokes the exported AD vector and the displayed
+price, with compiler-owned edges proving both reach the same `bs_call_f64`
+body. Multi-seed finite-difference consistency and the independent runtime
+oracle are active; certified-box and global verified-differentiation evidence
+remain separately deferred on Shoals#42. The older bumped-price family is not
+relabelled as AD correctness.
 
 ### 3. VaR / Quantile Coherence (fuzz_validated)
 
@@ -44,7 +53,7 @@ and 2. Corrupt twins fail with in-domain witnesses. The release gate consumes
 only compiler-owned dependency edges and requires both function edges in each
 ES/VaR relation; no dependency is reconstructed from source text.
 
-Evidence boundary: the 0.24.4 release gate reproduces these observations
+Evidence boundary: the 0.24.5 release gate reproduces these observations
 against the official, sidecar-verified Chelis 0.17.5 / Nautilus 0.7.37 /
 Coral 0.7.34 chain. The `fuzz_validated` tier is sampled characterization and
 does not promote either family to a global proof.

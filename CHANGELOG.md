@@ -8,6 +8,24 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 No unreleased changes.
 
+## [0.24.5] - 2026-08-01
+
+- Activated seven Shoals#42 Black-Scholes sensitivity records that call the
+  actual exported AD delta, vega, rho, theta, gamma, volga, and vanna vectors
+  and compare them numerically with finite differences of the displayed
+  `bs_call_scalar` price. Each has a materially biased corrupt-output control
+  that refutes with an in-domain witness over deterministic seeds 0, 1, and 2.
+- Bound each record using only compiler-owned graph edges: property to AD
+  output, property to displayed price, AD output to `bs_call_f64`, and
+  displayed price to that same body. The manifest and gate distinguish the
+  existing 63-cell runtime oracle, sampled fuzz characterization, deferred
+  certified-box evidence, and deferred global verified-differentiation proof;
+  no bumped-price result is relabeled as AD correctness.
+- Raised the characterization surface to 37 active invariants while retaining
+  all 6 additive schema-v1 deferrals. The unsupported inline-`grad` sign claim
+  remains distinct from the new exported-AD consistency records. Shoals#42
+  remains the explicit promotion tracker for certified-box and global AD claims.
+
 ## [0.24.4] - 2026-08-01
 
 - Closed Shoals#19 with `Shoals.Pricing.bs_call_wire_f64`, a producer-clean

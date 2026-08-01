@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Regression tests for the #37 compiler-evidence and fuzz non-vacuity gate."""
+"""Regression tests for the #37/#42 compiler-evidence and fuzz gates."""
 
 from __future__ import annotations
 
 import copy
+import contextlib
 import importlib.util
+import io
 import json
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,6 +26,48 @@ CONTRACT_SPEC.loader.exec_module(CONTRACT_GATE)
 
 
 class RiskInvariantGateTests(unittest.TestCase):
+    def test_actual_ad_manifest_preserves_inline_grad_deferral(self) -> None:
+        manifest = json.loads(
+            (ROOT / "docs/cnote-import-surface.json").read_text()
+        )
+        self.assertEqual(
+            CONTRACT_GATE.ad_greek_family_errors(
+                manifest, manifest["chelis_pin"]
+            ),
+            [],
+        )
+
+        removed = copy.deepcopy(manifest)
+        removed["deferred_invariants"] = [
+            inv for inv in removed["deferred_invariants"]
+            if inv.get("id") != CONTRACT_GATE.INLINE_GRAD_DEFERRED_ID
+        ]
+        errors = CONTRACT_GATE.ad_greek_family_errors(removed, "0.17.5")
+        self.assertTrue(any("additive schema-v1" in error for error in errors))
+
+    def test_actual_ad_extra_seeds_reject_duplicate_records(self) -> None:
+        manifest = json.loads(
+            (ROOT / "docs/cnote-import-surface.json").read_text()
+        )
+        models = {model["id"]: model for model in manifest["models"]}
+        forged_result = {
+            "returncode": 1,
+            "summary_count": 1,
+            "duplicate_records": ["bs_ad_delta_matches_displayed_price"],
+            "records": {},
+            "dependency_graph": {"status": "complete", "declarations": [],
+                                 "edges": []},
+        }
+        with mock.patch.object(PROVE_GATE, "run_prove",
+                               return_value=forged_result), \
+             mock.patch.object(PROVE_GATE, "check_instantiation",
+                               return_value=True):
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertFalse(PROVE_GATE.check_extra_ad_greek_fuzz_seeds(
+                    "chelis", manifest, models, manifest["pkg"],
+                    manifest["chelis_pin"], 25,
+                ))
+
     def test_manifest_locks_exact_two_kind_six_invariant_contract(self) -> None:
         manifest = json.loads(
             (ROOT / "docs/cnote-import-surface.json").read_text()
