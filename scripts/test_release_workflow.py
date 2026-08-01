@@ -67,6 +67,13 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertLess(seal, rebuild)
         self.assertLess(rebuild, validate)
         self.assertLess(validate, publish)
+
+        seal_step = release[
+            release.index("- name: Seal and validate the complete release payload") :
+            release.index("- name: Verify release assets")
+        ]
+        self.assertIn("GH_TOKEN:", seal_step)
+        self.assertIn("GITHUB_TOKEN:", seal_step)
         for suffix in ("chb", "tar.zst", "invariants.json", "sha256"):
             self.assertIn(
                 f"dist/${{{{ env.PACKAGE_NAME }}}}-${{{{ env.PACKAGE_VERSION }}}}.{suffix}",
