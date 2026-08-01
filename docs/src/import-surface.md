@@ -4,7 +4,7 @@ This is the frozen surface C Note vendors and resolves in its no-network sandbox
 pinned so C Note builds against a stable contract while Shoals internals evolve. The
 machine-readable manifest is `docs/cnote-import-surface.json`.
 
-Pins: Chelis `0.17.5`, Shoals `0.24.4`, Nautilus `0.7.37`, and Coral `0.7.34`.
+Pins: Chelis `0.17.5`, Shoals `0.24.5`, Nautilus `0.7.37`, and Coral `0.7.34`.
 The exact dependency chain is published and sidecar-verified. The
 machine-readable manifest records only observations reproduced by the final
 official-asset gate.
@@ -38,6 +38,21 @@ The Greeks are oracle-validated (analytic closed form, tuned finite differences 
 displayed price, the `d1 = 0` sign fold, and an accuracy-monotone guard) by
 `scripts/oracle_greeks_gate.py`, with in-suite `Std.Test` standing assertions (the heavy
 second-order grad assertions in `tests-manual/greeks_secondorder.ch`).
+
+### Actual-AD characterization (Shoals#42)
+
+Seven active records call `deltas_call`, `vegas_call`, `rhos_call`,
+`thetas_call`, `gammas_call`, `volgas_call`, and `vannas_call` directly and
+compare each output with a finite difference of `bs_call_scalar`. The compiler
+summary—not source parsing—must report property-to-Greek and property-to-price
+edges, plus Greek-to-`bs_call_f64` and price-to-the-same-`bs_call_f64` edges.
+Each record has a materially biased corrupt-output twin that must refute with an
+in-domain witness at seeds 0, 1, and 2.
+
+This is honest sampled consistency plus the independent 63-cell runtime oracle.
+The manifest reports certified-box and global verified-differentiation evidence
+as separate deferred levels linked to Shoals#42. Neither the direct bumped-price
+sign family nor these sampled records are relabeled as global AD correctness.
 
 ## Composite property corpus (`Shoals.Properties.Composites`)
 
@@ -87,7 +102,7 @@ Shipped verification predicates C Note can surface: `Shoals.Properties.Pricing`,
 `Shoals.Properties.Greeks`, `Shoals.Properties.NoArbitrage`, and the contract-bound
 `Shoals.Properties.Composites` (see the manifest for the full ID list).
 
-Shoals 0.24.4 adds six `fuzz_validated` VaR/ES entries split across
+Shoals 0.24.5 carries six `fuzz_validated` VaR/ES entries split across
 the parametric inverse-CDF and historical empirical-quantile kinds. Each kind
 has confidence-monotonicity, ES-dominates-VaR, and positivity controls. The
 release gate requires 25 accepted constraint-directed samples at seeds 0, 1,
@@ -98,7 +113,7 @@ CVaR function. The release gate reproduces this evidence against the official
 
 ## Dependency tree
 
-The 0.24.4 manifest targets `chelis-std 0.4.0` (bundled), Coral 0.7.34,
+The 0.24.5 manifest targets `chelis-std 0.4.0` (bundled), Coral 0.7.34,
 Nautilus 0.7.37, and compiler 0.17.5. Release identities and hashes come from
 independently downloaded, sidecar-verified official assets; they are never
 inferred from local checkouts.

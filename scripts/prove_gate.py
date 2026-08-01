@@ -70,6 +70,16 @@ GREEK_FUZZ_INVARIANT_IDS = {
     "shoals.inv.bs_rho_sign.v1",
     "shoals.inv.bs_gamma_sign.v1",
 }
+AD_GREEK_FUZZ_PROBE = "shoals42_ad_greeks_multi_seed"
+AD_GREEK_FUZZ_INVARIANT_IDS = {
+    "shoals.inv.bs_ad_delta_fd_consistency.v1",
+    "shoals.inv.bs_ad_vega_fd_consistency.v1",
+    "shoals.inv.bs_ad_rho_fd_consistency.v1",
+    "shoals.inv.bs_ad_theta_fd_consistency.v1",
+    "shoals.inv.bs_ad_gamma_fd_consistency.v1",
+    "shoals.inv.bs_ad_volga_fd_consistency.v1",
+    "shoals.inv.bs_ad_vanna_fd_consistency.v1",
+}
 EXTRA_RISK_FUZZ_SEEDS = ("1", "2")
 RISK_FUZZ_INVARIANT_IDS = {
     "shoals.inv.var_monotone_in_confidence.v1",
@@ -319,6 +329,75 @@ def additional_dependency_references(
     )
 
 
+def compiler_graph_function_edge(graph: object, source: dict,
+                                 target: dict) -> tuple[bool, str]:
+    """Validate one exact function-to-function edge from compiler records."""
+    if not isinstance(graph, dict) or graph.get("status") != "complete":
+        return False, "dependency_graph missing or status is not complete"
+    declarations, edges = graph.get("declarations"), graph.get("edges")
+    if not isinstance(declarations, list) or not isinstance(edges, list):
+        return False, "dependency_graph declarations/edges are malformed"
+
+    def matches(decl: object, spec: dict) -> bool:
+        if not isinstance(decl, dict):
+            return False
+        src = decl.get("source")
+        return (
+            decl.get("kind") == "function"
+            and decl.get("package") == spec.get("package")
+            and decl.get("module") == spec.get("module")
+            and decl.get("name") == spec.get("name")
+            and isinstance(src, dict)
+            and src.get("file") == spec.get("source_file")
+            and isinstance(decl.get("id"), str)
+        )
+
+    sources = [decl for decl in declarations if matches(decl, source)]
+    targets = [decl for decl in declarations if matches(decl, target)]
+    if len(sources) != 1 or len(targets) != 1:
+        return False, (f"exact function declaration counts are "
+                       f"source={len(sources)}, target={len(targets)}")
+    wanted = (sources[0]["id"], targets[0]["id"])
+    normalized = {
+        (edge.get("from"), edge.get("to")) for edge in edges
+        if isinstance(edge, dict)
+    }
+    if wanted not in normalized:
+        return False, "exact compiler-reported function edge is absent"
+    return True, "exact compiler-reported function edge present"
+
+
+def ad_binding_references(graph: object, inv: dict, *, property_name: str,
+                          package: str) -> tuple[bool, list[str]]:
+    """Validate the shoals#42 chain solely from compiler-owned records:
+    property -> AD output; property -> displayed price (checked separately);
+    AD output -> shared f64 price body; displayed price -> same body."""
+    ad = inv.get("binding", {}).get("ad_binding")
+    if not isinstance(ad, dict):
+        return True, []
+    messages: list[str] = []
+    greek = ad.get("sensitivity_fn")
+    displayed = ad.get("displayed_price_fn")
+    shared = ad.get("shared_price_body")
+    if not all(isinstance(x, dict) for x in (greek, displayed, shared)):
+        return False, ["AD binding metadata is malformed"]
+    direct, why = compiler_graph_directly_references(
+        graph,
+        property_name=property_name,
+        property_module=inv["property"]["module"],
+        property_file=inv["property"]["file"],
+        target_name=greek["name"], target_module=greek["module"],
+        target_package=greek["package"], target_file=greek["source_file"],
+        package=package,
+    )
+    messages.append(f"property -> {greek['name']}: {why}")
+    greek_body, why = compiler_graph_function_edge(graph, greek, shared)
+    messages.append(f"{greek['name']} -> {shared['name']}: {why}")
+    displayed_body, why = compiler_graph_function_edge(graph, displayed, shared)
+    messages.append(f"{displayed['name']} -> {shared['name']}: {why}")
+    return direct and greek_body and displayed_body, messages
+
+
 def dependency_binding_references(
         rec: dict, graph: object, inv: dict, *, pin: str, output_fn: str,
         output_module: str, package: str,
@@ -425,6 +504,35 @@ def dependency_graph_self_test() -> bool:
         ("pre-0.17.2 goal fallback accepted", legacy),
         ("modern missing graph rejected", not modern_missing),
         ("malformed pin rejected", not malformed_pin),
+    ]
+    greek = {
+        "id": "g", "kind": "function", "package": "shoals",
+        "module": "Shoals.Pricing", "name": "deltas_call",
+        "source": {"file": "src/pricing.ch"},
+    }
+    body = {
+        "id": "b", "kind": "function", "package": "shoals",
+        "module": "Shoals.Pricing", "name": "bs_call_f64",
+        "source": {"file": "src/pricing.ch"},
+    }
+    greek_spec = {k: greek[k] for k in ("package", "module", "kind", "name")}
+    greek_spec["source_file"] = greek["source"]["file"]
+    body_spec = {k: body[k] for k in ("package", "module", "kind", "name")}
+    body_spec["source_file"] = body["source"]["file"]
+    function_graph = {
+        "status": "complete", "declarations": [greek, body],
+        "edges": [{"from": "g", "to": "b"}],
+    }
+    cases += [
+        ("exact function-body edge accepted",
+         compiler_graph_function_edge(function_graph, greek_spec, body_spec)[0]),
+        ("missing function-body edge rejected",
+         not compiler_graph_function_edge(
+             {**function_graph, "edges": []}, greek_spec, body_spec)[0]),
+        ("wrong function source rejected",
+         not compiler_graph_function_edge(
+             function_graph, {**greek_spec, "source_file": "attacker.ch"},
+             body_spec)[0]),
     ]
     failed = [name for name, passed in cases if not passed]
     if failed:
@@ -617,6 +725,13 @@ def check_instantiation(recs, graph, inv, inst, pin, model, package) -> bool:
             else:
                 print(f"    compiler attribution `{control_name}` -> "
                       f"{dep['module']}.{dep['name']}: {extra_why}")
+        ad_ok, ad_messages = ad_binding_references(
+            graph, effective, property_name=control_name, package=package)
+        for message in ad_messages:
+            print(f"    AD attribution `{control_name}`: {message}")
+        if not ad_ok:
+            fail(f"{label} `{control_name}` AD/shared-price attribution failed")
+            extras_ok = False
         return extras_ok
 
     # Defective-model invariants have only a violating control (the break).
@@ -993,6 +1108,41 @@ def check_extra_greek_fuzz_seeds(binary: str, manifest: dict, models: dict,
     return ok
 
 
+def check_extra_ad_greek_fuzz_seeds(binary: str, manifest: dict, models: dict,
+                                    package: str, pin: str,
+                                    primary_samples: int) -> bool:
+    """Require shoals#42's actual AD-output family over seeds 1 and 2."""
+    invs = [inv for inv in manifest["invariants"]
+            if inv.get("dischargeability_probe") == AD_GREEK_FUZZ_PROBE]
+    ids = {inv.get("id") for inv in invs}
+    if ids != AD_GREEK_FUZZ_INVARIANT_IDS:
+        fail("multi-seed AD Greek gate: invariant set drifted; expected "
+             f"{sorted(AD_GREEK_FUZZ_INVARIANT_IDS)}, got {sorted(ids)}")
+        return False
+    if {inv["property"]["file"] for inv in invs} != {"properties/canonadgreeks.ch"}:
+        fail("multi-seed AD Greek gate: expected canonadgreeks.ch only")
+        return False
+    samples = min(primary_samples, EXTRA_GREEK_FUZZ_SAMPLE_CAP)
+    ok = True
+    for seed in EXTRA_GREEK_FUZZ_SEEDS:
+        print(f"\n== multi-seed actual-AD Greek probe: seed={seed} samples={samples} ==")
+        result = run_prove(binary, "properties/canonadgreeks.ch", True,
+                           samples, seed=seed)
+        if result["returncode"] not in (0, 1) or result["summary_count"] != 1:
+            fail(f"multi-seed actual-AD probe seed {seed}: malformed compiler run")
+            ok = False
+        for inv in invs:
+            print(f"  [{inv['id']}] seed {seed}")
+            i_ok = check_instantiation(
+                result["records"], result["dependency_graph"], inv,
+                {"controls": inv["controls"],
+                 "preconditions": inv.get("preconditions", []),
+                 "property": inv["property"]},
+                pin, models[inv["target_model"]], package)
+            ok = i_ok and ok
+    return ok
+
+
 def check_extra_risk_fuzz_seeds(binary: str, manifest: dict, models: dict,
                                 package: str, pin: str,
                                 primary_samples: int) -> bool:
@@ -1160,6 +1310,8 @@ def main() -> None:
 
     if include_fuzz:
         ok = check_extra_greek_fuzz_seeds(
+            binary, manifest, models, manifest["pkg"], pin, samples) and ok
+        ok = check_extra_ad_greek_fuzz_seeds(
             binary, manifest, models, manifest["pkg"], pin, samples) and ok
         ok = check_extra_risk_fuzz_seeds(
             binary, manifest, models, manifest["pkg"], pin, samples) and ok

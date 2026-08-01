@@ -86,6 +86,23 @@ RISK_GOAL_PATTERNS = {
         "{{output_fn}}(losses, alpha) > 0.0"
     ),
 }
+AD_GREEK_PROBE = "shoals42_ad_greeks_multi_seed"
+AD_GREEK_FAMILY = {
+    "shoals.inv.bs_ad_delta_fd_consistency.v1":
+        ("bs_ad_delta_matches_displayed_price", "deltas_call", "s", 1),
+    "shoals.inv.bs_ad_vega_fd_consistency.v1":
+        ("bs_ad_vega_matches_displayed_price", "vegas_call", "sigma", 1),
+    "shoals.inv.bs_ad_rho_fd_consistency.v1":
+        ("bs_ad_rho_matches_displayed_price", "rhos_call", "r", 1),
+    "shoals.inv.bs_ad_theta_fd_consistency.v1":
+        ("bs_ad_theta_matches_displayed_price", "thetas_call", "t", 1),
+    "shoals.inv.bs_ad_gamma_fd_consistency.v1":
+        ("bs_ad_gamma_matches_displayed_price", "gammas_call", "s", 2),
+    "shoals.inv.bs_ad_volga_fd_consistency.v1":
+        ("bs_ad_volga_matches_displayed_price", "volgas_call", "sigma", 2),
+    "shoals.inv.bs_ad_vanna_fd_consistency.v1":
+        ("bs_ad_vanna_matches_displayed_price", "vannas_call", "s,sigma", 2),
+}
 
 _errors: list[str] = []
 
@@ -295,6 +312,103 @@ def risk_family_errors(manifest: dict, pin: str) -> list[str]:
     return out
 
 
+def ad_greek_family_errors(manifest: dict, pin: str) -> list[str]:
+    """Lock shoals#42 to real AD outputs, one shared displayed-price body,
+    corrupt controls, and four explicitly distinct evidence levels."""
+    out: list[str] = []
+    selected = {
+        inv.get("id"): inv for inv in manifest.get("invariants", [])
+        if inv.get("dischargeability_probe") == AD_GREEK_PROBE
+    }
+    if set(selected) != set(AD_GREEK_FAMILY):
+        out.append(
+            f"{AD_GREEK_PROBE}: invariant set drifted; expected "
+            f"{sorted(AD_GREEK_FAMILY)}, got {sorted(selected)}"
+        )
+
+    models = {model.get("id"): model for model in manifest.get("models", [])}
+    model = models.get("bs_call") or {}
+    wanted_sensitivities = [
+        {"wrt": wrt, "fn": fn, "order": order}
+        for _, fn, wrt, order in AD_GREEK_FAMILY.values()
+    ]
+    if model.get("sensitivities") != wanted_sensitivities:
+        out.append("bs_call sensitivities must enumerate the exact shoals#42 "
+                   "first/second-order AD surface")
+
+    for inv_id, (property_name, greek_fn, _, order) in AD_GREEK_FAMILY.items():
+        inv = selected.get(inv_id)
+        if not inv:
+            continue
+        if inv.get("target_model") != "bs_call":
+            out.append(f"{inv_id}: target_model must be 'bs_call'")
+        prop = inv.get("property") or {}
+        if prop != {
+            "file": "properties/canonadgreeks.ch",
+            "name": property_name,
+            "module": "Shoals.Properties.CanonAdGreeks",
+        }:
+            out.append(f"{inv_id}: property binding drifted")
+        controls = inv.get("controls") or {}
+        if controls.get("satisfying") != {
+            "name": property_name, "expected": "passed"
+        }:
+            out.append(f"{inv_id}: satisfying control drifted")
+        if controls.get("violating") != {
+            "name": f"{property_name}_corrupted",
+            "expected": "failed",
+            "witness_required": True,
+        }:
+            out.append(f"{inv_id}: corrupt derivative control drifted")
+        binding = inv.get("binding") or {}
+        if (binding.get("mechanism") != "direct-call"
+                or binding.get("references_output_fn") != "direct"
+                or binding.get("contracts") != []):
+            out.append(f"{inv_id}: displayed-price direct binding drifted")
+        expected_ad = {
+            "sensitivity_fn": {
+                "package": "shoals", "module": "Shoals.Pricing",
+                "kind": "function", "name": greek_fn,
+                "source_file": "src/pricing.ch",
+            },
+            "displayed_price_fn": {
+                "package": "shoals", "module": "Shoals.Pricing",
+                "kind": "function", "name": "bs_call_scalar",
+                "source_file": "src/pricing.ch",
+            },
+            "shared_price_body": {
+                "package": "shoals", "module": "Shoals.Pricing",
+                "kind": "function", "name": "bs_call_f64",
+                "source_file": "src/pricing.ch",
+            },
+            "derivative_order": order,
+        }
+        if binding.get("ad_binding") != expected_ad:
+            out.append(f"{inv_id}: AD/shared-price compiler binding drifted")
+        for label, dep in (("sensitivity_fn", expected_ad["sensitivity_fn"]),
+                           ("displayed_price_fn", expected_ad["displayed_price_fn"]),
+                           ("shared_price_body", expected_ad["shared_price_body"])):
+            for detail in additional_dependency_errors(dep):
+                out.append(f"{inv_id}: {label}: {detail}")
+        if inv.get("expected_tier_per_pin", {}).get(pin) != "fuzz_validated":
+            out.append(f"{inv_id}: expected {pin} tier must be fuzz_validated")
+        evidence = inv.get("evidence_levels") or {}
+        if evidence.get("runtime_oracle") != {
+            "status": "validated", "runner": "scripts/oracle_greeks_gate.py"
+        }:
+            out.append(f"{inv_id}: runtime oracle evidence drifted")
+        if evidence.get("fuzz_validation") != {
+            "status": "validated", "tier": "fuzz_validated",
+            "seeds": [0, 1, 2]
+        }:
+            out.append(f"{inv_id}: fuzz evidence drifted")
+        for level in ("certified_box", "global_proof"):
+            record = evidence.get(level) or {}
+            if record.get("status") != "deferred" or "shoals#42" not in record.get("trigger", ""):
+                out.append(f"{inv_id}: {level} must be an issue-linked explicit deferral")
+    return out
+
+
 def property_block(pfile: Path, name: str) -> str | None:
     """The `@property <name> ...:` HEADER line (params + where-guards). The
     canonically-formatted header is one line ending in `:`, the goal on the
@@ -482,6 +596,8 @@ def main() -> None:
     if len(invariant_ids) != len(set(invariant_ids)):
         err("invariants contains duplicate IDs")
     for detail in risk_family_errors(manifest, pin):
+        err(detail)
+    for detail in ad_greek_family_errors(manifest, pin):
         err(detail)
     for m in manifest["models"]:
         if m["output_fn"] not in exports_of(m["module"]):

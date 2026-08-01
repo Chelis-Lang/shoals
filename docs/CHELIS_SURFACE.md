@@ -15,7 +15,7 @@ quantitative-finance domain this shell touches — numerical methods, pricing,
 Greeks, and the proof surface over them. **Read this before designing around a
 suspected language gap.**
 
-> **Pinned manifest:** Shoals 0.24.4; chelis 0.17.5 (chelis-std 0.4.0,
+> **Pinned manifest:** Shoals 0.24.5; chelis 0.17.5 (chelis-std 0.4.0,
 > bundled), Nautilus 0.7.37, Coral 0.7.34 · **Last refreshed:** 2026-08-01
 
 The published Chelis `v0.17.5` tag resolves to commit
@@ -34,12 +34,16 @@ Coral 0.7.34 is published from commit
 SHA-256 `97fcab7dc44f80e2d05b70dc117bf1d8276328e408593fe0d89729d00ffea4b1`
 and its archive has SHA-256
 `da9b67fd475c26713e611c078969a342fa07bb1bbfaeccca34af6ddcdbcea68e`.
-The 0.24.4 release proof gate completed successfully on this exact chain. Its
+The 0.24.5 release proof gate consumes this exact chain. Its
 Shoals#37 lanes observed both risk families at `fuzz_validated`: all six
 properties accepted 25 constraint-directed samples at each seed 0, 1, and 2;
 every corrupt control produced an in-domain witness; and the compiler summary
 graph supplied every direct function edge, including the second CVaR edge in
 both dominance relations.
+Its Shoals#42 lane separately binds seven actual AD outputs and the displayed
+price to their compiler-reported shared `bs_call_f64` body. Those records carry
+runtime-oracle and multi-seed fuzz evidence; certified-box and global proof
+remain explicit Shoals#42 deferrals.
 
 The previous validated Chelis `v0.17.4` baseline resolves to commit
 `0b0c92f9916163b05a483fba70473496923730e6`. Its downloaded
