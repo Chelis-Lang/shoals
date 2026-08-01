@@ -337,6 +337,12 @@ def compiler_graph_function_edge(graph: object, source: dict,
     declarations, edges = graph.get("declarations"), graph.get("edges")
     if not isinstance(declarations, list) or not isinstance(edges, list):
         return False, "dependency_graph declarations/edges are malformed"
+    if not all(isinstance(decl, dict) and isinstance(decl.get("id"), str)
+               for decl in declarations):
+        return False, "dependency_graph contains malformed declarations"
+    ids = [decl["id"] for decl in declarations]
+    if len(ids) != len(set(ids)):
+        return False, "dependency_graph contains duplicate declaration IDs"
 
     def matches(decl: object, spec: dict) -> bool:
         if not isinstance(decl, dict):
@@ -358,10 +364,17 @@ def compiler_graph_function_edge(graph: object, source: dict,
         return False, (f"exact function declaration counts are "
                        f"source={len(sources)}, target={len(targets)}")
     wanted = (sources[0]["id"], targets[0]["id"])
-    normalized = {
-        (edge.get("from"), edge.get("to")) for edge in edges
-        if isinstance(edge, dict)
-    }
+    valid_ids = set(ids)
+    normalized: set[tuple[str, str]] = set()
+    for edge in edges:
+        if not isinstance(edge, dict):
+            return False, "dependency_graph contains a malformed edge"
+        from_id, to_id = edge.get("from"), edge.get("to")
+        if not isinstance(from_id, str) or not isinstance(to_id, str):
+            return False, "dependency_graph contains an edge without string endpoints"
+        if from_id not in valid_ids or to_id not in valid_ids:
+            return False, "dependency_graph edge refers to an unknown declaration ID"
+        normalized.add((from_id, to_id))
     if wanted not in normalized:
         return False, "exact compiler-reported function edge is absent"
     return True, "exact compiler-reported function edge present"
@@ -533,6 +546,25 @@ def dependency_graph_self_test() -> bool:
          not compiler_graph_function_edge(
              function_graph, {**greek_spec, "source_file": "attacker.ch"},
              body_spec)[0]),
+        ("duplicate function declaration ID rejected",
+         not compiler_graph_function_edge(
+             {**function_graph,
+              "declarations": [greek, {**body, "id": "g"}]},
+             greek_spec, body_spec)[0]),
+        ("malformed function graph edge rejected",
+         not compiler_graph_function_edge(
+             {**function_graph, "edges": ["g->b"]},
+             greek_spec, body_spec)[0]),
+        ("function graph edge without string endpoints rejected",
+         not compiler_graph_function_edge(
+             {**function_graph, "edges": [{"from": "g", "to": None}]},
+             greek_spec, body_spec)[0]),
+        ("function graph edge with unknown declaration rejected",
+         not compiler_graph_function_edge(
+             {**function_graph,
+              "edges": [{"from": "g", "to": "b"},
+                        {"from": "attacker", "to": "b"}]},
+             greek_spec, body_spec)[0]),
     ]
     failed = [name for name, passed in cases if not passed]
     if failed:
