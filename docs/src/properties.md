@@ -138,4 +138,4 @@ empirical-quantile families. They are observed at `fuzz_validated`, with 25
 accepted constraint-directed samples at seeds 0, 1, and 2, corrupt controls,
 and compiler-owned dependency attribution. ES dominance additionally requires
 the exact second edge to `parametric_cvar` or `historical_cvar`. The release
-gate reproduces this evidence on the official 0.17.5 dependency chain.
+gate reproduces this evidence on the official 0.18.1 dependency chain.

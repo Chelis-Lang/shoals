@@ -17,8 +17,8 @@ concurrency:
 # so a literal has to exist for the guard to check). The extract step below
 # re-derives the pin from reef.toml only to assert this literal has not drifted.
 env:
-  CHELIS_TAG: v0.17.5
-  CHELIS_VERSION: 0.17.5
+  CHELIS_TAG: v0.18.1
+  CHELIS_VERSION: 0.18.1
 
 jobs:
   hard-rule-guard:

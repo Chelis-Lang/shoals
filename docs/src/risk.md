@@ -54,4 +54,4 @@ the gate accepts dependency identity only from the compiler summary graph. An
 ES/VaR relation must report edges to both functions it calls.
 
 For 0.24.5 these are release-gated observations against the official,
-sidecar-verified Chelis 0.17.5, Nautilus 0.7.37, and Coral 0.7.34 artifacts.
+sidecar-verified Chelis 0.18.1, Nautilus 0.7.38, and Coral 0.7.35 artifacts.

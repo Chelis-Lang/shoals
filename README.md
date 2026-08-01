@@ -6,7 +6,7 @@ Ships as a reef package under the `Shoals` module prefix.
 
 ## Status
 
-v0.24.5 release candidate targeting Chelis 0.17.5. The M0-M9
+v0.24.5 release candidate targeting Chelis 0.18.1. The M0-M9
 quantitative surface is implemented across pricing, curves, volatility,
 stochastic models, Greeks, XVA, calibration, and risk. The candidate carries a first-class
 characterization manifest and proof gate: 37 active invariants must be checked at
@@ -20,7 +20,7 @@ records call the actual exported AD first- and second-order Greeks and compare
 them with finite differences of the displayed price. They are sampled runtime
 consistency evidence, not a global proof of automatic differentiation. The module table below is the
 current package surface; `docs/CHELIS_SURFACE.md` is the versioned capability
-inventory. Chelis 0.17.5, Nautilus 0.7.37, and Coral 0.7.34 are published as
+inventory. Chelis 0.18.1, Nautilus 0.7.38, and Coral 0.7.35 are published as
 one installable, sidecar-verified dependency chain used by the release gate.
 
 ## Modules
@@ -78,41 +78,41 @@ with cited upgrade triggers. See `docs/CHELIS_SURFACE.md` and
 `docs/cnote-import-surface.json` for the exact current surface.
 
 The six VaR/ES entries are official-chain observations: the same 25-sample,
-three-seed controls pass with the published 0.17.5 / 0.7.37 / 0.7.34
+three-seed controls pass with the published 0.18.1 / 0.7.38 / 0.7.35
 artifacts.
 
 ## Toolchain
 
-Pinned to `chelis v0.17.5` in `reef.toml`:
+Pinned to `chelis v0.18.1` in `reef.toml`:
 
 ```toml
 [package]
-compiler = "=0.17.5"
+compiler = "=0.18.1"
 ```
 
 Dependencies resolve via the local Reef registry (`~/.chelis/reef/`):
 
 * `chelis-std` 0.4.0 — standard library
-* `nautilus`   0.7.37 — distributions, special functions, stats,
+* `nautilus`   0.7.38 — distributions, special functions, stats,
   interpolation
-* `coral`      0.7.34 — dataframe runtime (transitively required for
+* `coral`      0.7.35 — dataframe runtime (transitively required for
   the same `nautilus` minor version)
 
-This exact chain is published and installable. The Chelis v0.17.5 tag
-resolves to `333cb4d3688573036d37828eba68416c11c5d1b4`; its authenticated Linux
-glibc-2.31 archive has SHA-256 `65f5949a540a547aacbee9845b3d40d2a02d1b28e3c8d608fc7af140fafd6ccf`
+This exact chain is published and installable. The Chelis v0.18.1 tag
+resolves to `c8db387d06d538ce8039ac37645a43def48373c9`; its authenticated Linux
+glibc-2.31 archive has SHA-256 `88a1a53b47b7168e4df614e66a6d9313176174b1dc3a25a43db5f73a3ee8f0cd`
 and its extracted compiler payload has SHA-256
-`9728e7824cd5d8aba26daf5189f95b90c98f9636b8aa0b6ca2fe9cc286c44801`.
-Nautilus 0.7.37 is published from commit
-`1b932d75ed4d03a53f90b2093f0801992e963050`; its sidecar-verified CHB is
-`daeb7a4a3cef0f3c98e06c048998cd207a9aa372d161e7c115e430068ecbdd1d`
+`0d7a46262b4ba2975702d5ed2def5d54b79b5d68258602da59069b6715cc690b`.
+Nautilus 0.7.38 is published from commit
+`6b4c10f19a2cd120c08ba3c7d9cb746c161106ec`; its sidecar-verified CHB is
+`cad8bd996ddeddb25f698496a394ab45388a120f9b870e7832cb5b87b5935740`
 and its source archive is
-`d5a861566850a0706aae07f68b21bc2eecdd0dfcedafbe26a0083447fa24143b`.
-Coral 0.7.34 is published from commit
-`2ff17977ef5d3a9cb193c2be9dfee0151fda8146`; its sidecar-verified CHB is
-`97fcab7dc44f80e2d05b70dc117bf1d8276328e408593fe0d89729d00ffea4b1`
+`39a81b079dfae2a0aa907574954eeb48631757fb5fb1d0940def0c8a98adf4f6`.
+Coral 0.7.35 is published from commit
+`313c53f71650d24041287d329240b0cc2b26135e`; its sidecar-verified CHB is
+`457bc6a41246795f0ce77763e490b4869225faf837255d15e655fb3e709e9a8b`
 and its source archive is
-`da9b67fd475c26713e611c078969a342fa07bb1bbfaeccca34af6ddcdbcea68e`.
+`8a95c0bb412c86040cba5210d4a305034761d5a205291c30b472c324b78650f5`.
 Do not substitute source builds or local package checkouts for release
 validation.
 
@@ -257,7 +257,7 @@ monorepo oracle remains a separate manual gate.
    an M2-continuation candidate per `docs/plan-quant-surface.md`.
 5. **`erfc` direct routing.** Per Chelis architecture, special
    functions live in `Nautilus.Special`. Since Nautilus 0.7.27 (including the
-   pinned 0.7.37),
+   pinned 0.7.38),
    Shoals routes Black-Scholes through `Nautilus.Special.erfc`
    directly (computing `0.5 * erfc(-x / sqrt(2))` for the standard
    normal CDF), bypassing the higher-level distribution wrapper. No
@@ -271,8 +271,8 @@ following the chelis-reef v0.4.1 multi-source-roots fix
 (`6b58030 feat(reef): multi-source-roots — additional_sources in reef.toml;
 bump v0.4.1`). The reef.toml declares
 `additional_sources = ["properties", "references", "demos"]`. Shoals 0.24.5
-carries the canonical layout forward and pins Chelis 0.17.5, Nautilus 0.7.37,
-and Coral 0.7.34. (References to the pre-reset v0.7.x numbering point at
+carries the canonical layout forward and pins Chelis 0.18.1, Nautilus 0.7.38,
+and Coral 0.7.35. (References to the pre-reset v0.7.x numbering point at
 the historical version track and remain valid as release-history
 records; current planning lives on Shoals's own track per
 `docs/plan-quant-surface.md`.)
