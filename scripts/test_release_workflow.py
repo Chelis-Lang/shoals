@@ -13,6 +13,24 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseWorkflowTests(unittest.TestCase):
+    def test_every_dependency_coordinate_uses_canonical_lowercase_owner(self) -> None:
+        paths = [
+            ROOT / ".github/workflows/ci.yml",
+            ROOT / ".github/workflows/nightly.yml",
+            ROOT / ".github/workflows/release.yml",
+            ROOT / "scripts/check_package_prove_latency.py",
+            ROOT / "scripts/build_release_assets.py",
+        ]
+        combined = "\n".join(path.read_text() for path in paths)
+        self.assertNotIn("Chelis-Lang/nautilus", combined)
+        self.assertNotIn("Chelis-Lang/coral", combined)
+        self.assertIn("chelis-lang/nautilus", combined)
+        self.assertIn("chelis-lang/coral", combined)
+        adversarial = (
+            ROOT / "scripts/check_release_artifact_determinism.py"
+        ).read_text()
+        self.assertIn('f"Chelis-Lang/{name}@v{dep_version}"', adversarial)
+
     def test_toolchain_download_verifies_the_publisher_sidecar(self) -> None:
         action = (ROOT / ".github/actions/install-chelis/action.yml").read_text()
         self.assertIn("default: linux-x86_64-glibc2.31", action)
@@ -31,13 +49,19 @@ class ReleaseWorkflowTests(unittest.TestCase):
 
     def test_release_seals_every_payload_and_rebuilds_before_publish(self) -> None:
         release = (ROOT / ".github/workflows/release.yml").read_text()
+        artifact_oracle = release.index(
+            "python3 scripts/check_release_artifact_determinism.py"
+        )
+        canonical_build = release.index("python3 scripts/build_release_assets.py")
         prove = release.index("python3 scripts/prove_gate.py")
         copy_manifest = release.index("cp docs/cnote-import-surface.json")
         seal = release.index("sha256sum \\\n", copy_manifest)
-        rebuild = release.index("chelis reef build", seal)
+        rebuild = release.index("python3 scripts/build_release_assets.py", seal)
         validate = release.index("sha256sum -c", rebuild)
         publish = release.index("uses: softprops/action-gh-release@v2")
         self.assertIn('PROVE_GATE_FUZZ: "1"', release[:copy_manifest])
+        self.assertLess(artifact_oracle, canonical_build)
+        self.assertLess(canonical_build, prove)
         self.assertLess(prove, copy_manifest)
         self.assertLess(copy_manifest, seal)
         self.assertLess(seal, rebuild)
@@ -49,6 +73,25 @@ class ReleaseWorkflowTests(unittest.TestCase):
                 release[publish:],
             )
         self.assertIn("overwrite_files: true", release[publish:])
+
+    def test_adversarial_risk_self_tests_are_authoritative(self) -> None:
+        ci = (ROOT / ".github/workflows/ci.yml").read_text()
+        release = (ROOT / ".github/workflows/release.yml").read_text()
+        local = (ROOT / "scripts/run_local_gate.py").read_text()
+        command = "python3 scripts/test_risk_invariant_gate.py"
+        self.assertIn(command, ci)
+        self.assertIn(command, release)
+        self.assertIn(
+            '["python3", "scripts/test_risk_invariant_gate.py"]', local
+        )
+        self.assertIn("python3 scripts/test_build_release_assets.py", ci)
+
+    def test_full_local_gate_runs_cross_registry_artifact_oracle(self) -> None:
+        local = (ROOT / "scripts/run_local_gate.py").read_text()
+        self.assertIn(
+            '["python3", "scripts/check_release_artifact_determinism.py"]',
+            local,
+        )
 
     def test_nightly_executes_the_latency_oracle(self) -> None:
         nightly = (ROOT / ".github/workflows/nightly.yml").read_text()

@@ -14,8 +14,8 @@ env:
   # Literal chelis pin. MUST equal reef.toml `compiler = "=X.Y.Z"`;
   # scripts/audit_workarounds.py --pins-only enforces it offline. The extract
   # step re-derives from reef.toml only to assert this has not drifted.
-  CHELIS_TAG: v0.17.4
-  CHELIS_VERSION: 0.17.4
+  CHELIS_TAG: v0.17.5
+  CHELIS_VERSION: 0.17.5
 
 jobs:
   build-reef-assets:
@@ -77,14 +77,24 @@ jobs:
           GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
           GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
         run: |
-          chelis reef install --from-github "Chelis-Lang/nautilus@${NAUTILUS_TAG}"
-          chelis reef install --from-github "Chelis-Lang/coral@${CORAL_TAG}"
+          # Canonical lowercase owner is a release-byte narrowing for chelis#1002.
+          chelis reef install --from-github "chelis-lang/nautilus@${NAUTILUS_TAG}"
+          chelis reef install --from-github "chelis-lang/coral@${CORAL_TAG}"
 
-      - name: Build reef assets
+      - name: Verify release bytes converge across adversarial Reef registries (chelis#1002)
         env:
           GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
           GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
-        run: chelis reef build
+        run: python3 scripts/check_release_artifact_determinism.py
+
+      - name: Build canonical reef assets (chelis#1002)
+        env:
+          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
+          GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
+        run: python3 scripts/build_release_assets.py
+
+      - name: Run adversarial risk invariant gate regressions
+        run: python3 scripts/test_risk_invariant_gate.py
 
       - name: Verify complete SMT and fuzz-validated canon
         env:
@@ -123,7 +133,7 @@ jobs:
               "${PACKAGE_NAME}-${PACKAGE_VERSION}.tar.zst" \
               > "${PACKAGE_NAME}-${PACKAGE_VERSION}.sha256"
           )
-          chelis reef build
+          python3 scripts/build_release_assets.py
           cmp docs/cnote-import-surface.json "$invariant"
           (
             cd dist

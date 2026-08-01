@@ -93,14 +93,14 @@ coral = { version = "0.7.33" }
                     "reef",
                     "install",
                     "--from-github",
-                    "Chelis-Lang/nautilus@v0.7.36",
+                    "chelis-lang/nautilus@v0.7.36",
                 ],
                 [
                     "/bin/chelis",
                     "reef",
                     "install",
                     "--from-github",
-                    "Chelis-Lang/coral@v0.7.33",
+                    "chelis-lang/coral@v0.7.33",
                 ],
             ],
         )

@@ -26,28 +26,35 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
       freshness (also a per-PR CI gate).
   10. ``scripts/test_check_package_prove_latency.py`` — negative-parity tests
       for the chelis#924 release oracle.
-  11. ``scripts/test_release_workflow.py`` — static release/toolchain and
+  11. ``scripts/test_risk_invariant_gate.py`` — adversarial compiler-evidence
+      and risk-family non-vacuity tests.
+  12. ``scripts/test_build_release_assets.py`` — canonical release-builder
+      unit tests for the chelis#1002 narrowing.
+  13. ``scripts/test_release_workflow.py`` — static release/toolchain and
       hosted/local matrix integrity contracts.
 
 ``--full`` appends the stages CI runs in ``.github/workflows/nightly.yml``
 (scheduled, NOT per-PR) — run this at least once at a pin bump
 (``AGENTS.md`` §Pin Bump Checklist) or before a release tag:
 
-  12. ``chelis test tests/ --timeout 1200 --suite-timeout 1500 --jobs auto`` — the fast unit
+  14. ``chelis test tests/ --timeout 1200 --suite-timeout 1500 --jobs auto`` — the fast unit
       suite (~13 min of real-chelis wall; nightly in CI).
-  13. The weekly nightly ``heavy`` matrix, one ``tests-manual/<file>.ch`` at
+  15. The weekly nightly ``heavy`` matrix, one ``tests-manual/<file>.ch`` at
       a time with ``--timeout 1500 --suite-timeout 1650 --jobs 1``. This
       explicitly raises Chelis 0.17.4's separate 600-second whole-suite
       watchdog without weakening any test oracle. It deliberately excludes
       ``modelfit_bfgs_heavy`` pending chelis#408, exactly like hosted nightly;
       an all-directory batch both over-scopes the release gate and hits the
       compiler's whole-suite timeout before completing the reviewed matrix.
-  14. ``scripts/prove_gate.py`` — the keystone canon self-audit against
+  16. ``scripts/prove_gate.py`` — the keystone canon self-audit against
       the release binary (real SMT, ~8.6 min; nightly in CI).
-  15. ``scripts/check_package_prove_latency.py`` — the chelis#924 release
+  17. ``scripts/check_package_prove_latency.py`` — the chelis#924 release
       oracle: install the just-built Shoals candidate, then require a cold
       trivial package prove in <=20s and an unchanged warm prove in <=5s with
       byte-identical NDJSON.
+  18. ``scripts/check_release_artifact_determinism.py`` — two fresh isolated
+      registries (mixed-case manual preseed versus clean canonical) must emit
+      byte-identical lock, CHB, and archive payloads despite chelis#1002.
 
 Exits 0 only if all requested stages succeed.
 
@@ -175,6 +182,14 @@ def main() -> int:
             ["python3", "scripts/test_check_package_prove_latency.py"],
         ),
         (
+            "risk invariant adversarial unit tests",
+            ["python3", "scripts/test_risk_invariant_gate.py"],
+        ),
+        (
+            "canonical release-builder unit tests (chelis#1002)",
+            ["python3", "scripts/test_build_release_assets.py"],
+        ),
+        (
             "release workflow integrity tests",
             ["python3", "scripts/test_release_workflow.py"],
         ),
@@ -206,6 +221,10 @@ def main() -> int:
         (
             "chelis#924 package prove latency oracle",
             ["python3", "scripts/check_package_prove_latency.py"],
+        ),
+        (
+            "cross-registry release artifact determinism (chelis#1002)",
+            ["python3", "scripts/check_release_artifact_determinism.py"],
         ),
     ]
 

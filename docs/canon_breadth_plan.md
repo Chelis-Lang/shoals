@@ -29,19 +29,25 @@ and corrupted controls run over three deterministic seeds. Their upgrade to a
 global proven tier remains deferred to chelis#637 (relational / BoxRange
 abstraction); the separate grad-in-property candidate remains deferred.
 
-### 3. VaR / Quantile Coherence Stubs (deferred or fuzz_validated)
+### 3. VaR / Quantile Coherence (fuzz_validated)
 
 Author `properties/canonrisk.ch` with VaR-monotonicity, CVaR-dominance, and
 VaR-nonneg invariants targeting `src/risk.ch`. Tier classification is honest:
 if fuzz completes they enter active invariants; if intractable they go deferred
 with trigger "chelis-std quantile primitive".
 
-Current verdict for shoals#37: explicitly deferred. Chelis#977's
-constraint-directed sampler is not in the pinned release, and chelis#979's
-source-level contract binding to the real Nautilus quantile implementation has
-not landed. The existing parametric probes remain characterization evidence,
-but activating them alone would not satisfy the issue's distinct parametric and
-historical acceptance surface.
+Current verdict for shoals#37: active at `fuzz_validated`. The parametric
+inverse-CDF and historical empirical-quantile families are distinct. Each
+covers confidence monotonicity, ES dominance, and positivity against the real
+exported bodies over 25 accepted constraint-directed samples at seeds 0, 1,
+and 2. Corrupt twins fail with in-domain witnesses. The release gate consumes
+only compiler-owned dependency edges and requires both function edges in each
+ES/VaR relation; no dependency is reconstructed from source text.
+
+Evidence boundary: the 0.24.4 release gate reproduces these observations
+against the official, sidecar-verified Chelis 0.17.5 / Nautilus 0.7.37 /
+Coral 0.7.34 chain. The `fuzz_validated` tier is sampled characterization and
+does not promote either family to a global proof.
 
 ### 4. General-Size Promotion Stubs (deferred)
 
@@ -63,7 +69,9 @@ references. Update `docs/src/demos.md`.
 - Each tier claim is backed by a dischargeability probe against the shipped
   shell corpus.
 - Nothing carries a tier the gate cannot confirm.
-- Probes run against published chelis and published shell artifacts.
+- Release evidence runs against published chelis and published shell artifacts.
+  Local pre-release probes may inform preparation, but are labeled candidate
+  evidence and never satisfy the release acceptance gate.
 
 ## Verification
 

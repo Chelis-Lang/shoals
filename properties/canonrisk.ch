@@ -1,20 +1,12 @@
 module Shoals.Properties.CanonRisk
 import Shoals.Risk (parametric_var, parametric_cvar)
--- Canon risk-measure invariant stubs: coherence properties over the parametric
--- VaR/CVaR functions in src/risk.ch. These target the REAL risk functions
--- (anti-vacuity: the dependency edge names parametric_var / parametric_cvar),
--- but their bodies call normal_inv_cdf (a transcendental) so SMT returns
--- unsupported, and the fuzz lane must evaluate mean_vec + std_vec + normal_inv_cdf
--- over a tensor. Tier classification is honest: if fuzz completes at a small
--- sample count they enter active invariants at fuzz_validated. The 2026-07-31
--- 0.17.4 probes produced one-sample greens for CVaR dominance and positive-
--- mean VaR, but did not survive a five-sample release-budget check; confidence
--- monotonicity exhausted its ordered-alpha guards. All three therefore remain
--- deferred under shoals#37: chelis#977's constraint-directed sampler is only
--- a candidate (not in the pinned release), and chelis#979's real Nautilus
--- quantile-contract consumer seam has not landed. Activating only these
--- parametric probes would not satisfy the separate historical-model acceptance
--- surface, so no partial invariant is promoted.
+-- Active parametric risk-measure coherence properties over the real VaR/CVaR
+-- functions in src/risk.ch. Their inverse-normal-CDF bodies are characterized
+-- honestly at fuzz_validated: the release gate requires 25 accepted
+-- constraint-directed samples at each seed 0, 1, and 2. Compiler-owned graph
+-- edges bind both parametric_var and parametric_cvar where the goal uses both;
+-- source-text attribution is never accepted. The distinct empirical-quantile
+-- family lives in canonriskhistorical.ch.
 --
 -- The @property surface quantifies over scalar f32 values that are then packed
 -- into a fixed 3-element tensor inside the goal body. This is the smallest size

@@ -17,8 +17,8 @@ concurrency:
 # so a literal has to exist for the guard to check). The extract step below
 # re-derives the pin from reef.toml only to assert this literal has not drifted.
 env:
-  CHELIS_TAG: v0.17.4
-  CHELIS_VERSION: 0.17.4
+  CHELIS_TAG: v0.17.5
+  CHELIS_VERSION: 0.17.5
 
 jobs:
   hard-rule-guard:
@@ -80,8 +80,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
         run: |
           set -euo pipefail
-          chelis reef install --from-github "Chelis-Lang/nautilus@${NAUTILUS_TAG}"
-          chelis reef install --from-github "Chelis-Lang/coral@${CORAL_TAG}"
+          # Canonical lowercase owner is a release-byte narrowing for chelis#1002.
+          chelis reef install --from-github "chelis-lang/nautilus@${NAUTILUS_TAG}"
+          chelis reef install --from-github "chelis-lang/coral@${CORAL_TAG}"
 
       - name: chelis fmt --check
         run: |
@@ -140,6 +141,10 @@ jobs:
         uses: actions/checkout@v4
       - name: Validate the invariant-surface manifest
         run: python3 scripts/contract_gate.py
+      - name: Run adversarial risk invariant gate regressions
+        run: python3 scripts/test_risk_invariant_gate.py
+      - name: Validate canonical release builder (chelis#1002)
+        run: python3 scripts/test_build_release_assets.py
       - name: Validate the chelis#924 release oracle
         run: python3 scripts/test_check_package_prove_latency.py
       - name: Validate release workflow integrity contracts

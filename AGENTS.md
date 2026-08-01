@@ -5,7 +5,7 @@ to this file so Claude-style and Codex-style entry points do not drift.
 
 ## Repo Identity
 
-<!-- BEGIN CHELIS MANAGED BLOCK: agents-inheritance chelis@0.17.4 (sha256:758a5eb9aefb5c7e) -->
+<!-- BEGIN CHELIS MANAGED BLOCK: agents-inheritance chelis@0.17.5 (sha256:758a5eb9aefb5c7e) -->
 This repository is a downstream **shell** of the Chelis compiler. Its upstream
 of truth is `Chelis-Lang/chelis`: the monorepo `AGENTS.md` applies verbatim
 (machine-local environment sections excepted), and
@@ -119,14 +119,19 @@ C Note is the consumer. Shoals' local obligations:
   compatibility oracle; metamorphic substitution remains the complementary
   semantic anti-vacuity check. Both gates run in CI and the
   local gate. Every active invariant is observed against the release binary.
-  At 0.17.4 the direct Black-Scholes and Black-76 call-price positivity family
+  At 0.17.5 the direct Black-Scholes and Black-76 call-price positivity family
   and the direct Black-Scholes spot-monotonicity/delta, vega, rho, and gamma
   comparisons complete at `fuzz_validated` with corrupted twins. The Greek
   family runs over three deterministic seeds. Promotion to `proven` remains
   blocked by chelis#637 because free-variable abstraction discards the coupled
-  pricing subterms. The direct intrinsic-bound, grad-in-property, and risk
-  invariants remain deferred until their own per-surface probes demonstrate a
-  stable tier.
+  pricing subterms. Shoals#37 adds distinct parametric inverse-CDF and
+  historical empirical-quantile VaR/ES families, each covering confidence
+  monotonicity, ES dominance, and positivity over 25 accepted samples at seeds
+  0, 1, and 2. The 0.24.4 release gate reproduces that evidence against the
+  official, sidecar-verified Chelis 0.17.5 / Nautilus 0.7.37 / Coral 0.7.34
+  artifacts. The direct intrinsic-bound and
+  grad-in-property invariants remain deferred until their own per-surface
+  probes demonstrate a stable tier.
 - Additive-only within schema major 1; renames/removals need a major bump and a
   relayed heads-up (the master agent relays between repos; shells never read
   each other's manifest).

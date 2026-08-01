@@ -130,3 +130,12 @@ vol-surface properties are exercised through their respective test modules.
 The properties are written as plain boolean functions, which is the form the
 test suite consumes. See [Scope and limitations](scope.md) for what this
 form does and does not cover.
+
+The canonical `@property` corpus has a separate release proof gate. Shoals#37
+adds exactly six VaR/ES entries: confidence monotonicity, ES dominance, and
+positivity for each of the parametric inverse-CDF and historical
+empirical-quantile families. They are observed at `fuzz_validated`, with 25
+accepted constraint-directed samples at seeds 0, 1, and 2, corrupt controls,
+and compiler-owned dependency attribution. ES dominance additionally requires
+the exact second edge to `parametric_cvar` or `historical_cvar`. The release
+gate reproduces this evidence on the official 0.17.5 dependency chain.

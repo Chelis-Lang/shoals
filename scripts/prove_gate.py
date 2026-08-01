@@ -43,8 +43,9 @@ Stdlib-only. Resolves the binary env-first (CHELIS_SMT_BIN / CHELIS_BIN) then
 the pin-derived ~/.local/share/chelis/<pin>/ then PATH. Fuzz sample count is
 FUZZ_SAMPLES controls the primary seed budget. Direct Black-Scholes Greek-sign
 invariants additionally run two deterministic seeds at a capped five-sample
-budget, so their multi-seed characterization is a release oracle rather than a
-one-off manual observation.
+budget. The parametric and historical risk-coherence families run the full
+configured budget over all three seeds, so their activation cannot rest on a
+one-off or starved sample.
 """
 
 from __future__ import annotations
@@ -68,6 +69,15 @@ GREEK_FUZZ_INVARIANT_IDS = {
     "shoals.inv.bs_vega_sign.v1",
     "shoals.inv.bs_rho_sign.v1",
     "shoals.inv.bs_gamma_sign.v1",
+}
+EXTRA_RISK_FUZZ_SEEDS = ("1", "2")
+RISK_FUZZ_INVARIANT_IDS = {
+    "shoals.inv.var_monotone_in_confidence.v1",
+    "shoals.inv.cvar_dominates_var.v1",
+    "shoals.inv.var_nonneg_positive_mean.v1",
+    "shoals.inv.historical_var_monotone_in_confidence.v1",
+    "shoals.inv.historical_cvar_dominates_var.v1",
+    "shoals.inv.historical_var_nonneg_positive_losses.v1",
 }
 
 # Contract sec 1 tier vocabulary.
@@ -284,6 +294,29 @@ def compiler_graph_directly_references(
     if wanted not in normalized_edges:
         return False, "exact compiler-reported dependency edge is absent"
     return True, "exact compiler-reported dependency edge present"
+
+
+def additional_dependency_references(
+        graph: object, dependency: dict, *, property_name: str,
+        property_module: str, property_file: str,
+        package: str) -> tuple[bool, str]:
+    """Validate one manifest-declared extra function dependency from the graph."""
+    required = {"package", "module", "kind", "name", "source_file"}
+    if (not isinstance(dependency, dict)
+            or set(dependency) != required
+            or dependency.get("kind") != "function"):
+        return False, "additional compiler dependency metadata is malformed"
+    return compiler_graph_directly_references(
+        graph,
+        property_name=property_name,
+        property_module=property_module,
+        property_file=property_file,
+        target_name=dependency["name"],
+        target_module=dependency["module"],
+        target_package=dependency["package"],
+        target_file=dependency["source_file"],
+        package=package,
+    )
 
 
 def dependency_binding_references(
@@ -526,6 +559,30 @@ def check_control(recs, name, want_status, label) -> tuple[bool, dict | None]:
     return ok, rec
 
 
+def fuzz_non_vacuity(rec: dict) -> tuple[bool, str]:
+    """Require a satisfying fuzz record to consume its full constrained budget."""
+    samples = rec.get("samples")
+    accepted = rec.get("accepted_samples")
+    attempted = rec.get("attempted_samples")
+    if not isinstance(samples, int) or samples <= 0:
+        return False, "missing positive requested sample count"
+    if accepted != samples or attempted != samples:
+        return False, (f"sample budget not fully accepted: requested={samples}, "
+                       f"accepted={accepted}, attempted={attempted}")
+    if rec.get("sampling_method") != "constraint_directed":
+        return False, f"sampling_method={rec.get('sampling_method')!r}, expected constraint_directed"
+    assumptions = rec.get("assumptions") or []
+    established = any(
+        isinstance(a, dict)
+        and isinstance(a.get("non_vacuity"), dict)
+        and a["non_vacuity"].get("status") == "established"
+        for a in assumptions
+    )
+    if not established:
+        return False, "compiler did not report established precondition non-vacuity"
+    return True, "full constraint-directed budget with established non-vacuity"
+
+
 def check_instantiation(recs, graph, inv, inst, pin, model, package) -> bool:
     ok = True
     exp_tier = inv["expected_tier_per_pin"].get(pin)
@@ -544,7 +601,23 @@ def check_instantiation(recs, graph, inv, inst, pin, model, package) -> bool:
             return False
         if version_at_least(pin, (0, 17, 2)):
             print(f"    compiler attribution `{control_name}`: {why}")
-        return True
+        extras_ok = True
+        for dep in effective["binding"].get("additional_compiler_dependencies", []):
+            extra_bound, extra_why = additional_dependency_references(
+                graph, dep,
+                property_name=control_name,
+                property_module=effective["property"]["module"],
+                property_file=effective["property"]["file"],
+                package=package,
+            )
+            if not extra_bound:
+                fail(f"{label} `{control_name}` additional compiler attribution "
+                     f"{dep.get('module')}.{dep.get('name')}: {extra_why}")
+                extras_ok = False
+            else:
+                print(f"    compiler attribution `{control_name}` -> "
+                      f"{dep['module']}.{dep['name']}: {extra_why}")
+        return extras_ok
 
     # Defective-model invariants have only a violating control (the break).
     if inv.get("defective_model"):
@@ -581,6 +654,13 @@ def check_instantiation(recs, graph, inv, inst, pin, model, package) -> bool:
             fail(f"TIER DRIFT: `{sg['name']}` achieved {got}, expected {exp_tier} "
                  f"(either direction fails -- run the de-narrowing motion)")
             ok = False
+        if got == "fuzz_validated":
+            non_vacuous, why = fuzz_non_vacuity(rec)
+            if not non_vacuous:
+                fail(f"fuzz non-vacuity `{sg['name']}`: {why}")
+                ok = False
+            else:
+                print(f"    fuzz non-vacuity `{sg['name']}`: {why}")
         if not goal_names_ref(rec.get("goal", ""), inv_with_fn):
             fail(f"anti-vacuity: goal for `{sg['name']}` does not name the "
                  f"output fn / contract symbol (goal={rec.get('goal','')[:80]})")
@@ -913,6 +993,59 @@ def check_extra_greek_fuzz_seeds(binary: str, manifest: dict, models: dict,
     return ok
 
 
+def check_extra_risk_fuzz_seeds(binary: str, manifest: dict, models: dict,
+                                package: str, pin: str,
+                                primary_samples: int) -> bool:
+    """Require both #37 families to pass their real bodies over three seeds."""
+    risk_invs = [
+        inv for inv in manifest["invariants"]
+        if inv.get("dischargeability_probe") == "shoals37_risk_multi_seed"
+    ]
+    risk_ids = {inv.get("id") for inv in risk_invs}
+    if risk_ids != RISK_FUZZ_INVARIANT_IDS:
+        fail("multi-seed risk gate: invariant set drifted; expected "
+             f"{sorted(RISK_FUZZ_INVARIANT_IDS)}, got {sorted(risk_ids)}")
+        return False
+    files = {inv["property"]["file"] for inv in risk_invs}
+    expected_files = {"properties/canonrisk.ch", "properties/canonriskhistorical.ch"}
+    if files != expected_files:
+        fail(f"multi-seed risk gate: expected {sorted(expected_files)}, got {sorted(files)}")
+        return False
+
+    ok = True
+    by_file: dict[str, list] = {}
+    for inv in risk_invs:
+        by_file.setdefault(inv["property"]["file"], []).append(inv)
+    for seed in EXTRA_RISK_FUZZ_SEEDS:
+        for fname, invs in sorted(by_file.items()):
+            print(f"\n== multi-seed risk probe: {fname} seed={seed} "
+                  f"samples={primary_samples} ==")
+            result = run_prove(binary, fname, True, primary_samples, seed=seed)
+            if result["returncode"] not in (0, 1):
+                fail(f"multi-seed risk probe {fname} seed {seed}: compiler exited "
+                     f"{result['returncode']}")
+                ok = False
+            if result["summary_count"] != 1:
+                fail(f"multi-seed risk probe {fname} seed {seed}: emitted "
+                     f"{result['summary_count']} summary records, expected 1")
+                ok = False
+            if result["duplicate_records"]:
+                fail(f"multi-seed risk probe {fname} seed {seed}: duplicate records "
+                     f"{sorted(set(result['duplicate_records']))}")
+                ok = False
+            for inv in invs:
+                anchor = inv.get("target_model") or inv.get("anchor_model")
+                print(f"  [{inv['id']}] seed {seed}")
+                i_ok = check_instantiation(
+                    result["records"], result["dependency_graph"], inv,
+                    {"controls": inv["controls"],
+                     "preconditions": inv.get("preconditions", []),
+                     "property": inv["property"]},
+                    pin, models[anchor], package)
+                ok = i_ok and ok
+    return ok
+
+
 def main() -> None:
     manifest = json.loads(MANIFEST.read_text())
     pin = manifest["chelis_pin"]
@@ -937,7 +1070,9 @@ def main() -> None:
 
     canon_files = [REPO / "properties" / "canonpricing.ch",
                    REPO / "properties" / "canontrees.ch",
-                   REPO / "properties" / "canonfixedincome.ch"]
+                   REPO / "properties" / "canonfixedincome.ch",
+                   REPO / "properties" / "canonrisk.ch",
+                   REPO / "properties" / "canonriskhistorical.ch"]
     ok = name_lint([f for f in canon_files if f.exists()]) and ok
 
     # Group invariants by property file; a file is a fuzz lane if any of its
@@ -1025,6 +1160,8 @@ def main() -> None:
 
     if include_fuzz:
         ok = check_extra_greek_fuzz_seeds(
+            binary, manifest, models, manifest["pkg"], pin, samples) and ok
+        ok = check_extra_risk_fuzz_seeds(
             binary, manifest, models, manifest["pkg"], pin, samples) and ok
 
     print()
