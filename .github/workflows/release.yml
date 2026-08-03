@@ -14,8 +14,8 @@ env:
   # Literal chelis pin. MUST equal reef.toml `compiler = "=X.Y.Z"`;
   # scripts/audit_workarounds.py --pins-only enforces it offline. The extract
   # step re-derives from reef.toml only to assert this has not drifted.
-  CHELIS_TAG: v0.18.1
-  CHELIS_VERSION: 0.18.1
+  CHELIS_TAG: v0.18.2
+  CHELIS_VERSION: 0.18.2
 
 jobs:
   build-reef-assets:
