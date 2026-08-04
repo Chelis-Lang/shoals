@@ -65,9 +65,11 @@ tests, 3 negative contracts, fmt/lint clean, `reef build` OK, WireDag root gate
 OK, `contract_gate.py` green, `prove_gate.py` green, and all four Python
 contract suites OK.
 
-⚠️ The Nautilus and Coral legs of this validation are cascade-branch builds, not
-published releases. Regenerate `docs/cnote-import-surface.json` against the
-published `v0.7.40` / `v0.7.37` assets before the release tag.
+Validated against the published cascade: Nautilus 0.7.40 (commit `c8466b29ffbe4ebc4126363db8c62a06a5b10e7f`, CHB
+`2ba0d478f55d5b270801ada1b51d8dbc75a4d721a24bb8aa42f6f663b0e19bad`, archive `a881f0b96a908a8356b720bfe21e6bde724bea204310e51957b452ad3740a47c`) and Coral 0.7.37 (commit `8e38cd42aeb5e45d7ad5f92ed61143e1c121fb8b`, CHB `b8c41f1b563c2d460c764fb4373a26c7c0c622bd905c6d39a9284349f9a224de`, archive
+`5358b34994df4637dfce7e0deb48d78c6c61ddb807ef50a25261427093973de9`), both installed through `chelis reef install --from-github`. Coral's
+artifact bytes are install-path dependent under chelis#1002, so the published
+values above -- not any local rebuild -- are authoritative.
 
 ## [0.24.5] - 2026-08-01
 

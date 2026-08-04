@@ -37,16 +37,13 @@ in code that is CLOSED upstream but not sitting in §Archived.
 > Coral's native build broke and its 0.7.36 release never happened. Chelis
 > 0.18.3 ships `cast_trunc` ([05-OP-6]) and Nautilus 0.7.40 moves onto it.
 >
-> The Nautilus and Coral legs of this validation are cascade-branch builds, not
-> published releases: Nautilus 0.7.40 from commit
-> `d51183cfd2de7d99b4b991662fa4321be66016fa` (CHB
-> `2ba0d478f55d5b270801ada1b51d8dbc75a4d721a24bb8aa42f6f663b0e19bad`, archive
-> `a881f0b96a908a8356b720bfe21e6bde724bea204310e51957b452ad3740a47c`) and Coral
-> 0.7.37 from commit `a83b43d42f25a71ecd52e584fcff846e3ec48ba1` (CHB
-> `d9d745925fbfb05e402c402fc372cffb24766f53cdf8f93ef1e2c6536fe58520`, archive
-> `6f173e73a4550061f89d2c98ba56d96b127bad04ec20814ccbc6dd69356ee84b`).
-> **`docs/cnote-import-surface.json` must be regenerated against the published
-> `v0.7.40` / `v0.7.37` assets before the Shoals release tag.**
+> Nautilus 0.7.40 is published from commit `c8466b29ffbe4ebc4126363db8c62a06a5b10e7f`; its sidecar verifies CHB
+> `2ba0d478f55d5b270801ada1b51d8dbc75a4d721a24bb8aa42f6f663b0e19bad` and archive `a881f0b96a908a8356b720bfe21e6bde724bea204310e51957b452ad3740a47c`. Coral 0.7.37 is published from commit `8e38cd42aeb5e45d7ad5f92ed61143e1c121fb8b`;
+> its sidecar verifies CHB `b8c41f1b563c2d460c764fb4373a26c7c0c622bd905c6d39a9284349f9a224de` and archive `5358b34994df4637dfce7e0deb48d78c6c61ddb807ef50a25261427093973de9`. Both were installed
+> through `chelis reef install --from-github` and the full gate was re-run
+> against them. Note the Coral artifact bytes are install-path dependent under
+> chelis#1002, so these published values -- not any local rebuild -- are the
+> authoritative ones.
 >
 > **chelis#680 is FIXED at this pin and moved to §Archived.** Its
 > `tests_blocked/` probe went FIX-DETECTED, was promoted to
