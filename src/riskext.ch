@@ -24,7 +24,7 @@ def re_frtb_ima_window_count(indicators_l: List[f32], t_end: int64) -> int64 = {
   start_idx = sub(t_end, cast(249, int64))
   offsets = range(cast(0, int64), cast(250, int64))
   s = fold(fn (acc: f32, k: int64) -> add(acc, index(indicators_l, add(start_idx, k))), cast(0.0, f32), offsets)
-  cast(s, int64)
+  cast_trunc(s, int64)
 }
 def re_frtb_ima_zone_rolling[n, m](loss_series: tensor[n, f32], var_forecasts: tensor[n, f32]) -> tensor[m, int64] = {
   losses_l = to_list(copy(loss_series))
@@ -86,7 +86,7 @@ def re_christoffersen_cc[n](losses: tensor[n, f32], var_forecasts: tensor[n, f32
   n_total = numel(copy(losses))
   indicators_l = re_christoffersen_exception_indicators(losses, var_forecasts)
   exception_count = fold(fn (acc: f32, e: f32) -> add(acc, e), cast(0.0, f32), indicators_l)
-  lr_uc = kupiec_pof_statistic_simple(cast(exception_count, int64), n_total, alpha)
+  lr_uc = kupiec_pof_statistic_simple(cast_trunc(exception_count, int64), n_total, alpha)
   counts = re_christoffersen_transition_counts(indicators_l)
   lr_ind = re_christoffersen_lr_ind(counts.0, counts.1, counts.2, counts.3)
   lr_cc = add(lr_uc, lr_ind)

@@ -206,7 +206,7 @@ def sto_kou_jump_terminal[n](paths_template: tensor[n, f32], jumps_template: ten
   _ = jumps_template
   n_paths = numel(copy(paths_template))
   expected_jumps_f = mul(lambda_jump, t)
-  n_max_raw = cast(add(mul(expected_jumps_f, cast(5.0, f32)), cast(1.0, f32)), int64)
+  n_max_raw = cast_trunc(add(mul(expected_jumps_f, cast(5.0, f32)), cast(1.0, f32)), int64)
   n_max = if lt(n_max_raw, cast(1, int64)) then cast(1, int64) else n_max_raw
   total = mul(n_paths, n_max)
   big_template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), total)))

@@ -17,8 +17,8 @@ concurrency:
 # so a literal has to exist for the guard to check). The extract step below
 # re-derives the pin from reef.toml only to assert this literal has not drifted.
 env:
-  CHELIS_TAG: v0.18.1
-  CHELIS_VERSION: 0.18.1
+  CHELIS_TAG: v0.18.3
+  CHELIS_VERSION: 0.18.3
 
 jobs:
   hard-rule-guard:
@@ -109,8 +109,21 @@ jobs:
       - name: Negative tests
         run: chelis test tests_neg/ --expect neg
 
+      # `--expect blocked` errors on an empty suite (a guard running zero
+      # probes would be silently green), and tests_blocked/ is legitimately
+      # empty whenever every pinned blocker has been de-narrowed. Skip the
+      # step in exactly that case; any probe added here runs with no further
+      # wiring. See tests_blocked/README.md.
       - name: Blocked-probe suite
-        run: chelis test tests_blocked/ --expect blocked
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          probes=(tests_blocked/**/*.ch)
+          if [ ${#probes[@]} -eq 0 ]; then
+            echo "tests_blocked/ carries no probes; skipping (see tests_blocked/README.md)."
+            exit 0
+          fi
+          chelis test tests_blocked/ --expect blocked
 
       # Contract §11 conformance + §7 pin-bump guard (toolchain-native since
       # chelis 0.15.1, chelis#628).

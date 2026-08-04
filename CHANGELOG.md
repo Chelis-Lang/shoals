@@ -4,9 +4,72 @@ All notable changes to this project are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.24.7] - Unreleased
 
-No unreleased changes.
+Compiler-pin and de-narrowing change set for the Chelis 0.18.3 / Nautilus
+0.7.40 / Coral 0.7.37 cascade. `chelis reef conform bump 0.18.3` advanced the
+pin and every workflow audit mirror; the Shoals package version advanced from
+0.24.5 to 0.24.7.
+
+**0.18.2 is skipped.** The 0.24.6 / 0.18.2 candidate could not land: Nautilus
+0.7.39 worked the chelis#759 float-to-integer trap around with `floor(...)`,
+which has no compiled-lane expression identity, so Coral's native build broke
+and Coral 0.7.36 was never published — leaving this repo's `check` job failing
+on a 404 for that dependency. Chelis 0.18.3 ships `cast_trunc` ([05-OP-6]);
+Nautilus 0.7.40 moves onto it and the cascade is unblocked.
+
+- **Retired the chelis#759 `floor` workaround.** 0.18.3 ships `cast_trunc`
+  ([05-OP-6]) as the named truncating float-to-integer cast on the Surf, eval,
+  and compiled-C surfaces, so the seven sites this branch had wrapped in
+  `floor(...)` now call it directly: `cds.ch` (`cds_premium_grid`), `pde.ch`
+  (`pde_interp_at_s0`, and both spread-option grid positions), `riskext.ch`
+  (`re_frtb_ima_window_count`, `re_christoffersen_cc`), and `stochastic.ch`
+  (`sto_kou_jump_terminal`). Behavior-preserving at every site: two are
+  explicitly clamped non-negative, three are sums of 0/1 exception indicators,
+  one is `lambda*t*5 + 1 >= 1`, and one is maturity times frequency — so floor
+  and truncation agree everywhere they are reached.
+- **chelis#680 de-narrowed (i64 `mod` precision).** The blocked probe
+  `tests_blocked/runtime/mod_big_i64_precision.ch` went **FIX-DETECTED** at this
+  pin. Verified per surface before acting:
+  `mod(1103515245·1406938949 + 12345, 2147483647)` returns the exact
+  `178066070` on both the eval and compiled-C lanes at 0.18.3, versus
+  `178065916` on the 0.18.1 binary. Per the sidecar's instructions the probe was
+  promoted to `tests/mod_big_i64_precision.ch`, the internal `Shoals.Rng`
+  bit-walk call sites moved from the hand-rolled `i64_mod` back onto the builtin
+  `mod`, and the `UPSTREAM_BUGS` entry moved to §Archived. The exported
+  `i64_mod` shim is **retained for one release** for downstream compatibility.
+  Note it is a *floored* modulo while builtin `mod` is *truncated* — they agree
+  only for `n >= 0`, which every in-repo call site satisfies;
+  `tests/rng.ch` and `tests/rng_sobol_1024.ch` are unchanged before and after.
+- **`tests_blocked/` is now empty**, and `chelis test --expect` rejects an empty
+  suite. The blocked-suite step in `ci.yml` and `scripts/run_local_gate.py` is
+  guarded to skip when the directory holds no probes; adding a probe re-arms it
+  with no further wiring. See `tests_blocked/README.md`.
+- **WireDag artifact re-pinned for the #729 typed payloads.**
+  `scripts/validate_bs_wire_root.py` moves to `WIRE_DAG_SCHEMA_VERSION = 4`
+  (raised upstream in chelis#1049, after v0.18.1) and re-pins
+  `EXPECTED_RAW_SHA256`. The drift was audited before re-pinning by lowering the
+  identical `src/pricing.ch` under both toolchains and diffing: the only changes
+  are the schema version and nine `const` nodes whose `op.value` gained an
+  explicit dtype tag (`0.0` -> `{"F64": 0.0}`). Node count (1018), entry root
+  (535), op set, and load set are unchanged — a serialization change, not a
+  lowering change.
+- **Characterization manifest advanced to the new pin.**
+  `docs/cnote-import-surface.json` carries `pkg_version` 0.24.7, `chelis_pin`
+  0.18.3, and an `expected_tier_per_pin` entry for 0.18.3 on all 37 active
+  invariants. Every carried-forward tier was **observed**, not assumed:
+  `scripts/prove_gate.py` is green against the 0.18.3 release binary.
+
+Complete local gate on the official Darwin arm64 0.18.3 payload: 370 positive
+tests, 3 negative contracts, fmt/lint clean, `reef build` OK, WireDag root gate
+OK, `contract_gate.py` green, `prove_gate.py` green, and all four Python
+contract suites OK.
+
+Validated against the published cascade: Nautilus 0.7.40 (commit `c8466b29ffbe4ebc4126363db8c62a06a5b10e7f`, CHB
+`2ba0d478f55d5b270801ada1b51d8dbc75a4d721a24bb8aa42f6f663b0e19bad`, archive `a881f0b96a908a8356b720bfe21e6bde724bea204310e51957b452ad3740a47c`) and Coral 0.7.37 (commit `8e38cd42aeb5e45d7ad5f92ed61143e1c121fb8b`, CHB `b8c41f1b563c2d460c764fb4373a26c7c0c622bd905c6d39a9284349f9a224de`, archive
+`5358b34994df4637dfce7e0deb48d78c6c61ddb807ef50a25261427093973de9`), both installed through `chelis reef install --from-github`. Coral's
+artifact bytes are install-path dependent under chelis#1002, so the published
+values above -- not any local rebuild -- are authoritative.
 
 ## [0.24.5] - 2026-08-01
 

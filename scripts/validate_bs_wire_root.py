@@ -20,7 +20,16 @@ ROOT = Path(__file__).resolve().parents[1]
 ENTRY = "bs_call_wire_f64"
 EXPECTED_ENTRY_ROOT = 535
 EXPECTED_NODE_COUNT = 1018
-EXPECTED_RAW_SHA256 = "39db5ba76af6f83643da14110f93d2973d38d24add43978a4091036fe00b7932"
+# Re-pinned at the chelis 0.18.3 bump (was
+# 39db5ba76af6f83643da14110f93d2973d38d24add43978a4091036fe00b7932 at 0.18.1).
+# The drift was audited before re-pinning by lowering the identical
+# src/pricing.ch under both toolchains and diffing the two artifacts: the ONLY
+# changes are the schema version (3 -> 4) and nine `const` nodes whose `op.value`
+# gained an explicit dtype tag (`0.0` -> `{"F64": 0.0}`) from the #729 typed
+# payload work (chelis#1049). Numeric values, node count (1018), entry root
+# (535), op set, and load set are all unchanged, so this is a serialization
+# change and not a lowering change.
+EXPECTED_RAW_SHA256 = "e1705cc66dc289f961355d123729877b53bf212176907d71b8e2f49a39aa98b0"
 FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
 EXPECTED_LOADS = {
     "a1",
@@ -39,7 +48,12 @@ EXPECTED_LOADS = {
     "t",
     "two_over_sqrt_pi",
 }
-WIRE_DAG_SCHEMA_VERSION = 3
+# Bumped 3 -> 4 at the chelis 0.18.3 pin. Upstream raised
+# `WIRE_DAG_SCHEMA_VERSION` in chelis#1049 ("Port #729 Phase 1 onto the typed
+# census hard edges", commit 6ae5b40a), which landed after v0.18.1. Re-check
+# this constant against `crates/chelis-compiler-api/src/schema.rs` at every pin
+# bump; the gate fails closed on a mismatch rather than accepting any schema.
+WIRE_DAG_SCHEMA_VERSION = 4
 WIRE_OPS = {
     "add",
     "cast",
