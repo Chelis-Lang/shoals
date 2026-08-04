@@ -21,27 +21,43 @@ mechanical staleness audit (`scripts/audit_workarounds.py`) can find them.
 `scripts/audit_workarounds.py` (full mode) flags any `chelis#NNN` cited here or
 in code that is CLOSED upstream but not sitting in §Archived.
 
-> **0.18.1 release status (2026-08-01):** the published Chelis tag points
-> to `c8db387d06d538ce8039ac37645a43def48373c9`; its authenticated Linux
-> glibc-2.31 archive is `88a1a53b47b7168e4df614e66a6d9313176174b1dc3a25a43db5f73a3ee8f0cd`
+> **0.18.3 release status (2026-08-04):** the published Chelis tag points
+> to `29700dd73c0e35b672bdd384493054b3107ce308`; its authenticated Darwin arm64
+> archive is `cc8737adf8c21040432d94b96635ef48895bd7ac8cdf94bd7696046c44bc7371`
 > and its extracted compiler payload is
-> `0d7a46262b4ba2975702d5ed2def5d54b79b5d68258602da59069b6715cc690b`.
-> Nautilus 0.7.38 is published from commit
-> `6b4c10f19a2cd120c08ba3c7d9cb746c161106ec`; its sidecar verifies CHB
-> `cad8bd996ddeddb25f698496a394ab45388a120f9b870e7832cb5b87b5935740`
-> and archive
-> `39a81b079dfae2a00a907574954eeb48631757fb5fb1d0940def0c8a98adf4f6`.
-> Coral 0.7.35 is published from commit
-> `313c53f71650d24041287d329240b0cc2b26135e`; its sidecar verifies CHB
-> `457bc6a41246795f0ce77763e490b4869225faf837255d15e655fb3e709e9a8b`
-> and archive
-> `8a95c0bb412c86040cba5210d4a305034761d5a205291c30b472c324b78650f5`.
-> The release proof gate completed on that exact official chain. Active entries
-> below were re-probed against the 0.18.1 binary and this dependency chain;
-> archived paragraphs retain their historical pin evidence. Shoals#37's
-> six risk invariants observed 25/25 constraint-directed samples at seeds 0,
-> 1, and 2 with in-domain corrupt witnesses and exact compiler-owned function
-> edges, including both additional CVaR dependencies.
+> `3a14b0d7e0a46a49c9b25f3dc61573d5972a91b411021672e09b8e3e0e9e1eba`. The
+> glibc-2.31 archive for the same tag is
+> `36789e3a260c61b5082bc8842ba7b975899796ddf17c7b971815a2ed112904a3` (payload
+> `ea0ba326b190366f905445b4996c3993fe6c5cc7214f14cf5d862a615b78badf`), verified
+> against its sidecar but exercised by CI rather than this gate run.
+>
+> **This bump skips 0.18.2: 0.18.1 → 0.18.3.** The 0.24.6 / 0.18.2 candidate
+> could not land — Nautilus 0.7.39 worked the chelis#759 float-to-integer trap
+> around with `floor(...)`, which has no compiled-lane expression identity, so
+> Coral's native build broke and its 0.7.36 release never happened. Chelis
+> 0.18.3 ships `cast_trunc` ([05-OP-6]) and Nautilus 0.7.40 moves onto it.
+>
+> The Nautilus and Coral legs of this validation are cascade-branch builds, not
+> published releases: Nautilus 0.7.40 from commit
+> `d51183cfd2de7d99b4b991662fa4321be66016fa` (CHB
+> `2ba0d478f55d5b270801ada1b51d8dbc75a4d721a24bb8aa42f6f663b0e19bad`, archive
+> `a881f0b96a908a8356b720bfe21e6bde724bea204310e51957b452ad3740a47c`) and Coral
+> 0.7.37 from commit `a83b43d42f25a71ecd52e584fcff846e3ec48ba1` (CHB
+> `d9d745925fbfb05e402c402fc372cffb24766f53cdf8f93ef1e2c6536fe58520`, archive
+> `6f173e73a4550061f89d2c98ba56d96b127bad04ec20814ccbc6dd69356ee84b`).
+> **`docs/cnote-import-surface.json` must be regenerated against the published
+> `v0.7.40` / `v0.7.37` assets before the Shoals release tag.**
+>
+> **chelis#680 is FIXED at this pin and moved to §Archived.** Its
+> `tests_blocked/` probe went FIX-DETECTED, was promoted to
+> `tests/mod_big_i64_precision.ch`, and `Shoals.Rng`'s internal bit-walk call
+> sites moved back onto the builtin `mod`. `tests_blocked/` is now empty; see
+> its README. Every other active entry below was re-probed against the 0.18.3
+> binary and this dependency chain and did not move; archived paragraphs retain
+> their historical pin evidence. Shoals#37's six risk invariants observed 25/25
+> constraint-directed samples at seeds 0, 1, and 2 with in-domain corrupt
+> witnesses and exact compiler-owned function edges, including both additional
+> CVaR dependencies.
 
 ## Actively blocking
 
@@ -133,31 +149,6 @@ in code that is CLOSED upstream but not sitting in §Archived.
       `bs_call_positive` on the un-abstracted body per-surface, not by
       reading the changelog.
 
-- **chelis#680 — i64 `mod`-path precision drift: the integer `mul`/`add` that
-  build the operand compute in f64 and lose precision above the 53-bit
-  mantissa (class META chelis#695).** Builtin `mod(big_i64, m)` returns a
-  wrong result once the operand exceeds f64's 53-bit mantissa (~9e15): the
-  Park-Miller-shaped update
-  `mod(1103515245·1406938949 + 12345, 2147483647)` returns 178065920
-    instead of the exact 178066070 (re-verified with the 0.18.1 release binary
-  on 2026-08-01: `chelis test tests_blocked/ --expect blocked` reports the
-  probe `OK` in blocked mode, so it still fails as expected). The `mod`
-  reduction itself is exact via `checked_int_binop`; the loss is upstream of
-  it, in the f64 `mul` that forms the operand — the
-  integer-arithmetic-in-f64 class chelis#680 tracks (read chelis#695 first).
-  Previously carried here unfiled, deferring to the school shell's pinned
-  probe of the same drift class; now cited to chelis#680.
-    - **Affected surface / workaround:** `Shoals.Rng` hand-rolls `i64_mod`
-      (`sub`/`mul`/`floor_div`) for the Sobol/xor bit walks instead of
-      calling the builtin — the hand-roll stays until the upstream path is
-      exact.
-    - **Probe:** `tests_blocked/runtime/mod_big_i64_precision.ch` (run by
-      `chelis test tests_blocked/ --expect blocked` in CI; FIX-detected =
-      follow the sidecar's de-narrowing instructions).
-    - **Re-probe trigger:** any chelis release touching the i64 `mod`
-      runtime or the integer-arithmetic-in-f64 path chelis#680 (the probe
-      re-probes mechanically on every CI run).
-
 - **chelis#846 — Depth-3 SMT function-call inlining cap (capacity limit).**
   The Tier-B lowerer inlines nested function calls only to a fixed depth. The
   cap remains observable in the 0.18.1 release binary (re-probed 2026-08-01
@@ -183,6 +174,35 @@ in code that is CLOSED upstream but not sitting in §Archived.
 No parked entries.
 
 ## Archived
+
+- **chelis#680 — i64 `mod`-path precision drift (class META chelis#695;
+  RESOLVED on 0.18.3).** Builtin `mod(big_i64, m)` used to return a wrong
+  result once the operand exceeded f64's 53-bit mantissa (~9e15): the
+  Park-Miller-shaped update `mod(1103515245·1406938949 + 12345, 2147483647)`
+  returned `178065916` on the 0.18.1 release binary instead of the exact
+  `178066070`. The `mod` reduction itself was always exact via
+  `checked_int_binop`; the loss was upstream of it, in the f64 `mul` forming
+  the operand — the integer-arithmetic-in-f64 class chelis#680 tracked.
+    - **0.18.3 re-probe (2026-08-04, per verb and per surface):** exact on the
+      eval lane (`chelis eval` → `178066070`) **and** on the compiled-C lane
+      (`chelis build` → link → run → `178066070`), matching exact integer
+      arithmetic. Confirmed against the 0.18.1 binary in the same session to
+      establish the before/after pair rather than trusting a changelog claim.
+    - **De-narrowing executed in the same change set:** the blocked probe
+      `tests_blocked/runtime/mod_big_i64_precision.ch` went FIX-DETECTED and was
+      promoted to `tests/mod_big_i64_precision.ch`; the internal `Shoals.Rng`
+      bit-walk call sites (`bit_at_i64`, `i64_xor_32` ×3,
+      `sobol_value_from_slice`, `rng_sobol_runtime_fallback_base`) moved from
+      the hand-rolled `i64_mod` back onto the builtin `mod`. The exported
+      `i64_mod` shim is **retained for one release** for downstream
+      compatibility, per the sidecar's instructions.
+    - **Residual caveat recorded at the shim:** `i64_mod` is a FLOORED modulo
+      (`sub(n, mul(p, floor_div(n, p)))`) whereas builtin `mod` is truncated —
+      `mod(-7, 2) = -1` versus `i64_mod(-7, 2) = 1`. They agree only for
+      `n >= 0`. Every in-repo call site passes non-negative operands (bit-walk
+      values, sample indices, dimension indices), which is why the swap is
+      behavior-preserving; `tests/rng.ch` and `tests/rng_sobol_1024.ch` produce
+      identical results before and after.
 
 - **shoals#19 — real Black-Scholes tensor `WireDag` producer seam.** Resolved
   by `Shoals.Pricing.bs_call_wire_f64`: a pure f64 tensor-DAG entry with the

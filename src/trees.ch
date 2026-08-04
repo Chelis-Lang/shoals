@@ -32,7 +32,9 @@ def tr_crr_call_2step_nodisc(s: f32, k: f32, u: f32, d: f32, q: f32) -> f32 = ((
 -- under the martingale condition -- they FAIL on the free-parameter
 -- tr_crr_call_2step (cvc5 finds an in-domain arbitrage witness) and are the
 -- teaching exemplar of the genuine-vs-deferred distinction (the same intrinsic
--- lower bound is deferred on Black-Scholes: chelis#637). Division lowers to cvc5,
+-- lower bound is deferred on Black-Scholes; the narrowing and its upstream
+-- citation live at that deferral in Shoals.Properties.CanonTrees, with the full
+-- entry in docs/UPSTREAM_BUGS.md). Division lowers to cvc5,
 -- so these discharge unqualified at Tier B (proven_modulo_real_arithmetic); g > 0
 -- under the guards (both q*u and (1-q)*d positive), so 1/g is well defined.
 -- Properties in Shoals.Properties.CanonTrees; dischargeability lane p14.

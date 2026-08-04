@@ -9,9 +9,22 @@ entry in the same change set).
 
 ## Current probes
 
-| Probe | Blocker | Expected to flip at |
-|---|---|---|
-| `runtime/mod_big_i64_precision.ch` | i64 `mod` f64-path precision drift (chelis#680; `docs/UPSTREAM_BUGS.md` §Tracking) — why `Shoals.Rng` hand-rolls `i64_mod` for the Sobol/xor bit walks | any release touching the i64 `mod` runtime |
+**None — this directory is deliberately empty as of the chelis 0.18.3 bump.**
+
+`runtime/mod_big_i64_precision.ch` was the only probe here. At 0.18.3 it went
+**FIX-DETECTED**: chelis#680's i64 `mod` f64-path precision drift is fixed
+(`mod(1103515245·1406938949 + 12345, 2147483647)` now returns the exact
+`178066070` on both the eval and compiled-C lanes; 0.18.1 returned `178065916`).
+Per its sidecar it was promoted to `tests/mod_big_i64_precision.ch`,
+`Shoals.Rng`'s internal bit-walk call sites moved back onto the builtin `mod`,
+and the `docs/UPSTREAM_BUGS.md` entry was archived — all in that change set.
+
+Because `chelis test --expect` rejects an empty suite (a guard that runs zero
+probes would be silently green), the gate steps that invoke it are guarded to
+skip when this directory holds no `.ch` files. Drop a probe in and it runs
+again with no further wiring — see the `Blocked-probe suite` step in
+`.github/workflows/ci.yml` and the matching stage in
+`scripts/run_local_gate.py`.
 
 Every other open Shoals blocker is a **prove-lane** capability gap (see
 §cannot-be-probed): the failing surface is a `chelis prove` verdict, not a

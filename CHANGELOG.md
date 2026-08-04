@@ -4,9 +4,60 @@ All notable changes to this project are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.24.7] - Unreleased
 
-No unreleased changes.
+Compiler-pin and de-narrowing change set for the Chelis 0.18.3 / Nautilus
+0.7.40 / Coral 0.7.37 cascade. `chelis reef conform bump 0.18.3` advanced the
+pin and every workflow audit mirror; the Shoals package version advanced from
+0.24.5 to 0.24.7.
+
+**0.18.2 is skipped.** The 0.24.6 / 0.18.2 candidate could not land: Nautilus
+0.7.39 worked the chelis#759 float-to-integer trap around with `floor(...)`,
+which has no compiled-lane expression identity, so Coral's native build broke
+and Coral 0.7.36 was never published — leaving this repo's `check` job failing
+on a 404 for that dependency. Chelis 0.18.3 ships `cast_trunc` ([05-OP-6]);
+Nautilus 0.7.40 moves onto it and the cascade is unblocked.
+
+- **chelis#680 de-narrowed (i64 `mod` precision).** The blocked probe
+  `tests_blocked/runtime/mod_big_i64_precision.ch` went **FIX-DETECTED** at this
+  pin. Verified per surface before acting:
+  `mod(1103515245·1406938949 + 12345, 2147483647)` returns the exact
+  `178066070` on both the eval and compiled-C lanes at 0.18.3, versus
+  `178065916` on the 0.18.1 binary. Per the sidecar's instructions the probe was
+  promoted to `tests/mod_big_i64_precision.ch`, the internal `Shoals.Rng`
+  bit-walk call sites moved from the hand-rolled `i64_mod` back onto the builtin
+  `mod`, and the `UPSTREAM_BUGS` entry moved to §Archived. The exported
+  `i64_mod` shim is **retained for one release** for downstream compatibility.
+  Note it is a *floored* modulo while builtin `mod` is *truncated* — they agree
+  only for `n >= 0`, which every in-repo call site satisfies;
+  `tests/rng.ch` and `tests/rng_sobol_1024.ch` are unchanged before and after.
+- **`tests_blocked/` is now empty**, and `chelis test --expect` rejects an empty
+  suite. The blocked-suite step in `ci.yml` and `scripts/run_local_gate.py` is
+  guarded to skip when the directory holds no probes; adding a probe re-arms it
+  with no further wiring. See `tests_blocked/README.md`.
+- **WireDag artifact re-pinned for the #729 typed payloads.**
+  `scripts/validate_bs_wire_root.py` moves to `WIRE_DAG_SCHEMA_VERSION = 4`
+  (raised upstream in chelis#1049, after v0.18.1) and re-pins
+  `EXPECTED_RAW_SHA256`. The drift was audited before re-pinning by lowering the
+  identical `src/pricing.ch` under both toolchains and diffing: the only changes
+  are the schema version and nine `const` nodes whose `op.value` gained an
+  explicit dtype tag (`0.0` -> `{"F64": 0.0}`). Node count (1018), entry root
+  (535), op set, and load set are unchanged — a serialization change, not a
+  lowering change.
+- **Characterization manifest advanced to the new pin.**
+  `docs/cnote-import-surface.json` carries `pkg_version` 0.24.7, `chelis_pin`
+  0.18.3, and an `expected_tier_per_pin` entry for 0.18.3 on all 37 active
+  invariants. Every carried-forward tier was **observed**, not assumed:
+  `scripts/prove_gate.py` is green against the 0.18.3 release binary.
+
+Complete local gate on the official Darwin arm64 0.18.3 payload: 370 positive
+tests, 3 negative contracts, fmt/lint clean, `reef build` OK, WireDag root gate
+OK, `contract_gate.py` green, `prove_gate.py` green, and all four Python
+contract suites OK.
+
+⚠️ The Nautilus and Coral legs of this validation are cascade-branch builds, not
+published releases. Regenerate `docs/cnote-import-surface.json` against the
+published `v0.7.40` / `v0.7.37` assets before the release tag.
 
 ## [0.24.5] - 2026-08-01
 

@@ -17,7 +17,10 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
      Black-Scholes entry and require its named WireDag root (shoals#19).
   6. ``chelis test tests_neg/ --expect neg`` (contract §6).
   7. ``chelis test tests_blocked/ --expect blocked`` (contract §5 —
-     a pass here is FIX-detected and fails loudly by design).
+     a pass here is FIX-detected and fails loudly by design). Skipped when
+     ``tests_blocked/`` holds no probes: ``--expect`` rejects an empty suite,
+     and the directory is legitimately empty once every pinned blocker has
+     been de-narrowed (see ``tests_blocked/README.md``).
   8. ``chelis reef conform audit`` (contract §11). The per-PR CI also runs
      ``conform bump-check --base origin/main``; that step is CI-only —
      a stale local ``origin/main`` would make it false-fail, and CI runs
@@ -141,6 +144,8 @@ def main() -> int:
     args = parser.parse_args()
     quiet = args.quiet
 
+    blocked_probes = sorted((REPO_ROOT / "tests_blocked").glob("**/*.ch"))
+
     fmt_files = (
         sorted((REPO_ROOT / "src").glob("*.ch"))
         + sorted((REPO_ROOT / "properties").glob("*.ch"))
@@ -149,7 +154,7 @@ def main() -> int:
         + sorted((REPO_ROOT / "tests").glob("*.ch"))
         + sorted((REPO_ROOT / "tests-manual").glob("*.ch"))
         + sorted((REPO_ROOT / "tests_neg").glob("**/*.ch"))
-        + sorted((REPO_ROOT / "tests_blocked").glob("**/*.ch"))
+        + blocked_probes
     )
 
     per_pr_stages: list[tuple[str, list[str]]] = [
@@ -168,9 +173,19 @@ def main() -> int:
             "chelis test tests_neg/ --expect neg",
             ["chelis", "test", "tests_neg/", "--expect", "neg"],
         ),
-        (
-            "chelis test tests_blocked/ --expect blocked",
-            ["chelis", "test", "tests_blocked/", "--expect", "blocked"],
+        # `--expect blocked` errors on an empty suite (a guard running zero
+        # probes would be silently green), and tests_blocked/ is legitimately
+        # empty whenever every pinned blocker has been de-narrowed. Include
+        # the stage only when a probe exists; see tests_blocked/README.md.
+        *(
+            [
+                (
+                    "chelis test tests_blocked/ --expect blocked",
+                    ["chelis", "test", "tests_blocked/", "--expect", "blocked"],
+                )
+            ]
+            if blocked_probes
+            else []
         ),
         ("chelis reef conform audit", ["chelis", "reef", "conform", "audit"]),
         (
