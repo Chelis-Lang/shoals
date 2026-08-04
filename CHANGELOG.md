@@ -18,6 +18,16 @@ and Coral 0.7.36 was never published — leaving this repo's `check` job failing
 on a 404 for that dependency. Chelis 0.18.3 ships `cast_trunc` ([05-OP-6]);
 Nautilus 0.7.40 moves onto it and the cascade is unblocked.
 
+- **Retired the chelis#759 `floor` workaround.** 0.18.3 ships `cast_trunc`
+  ([05-OP-6]) as the named truncating float-to-integer cast on the Surf, eval,
+  and compiled-C surfaces, so the seven sites this branch had wrapped in
+  `floor(...)` now call it directly: `cds.ch` (`cds_premium_grid`), `pde.ch`
+  (`pde_interp_at_s0`, and both spread-option grid positions), `riskext.ch`
+  (`re_frtb_ima_window_count`, `re_christoffersen_cc`), and `stochastic.ch`
+  (`sto_kou_jump_terminal`). Behavior-preserving at every site: two are
+  explicitly clamped non-negative, three are sums of 0/1 exception indicators,
+  one is `lambda*t*5 + 1 >= 1`, and one is maturity times frequency — so floor
+  and truncation agree everywhere they are reached.
 - **chelis#680 de-narrowed (i64 `mod` precision).** The blocked probe
   `tests_blocked/runtime/mod_big_i64_precision.ch` went **FIX-DETECTED** at this
   pin. Verified per surface before acting:

@@ -38,7 +38,7 @@ def cds_premium_grid(t_maturity: f32, n_premiums_per_year: int64) -> List[f32] =
   freq_f = cast(n_premiums_per_year, f32)
   dt = div(cast(1.0, f32), freq_f)
   total_f32 = mul(t_maturity, freq_f)
-  total = cast(floor(total_f32), int64)
+  total = cast_trunc(total_f32, int64)
   ks = range(cast(1, int64), add(total, cast(1, int64)))
   map(fn (k: int64) -> mul(cast(k, f32), dt), ks)
 }
