@@ -7,7 +7,7 @@ def du_one_f() -> f32 = cast(1.0, f32)
 def du_two_f() -> f32 = cast(2.0, f32)
 def du_half_f() -> f32 = cast(0.5, f32)
 def du_min_t() -> f32 = cast(0.0001, f32)
-def du_min_d2c_dk2() -> f32 = cast(0.0000000001, f32)
+def du_min_d2c_dk2() -> f32 = cast(1e-10, f32)
 def du_bs_call_q(s: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32) -> f32 = {
   s_eff = mul(s, exp(neg(mul(q, t))))
   bs_call_scalar(s_eff, k, r, sigma, t)

@@ -3,7 +3,7 @@ import Std.Test (assert_close, assert_true)
 import Shoals.Curves (Instrument, deposit, zero_coupon, cur_par_swap, bootstrap_multi, bootstrap_grad_at_solution, bootstrap_grad_diagonal, fd_bump_pillar_rate)
 def abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 def rel_err(a: f32, b: f32) -> f32 = {
-  denom = if lt(abs_f32(b), cast(0.000001, f32)) then cast(0.000001, f32) else abs_f32(b)
+  denom = if lt(abs_f32(b), cast(1e-6, f32)) then cast(1e-6, f32) else abs_f32(b)
   div(abs_f32(sub(a, b)), denom)
 }
 def test_grad_zero_coupon_matches_analytic() -> unit ! { Test } = {
@@ -66,7 +66,7 @@ def test_grad_fd_step_size_stability() -> unit ! { Test } = {
   ift_grad = bootstrap_grad_diagonal(inst, div(neg(log(cast(0.9, f32))), cast(2.0, f32)), cast(0.0, f32))
   fd_e2 = fd_bump_pillar_rate(inst, [], [], cast(0.01, f32))
   fd_e4 = fd_bump_pillar_rate(inst, [], [], cast(0.0001, f32))
-  fd_e6 = fd_bump_pillar_rate(inst, [], [], cast(0.000001, f32))
+  fd_e6 = fd_bump_pillar_rate(inst, [], [], cast(1e-6, f32))
   err_e4 = rel_err(ift_grad, fd_e4)
   spread = sub(if gt(fd_e2, fd_e6) then fd_e2 else fd_e6, if lt(fd_e2, fd_e6) then fd_e2 else fd_e6)
   _ = assert_true(lt(err_e4, cast(0.02, f32)), "IFT is stable: matches FD@1e-4 within 2% (f32 + brent-1e-7 precision floor on a 2-step finite-difference of a brent-solved scalar)")

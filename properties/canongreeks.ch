@@ -18,11 +18,11 @@ import Shoals.Trees (tr_crr_call_2step)
 -- is non-decreasing in u. This is the lattice analog of vega >= 0: wider
 -- volatility (larger u) increases call value. Corrupted twin: claims monotone
 -- DECREASING in u, refuted by an in-the-money call where u2 > u1.
-@property crr_call_vega_sign forall(s: f32, k: f32, u1: f32, u2: f32, d: f32, q: f32, disc: f32) where (s > 0.0), (k > 0.0), (u1 > 1.0), (u2 > u1), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0), (disc > 0.0), (disc <= 1.0):
+@property crr_call_vega_sign forall(s: f32, k: f32, u1: f32, u2: f32, d: f32, q: f32, disc: f32) where s > 0.0, k > 0.0, u1 > 1.0, u2 > u1, d > 0.0, d < 1.0, q > 0.0, q < 1.0, disc > 0.0, disc <= 1.0:
   (tr_crr_call_2step(s, k, u2, d, q, disc) >= tr_crr_call_2step(s, k, u1, d, q, disc))
-@property crr_call_vega_sign_corrupted forall(s: f32, k: f32, u1: f32, u2: f32, d: f32, q: f32, disc: f32) where (s > 0.0), (k > 0.0), (u1 > 1.0), (u2 > u1), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0), (disc > 0.0), (disc <= 1.0):
+@property crr_call_vega_sign_corrupted forall(s: f32, k: f32, u1: f32, u2: f32, d: f32, q: f32, disc: f32) where s > 0.0, k > 0.0, u1 > 1.0, u2 > u1, d > 0.0, d < 1.0, q > 0.0, q < 1.0, disc > 0.0, disc <= 1.0:
   (tr_crr_call_2step(s, k, u2, d, q, disc) <= tr_crr_call_2step(s, k, u1, d, q, disc))
-@property crr_call_vega_guards_satisfiable forall(s: f32, k: f32, u1: f32, u2: f32, d: f32, q: f32, disc: f32) where (s > 0.0), (k > 0.0), (u1 > 1.0), (u2 > u1), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0), (disc > 0.0), (disc <= 1.0):
+@property crr_call_vega_guards_satisfiable forall(s: f32, k: f32, u1: f32, u2: f32, d: f32, q: f32, disc: f32) where s > 0.0, k > 0.0, u1 > 1.0, u2 > u1, d > 0.0, d < 1.0, q > 0.0, q < 1.0, disc > 0.0, disc <= 1.0:
   false
 -- ===========================================================================
 -- (2) DISC SENSITIVITY / RHO ANALOG (monotone-nondecreasing in disc): on the
@@ -37,11 +37,11 @@ import Shoals.Trees (tr_crr_call_2step)
 -- rho. The invariant is stated honestly as monotone-in-disc, not "rho > 0".)
 -- Corrupted twin: claims monotone DECREASING in disc (more discounting =>
 -- higher price), refuted by any in-the-money call.
-@property crr_call_disc_sensitivity forall(s: f32, k: f32, u: f32, d: f32, q: f32, disc1: f32, disc2: f32) where (s > 0.0), (k > 0.0), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0), (disc1 > 0.0), (disc2 > disc1), (disc2 <= 1.0):
+@property crr_call_disc_sensitivity forall(s: f32, k: f32, u: f32, d: f32, q: f32, disc1: f32, disc2: f32) where s > 0.0, k > 0.0, u > 1.0, d > 0.0, d < 1.0, q > 0.0, q < 1.0, disc1 > 0.0, disc2 > disc1, disc2 <= 1.0:
   (tr_crr_call_2step(s, k, u, d, q, disc2) >= tr_crr_call_2step(s, k, u, d, q, disc1))
-@property crr_call_disc_sensitivity_corrupted forall(s: f32, k: f32, u: f32, d: f32, q: f32, disc1: f32, disc2: f32) where (s > 0.0), (k > 0.0), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0), (disc1 > 0.0), (disc2 > disc1), (disc2 <= 1.0):
+@property crr_call_disc_sensitivity_corrupted forall(s: f32, k: f32, u: f32, d: f32, q: f32, disc1: f32, disc2: f32) where s > 0.0, k > 0.0, u > 1.0, d > 0.0, d < 1.0, q > 0.0, q < 1.0, disc1 > 0.0, disc2 > disc1, disc2 <= 1.0:
   (tr_crr_call_2step(s, k, u, d, q, disc2) <= tr_crr_call_2step(s, k, u, d, q, disc1))
-@property crr_call_disc_guards_satisfiable forall(s: f32, k: f32, u: f32, d: f32, q: f32, disc1: f32, disc2: f32) where (s > 0.0), (k > 0.0), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0), (disc1 > 0.0), (disc2 > disc1), (disc2 <= 1.0):
+@property crr_call_disc_guards_satisfiable forall(s: f32, k: f32, u: f32, d: f32, q: f32, disc1: f32, disc2: f32) where s > 0.0, k > 0.0, u > 1.0, d > 0.0, d < 1.0, q > 0.0, q < 1.0, disc1 > 0.0, disc2 > disc1, disc2 <= 1.0:
   false
 -- ===========================================================================
 -- (3) GAMMA SIGN (convexity in spot): the call price is convex in spot (a long
@@ -52,9 +52,9 @@ import Shoals.Trees (tr_crr_call_2step)
 -- and a positively-weighted sum of convex functions is convex. This is the
 -- lattice analog of gamma >= 0. Corrupted twin: claims strict concavity
 -- (second difference <= -0.01). Guard: s > h > 0 ensures s-h > 0.
-@property crr_call_gamma_sign forall(s: f32, k: f32, h: f32, u: f32, d: f32, q: f32, disc: f32) where (s > 0.0), (h > 0.0), (s > h), (k > 0.0), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0), (disc > 0.0), (disc <= 1.0):
+@property crr_call_gamma_sign forall(s: f32, k: f32, h: f32, u: f32, d: f32, q: f32, disc: f32) where s > 0.0, h > 0.0, s > h, k > 0.0, u > 1.0, d > 0.0, d < 1.0, q > 0.0, q < 1.0, disc > 0.0, disc <= 1.0:
   (((tr_crr_call_2step((s + h), k, u, d, q, disc) + tr_crr_call_2step((s - h), k, u, d, q, disc)) - (2.0 * tr_crr_call_2step(s, k, u, d, q, disc))) >= 0.0)
-@property crr_call_gamma_sign_corrupted forall(s: f32, k: f32, h: f32, u: f32, d: f32, q: f32, disc: f32) where (s > 0.0), (h > 0.0), (s > h), (k > 0.0), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0), (disc > 0.0), (disc <= 1.0):
+@property crr_call_gamma_sign_corrupted forall(s: f32, k: f32, h: f32, u: f32, d: f32, q: f32, disc: f32) where s > 0.0, h > 0.0, s > h, k > 0.0, u > 1.0, d > 0.0, d < 1.0, q > 0.0, q < 1.0, disc > 0.0, disc <= 1.0:
   (((tr_crr_call_2step((s + h), k, u, d, q, disc) + tr_crr_call_2step((s - h), k, u, d, q, disc)) - (2.0 * tr_crr_call_2step(s, k, u, d, q, disc))) <= (0.0 - 0.01))
-@property crr_call_gamma_guards_satisfiable forall(s: f32, k: f32, h: f32, u: f32, d: f32, q: f32, disc: f32) where (s > 0.0), (h > 0.0), (s > h), (k > 0.0), (u > 1.0), (d > 0.0), (d < 1.0), (q > 0.0), (q < 1.0), (disc > 0.0), (disc <= 1.0):
+@property crr_call_gamma_guards_satisfiable forall(s: f32, k: f32, h: f32, u: f32, d: f32, q: f32, disc: f32) where s > 0.0, h > 0.0, s > h, k > 0.0, u > 1.0, d > 0.0, d < 1.0, q > 0.0, q < 1.0, disc > 0.0, disc <= 1.0:
   false

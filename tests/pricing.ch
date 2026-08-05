@@ -7,7 +7,7 @@ def assert_close_f64(actual: f64, expected: f64, tol: f64, label: string) -> uni
   assert_true(lte(diff, tol), label)
 }
 def assert_close_f64_scaled(actual: f64, expected: f64, label: string) -> unit ! { Test } = {
-  tol = add(cast(0.00001, f64), mul(cast(0.00000001, f64), abs_f64_test(expected)))
+  tol = add(cast(0.00001, f64), mul(cast(1e-8, f64), abs_f64_test(expected)))
   assert_close_f64(actual, expected, tol, label)
 }
 def test_bs_call_atm() -> unit ! { Test } = {

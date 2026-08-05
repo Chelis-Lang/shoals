@@ -40,13 +40,13 @@ import Std.Contracts (normal_cdf)
 -- normal_cdf(d1)/normal_cdf(neg(d1)) and normal_cdf(d2)/normal_cdf(neg(d2)) so
 -- the prover can pair the negated-argument calls. Expect:
 -- composite_verdict = proven_modulo_fuzz_validated_contract.
-@property put_call_parity_reflection forall(s: f32, k: f32, d1: f32, d2: f32, disc: f32) where (s >= 0.0), (k >= 0.0), (disc >= 0.0), (disc <= 1.0):
+@property put_call_parity_reflection forall(s: f32, k: f32, d1: f32, d2: f32, disc: f32) where s >= 0.0, k >= 0.0, disc >= 0.0, disc <= 1.0:
   ((((s * normal_cdf(d1)) - (k * (disc * normal_cdf(d2)))) - ((k * (disc * normal_cdf(neg(d2)))) - (s * normal_cdf(neg(d1))))) == (s - (k * disc)))
   with contract = "std.normal_cdf.reflection"
 -- C2 -- Upper bound C <= S. From ranges alone: s,k,disc,N(d2) >= 0 and
 -- N(d1) <= 1, so s*N(d1) - k*disc*N(d2) <= s. Rests on the range contract.
 -- Expect: composite_verdict = proven_modulo_fuzz_validated_contract.
-@property call_upper_bounded_by_spot forall(s: f32, k: f32, d1: f32, d2: f32, disc: f32) where (s >= 0.0), (k >= 0.0), (disc >= 0.0), (disc <= 1.0):
+@property call_upper_bounded_by_spot forall(s: f32, k: f32, d1: f32, d2: f32, disc: f32) where s >= 0.0, k >= 0.0, disc >= 0.0, disc <= 1.0:
   (((s * normal_cdf(d1)) - (k * (disc * normal_cdf(d2)))) <= s)
   with contract = "std.normal_cdf.range"
 -- C3 -- Delta bounds: the call delta N(d1) lies in [0,1] (its sign and bound,
@@ -66,7 +66,7 @@ import Std.Contracts (normal_cdf)
 -- with the put leg's spot term scaled by 2). The structural goal no longer
 -- follows from the sound reflection contract, so cvc5 returns a counterexample.
 -- Expect: status = failed (the verdict FLIPS away from proven).
-@property put_call_parity_corrupted forall(s: f32, k: f32, d1: f32, d2: f32, disc: f32) where (s >= 0.0), (k >= 0.0), (disc >= 0.0), (disc <= 1.0):
+@property put_call_parity_corrupted forall(s: f32, k: f32, d1: f32, d2: f32, disc: f32) where s >= 0.0, k >= 0.0, disc >= 0.0, disc <= 1.0:
   ((((s * normal_cdf(d1)) - (k * (disc * normal_cdf(d2)))) - ((k * (disc * normal_cdf(neg(d2)))) - ((2.0 * s) * normal_cdf(neg(d1))))) == (s - (k * disc)))
   with contract = "std.normal_cdf.reflection"
 -- E2 -- Unknown contract id. The body calls the real normal_cdf but cites a
@@ -78,7 +78,7 @@ import Std.Contracts (normal_cdf)
 -- E3 -- Corrupted upper bound: claims the call is bounded by HALF the spot,
 -- which the range contract refutes (N(d1) can reach 1 with the strike leg near
 -- 0, so the call approaches s > 0.5*s). Expect: status = failed.
-@property call_upper_bounded_by_spot_corrupted forall(s: f32, k: f32, d1: f32, d2: f32, disc: f32) where (s >= 0.0), (k >= 0.0), (disc >= 0.0), (disc <= 1.0):
+@property call_upper_bounded_by_spot_corrupted forall(s: f32, k: f32, d1: f32, d2: f32, disc: f32) where s >= 0.0, k >= 0.0, disc >= 0.0, disc <= 1.0:
   (((s * normal_cdf(d1)) - (k * (disc * normal_cdf(d2)))) <= (0.5 * s))
   with contract = "std.normal_cdf.range"
 -- E4 -- Corrupted delta bound: claims the call delta N(d1) never exceeds 0.5,

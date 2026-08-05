@@ -1,6 +1,6 @@
 module Shoals.References.Vasicek
 export (zero_bond_price_textbook, short_rate_mean_textbook, short_rate_variance_textbook)
-def short_rate_mean_textbook(r0: f32, a: f32, b: f32, t: f32) -> f32 = { add(b, r0 |> sub(b) |> mul(exp(neg(mul(a, t))))) }
+def short_rate_mean_textbook(r0: f32, a: f32, b: f32, t: f32) -> f32 = add(b, r0 |> sub(b) |> mul(exp(neg(mul(a, t)))))
 def short_rate_variance_textbook(a: f32, sigma: f32, t: f32) -> f32 = {
   factor = 1.0
     |> fn (__chelis_pipe) -> cast(__chelis_pipe, f32) |> sub(exp(neg(mul(cast(2.0, f32), mul(a, t)))))

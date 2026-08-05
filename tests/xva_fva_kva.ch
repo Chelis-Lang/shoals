@@ -5,7 +5,7 @@ def test_fva_zero_funding_spread_zero() -> unit ! { Test } = {
   time_grid = to_tensor([cast(1.0, f32), cast(2.0, f32), cast(3.0, f32)])
   epe = to_tensor([cast(10.0, f32), cast(15.0, f32), cast(12.0, f32)])
   out = fva(time_grid, epe, cast(0.0, f32), cast(0.03, f32))
-  assert_close(out, cast(0.0, f32), cast(0.000001, f32), "FVA = 0 when funding_spread = 0")
+  assert_close(out, cast(0.0, f32), cast(1e-6, f32), "FVA = 0 when funding_spread = 0")
 }
 def test_fva_increasing_in_funding_spread() -> unit ! { Test } = {
   time_grid = to_tensor([cast(1.0, f32), cast(2.0, f32), cast(3.0, f32)])
@@ -27,7 +27,7 @@ def test_kva_zero_cost_zero() -> unit ! { Test } = {
   time_grid = to_tensor([cast(1.0, f32), cast(2.0, f32), cast(3.0, f32)])
   ead = to_tensor([cast(100.0, f32), cast(120.0, f32), cast(90.0, f32)])
   out = kva(time_grid, ead, cast(0.0, f32), cast(0.08, f32), cast(0.03, f32))
-  assert_close(out, cast(0.0, f32), cast(0.000001, f32), "KVA = 0 when cost_of_capital = 0")
+  assert_close(out, cast(0.0, f32), cast(1e-6, f32), "KVA = 0 when cost_of_capital = 0")
 }
 def test_kva_increasing_in_capital_weight() -> unit ! { Test } = {
   time_grid = to_tensor([cast(1.0, f32), cast(2.0, f32), cast(3.0, f32)])

@@ -10,7 +10,7 @@ def cds_synthetic_spread_for_tenor(tenor: f32, recovery: f32, r: f32, freq: int6
   prl = cds_protection_leg_value(tenor, recovery, curve_b, r)
   div(prl, pl)
 }
-def cds_build_synthetic_spreads(tenors_l: List[f32], recovery: f32, r: f32, freq: int64, times_l: List[f32], hazards_l: List[f32]) -> List[f32] = { map(fn (tenor: f32) -> cds_synthetic_spread_for_tenor(tenor, recovery, r, freq, times_l, hazards_l), tenors_l) }
+def cds_build_synthetic_spreads(tenors_l: List[f32], recovery: f32, r: f32, freq: int64, times_l: List[f32], hazards_l: List[f32]) -> List[f32] = map(fn (tenor: f32) -> cds_synthetic_spread_for_tenor(tenor, recovery, r, freq, times_l, hazards_l), tenors_l)
 def test_cds_pv_zero_at_market_spread() -> unit ! { Test } = {
   h = cast(0.02, f32)
   recovery = cast(0.4, f32)

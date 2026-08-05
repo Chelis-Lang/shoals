@@ -3,18 +3,16 @@ import Nautilus.Distributions (normal_cdf, normal_pdf, student_t_cdf, gamma_pdf,
 import Nautilus.Special (log_gamma)
 import Nautilus.LinAlg (cholesky_n, matvec)
 export (lognormal_pdf, lognormal_cdf, student_t_pdf, student_t_cdf_approx, student_t_cdf_exact, bvn_pdf, gamma_pdf_s, gamma_cdf_s, gamma_inv_cdf_s, gamma_sample_s, beta_pdf_s, beta_cdf_s, chi_squared_pdf_s, chi_squared_cdf_s, chi_squared_inv_cdf_s, chi_squared_sample_s, exponential_pdf_s, exponential_cdf_s, exponential_inv_cdf_s, exponential_sample_s, uniform_pdf_s, uniform_cdf_s, uniform_inv_cdf_s, uniform_sample_s, poisson_pmf_s, poisson_cdf_s, dist_mvn_factor, dist_mvn_sample_one)
-def lognormal_pdf(x: f32, mu: f32, sigma: f32) -> f32 = {
+def lognormal_pdf(x: f32, mu: f32, sigma: f32) -> f32 =
   if lte(x, cast(0.0, f32)) then cast(0.0, f32) else {
     lx = log(x)
     div(normal_pdf(lx, mu, sigma), x)
   }
-}
-def lognormal_cdf(x: f32, mu: f32, sigma: f32) -> f32 = {
+def lognormal_cdf(x: f32, mu: f32, sigma: f32) -> f32 =
   if lte(x, cast(0.0, f32)) then cast(0.0, f32) else {
     lx = log(x)
     normal_cdf(lx, mu, sigma)
   }
-}
 def student_t_pdf(x: f32, nu: f32) -> f32 = {
   half_nu = mul(cast(0.5, f32), nu)
   half_nup1 = mul(cast(0.5, f32), add(nu, cast(1.0, f32)))

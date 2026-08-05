@@ -7,14 +7,14 @@ def smile_svi() -> SVI = SVI { a: cast(0.04, f32), b: cast(0.2, f32), rho: cast(
 def test_flat_svi_total_variance_equals_a() -> unit ! { Test } = {
   p = flat_svi()
   w = vs_total_variance(p, cast(0.0, f32))
-  assert_close(w, cast(0.04, f32), cast(0.000001, f32), "flat SVI at k=0 has w == a")
+  assert_close(w, cast(0.04, f32), cast(1e-6, f32), "flat SVI at k=0 has w == a")
 }
 def test_flat_svi_independent_of_strike() -> unit ! { Test } = {
   p = flat_svi()
   w0 = vs_total_variance(p, cast(0.0, f32))
   w1 = vs_total_variance(p, cast(0.2, f32))
   diff = sub(w1, w0)
-  assert_close(diff, cast(0.0, f32), cast(0.000001, f32), "flat SVI variance constant in k")
+  assert_close(diff, cast(0.0, f32), cast(1e-6, f32), "flat SVI variance constant in k")
 }
 def test_smile_svi_higher_otm() -> unit ! { Test } = {
   p = smile_svi()
@@ -32,17 +32,17 @@ def test_svi_shift_atm() -> unit ! { Test } = {
   shifted = vs_shift_atm(p, cast(0.02, f32))
   w_before = vs_total_variance(p, cast(0.0, f32))
   w_after = vs_total_variance(shifted, cast(0.0, f32))
-  assert_close(sub(w_after, w_before), cast(0.02, f32), cast(0.000001, f32), "ATM shift adds delta_a to total variance")
+  assert_close(sub(w_after, w_before), cast(0.02, f32), cast(1e-6, f32), "ATM shift adds delta_a to total variance")
 }
 def test_svi_shift_skew_changes_rho() -> unit ! { Test } = {
   p = smile_svi()
   shifted = vs_shift_skew(p, cast(0.1, f32))
-  assert_close(shifted.rho, cast(-0.2, f32), cast(0.000001, f32), "rho updated from -0.3 to -0.2")
+  assert_close(shifted.rho, cast(-0.2, f32), cast(1e-6, f32), "rho updated from -0.3 to -0.2")
 }
 def test_smile_shift_adds_to_b() -> unit ! { Test } = {
   p = smile_svi()
   shifted = smile_shift_skew_wing(p, cast(0.05, f32))
-  assert_close(shifted.b, cast(0.25, f32), cast(0.000001, f32), "smile shift increments b by delta")
+  assert_close(shifted.b, cast(0.25, f32), cast(1e-6, f32), "smile shift increments b by delta")
 }
 def test_implied_vol_from_call_round_trip() -> unit ! { Test } = {
   spot = cast(100.0, f32)
@@ -91,11 +91,11 @@ def test_parallel_shift_atm_iv_on_flat_surface() -> unit ! { Test } = {
   assert_close(sub(iv_after, iv_before), cast(0.02, f32), cast(0.0001, f32), "parallel_shift_atm_iv on flat surface lifts IV by delta")
 }
 def test_iv_solver_failure_on_unbracketed_target() -> unit ! { Test } = {
-  iv = implied_vol_bisect(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(1.0, f32), cast(200.0, f32), cast(0.0001, f32), cast(5.0, f32), cast(60, int64), cast(0.000001, f32))
+  iv = implied_vol_bisect(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(1.0, f32), cast(200.0, f32), cast(0.0001, f32), cast(5.0, f32), cast(60, int64), cast(1e-6, f32))
   assert_true(is_iv_solver_failed(iv), "out-of-range target returns NaN sentinel rather than silently pinning at vol_hi")
 }
 def test_iv_solver_failure_on_negative_target() -> unit ! { Test } = {
-  iv = implied_vol_bisect(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(1.0, f32), cast(-1.0, f32), cast(0.0001, f32), cast(5.0, f32), cast(60, int64), cast(0.000001, f32))
+  iv = implied_vol_bisect(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(1.0, f32), cast(-1.0, f32), cast(0.0001, f32), cast(5.0, f32), cast(60, int64), cast(1e-6, f32))
   assert_true(is_iv_solver_failed(iv), "negative target returns NaN sentinel")
 }
 def test_bracket_brackets_root_valid() -> unit ! { Test } = {
@@ -120,7 +120,7 @@ def test_bracket_brackets_root_invalid() -> unit ! { Test } = {
 def test_sabr_atm_reduces_to_alpha_at_beta_1() -> unit ! { Test } = {
   p = SABR { alpha: cast(0.2, f32), beta: cast(1.0, f32), rho: cast(0.0, f32), nu: cast(0.0, f32) }
   iv = vs_sabr_atm_implied_vol(p, cast(100.0, f32), cast(1.0, f32))
-  assert_close(iv, cast(0.2, f32), cast(0.000001, f32), "SABR ATM with beta=1, nu=0 reduces to alpha")
+  assert_close(iv, cast(0.2, f32), cast(1e-6, f32), "SABR ATM with beta=1, nu=0 reduces to alpha")
 }
 def test_sabr_atm_matches_full_formula_at_atm() -> unit ! { Test } = {
   p = SABR { alpha: cast(0.2, f32), beta: cast(0.5, f32), rho: cast(-0.3, f32), nu: cast(0.4, f32) }
@@ -145,15 +145,15 @@ def test_sabr_no_smile_at_zero_nu() -> unit ! { Test } = {
 def test_vs_sabr_shift_alpha() -> unit ! { Test } = {
   p = SABR { alpha: cast(0.2, f32), beta: cast(0.5, f32), rho: cast(-0.3, f32), nu: cast(0.4, f32) }
   shifted = vs_sabr_shift_alpha(p, cast(0.05, f32))
-  assert_close(shifted.alpha, cast(0.25, f32), cast(0.000001, f32), "alpha shifts by delta")
+  assert_close(shifted.alpha, cast(0.25, f32), cast(1e-6, f32), "alpha shifts by delta")
 }
 def test_vs_sabr_shift_rho() -> unit ! { Test } = {
   p = SABR { alpha: cast(0.2, f32), beta: cast(0.5, f32), rho: cast(-0.3, f32), nu: cast(0.4, f32) }
   shifted = vs_sabr_shift_rho(p, cast(0.1, f32))
-  assert_close(shifted.rho, cast(-0.2, f32), cast(0.000001, f32), "rho shifts by delta")
+  assert_close(shifted.rho, cast(-0.2, f32), cast(1e-6, f32), "rho shifts by delta")
 }
 def test_vs_sabr_shift_nu() -> unit ! { Test } = {
   p = SABR { alpha: cast(0.2, f32), beta: cast(0.5, f32), rho: cast(-0.3, f32), nu: cast(0.4, f32) }
   shifted = vs_sabr_shift_nu(p, cast(0.05, f32))
-  assert_close(shifted.nu, cast(0.45, f32), cast(0.000001, f32), "nu shifts by delta")
+  assert_close(shifted.nu, cast(0.45, f32), cast(1e-6, f32), "nu shifts by delta")
 }

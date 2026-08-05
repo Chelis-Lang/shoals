@@ -11,5 +11,5 @@
 -- (forge_legit_convex) while still rejecting a guard-restatement / canceling one.
 module Metamorphic.ForgeVacuousConvex
 def fv(k: f32, h: f32) -> f32 = (k * k)
-@property forge_vacuous_convex forall(k: f32, h: f32) where (h > 0.0):
+@property forge_vacuous_convex forall(k: f32, h: f32) where h > 0.0:
   (((fv(k, h) + fv(k, h)) - (2.0 * fv(k, h))) >= 0.0)

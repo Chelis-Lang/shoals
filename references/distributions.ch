@@ -1,7 +1,7 @@
 module Shoals.References.Distributions
 import Nautilus.Special (erfc, log_gamma)
 export (lognormal_pdf_textbook, lognormal_cdf_textbook, student_t_pdf_textbook, bvn_pdf_textbook)
-def lognormal_pdf_textbook(x: f32, mu: f32, sigma: f32) -> f32 = {
+def lognormal_pdf_textbook(x: f32, mu: f32, sigma: f32) -> f32 =
   if lte(x, cast(0.0, f32)) then cast(0.0, f32) else {
     lx = log(x)
     diff = sub(lx, mu)
@@ -9,15 +9,13 @@ def lognormal_pdf_textbook(x: f32, mu: f32, sigma: f32) -> f32 = {
     denom = mul(x, mul(sigma, cast(2.5066282746310002, f32)))
     div(exp(num), denom)
   }
-}
-def lognormal_cdf_textbook(x: f32, mu: f32, sigma: f32) -> f32 = {
+def lognormal_cdf_textbook(x: f32, mu: f32, sigma: f32) -> f32 =
   if lte(x, cast(0.0, f32)) then cast(0.0, f32) else {
     lx = log(x)
     sqrt_2 = cast(1.4142135623730951, f32)
     z = div(sub(lx, mu), mul(sigma, sqrt_2))
     mul(cast(0.5, f32), erfc(neg(z)))
   }
-}
 def student_t_pdf_textbook(x: f32, nu: f32) -> f32 = {
   half_nu = mul(cast(0.5, f32), nu)
   half_nup1 = mul(cast(0.5, f32), add(nu, cast(1.0, f32)))

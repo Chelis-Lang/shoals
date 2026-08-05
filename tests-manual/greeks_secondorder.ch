@@ -23,10 +23,10 @@ def abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 def test_gammas_call_matches_displayed_2nd_deriv() -> unit ! { Test } = {
   spots = to_tensor([cast(60.0, f32), cast(80.0, f32), cast(100.0, f32), cast(120.0, f32)])
   g = to_list(gammas_call(spots, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32)))
-  _ = assert_close(index(g, cast(0, int64)), cast(0.00292966, f32), cast(0.000005, f32), "gamma neg-d1 s=60")
-  _ = assert_close(index(g, cast(1, int64)), cast(0.01859904, f32), cast(0.000005, f32), "gamma s=80")
-  _ = assert_close(index(g, cast(2, int64)), cast(0.01876338, f32), cast(0.000005, f32), "gamma ATM s=100")
-  assert_close(index(g, cast(3, int64)), cast(0.00750041, f32), cast(0.000005, f32), "gamma ITM s=120")
+  _ = assert_close(index(g, cast(0, int64)), cast(0.00292966, f32), cast(5e-6, f32), "gamma neg-d1 s=60")
+  _ = assert_close(index(g, cast(1, int64)), cast(0.01859904, f32), cast(5e-6, f32), "gamma s=80")
+  _ = assert_close(index(g, cast(2, int64)), cast(0.01876338, f32), cast(5e-6, f32), "gamma ATM s=100")
+  assert_close(index(g, cast(3, int64)), cast(0.00750041, f32), cast(5e-6, f32), "gamma ITM s=120")
 }
 -- gamma of a vanilla call is strictly positive everywhere (price convex in S).
 def test_gammas_call_strictly_positive() -> unit ! { Test } = {

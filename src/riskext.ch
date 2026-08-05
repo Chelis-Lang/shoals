@@ -19,7 +19,7 @@ def kupiec_pof_statistic_simple(num_violations: int64, total_observations: int64
   log_lik_h1_b = if eq(observed_rate, cast(1.0, f32)) then cast(0.0, f32) else mul(sub(n_t, n_v), log(sub(cast(1.0, f32), observed_rate)))
   mul(cast(-2.0, f32), sub(add(log_lik_h0, log_lik_h0_b), add(log_lik_h1, log_lik_h1_b)))
 }
-def re_frtb_ima_zone_at_day(n_exceptions_window: int64) -> int64 = { if lte(n_exceptions_window, cast(4, int64)) then cast(0, int64) else if lte(n_exceptions_window, cast(9, int64)) then cast(1, int64) else cast(2, int64) }
+def re_frtb_ima_zone_at_day(n_exceptions_window: int64) -> int64 = if lte(n_exceptions_window, cast(4, int64)) then cast(0, int64) else if lte(n_exceptions_window, cast(9, int64)) then cast(1, int64) else cast(2, int64)
 def re_frtb_ima_window_count(indicators_l: List[f32], t_end: int64) -> int64 = {
   start_idx = sub(t_end, cast(249, int64))
   offsets = range(cast(0, int64), cast(250, int64))
@@ -59,11 +59,11 @@ def re_christoffersen_transition_counts(indicators_l: List[f32]) -> (f32, f32, f
       curr = index(indicators_l, t)
       is_prev_one = eq(prev, cast(1.0, f32))
       is_curr_one = eq(curr, cast(1.0, f32))
-      if is_prev_one then { if is_curr_one then (t00, t01, t10, add(t11, cast(1.0, f32))) else (t00, t01, add(t10, cast(1.0, f32)), t11) } else { if is_curr_one then (t00, add(t01, cast(1.0, f32)), t10, t11) else (add(t00, cast(1.0, f32)), t01, t10, t11) }
+      if is_prev_one then if is_curr_one then (t00, t01, t10, add(t11, cast(1.0, f32))) else (t00, t01, add(t10, cast(1.0, f32)), t11) else if is_curr_one then (t00, add(t01, cast(1.0, f32)), t10, t11) else (add(t00, cast(1.0, f32)), t01, t10, t11)
     }, init, idxs)
   }
 }
-def re_safe_xlogx(x: f32, p: f32) -> f32 = { if eq(x, cast(0.0, f32)) then cast(0.0, f32) else if lte(p, cast(0.0, f32)) then cast(0.0, f32) else mul(x, log(p)) }
+def re_safe_xlogx(x: f32, p: f32) -> f32 = if eq(x, cast(0.0, f32)) then cast(0.0, f32) else if lte(p, cast(0.0, f32)) then cast(0.0, f32) else mul(x, log(p))
 def re_christoffersen_lr_ind(t00: f32, t01: f32, t10: f32, t11: f32) -> f32 = {
   row0_total = add(t00, t01)
   row1_total = add(t10, t11)

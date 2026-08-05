@@ -9,7 +9,7 @@ def vs_implied_vol_matches_sqrt_variance(p: SVI, k: f32, t: f32) -> bool = {
   w = vs_total_variance(p, k)
   w_clamped = if lt(w, cast(0.0, f32)) then cast(0.0, f32) else w
   expected = sqrt(div(w_clamped, t))
-  lt(abs_f32(sub(iv, expected)), cast(0.000001, f32))
+  lt(abs_f32(sub(iv, expected)), cast(1e-6, f32))
 }
 def implied_vol_round_trip(spot: f32, strike: f32, r: f32, t: f32, sigma_true: f32) -> bool = {
   price = bs_call_scalar(spot, strike, r, sigma_true, t)
@@ -17,8 +17,8 @@ def implied_vol_round_trip(spot: f32, strike: f32, r: f32, t: f32, sigma_true: f
   lt(abs_f32(sub(iv, sigma_true)), cast(0.001, f32))
 }
 def vs_sabr_atm_matches_textbook(alpha: f32, beta: f32, rho: f32, nu: f32, f: f32, t: f32) -> bool = {
-  p = SABR { alpha: alpha, beta: beta, rho: rho, nu: nu }
+  p = SABR { alpha, beta, rho, nu }
   module_val = vs_sabr_atm_implied_vol(p, f, t)
   ref_val = sabr_atm_iv_textbook(alpha, beta, rho, nu, f, t)
-  lt(abs_f32(sub(module_val, ref_val)), cast(0.000001, f32))
+  lt(abs_f32(sub(module_val, ref_val)), cast(1e-6, f32))
 }

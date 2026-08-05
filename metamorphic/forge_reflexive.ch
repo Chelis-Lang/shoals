@@ -3,5 +3,5 @@
 -- must REJECT it -- no substitution flips the outcome.
 module Metamorphic.ForgeReflexive
 def fr(x: f32) -> f32 = ((x * x) * x)
-@property forge_reflexive forall(x: f32) where (x > 0.0):
+@property forge_reflexive forall(x: f32) where x > 0.0:
   (fr(x) == fr(x))

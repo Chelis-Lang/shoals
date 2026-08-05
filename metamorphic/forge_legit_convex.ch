@@ -10,5 +10,5 @@
 -- convexity invariants).
 module Metamorphic.ForgeLegitConvex
 def gm(k: f32, h: f32) -> f32 = (k * k)
-@property forge_legit_convex forall(k: f32, h: f32) where (h > 0.0):
+@property forge_legit_convex forall(k: f32, h: f32) where h > 0.0:
   (((gm((k - h), h) + gm((k + h), h)) - (2.0 * gm(k, h))) >= 0.0)

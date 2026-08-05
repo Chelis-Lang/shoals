@@ -82,16 +82,15 @@ def mf_jcol[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32], x
   pred_plus = model(theta_plus, x)
   scale_vec(la_vec_sub(pred_plus, base_pred), div(cast(1.0, f32), eps))
 }
-def mf_jtwr_acc[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32], x: &tensor[m, f32], theta: &tensor[n, f32], base_pred: &tensor[m, f32], wr: &tensor[m, f32], tpl_n: &tensor[n, f32], i: int64, n_params: int64, eps: f32) -> tensor[n, f32] = {
-  if gte(i, n_params) then { to_tensor(map(fn (t: f32) -> cast(0.0, f32), to_list(tpl_n))) } else {
+def mf_jtwr_acc[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32], x: &tensor[m, f32], theta: &tensor[n, f32], base_pred: &tensor[m, f32], wr: &tensor[m, f32], tpl_n: &tensor[n, f32], i: int64, n_params: int64, eps: f32) -> tensor[n, f32] =
+  if gte(i, n_params) then to_tensor(map(fn (t: f32) -> cast(0.0, f32), to_list(tpl_n))) else {
     j_col = mf_jcol(model, copy(x), copy(theta), copy(base_pred), copy(tpl_n), i, eps)
     jtwr_i = inner_product(copy(j_col), copy(wr))
     e_i = mf_basis_vec(i, jtwr_i, copy(tpl_n))
     rest = mf_jtwr_acc(model, x, theta, base_pred, wr, tpl_n, add(i, cast(1, int64)), n_params, eps)
     la_vec_add(e_i, rest)
   }
-}
-def mf_jtwj_row[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32], x: &tensor[m, f32], theta: &tensor[n, f32], base_pred: &tensor[m, f32], tpl_n: &tensor[n, f32], j_col_i: &tensor[m, f32], weights: &tensor[m, f32], e_i: &tensor[n, f32], j: int64, n_params: int64, eps: f32) -> tensor[n, n, f32] = {
+def mf_jtwj_row[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32], x: &tensor[m, f32], theta: &tensor[n, f32], base_pred: &tensor[m, f32], tpl_n: &tensor[n, f32], j_col_i: &tensor[m, f32], weights: &tensor[m, f32], e_i: &tensor[n, f32], j: int64, n_params: int64, eps: f32) -> tensor[n, n, f32] =
   if gte(j, n_params) then {
     ztj = scale_vec(copy(tpl_n), cast(0.0, f32))
     einsum("i,j->ij", copy(ztj), ztj)
@@ -104,8 +103,7 @@ def mf_jtwj_row[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32
     rest = mf_jtwj_row(model, x, theta, base_pred, tpl_n, j_col_i, weights, e_i, add(j, cast(1, int64)), n_params, eps)
     add(this_entry, rest)
   }
-}
-def mf_jtwj_acc[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32], x: &tensor[m, f32], theta: &tensor[n, f32], base_pred: &tensor[m, f32], weights: &tensor[m, f32], tpl_n: &tensor[n, f32], i: int64, n_params: int64, eps: f32) -> tensor[n, n, f32] = {
+def mf_jtwj_acc[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32], x: &tensor[m, f32], theta: &tensor[n, f32], base_pred: &tensor[m, f32], weights: &tensor[m, f32], tpl_n: &tensor[n, f32], i: int64, n_params: int64, eps: f32) -> tensor[n, n, f32] =
   if gte(i, n_params) then {
     ztj = scale_vec(copy(tpl_n), cast(0.0, f32))
     einsum("i,j->ij", copy(ztj), ztj)
@@ -116,7 +114,6 @@ def mf_jtwj_acc[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32
     rest = mf_jtwj_acc(model, x, theta, base_pred, weights, tpl_n, add(i, cast(1, int64)), n_params, eps)
     add(row_i, rest)
   }
-}
 def mf_diag_entry[n](mat: &tensor[n, n, f32], i: int64, n_params: int64) -> f32 = {
   e_i = mf_basis_vec(i, cast(1.0, f32), to_tensor(map(fn (k: int64) -> cast(0.0, f32), range(cast(0, int64), n_params))))
   matrix = copy(mat)
@@ -127,7 +124,7 @@ def mf_damped_normal[n](jtwj: tensor[n, n, f32], lambda: f32, tpl_n: &tensor[n, 
   jtwj_ref = copy(jtwj)
   fold(fn (acc: tensor[n, n, f32], i: int64) -> {
     diag_i = mf_diag_entry(copy(jtwj_ref), i, n_params)
-    safe_diag = if lt(diag_i, cast(0.0000001, f32)) then cast(0.0000001, f32) else diag_i
+    safe_diag = if lt(diag_i, cast(1e-7, f32)) then cast(1e-7, f32) else diag_i
     scale = mul(lambda, safe_diag)
     le_i = mf_basis_vec(i, scale, copy(tpl_n))
     ue_i = mf_basis_vec(i, cast(1.0, f32), copy(tpl_n))
@@ -144,7 +141,7 @@ def mf_lm_step[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32]
   jtwr = mf_jtwr_acc(model, copy(x), copy(theta), copy(base_pred), copy(wr), copy(tpl_n), cast(0, int64), n_params, eps)
   jtwj = mf_jtwj_acc(model, copy(x), copy(theta), copy(base_pred), copy(weights), copy(tpl_n), cast(0, int64), n_params, eps)
   h = mf_damped_normal(jtwj, lambda, copy(tpl_n), n_params)
-  delta = cg_solve(h, jtwr, zero_n, cast(0.000001, f32), cast(50, int64))
+  delta = cg_solve(h, jtwr, zero_n, cast(1e-6, f32), cast(50, int64))
   theta_proposed = clamp_vec(la_vec_add(copy(theta), delta), copy(lo), copy(hi))
   new_pred = model(copy(theta_proposed), copy(x))
   new_r = la_vec_sub(copy(y), new_pred)
@@ -167,7 +164,7 @@ def active_set_mask[n](theta: &tensor[n, f32], lo: &tensor[n, f32], hi: &tensor[
     if near_lo then cast(1.0, f32) else if near_hi then cast(1.0, f32) else cast(0.0, f32)
   }, trips))
 }
-def mf_lm_rec[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32], features: &tensor[m, f32], observed: &tensor[m, f32], weights: &tensor[m, f32], lo: &tensor[n, f32], hi: &tensor[n, f32], theta: tensor[n, f32], sse: f32, lambda: f32, tol: f32, iters_left: int64, iters_used: int64, fd_eps: f32) -> (tensor[n, f32], f32, int64, bool) = {
+def mf_lm_rec[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32], features: &tensor[m, f32], observed: &tensor[m, f32], weights: &tensor[m, f32], lo: &tensor[n, f32], hi: &tensor[n, f32], theta: tensor[n, f32], sse: f32, lambda: f32, tol: f32, iters_left: int64, iters_used: int64, fd_eps: f32) -> (tensor[n, f32], f32, int64, bool) =
   if lte(iters_left, cast(0, int64)) then (theta, sse, iters_used, false) else {
     step_out = mf_lm_step(model, copy(features), copy(observed), copy(weights), copy(theta), copy(lo), copy(hi), lambda, fd_eps)
     theta_prop = step_out.0
@@ -175,7 +172,7 @@ def mf_lm_rec[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32],
     accepted = lt(sse_prop, sse)
     next_theta = if accepted then theta_prop else theta
     next_sse = if accepted then sse_prop else sse
-    lambda_floor = cast(0.0000001, f32)
+    lambda_floor = cast(1e-7, f32)
     lambda_ceiling = cast(10000000.0, f32)
     raw_next = if accepted then div(lambda, cast(3.0, f32)) else mul(lambda, cast(3.0, f32))
     next_lambda = if lt(raw_next, lambda_floor) then lambda_floor else if gt(raw_next, lambda_ceiling) then lambda_ceiling else raw_next
@@ -184,7 +181,6 @@ def mf_lm_rec[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32],
     now_converged = if accepted then lt(abs_rel_drop, tol) else false
     if now_converged then (next_theta, next_sse, add(iters_used, cast(1, int64)), true) else mf_lm_rec(model, features, observed, weights, lo, hi, next_theta, next_sse, next_lambda, tol, sub(iters_left, cast(1, int64)), add(iters_used, cast(1, int64)), fd_eps)
   }
-}
 def lm_bounded_nparam[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32], features: &tensor[m, f32], observed: &tensor[m, f32], weights: &tensor[m, f32], theta0: tensor[n, f32], lo: &tensor[n, f32], hi: &tensor[n, f32], lambda0: f32, tol: f32, max_iters: int64, fd_eps: f32) -> (tensor[n, f32], f32, int64, bool, tensor[n, f32]) = {
   theta_clamped0 = clamp_vec(copy(theta0), copy(lo), copy(hi))
   base_pred0 = model(copy(theta_clamped0), copy(features))
@@ -235,7 +231,7 @@ def mf_sabr_smart_initializer[n](strikes: &tensor[n, f32], market_ivs: &tensor[n
       iv_high = index(iv_list, high_idx)
       rr = sub(iv_high, iv_low)
       bf = sub(add(iv_high, iv_low), mul(cast(2.0, f32), atm_iv))
-      safe_atm = if lt(mf_abs_f32(atm_iv), cast(0.000001, f32)) then cast(0.000001, f32) else atm_iv
+      safe_atm = if lt(mf_abs_f32(atm_iv), cast(1e-6, f32)) then cast(1e-6, f32) else atm_iv
       rho_raw = mul(cast(0.5, f32), div(rr, safe_atm))
       rho_0 = clamp_to_bounds(rho_raw, cast(-0.9, f32), cast(0.9, f32))
       nu_raw = mul(cast(2.0, f32), div(bf, safe_atm))
@@ -270,8 +266,8 @@ def mf_sse_at[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32],
   r = la_vec_sub(copy(observed), pred)
   weighted_sse(r, copy(weights))
 }
-def mf_fd_gradient_acc[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32], features: &tensor[m, f32], observed: &tensor[m, f32], weights: &tensor[m, f32], theta: &tensor[n, f32], base_sse: f32, tpl_n: &tensor[n, f32], i: int64, n_params: int64, eps: f32) -> tensor[n, f32] = {
-  if gte(i, n_params) then { scale_vec(copy(tpl_n), cast(0.0, f32)) } else {
+def mf_fd_gradient_acc[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32], features: &tensor[m, f32], observed: &tensor[m, f32], weights: &tensor[m, f32], theta: &tensor[n, f32], base_sse: f32, tpl_n: &tensor[n, f32], i: int64, n_params: int64, eps: f32) -> tensor[n, f32] =
+  if gte(i, n_params) then scale_vec(copy(tpl_n), cast(0.0, f32)) else {
     eps_vec = mf_basis_vec(i, eps, copy(tpl_n))
     theta_plus = la_vec_add(copy(theta), eps_vec)
     sse_plus = mf_sse_at(model, copy(features), copy(observed), copy(weights), copy(theta_plus))
@@ -281,7 +277,6 @@ def mf_fd_gradient_acc[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor
     rest = mf_fd_gradient_acc(model, features, observed, weights, theta, base_sse, tpl_n, add(i, cast(1, int64)), n_params, eps)
     la_vec_add(e_i, rest)
   }
-}
 def mf_fd_gradient[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32], features: &tensor[m, f32], observed: &tensor[m, f32], weights: &tensor[m, f32], theta: &tensor[n, f32], base_sse: f32, eps: f32) -> tensor[n, f32] = {
   tpl_n = to_tensor(map(fn (t: f32) -> cast(0.0, f32), to_list(theta)))
   n_params = len(to_list(copy(tpl_n)))
@@ -298,7 +293,7 @@ def mf_bfgs_linesearch[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor
 }
 def mf_bfgs_update[n](h: tensor[n, n, f32], s: &tensor[n, f32], y: &tensor[n, f32], tpl_n: &tensor[n, f32]) -> tensor[n, n, f32] = {
   ys = inner_product(copy(y), copy(s))
-  eps_skip = cast(0.0000000001, f32)
+  eps_skip = cast(1e-10, f32)
   if lte(ys, eps_skip) then {
     _ = drop(tpl_n)
     h
@@ -321,7 +316,7 @@ def mf_bfgs_update[n](h: tensor[n, n, f32], s: &tensor[n, f32], y: &tensor[n, f3
     add(h2, outer_s_s_scaled)
   }
 }
-def mf_bfgs_rec[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32], features: &tensor[m, f32], observed: &tensor[m, f32], weights: &tensor[m, f32], lo: &tensor[n, f32], hi: &tensor[n, f32], theta: tensor[n, f32], g: tensor[n, f32], h: tensor[n, n, f32], sse: f32, tol: f32, iters_left: int64, iters_used: int64, fd_eps: f32) -> (tensor[n, f32], f32, int64, bool) = {
+def mf_bfgs_rec[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32], features: &tensor[m, f32], observed: &tensor[m, f32], weights: &tensor[m, f32], lo: &tensor[n, f32], hi: &tensor[n, f32], theta: tensor[n, f32], g: tensor[n, f32], h: tensor[n, n, f32], sse: f32, tol: f32, iters_left: int64, iters_used: int64, fd_eps: f32) -> (tensor[n, f32], f32, int64, bool) =
   if lte(iters_left, cast(0, int64)) then {
     _ = drop(g)
     _ = drop(h)
@@ -363,7 +358,6 @@ def mf_bfgs_rec[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32
       (theta_new, sse_new, add(iters_used, cast(1, int64)), true)
     } else mf_bfgs_rec(model, features, observed, weights, lo, hi, theta_new, g_new, h_new, sse_new, tol, sub(iters_left, cast(1, int64)), add(iters_used, cast(1, int64)), fd_eps)
   }
-}
 def bfgs_bounded_nparam[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32], features: &tensor[m, f32], observed: &tensor[m, f32], weights: &tensor[m, f32], theta0: tensor[n, f32], lo: &tensor[n, f32], hi: &tensor[n, f32], tol: f32, max_iters: int64, fd_eps: f32) -> (tensor[n, f32], f32, int64, bool, tensor[n, f32]) = {
   theta_clamped0 = clamp_vec(copy(theta0), copy(lo), copy(hi))
   tpl_n = to_tensor(map(fn (t: f32) -> cast(0.0, f32), to_list(copy(theta_clamped0))))
@@ -428,6 +422,6 @@ def sequential_pipeline_2stage_gradient[n1, m1, n2, m2](model1: &tensor[n1, f32]
   _ = drop(tpl_m1)
   row_idxs = range(cast(0, int64), n2_len)
   col_idxs = range(cast(0, int64), m1_len)
-  flat = fold(fn (acc_i: List[f32], i: int64) -> { fold(fn (acc_j: List[f32], j: int64) -> append(acc_j, index(index(cols, j), i)), acc_i, col_idxs) }, [], row_idxs)
+  flat = fold(fn (acc_i: List[f32], i: int64) -> fold(fn (acc_j: List[f32], j: int64) -> append(acc_j, index(index(cols, j), i)), acc_i, col_idxs), [], row_idxs)
   reshape(to_tensor(flat), [n2_len, m1_len])
 }

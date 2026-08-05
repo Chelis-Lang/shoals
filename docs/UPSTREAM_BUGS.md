@@ -58,7 +58,25 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 ## Actively blocking
 
-- **None actively blocking.** The finance proof surface ships as documented in
+- **`_ = f(x)` marks `x` consumed when `f` destructures a record parameter
+  (0.18.4 regression)** -- `chelis#1200`
+  ([Chelis-Lang/chelis#1200](https://github.com/Chelis-Lang/chelis/issues/1200)).
+  A `_ =` wildcard discard desugars with the `destructure: true` marker,
+  opening the Linearity-F2 destructure-consume scope over the rest of the
+  enclosing body; any later reuse of a variable that a record-destructuring
+  callee consumed is a hard `UseAfterConsume` instead of receiving the
+  implicit Copy a named binding gets. In Shoals this failed
+  `tests/curves_basis.ch` (through `Curves.basis_spread_at`) at the 0.18.4
+  bump.
+    - **Minimal reproducer:** `tests_blocked/linearity/wildcard_discard_consume.ch`.
+    - **Workaround:** bind, do not discard. 4 sites in
+      `tests/curves_basis.ch` rewritten to `asserted_N` bindings, each
+      carrying a `-- chelis#1200:` citation. `src/` needed no change.
+    - **Re-probe trigger:** every pin bump and the release resolving
+      chelis#1200. On pass, revert the cited bindings to `_ =` where the
+      name is unused and archive this entry.
+
+- **None other actively blocking.** The finance proof surface ships as documented in
   `research/proof-infra/report.md`: the economic / dynamic-programming properties
   reach the SMT tier with no transcendental contract; the derivatives structural
   properties (`properties/composites.ch`: upper bound, put–call parity with

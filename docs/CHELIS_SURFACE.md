@@ -1,4 +1,4 @@
-<!-- BEGIN CHELIS MANAGED BLOCK: chelis-surface-header chelis@0.18.3 (sha256:28011bed9ccb5778) -->
+<!-- BEGIN CHELIS MANAGED BLOCK: chelis-surface-header chelis@0.18.4 (sha256:28011bed9ccb5778) -->
 This file is a domain-scoped view of the canonical Chelis capability surface,
 generated for the pinned toolchain. Each capability row is marked `@pin` (usable
 at the current pin) or `@upstream` (lands at the next bump). **Read it before
@@ -15,18 +15,18 @@ quantitative-finance domain this shell touches — numerical methods, pricing,
 Greeks, and the proof surface over them. **Read this before designing around a
 suspected language gap.**
 
-> **Pinned manifest:** Shoals 0.24.7; chelis 0.18.3 (chelis-std 0.4.0,
-> bundled), Nautilus 0.7.40, Coral 0.7.37 · **Last refreshed:** 2026-08-04
+> **Pinned manifest:** Shoals 0.24.8; chelis 0.18.4 (chelis-std 0.4.0,
+> bundled), Nautilus 0.7.41, Coral 0.7.38 · **Last refreshed:** 2026-08-05
 
-The published Chelis `v0.18.3` tag resolves to commit
-`29700dd73c0e35b672bdd384493054b3107ce308`. Release workflow `30915952765`
+The published Chelis `v0.18.4` tag resolves to commit
+`c0138c828bf2c42e1c8941e824f16616bd974fd5`. Release workflow `31027974411`
 completed successfully; the publisher-authenticated Darwin arm64 archive
-has SHA-256 `cc8737adf8c21040432d94b96635ef48895bd7ac8cdf94bd7696046c44bc7371`
+has SHA-256 `ac905d2a2d471ff09a46e39c7ae78ede85aab2f97515553b445ffd0dc0d29fea`
 and its extracted compiler payload has SHA-256
-`3a14b0d7e0a46a49c9b25f3dc61573d5972a91b411021672e09b8e3e0e9e1eba`. The
+`b6b80d65bf1822f6ad926915b4c5d4b3c94e414a9afcafa0bc02f9fc29a48037`. The
 glibc-2.31 archive for the same tag has SHA-256
-`36789e3a260c61b5082bc8842ba7b975899796ddf17c7b971815a2ed112904a3`
-(payload `ea0ba326b190366f905445b4996c3993fe6c5cc7214f14cf5d862a615b78badf`);
+`c31b59a830ca232fa4e0a454e1314810026b5ec4f2b1a6e54d024eb049f65902`
+(payload `314e840b7bf483caae985e663d27d0d2ccab85c003776bdd7689c5832cb3addf`);
 it is sidecar-verified but exercised by CI rather than this gate run.
 
 **0.18.2 is skipped.** The 0.24.6 / 0.18.2 candidate could not land: Nautilus
@@ -35,10 +35,10 @@ which has no compiled-lane expression identity, so Coral's native build broke
 and its 0.7.36 release never happened. Chelis 0.18.3 ships `cast_trunc`
 ([05-OP-6]) and Nautilus 0.7.40 moves onto it.
 
-Nautilus 0.7.40 is published from commit `c8466b29ffbe4ebc4126363db8c62a06a5b10e7f`; its sidecar-verified CHB
-has SHA-256 `2ba0d478f55d5b270801ada1b51d8dbc75a4d721a24bb8aa42f6f663b0e19bad` and its archive has SHA-256 `a881f0b96a908a8356b720bfe21e6bde724bea204310e51957b452ad3740a47c`. Coral 0.7.37 is
-published from commit `8e38cd42aeb5e45d7ad5f92ed61143e1c121fb8b`; its sidecar-verified CHB has SHA-256 `b8c41f1b563c2d460c764fb4373a26c7c0c622bd905c6d39a9284349f9a224de`
-and its archive has SHA-256 `5358b34994df4637dfce7e0deb48d78c6c61ddb807ef50a25261427093973de9`. Both were installed through
+Nautilus 0.7.41 is published from commit `5bf6fd11ea4faa5bec0ca79e8974653b5e3158f8`; its sidecar-verified CHB
+has SHA-256 `e92a47020f5691b49e5b39aba0094c7e1ed2e39d9dce55a9a135fd34480cc083` and its archive has SHA-256 `1bba785ccead8c38275f8daa111a27516b4f21d16eb3223c23dbb7bcb6a0a6f3`. Coral 0.7.38 is
+published from commit `53a40e781d869c19529ae2e4fcdad780f0a97f1b`; its sidecar-verified CHB has SHA-256 `a5be8783717b951db11f58beb9084a674ab86c7891cb847a6e74e4a04535e85e`
+and its archive has SHA-256 `e68ac948c3539c3eba95283b49a907a753acc1de540a4a3840410ae79bf70854`. Both were installed through
 `chelis reef install --from-github` and this chain was re-validated end to end
 against them.
 
@@ -71,7 +71,7 @@ SHA-256 values are
 `a3e04e308eb7d35c34fe4d6075c7e7626c57a6a9957fc6cf9926467b5787ec6c`
 and `fe41f1617b118eb1600d02518319a96780c77195cce4c836ec43776bd69e08b0`.
 
-Rows marked `@pin` carry official 0.18.3-chain evidence. `@upstream` remains a
+Rows marked `@pin` carry official 0.18.4-chain evidence. `@upstream` remains a
 later capability that is not shipped at this pin. Refresh this table at every pin bump
 (`AGENTS.md` §Pin Bump Checklist). The authoritative depth reference for the
 proof reachability map is

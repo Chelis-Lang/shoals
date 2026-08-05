@@ -76,7 +76,7 @@ def test_lmm_step_zero_drift_last_forward() -> unit ! { Test } = {
   out_l = to_list(out)
   v3 = index(out_l, cast(3, int64))
   expected_v3 = mul(cast(0.06, f32), exp(mul(neg(cast(0.5, f32)), mul(cast(0.1, f32), mul(cast(0.1, f32), cast(0.01, f32))))))
-  assert_close(v3, expected_v3, cast(0.000001, f32), "L_3 with z=0 evolves by drift -0.5*sigma^2*dt (zero terminal-measure drift for last forward)")
+  assert_close(v3, expected_v3, cast(1e-6, f32), "L_3 with z=0 evolves by drift -0.5*sigma^2*dt (zero terminal-measure drift for last forward)")
 }
 def test_hjm_step_zero_normal_pure_drift() -> unit ! { Test } = {
   forwards = to_tensor([cast(0.03, f32), cast(0.035, f32), cast(0.04, f32), cast(0.045, f32)])
@@ -87,6 +87,6 @@ def test_hjm_step_zero_normal_pure_drift() -> unit ! { Test } = {
   out_l = to_list(out)
   v0 = index(out_l, cast(0, int64))
   v3 = index(out_l, cast(3, int64))
-  _ = assert_close(v0, add(cast(0.03, f32), mul(cast(0.001, f32), cast(0.5, f32))), cast(0.000001, f32), "HJM step with z=0 advances f by drift*dt only (f_0)")
-  assert_close(v3, add(cast(0.045, f32), mul(cast(0.004, f32), cast(0.5, f32))), cast(0.000001, f32), "HJM step with z=0 advances f by drift*dt only (f_3)")
+  _ = assert_close(v0, add(cast(0.03, f32), mul(cast(0.001, f32), cast(0.5, f32))), cast(1e-6, f32), "HJM step with z=0 advances f by drift*dt only (f_0)")
+  assert_close(v3, add(cast(0.045, f32), mul(cast(0.004, f32), cast(0.5, f32))), cast(1e-6, f32), "HJM step with z=0 advances f by drift*dt only (f_3)")
 }

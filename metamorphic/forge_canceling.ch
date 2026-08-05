@@ -6,5 +6,5 @@
 -- (identity / negated / constant) changes the outcome.
 module Metamorphic.ForgeCanceling
 def fc(x: f32) -> f32 = ((x * x) * x)
-@property forge_canceling forall(x: f32) where (x > 0.0):
+@property forge_canceling forall(x: f32) where x > 0.0:
   ((fc(x) - fc(x)) < 1.0)

@@ -11,4 +11,4 @@ def days_then_weeks_equals_compound(ref: Date, n_days: int64, n_weeks: int64) ->
   via_sum = add_days(ref, add(n_days, mul(n_weeks, cast(7, int64))))
   eq(days_between(via_compose, via_sum), cast(0, int64))
 }
-def tenor_to_days_nonneg_for_positive_count(unit: TenorUnit, n: int64) -> bool = { if lt(n, cast(0, int64)) then true else gte(tenor_to_days(tenor(n, unit)), cast(0, int64)) }
+def tenor_to_days_nonneg_for_positive_count(unit: TenorUnit, n: int64) -> bool = if lt(n, cast(0, int64)) then true else gte(tenor_to_days(tenor(n, unit)), cast(0, int64))

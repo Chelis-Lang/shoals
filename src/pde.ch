@@ -9,10 +9,7 @@ def pde_log_grid_params(s0: f32, s_max_mult: f32, n_x: int64) -> (f32, f32) = {
   log_mult = log(s_max_mult)
   x_min = sub(log_s0, log_mult)
   x_max = add(log_s0, log_mult)
-  denom =
-    n_x
-    |> sub(cast(1, int64))
-    |> fn (__chelis_pipe) -> cast(__chelis_pipe, f32)
+  denom = n_x |> sub(cast(1, int64)) |> cast(f32)
   dx = x_max |> sub(x_min) |> div(denom)
   (x_min, dx)
 }
@@ -71,7 +68,7 @@ def pde_thomas_fwd(lower: List[f32], diag: List[f32], upper: List[f32], b_vec: L
     b_im1 = index(b_acc, im1)
     b_i_raw = index(b_vec, i)
     abs_dim1 = if lt(d_im1, pde_zero()) then neg(d_im1) else d_im1
-    safe_dim1 = if lt(abs_dim1, cast(0.0000000001, f32)) then pde_one() else d_im1
+    safe_dim1 = if lt(abs_dim1, cast(1e-10, f32)) then pde_one() else d_im1
     w = div(l_i, safe_dim1)
     d_i_new = sub(d_i_raw, mul(w, u_im1))
     b_i_new = sub(b_i_raw, mul(w, b_im1))
@@ -84,7 +81,7 @@ def pde_thomas_bwd(upper: List[f32], diag_f: List[f32], b_f: List[f32], n_x: int
   d_last = index(diag_f, n_xm1)
   b_last = index(b_f, n_xm1)
   abs_dl = if lt(d_last, pde_zero()) then neg(d_last) else d_last
-  safe_dl = if lt(abs_dl, cast(0.0000000001, f32)) then pde_one() else d_last
+  safe_dl = if lt(abs_dl, cast(1e-10, f32)) then pde_one() else d_last
   x_last = div(b_last, safe_dl)
   init_state = [x_last]
   step_idxs = 1 |> fn (__chelis_pipe) -> cast(__chelis_pipe, int64) |> range(n_x)
@@ -96,7 +93,7 @@ def pde_thomas_bwd(upper: List[f32], diag_f: List[f32], b_f: List[f32], n_x: int
     u_i = index(upper, i)
     b_i = index(b_f, i)
     abs_di = if lt(d_i, pde_zero()) then neg(d_i) else d_i
-    safe_di = if lt(abs_di, cast(0.0000000001, f32)) then pde_one() else d_i
+    safe_di = if lt(abs_di, cast(1e-10, f32)) then pde_one() else d_i
     x_i = b_i |> sub(mul(u_i, x_ip1)) |> div(safe_di)
     append(acc, x_i)
   }, init_state, step_idxs)
@@ -209,7 +206,7 @@ def pde_vanilla_driver(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_x:
 def pde_european_call_cn(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_x: int64, n_t: int64, s_max_mult: f32) -> f32 = pde_vanilla_driver(s0, k, r, q, sigma, t, n_x, n_t, s_max_mult, true, false)
 def pde_european_put_cn(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_x: int64, n_t: int64, s_max_mult: f32) -> f32 = pde_vanilla_driver(s0, k, r, q, sigma, t, n_x, n_t, s_max_mult, false, false)
 def pde_american_put_cn(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_x: int64, n_t: int64, s_max_mult: f32) -> f32 = pde_vanilla_driver(s0, k, r, q, sigma, t, n_x, n_t, s_max_mult, false, true)
-def pde_adi_payoff_spread_2d(xs1: List[f32], xs2: List[f32], k: f32) -> List[List[f32]] = {
+def pde_adi_payoff_spread_2d(xs1: List[f32], xs2: List[f32], k: f32) -> List[List[f32]] =
   map(fn (x1: f32) -> {
     s1 = exp(x1)
     map(fn (x2: f32) -> {
@@ -217,7 +214,6 @@ def pde_adi_payoff_spread_2d(xs1: List[f32], xs2: List[f32], k: f32) -> List[Lis
       pde_max(sub(sub(s1, s2), k), pde_zero())
     }, xs2)
   }, xs1)
-}
 def pde_adi_apply_1d(v_row: List[f32], a_coef: f32, b_half: f32, c_coef: f32, alpha: f32) -> List[f32] = {
   enum_pairs = enumerate(v_row)
   n_len = cast(len(v_row), int64)
