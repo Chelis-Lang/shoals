@@ -4,7 +4,43 @@ All notable changes to this project are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.24.7] - Unreleased
+## [0.24.8] - 2026-08-05
+
+Compiler-pin, grammar-migration, and chelis#1200-workaround release for
+Chelis v0.18.4, on Nautilus 0.7.41 and Coral 0.7.38.
+`chelis reef conform bump 0.18.4` advanced the compiler pin and all workflow
+audit mirrors; both reef dependencies advanced to their 0.18.4-pinning
+releases; the Shoals package version advanced from 0.24.7 to 0.24.8.
+
+**The entire Surf corpus migrated to canonical Surf v0.19 (chelis#1031).**
+The migration and the pin bump are one atomic change: v0.19-canonical source
+fails the 0.18.3 style gate and pre-v0.19 source fails the 0.18.4 one.
+
+**BREAKING: `Shoals.MarketData` constructors renamed.** `quote` is a reserved
+word in canonical Surf v0.19, so the `quote`/`bar`/`snapshot` constructors
+are now `make_quote`/`make_bar`/`make_snapshot` -- all three renamed together
+so the module keeps one constructor convention rather than a lone renamed
+member. The `Quote`/`Bar`/`Snapshot`/`Side` types, the
+`quote_side`/`quote_value` and `md_bar_*` accessors, `snapshot_lookup`, and
+record-literal construction are unchanged. Downstream callers must update.
+
+**chelis#1200 workaround.** On 0.18.4 a `_ =` wildcard discard opens the
+Linearity-F2 destructure-consume scope over the rest of the enclosing body;
+this failed `tests/curves_basis.ch` through `Curves.basis_spread_at`. The 4
+discard sites there are rewritten to named `asserted_N` bindings citing
+chelis#1200; `tests_blocked/linearity/wildcard_discard_consume.ch` pins the
+reproducer and `docs/UPSTREAM_BUGS.md` carries the narrowing. `src/` needed
+no change.
+
+**Validation on 0.18.4:** conform audit conformant, no MUST failures;
+full suite green at a 120s per-test timeout (the two Monte-Carlo tests
+`test_lmm_martingale_at_zero_drift` and `test_mc_converges_to_bs` exceed the
+default 30s on the validating workstation at the 0.18.3 baseline too --
+machine speed, not a bump regression; CI is their arbiter); 3 negative
+sidecars ok; the new chelis#1200 blocked probe ok. Nautilus 0.7.41 and
+Coral 0.7.38 consumed at their published sidecar hashes (chelis#1002).
+
+## [0.24.7] - 2026-08-04
 
 Compiler-pin and de-narrowing change set for the Chelis 0.18.3 / Nautilus
 0.7.40 / Coral 0.7.37 cascade. `chelis reef conform bump 0.18.3` advanced the
