@@ -52,10 +52,10 @@ def test_crr_american_put_ge_european() -> unit ! { Test } = {
   assert_true(and(finite_eu, and(finite_am, gte(p_am, p_eu))), "CRR ITM American put is finite, positive, and >= European put under the same tree at n=5 (early-exercise premium non-negative)")
 }
 def test_crr_low_sigma_returns_deterministic_intrinsic() -> unit ! { Test } = {
-  call_low = tr_crr_european_call(cast(100.0, f32), cast(90.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.0000001, f32), cast(1.0, f32), cast(5, int64))
+  call_low = tr_crr_european_call(cast(100.0, f32), cast(90.0, f32), cast(0.05, f32), cast(0.0, f32), cast(1e-7, f32), cast(1.0, f32), cast(5, int64))
   expected = sub(cast(100.0, f32), mul(cast(90.0, f32), exp(neg(cast(0.05, f32)))))
-  tian_low = tr_tian_european_call(cast(100.0, f32), cast(90.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.0000001, f32), cast(1.0, f32), cast(5, int64))
-  tri_low = tr_trinomial_european_call(cast(100.0, f32), cast(90.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.0000001, f32), cast(1.0, f32), cast(5, int64))
+  tian_low = tr_tian_european_call(cast(100.0, f32), cast(90.0, f32), cast(0.05, f32), cast(0.0, f32), cast(1e-7, f32), cast(1.0, f32), cast(5, int64))
+  tri_low = tr_trinomial_european_call(cast(100.0, f32), cast(90.0, f32), cast(0.05, f32), cast(0.0, f32), cast(1e-7, f32), cast(1.0, f32), cast(5, int64))
   crr_ok = lt(tr_abs(sub(call_low, expected)), cast(0.001, f32))
   tian_ok = eq(tian_low, tian_low)
   tri_ok = eq(tri_low, tri_low)

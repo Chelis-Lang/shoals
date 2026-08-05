@@ -3,7 +3,7 @@ import Nautilus.Roots (brent)
 export (HazardCurve, hazard_curve_from_pillars, cds_survival_from_hazards, cds_premium_leg_value, cds_protection_leg_value, cds_pv, cds_bootstrap_hazards)
 type HazardCurve[n] =
   | HazardCurve { times: tensor[n, f32], hazards: tensor[n, f32] }
-def hazard_curve_from_pillars[n](times: tensor[n, f32], hazards: tensor[n, f32]) -> HazardCurve[n] = HazardCurve { times: times, hazards: hazards }
+def hazard_curve_from_pillars[n](times: tensor[n, f32], hazards: tensor[n, f32]) -> HazardCurve[n] = HazardCurve { times, hazards }
 def cds_integrated_hazard(times_l: List[f32], hazards_l: List[f32], t: f32) -> f32 = {
   pairs = zip(times_l, hazards_l)
   init = (cast(0.0, f32), cast(0.0, f32))
@@ -24,7 +24,7 @@ def cds_integrated_hazard(times_l: List[f32], hazards_l: List[f32], t: f32) -> f
   last_h = fold(fn (acc: f32, h: f32) -> h, cast(0.0, f32), hazards_l)
   add(base, mul(last_h, tail_dt))
 }
-def cds_survival_from_hazards[n](curve: HazardCurve[n], t: f32) -> f32 = {
+def cds_survival_from_hazards[n](curve: HazardCurve[n], t: f32) -> f32 =
   match curve with {
     | HazardCurve { times: ts, hazards: hs } => {
     ts_l = to_list(copy(ts))
@@ -33,7 +33,6 @@ def cds_survival_from_hazards[n](curve: HazardCurve[n], t: f32) -> f32 = {
     exp(neg(integral))
   }
   }
-}
 def cds_premium_grid(t_maturity: f32, n_premiums_per_year: int64) -> List[f32] = {
   freq_f = cast(n_premiums_per_year, f32)
   dt = div(cast(1.0, f32), freq_f)
@@ -56,11 +55,10 @@ def cds_premium_leg_from_lists(spread: f32, grid: List[f32], times_l: List[f32],
   }, init, grid)
   out.1
 }
-def cds_premium_leg_from_grid[n](spread: f32, grid: List[f32], hazards: HazardCurve[n], r: f32) -> f32 = {
+def cds_premium_leg_from_grid[n](spread: f32, grid: List[f32], hazards: HazardCurve[n], r: f32) -> f32 =
   match hazards with {
     | HazardCurve { times: ts, hazards: hs } => cds_premium_leg_from_lists(spread, grid, to_list(ts), to_list(hs), r)
   }
-}
 def cds_premium_leg_value[n](spread: f32, t_maturity: f32, n_premiums_per_year: int64, hazards: HazardCurve[n], r: f32) -> f32 = {
   grid = cds_premium_grid(t_maturity, n_premiums_per_year)
   cds_premium_leg_from_grid(spread, grid, hazards, r)
@@ -83,11 +81,10 @@ def cds_protection_leg_from_lists(grid: List[f32], recovery: f32, times_l: List[
   }, init, grid)
   out.1
 }
-def cds_protection_leg_from_grid[n](grid: List[f32], recovery: f32, hazards: HazardCurve[n], r: f32) -> f32 = {
+def cds_protection_leg_from_grid[n](grid: List[f32], recovery: f32, hazards: HazardCurve[n], r: f32) -> f32 =
   match hazards with {
     | HazardCurve { times: ts, hazards: hs } => cds_protection_leg_from_lists(grid, recovery, to_list(ts), to_list(hs), r)
   }
-}
 def cds_protection_leg_value[n](t_maturity: f32, recovery: f32, hazards: HazardCurve[n], r: f32) -> f32 = {
   freq_default = cast(12, int64)
   grid = cds_premium_grid(t_maturity, freq_default)
@@ -100,18 +97,17 @@ def cds_pv_from_lists(spread: f32, t_maturity: f32, n_premiums_per_year: int64, 
   prl = cds_protection_leg_from_lists(grid_d, recovery, times_l, hazards_l, r)
   sub(prl, pl)
 }
-def cds_pv[n](spread: f32, t_maturity: f32, n_premiums_per_year: int64, recovery: f32, hazards: HazardCurve[n], r: f32) -> f32 = {
+def cds_pv[n](spread: f32, t_maturity: f32, n_premiums_per_year: int64, recovery: f32, hazards: HazardCurve[n], r: f32) -> f32 =
   match hazards with {
     | HazardCurve { times: ts, hazards: hs } => cds_pv_from_lists(spread, t_maturity, n_premiums_per_year, recovery, to_list(ts), to_list(hs), r)
   }
-}
 def cds_bootstrap_step(spread: f32, tenor: f32, recovery: f32, r: f32, n_premiums_per_year: int64, prev_times: List[f32], prev_hazards: List[f32]) -> f32 = {
   residual = fn (h_candidate: f32) -> {
     new_times = append(prev_times, tenor)
     new_hazards = append(prev_hazards, h_candidate)
     cds_pv_from_lists(spread, tenor, n_premiums_per_year, recovery, new_times, new_hazards, r)
   }
-  brent(residual, cast(0.000001, f32), cast(2.0, f32), cast(0.0000001, f32), cast(100, int64))
+  brent(residual, cast(1e-6, f32), cast(2.0, f32), cast(1e-7, f32), cast(100, int64))
 }
 def cds_bootstrap_hazards[n](spreads: tensor[n, f32], tenors: tensor[n, f32], recovery: f32, r: f32, n_premiums_per_year: int64) -> HazardCurve[n] = {
   spreads_l = to_list(copy(spreads))

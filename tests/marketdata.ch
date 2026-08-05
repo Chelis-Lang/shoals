@@ -5,7 +5,7 @@ import Shoals.MarketData (Side, Bid, Ask, Mid, Last, Quote, Bar, Snapshot, quote
 def test_quote_construct_and_read() -> unit ! { Test } = {
   d = date(cast(2025, int64), cast(6, int64), cast(15, int64))
   q = quote(Bid, cast(100.5, f32), d)
-  assert_close(quote_value(q), cast(100.5, f32), cast(0.000001, f32), "quote_value Bid 100.5")
+  assert_close(quote_value(q), cast(100.5, f32), cast(1e-6, f32), "quote_value Bid 100.5")
 }
 def test_quote_side_ask() -> unit ! { Test } = {
   d = date(cast(2025, int64), cast(6, int64), cast(15, int64))
@@ -21,14 +21,14 @@ def test_quote_side_ask() -> unit ! { Test } = {
 def test_bar_fields() -> unit ! { Test } = {
   d = date(cast(2025, int64), cast(6, int64), cast(15, int64))
   b = bar(d, cast(100.0, f32), cast(101.0, f32), cast(99.5, f32), cast(100.5, f32), cast(1000.0, f32))
-  assert_close(md_bar_open(b), cast(100.0, f32), cast(0.000001, f32), "bar open")
+  assert_close(md_bar_open(b), cast(100.0, f32), cast(1e-6, f32), "bar open")
 }
 def test_bar_high_low_volume() -> unit ! { Test } = {
   d = date(cast(2025, int64), cast(6, int64), cast(15, int64))
   b = bar(d, cast(100.0, f32), cast(101.0, f32), cast(99.5, f32), cast(100.5, f32), cast(1000.0, f32))
-  _ = assert_close(md_bar_high(b), cast(101.0, f32), cast(0.000001, f32), "bar high")
-  _ = assert_close(md_bar_low(b), cast(99.5, f32), cast(0.000001, f32), "bar low")
-  assert_close(md_bar_volume(b), cast(1000.0, f32), cast(0.000001, f32), "bar volume")
+  _ = assert_close(md_bar_high(b), cast(101.0, f32), cast(1e-6, f32), "bar high")
+  _ = assert_close(md_bar_low(b), cast(99.5, f32), cast(1e-6, f32), "bar low")
+  assert_close(md_bar_volume(b), cast(1000.0, f32), cast(1e-6, f32), "bar volume")
 }
 def test_snapshot_lookup_present() -> unit ! { Test } = {
   d = date(cast(2025, int64), cast(6, int64), cast(15, int64))
@@ -81,5 +81,5 @@ def test_snapshot_lookup_finds_second_entry() -> unit ! { Test } = {
     | Some(q) => quote_value(q)
     | None => cast(-1.0, f32)
   }
-  assert_close(found_value, cast(350.0, f32), cast(0.000001, f32), "snapshot lookup finds MSFT in slot 3")
+  assert_close(found_value, cast(350.0, f32), cast(1e-6, f32), "snapshot lookup finds MSFT in slot 3")
 }

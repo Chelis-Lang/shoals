@@ -2,10 +2,10 @@ module Shoals.Tests.HolidaycalIntl
 import Std.Test (assert_true, assert_false)
 import Shoals.HolidayCal (hc_tyo_is_holiday, hc_syd_is_holiday, hc_fra_is_holiday, hc_hkg_is_holiday)
 def hc_eq_bool(a: bool, b: bool) -> bool = or(and(a, b), and(not(a), not(b)))
-def test_tyo_coming_of_age_day_2026() -> unit ! { Test } = { assert_true(hc_tyo_is_holiday(cast(2026, int64), cast(1, int64), cast(12, int64)), "TYO: 2026-01-12 is Coming-of-Age Day (2nd Mon of Jan)") }
-def test_syd_australia_day_2025() -> unit ! { Test } = { assert_true(hc_syd_is_holiday(cast(2025, int64), cast(1, int64), cast(27, int64)), "SYD: 2025-01-27 is observed Australia Day (Jan 26 is Sunday)") }
-def test_fra_tag_der_deutschen_einheit_2025() -> unit ! { Test } = { assert_true(hc_fra_is_holiday(cast(2025, int64), cast(10, int64), cast(3, int64)), "FRA: 2025-10-03 is German Unity Day") }
-def test_hkg_lunar_new_year_2025() -> unit ! { Test } = { assert_true(hc_hkg_is_holiday(cast(2025, int64), cast(1, int64), cast(29, int64)), "HKG: 2025-01-29 is Lunar New Year (first day)") }
+def test_tyo_coming_of_age_day_2026() -> unit ! { Test } = assert_true(hc_tyo_is_holiday(cast(2026, int64), cast(1, int64), cast(12, int64)), "TYO: 2026-01-12 is Coming-of-Age Day (2nd Mon of Jan)")
+def test_syd_australia_day_2025() -> unit ! { Test } = assert_true(hc_syd_is_holiday(cast(2025, int64), cast(1, int64), cast(27, int64)), "SYD: 2025-01-27 is observed Australia Day (Jan 26 is Sunday)")
+def test_fra_tag_der_deutschen_einheit_2025() -> unit ! { Test } = assert_true(hc_fra_is_holiday(cast(2025, int64), cast(10, int64), cast(3, int64)), "FRA: 2025-10-03 is German Unity Day")
+def test_hkg_lunar_new_year_2025() -> unit ! { Test } = assert_true(hc_hkg_is_holiday(cast(2025, int64), cast(1, int64), cast(29, int64)), "HKG: 2025-01-29 is Lunar New Year (first day)")
 def test_calendars_disagree_on_christmas_eve_dec_24() -> unit ! { Test } = {
   tyo_24 = hc_tyo_is_holiday(cast(2025, int64), cast(12, int64), cast(24, int64))
   tyo_25 = hc_tyo_is_holiday(cast(2025, int64), cast(12, int64), cast(25, int64))

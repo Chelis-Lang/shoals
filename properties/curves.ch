@@ -6,12 +6,12 @@ def parallel_shift_uniformly_lifts(c: YieldCurve[3], delta: f32, probe_t: f32) -
   shifted = parallel_shift(c, delta)
   r_after = rate_at(shifted, probe_t)
   observed_delta = sub(r_after, r_before)
-  lt(abs_f32(sub(observed_delta, delta)), cast(0.000001, f32))
+  lt(abs_f32(sub(observed_delta, delta)), cast(1e-6, f32))
 }
 def parallel_shift_zero_is_identity(c: YieldCurve[3], probe_t: f32) -> bool = {
   shifted = parallel_shift(c, cast(0.0, f32))
   diff = sub(rate_at(shifted, probe_t), rate_at(c, probe_t))
-  lt(abs_f32(diff), cast(0.000001, f32))
+  lt(abs_f32(diff), cast(1e-6, f32))
 }
 def twist_at_midpoint_is_average(c: YieldCurve[3], short_d: f32, long_d: f32, t_mid: f32) -> bool = {
   twisted = twist(c, short_d, long_d)

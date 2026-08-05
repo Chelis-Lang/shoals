@@ -5,7 +5,7 @@ import Shoals.VolSurface (SABR, vs_sabr_implied_vol)
 def msi_abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 def msi_is_finite(x: f32) -> bool = if neq(x, x) then false else lt(msi_abs_f32(x), cast(1000000000.0, f32))
 def msi_build_smile_5(alpha: f32, beta: f32, rho: f32, nu: f32, forward: f32, t: f32) -> (tensor[5, f32], tensor[5, f32]) = {
-  params = SABR { alpha: alpha, beta: beta, rho: rho, nu: nu }
+  params = SABR { alpha, beta, rho, nu }
   ks = to_tensor([mul(cast(0.8, f32), forward), mul(cast(0.9, f32), forward), forward, mul(cast(1.1, f32), forward), mul(cast(1.2, f32), forward)])
   k_l = to_list(copy(ks))
   ivs = to_tensor(map(fn (k: f32) -> vs_sabr_implied_vol(params, forward, k, t), k_l))
@@ -81,7 +81,7 @@ def test_sabr_multi_start_returns_5_candidates() -> unit ! { Test } = {
     flat_idx = add(mul(i, cast(4, int64)), cast(2, int64))
     actual = index(flat, flat_idx)
     diff = msi_abs_f32(sub(actual, expected))
-    if acc then lt(diff, cast(0.000001, f32)) else false
+    if acc then lt(diff, cast(1e-6, f32)) else false
   }, true, rho_pairs)
   _ = assert_true(all_finite, "all 20 entries of the 5x4 multi-start tensor are finite")
   assert_true(rho_check, "rho component sweeps {-0.7, -0.3, 0, 0.3, 0.7} across the 5 candidates")

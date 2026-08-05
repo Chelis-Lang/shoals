@@ -14,13 +14,13 @@ def test_act_365_one_year() -> unit ! { Test } = {
   start = date(cast(2025, int64), cast(1, int64), cast(1, int64))
   end = date(cast(2026, int64), cast(1, int64), cast(1, int64))
   yf = year_fraction(start, end, Act365)
-  assert_close(yf, cast(1.0, f32), cast(0.000001, f32), "Act/365 one year == 1.0")
+  assert_close(yf, cast(1.0, f32), cast(1e-6, f32), "Act/365 one year == 1.0")
 }
 def test_thirty_360_half_year() -> unit ! { Test } = {
   start = date(cast(2025, int64), cast(1, int64), cast(15, int64))
   end = date(cast(2025, int64), cast(7, int64), cast(15, int64))
   yf = year_fraction(start, end, ThirtyThreeSixty)
-  assert_close(yf, cast(0.5, f32), cast(0.000001, f32), "30/360 six months == 0.5")
+  assert_close(yf, cast(0.5, f32), cast(1e-6, f32), "30/360 six months == 0.5")
 }
 def test_weekend_saturday() -> unit ! { Test } = {
   d = date(cast(2025, int64), cast(1, int64), cast(4, int64))

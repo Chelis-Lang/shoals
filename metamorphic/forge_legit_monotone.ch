@@ -5,5 +5,5 @@
 -- hardened gate does not reject genuine F-dependent greens).
 module Metamorphic.ForgeLegitMonotone
 def fm(x: f32) -> f32 = (x + 1.0)
-@property forge_legit_monotone forall(x1: f32, x2: f32) where (x2 > x1):
+@property forge_legit_monotone forall(x1: f32, x2: f32) where x2 > x1:
   (fm(x2) >= fm(x1))

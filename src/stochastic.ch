@@ -102,7 +102,7 @@ def heston_qe_step(log_s: f32, v: f32, min_v: f32, mu: f32, kappa: f32, theta: f
   s2_a = mul(div(mul(v, mul(sigma_sq, e_kdt)), kappa), one_minus_e)
   s2_b = mul(div(mul(theta, sigma_sq), mul(two, kappa)), mul(one_minus_e, one_minus_e))
   s2 = add(s2_a, s2_b)
-  tiny = cast(0.000000000001, f32)
+  tiny = cast(1e-12, f32)
   m_abs = if lt(m, zero) then neg(m) else m
   s2_abs = if lt(s2, zero) then neg(s2) else s2
   v_next = if lt(m_abs, tiny) then zero else if lt(s2_abs, tiny) then if lt(m, zero) then zero else m else {
@@ -201,7 +201,7 @@ def sto_kou_compensator(p: f32, eta_up: f32, eta_dn: f32) -> f32 = {
     sub(add(up_term, dn_term), one)
   }
 }
-def sto_kou_jump_sample(p: f32, eta_up: f32, eta_dn: f32, u_branch: f32, e_size: f32) -> f32 = { if lt(u_branch, p) then div(e_size, eta_up) else neg(div(e_size, eta_dn)) }
+def sto_kou_jump_sample(p: f32, eta_up: f32, eta_dn: f32, u_branch: f32, e_size: f32) -> f32 = if lt(u_branch, p) then div(e_size, eta_up) else neg(div(e_size, eta_dn))
 def sto_kou_jump_terminal[n](paths_template: tensor[n, f32], jumps_template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> tensor[n, f32] ! { Random } = {
   _ = jumps_template
   n_paths = numel(copy(paths_template))

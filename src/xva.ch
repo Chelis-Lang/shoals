@@ -111,8 +111,8 @@ def xva_wwr_default_time(rho: f32, z_e: f32, z_d: f32, hazard: f32) -> f32 = {
   x_d = add(mul(neg(rho), z_e), mul(sqrt_term, z_d))
   u_j = normal_cdf(x_d, cast(0.0, f32), cast(1.0, f32))
   one_minus_u = sub(cast(1.0, f32), u_j)
-  safe_one_minus_u = if lt(one_minus_u, cast(0.000000000001, f32)) then cast(0.000000000001, f32) else one_minus_u
-  safe_hazard = if lt(hazard, cast(0.000000000001, f32)) then cast(0.000000000001, f32) else hazard
+  safe_one_minus_u = if lt(one_minus_u, cast(1e-12, f32)) then cast(1e-12, f32) else one_minus_u
+  safe_hazard = if lt(hazard, cast(1e-12, f32)) then cast(1e-12, f32) else hazard
   div(neg(log(safe_one_minus_u)), safe_hazard)
 }
 def xva_cva_stochastic_hazard[n, m](time_grid: tensor[m, f32], epe: tensor[m, f32], hazards: HazardCurve[n], recovery: f32, discount_rate: f32) -> f32 = {

@@ -10,13 +10,12 @@ def sobol_direction_table() -> tensor[1024, int64] = to_tensor([2147483648i64, 1
 -- passes non-negative operands (bit-walk values, sample and dimension indices),
 -- which is why the swap is behavior-preserving here.
 def i64_mod(n: int64, p: int64) -> int64 = sub(n, mul(p, floor_div(n, p)))
-def pow2_list_32() -> List[int64] = {
+def pow2_list_32() -> List[int64] =
   map(fn (j: int64) -> {
     init = cast(1, int64)
     two = cast(2, int64)
     fold(fn (acc: int64, unused: int64) -> mul(acc, two), init, 0 |> fn (__chelis_pipe) -> cast(__chelis_pipe, int64) |> range(j))
   }, 0 |> fn (__chelis_pipe) -> cast(__chelis_pipe, int64) |> range(cast(33, int64)))
-}
 def bit_at_i64(n: int64, j: int64, pow2: List[int64]) -> int64 = n |> floor_div(index(pow2, j)) |> mod(cast(2, int64))
 def i64_xor_pow2(a: int64, b: int64, pow2: List[int64]) -> int64 = i64_xor_32(a, b)
 def i64_xor_32(a: int64, b: int64) -> int64 = {

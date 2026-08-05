@@ -72,7 +72,7 @@ def garman_kohlhagen_put(s: f32, k: f32, r_d: f32, r_f: f32, sigma: f32, t: f32)
 }
 def margrabe_exchange_call(s1: f32, s2: f32, sigma1: f32, sigma2: f32, rho: f32, t: f32) -> f32 = {
   variance = sub(add(mul(sigma1, sigma1), mul(sigma2, sigma2)), mul(cast(2.0, f32), mul(rho, mul(sigma1, sigma2))))
-  if lt(variance, cast(0.0000000001, f32)) then { if gt(sub(s1, s2), cast(0.0, f32)) then sub(s1, s2) else cast(0.0, f32) } else margrabe_exchange_call_nondegenerate(s1, s2, variance, t)
+  if lt(variance, cast(1e-10, f32)) then if gt(sub(s1, s2), cast(0.0, f32)) then sub(s1, s2) else cast(0.0, f32) else margrabe_exchange_call_nondegenerate(s1, s2, variance, t)
 }
 def margrabe_exchange_call_nondegenerate(s1: f32, s2: f32, variance: f32, t: f32) -> f32 = {
   sigma_eff = sqrt(variance)
@@ -86,7 +86,7 @@ def margrabe_exchange_call_nondegenerate(s1: f32, s2: f32, variance: f32, t: f32
 }
 def pe_margrabe_stulz(s1: f32, s2: f32, sigma1: f32, sigma2: f32, rho: f32, q1: f32, q2: f32, t: f32) -> f32 = {
   variance = sub(add(mul(sigma1, sigma1), mul(sigma2, sigma2)), mul(cast(2.0, f32), mul(rho, mul(sigma1, sigma2))))
-  if lt(variance, cast(0.0000000001, f32)) then pe_margrabe_stulz_degenerate(s1, s2, q1, q2, t) else pe_margrabe_stulz_nondegenerate(s1, s2, variance, q1, q2, t)
+  if lt(variance, cast(1e-10, f32)) then pe_margrabe_stulz_degenerate(s1, s2, q1, q2, t) else pe_margrabe_stulz_nondegenerate(s1, s2, variance, q1, q2, t)
 }
 def pe_margrabe_stulz_degenerate(s1: f32, s2: f32, q1: f32, q2: f32, t: f32) -> f32 = {
   fwd1 = mul(s1, exp(neg(mul(q1, t))))

@@ -5,7 +5,7 @@ import Shoals.Stochastic (merton_compensated_drift, merton_jump_terminal, choles
 def test_merton_compensated_drift_zero_lambda_equals_gbm() -> unit ! { Test } = {
   d = merton_compensated_drift(cast(0.05, f32), cast(0.2, f32), cast(0.0, f32), cast(-0.1, f32), cast(0.1, f32))
   expected = sub(cast(0.05, f32), mul(cast(0.5, f32), mul(cast(0.2, f32), cast(0.2, f32))))
-  assert_close(d, expected, cast(0.000001, f32), "lambda=0 reduces Merton drift to GBM drift")
+  assert_close(d, expected, cast(1e-6, f32), "lambda=0 reduces Merton drift to GBM drift")
 }
 def test_merton_compensated_drift_subtracts_expected_jump_contribution() -> unit ! { Test } = {
   d = merton_compensated_drift(cast(0.05, f32), cast(0.2, f32), cast(1.0, f32), cast(0.0, f32), cast(0.1, f32))
@@ -13,19 +13,19 @@ def test_merton_compensated_drift_subtracts_expected_jump_contribution() -> unit
   half_jump_vol_sq = mul(cast(0.5, f32), mul(cast(0.1, f32), cast(0.1, f32)))
   expected_jump = sub(exp(add(cast(0.0, f32), half_jump_vol_sq)), cast(1.0, f32))
   expected_d = sub(sub(cast(0.05, f32), half_sigma_sq), mul(cast(1.0, f32), expected_jump))
-  assert_close(d, expected_d, cast(0.000001, f32), "lambda=1 subtracts E[exp(J)-1]")
+  assert_close(d, expected_d, cast(1e-6, f32), "lambda=1 subtracts E[exp(J)-1]")
 }
 def test_cholesky_2x2_identity() -> unit ! { Test } = {
   out = cholesky_2x2_lower(cast(1.0, f32), cast(0.0, f32), cast(1.0, f32))
-  _ = assert_close(out.0, cast(1.0, f32), cast(0.000001, f32), "L11 = 1")
-  _ = assert_close(out.1, cast(0.0, f32), cast(0.000001, f32), "L21 = 0")
-  assert_close(out.2, cast(1.0, f32), cast(0.000001, f32), "L22 = 1")
+  _ = assert_close(out.0, cast(1.0, f32), cast(1e-6, f32), "L11 = 1")
+  _ = assert_close(out.1, cast(0.0, f32), cast(1e-6, f32), "L21 = 0")
+  assert_close(out.2, cast(1.0, f32), cast(1e-6, f32), "L22 = 1")
 }
 def test_cholesky_2x2_correlated() -> unit ! { Test } = {
   out = cholesky_2x2_lower(cast(4.0, f32), cast(2.0, f32), cast(3.0, f32))
-  _ = assert_close(out.0, cast(2.0, f32), cast(0.000001, f32), "L11 = sqrt(4) = 2")
-  _ = assert_close(out.1, cast(1.0, f32), cast(0.000001, f32), "L21 = 2/2 = 1")
-  assert_close(out.2, sqrt(cast(2.0, f32)), cast(0.000001, f32), "L22 = sqrt(3 - 1) = sqrt(2)")
+  _ = assert_close(out.0, cast(2.0, f32), cast(1e-6, f32), "L11 = sqrt(4) = 2")
+  _ = assert_close(out.1, cast(1.0, f32), cast(1e-6, f32), "L21 = 2/2 = 1")
+  assert_close(out.2, sqrt(cast(2.0, f32)), cast(1e-6, f32), "L22 = sqrt(3 - 1) = sqrt(2)")
 }
 def test_cholesky_round_trip_recovers_covariance() -> unit ! { Test } = {
   sigma_xx = cast(0.04, f32)
@@ -35,9 +35,9 @@ def test_cholesky_round_trip_recovers_covariance() -> unit ! { Test } = {
   recon_xx = mul(out.0, out.0)
   recon_xy = mul(out.0, out.1)
   recon_yy = add(mul(out.1, out.1), mul(out.2, out.2))
-  _ = assert_close(recon_xx, sigma_xx, cast(0.000001, f32), "L L^T [0,0] = Sigma_xx")
-  _ = assert_close(recon_xy, sigma_xy, cast(0.000001, f32), "L L^T [1,0] = Sigma_xy")
-  assert_close(recon_yy, sigma_yy, cast(0.000001, f32), "L L^T [1,1] = Sigma_yy")
+  _ = assert_close(recon_xx, sigma_xx, cast(1e-6, f32), "L L^T [0,0] = Sigma_xx")
+  _ = assert_close(recon_xy, sigma_xy, cast(1e-6, f32), "L L^T [1,0] = Sigma_xy")
+  assert_close(recon_yy, sigma_yy, cast(1e-6, f32), "L L^T [1,1] = Sigma_yy")
 }
 def test_merton_terminal_positive_paths() -> unit ! { Test } = {
   template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(2000, int64))))

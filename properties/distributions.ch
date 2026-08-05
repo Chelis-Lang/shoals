@@ -29,5 +29,5 @@ def lognormal_pdf_nonneg(x: f32, mu: f32, sigma: f32) -> bool = {
 def student_t_pdf_symmetric_at_zero(nu: f32, dx: f32) -> bool = {
   p_plus = student_t_pdf(dx, nu)
   p_minus = student_t_pdf(neg(dx), nu)
-  lt(abs_f32(sub(p_plus, p_minus)), cast(0.000001, f32))
+  lt(abs_f32(sub(p_plus, p_minus)), cast(1e-6, f32))
 }

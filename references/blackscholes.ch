@@ -10,8 +10,8 @@ def d1(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = {
   den = mul(sigma, sqrt(t))
   div(num, den)
 }
-def d2(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = { sub(d1(s, k, r, sigma, t), mul(sigma, sqrt(t))) }
-def n_pdf_std(x: f32) -> f32 = { div(exp(neg(mul(cast(0.5, f32), mul(x, x)))), cast(2.5066282746310002, f32)) }
+def d2(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = sub(d1(s, k, r, sigma, t), mul(sigma, sqrt(t)))
+def n_pdf_std(x: f32) -> f32 = div(exp(neg(mul(cast(0.5, f32), mul(x, x)))), cast(2.5066282746310002, f32))
 def call_textbook(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = {
   d1_v = d1(s, k, r, sigma, t)
   d2_v = d2(s, k, r, sigma, t)
@@ -26,8 +26,8 @@ def put_textbook(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = {
   n_neg_d2 = n_cdf(neg(d2_v))
   sub(mul(k, mul(exp(neg(mul(r, t))), n_neg_d2)), mul(s, n_neg_d1))
 }
-def delta_call_textbook(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = { n_cdf(d1(s, k, r, sigma, t)) }
-def delta_put_textbook(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = { sub(n_cdf(d1(s, k, r, sigma, t)), cast(1.0, f32)) }
+def delta_call_textbook(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = n_cdf(d1(s, k, r, sigma, t))
+def delta_put_textbook(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = sub(n_cdf(d1(s, k, r, sigma, t)), cast(1.0, f32))
 def gamma_textbook(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = {
   d1_v = d1(s, k, r, sigma, t)
   div(n_pdf_std(d1_v), mul(s, mul(sigma, sqrt(t))))

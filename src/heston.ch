@@ -17,12 +17,11 @@ def cexp(z: (f32, f32)) -> (f32, f32) = {
   r_factor = exp(z.0)
   (mul(r_factor, cos(z.1)), mul(r_factor, sin(z.1)))
 }
-def safe_atan2(y: f32, x: f32) -> f32 = {
+def safe_atan2(y: f32, x: f32) -> f32 =
   if eq(x, cast(0.0, f32)) then if gt(y, cast(0.0, f32)) then heston_half_pi() else if lt(y, cast(0.0, f32)) then neg(heston_half_pi()) else cast(0.0, f32) else {
     a = atan(div(y, x))
     if gt(x, cast(0.0, f32)) then a else if gte(y, cast(0.0, f32)) then add(a, heston_pi_const()) else sub(a, heston_pi_const())
   }
-}
 def clog(z: (f32, f32)) -> (f32, f32) = {
   r2 = add(mul(z.0, z.0), mul(z.1, z.1))
   (mul(cast(0.5, f32), log(r2)), safe_atan2(z.1, z.0))

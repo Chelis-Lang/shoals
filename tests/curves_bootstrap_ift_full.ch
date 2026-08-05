@@ -3,7 +3,7 @@ import Std.Test (assert_close, assert_true)
 import Shoals.Curves (Instrument, Deposit, ZeroCoupon, ParSwap, deposit, zero_coupon, cur_par_swap, bootstrap_multi, bootstrap_grad_at_solution, bootstrap_grad_full_jacobian, instrument_validate)
 def cbif_abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 def cbif_rel_err(a: f32, b: f32) -> f32 = {
-  denom = if lt(cbif_abs_f32(b), cast(0.000001, f32)) then cast(0.000001, f32) else cbif_abs_f32(b)
+  denom = if lt(cbif_abs_f32(b), cast(1e-6, f32)) then cast(1e-6, f32) else cbif_abs_f32(b)
   div(cbif_abs_f32(sub(a, b)), denom)
 }
 def cbif_template_5() -> tensor[5, f32] = to_tensor([cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(0.0, f32)])
@@ -37,7 +37,7 @@ def test_full_jacobian_diagonal_only_for_zero_coupons() -> unit ! { Test } = {
     v = cbif_abs_f32(index(flat, k))
     if gt(v, acc) then v else acc
   }, cast(0.0, f32), off_diag_idxs)
-  assert_true(lt(off_diag_max, cast(0.000001, f32)), "all-zero-coupon Jacobian: off-diagonal entries are zero (residuals are pillar-local)")
+  assert_true(lt(off_diag_max, cast(1e-6, f32)), "all-zero-coupon Jacobian: off-diagonal entries are zero (residuals are pillar-local)")
 }
 def test_full_jacobian_par_swap_off_diagonal_nonzero() -> unit ! { Test } = {
   insts = [deposit(cast(1.0, f32), cast(0.05, f32)), cur_par_swap(cast(2.0, f32), cast(0.04, f32))]
@@ -49,7 +49,7 @@ def test_full_jacobian_par_swap_off_diagonal_nonzero() -> unit ! { Test } = {
   j_11 = index(flat, cast(3, int64))
   is_finite_10 = eq(j_10, j_10)
   is_nonzero_10 = gt(cbif_abs_f32(j_10), cast(0.001, f32))
-  is_zero_01 = lt(cbif_abs_f32(j_01), cast(0.000001, f32))
+  is_zero_01 = lt(cbif_abs_f32(j_01), cast(1e-6, f32))
   _ = assert_true(is_finite_10, "J[1, 0] = dz_1/dx_0 is finite for deposit+par-swap")
   _ = assert_true(is_nonzero_10, "J[1, 0] = dz_1/dx_0 is non-trivially non-zero (par-swap residual depends on z_0 via cum_pv)")
   _ = assert_true(is_zero_01, "J[0, 1] = dz_0/dx_1 is zero (deposit pillar 0 does not depend on later par-swap rate)")

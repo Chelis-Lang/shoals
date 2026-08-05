@@ -34,7 +34,7 @@ def mp_run_pipeline_default() -> (tensor[2, f32], tensor[2, f32], f32, f32, int6
   theta2_0 = to_tensor([cast(1.0, f32), cast(1.0, f32)])
   lo2 = to_tensor([cast(-10.0, f32), cast(-10.0, f32)])
   hi2 = to_tensor([cast(10.0, f32), cast(10.0, f32)])
-  sequential_pipeline_2stage(mp_linear_model, copy(xs), copy(ys), copy(weights1), theta1_0, copy(lo1), copy(hi1), mp_stage1_to_stage2_passthrough, mp_stage2_model, copy(observed2), copy(weights2), theta2_0, copy(lo2), copy(hi2), cast(0.01, f32), cast(0.000001, f32), cast(100, int64), cast(0.0001, f32))
+  sequential_pipeline_2stage(mp_linear_model, copy(xs), copy(ys), copy(weights1), theta1_0, copy(lo1), copy(hi1), mp_stage1_to_stage2_passthrough, mp_stage2_model, copy(observed2), copy(weights2), theta2_0, copy(lo2), copy(hi2), cast(0.01, f32), cast(1e-6, f32), cast(100, int64), cast(0.0001, f32))
 }
 def test_pipeline_2stage_linear_chain() -> unit ! { Test } = {
   out = mp_run_pipeline_default()

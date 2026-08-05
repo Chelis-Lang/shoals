@@ -34,7 +34,7 @@ def bracket_brackets_root(spot: f32, strike: f32, r: f32, t: f32, target: f32, v
   lt(mul(flo, fhi), cast(0.0, f32))
 }
 def is_iv_solver_failed(iv: f32) -> bool = neq(iv, iv)
-def implied_vol_bisect(spot: f32, strike: f32, r: f32, t: f32, target: f32, vol_lo: f32, vol_hi: f32, max_iters: int64, tol: f32) -> f32 = {
+def implied_vol_bisect(spot: f32, strike: f32, r: f32, t: f32, target: f32, vol_lo: f32, vol_hi: f32, max_iters: int64, tol: f32) -> f32 =
   if not(bracket_brackets_root(spot, strike, r, t, target, vol_lo, vol_hi)) then div(cast(0.0, f32), cast(0.0, f32)) else {
     iters = range(cast(0, int64), max_iters)
     init = (vol_lo, vol_hi, cast(0.5, f32))
@@ -48,8 +48,7 @@ def implied_vol_bisect(spot: f32, strike: f32, r: f32, t: f32, target: f32, vol_
     }, init, iters)
     out.2
   }
-}
-def implied_vol_from_call(spot: f32, strike: f32, r: f32, t: f32, target_price: f32) -> f32 = implied_vol_bisect(spot, strike, r, t, target_price, cast(0.0001, f32), cast(5.0, f32), cast(60, int64), cast(0.000001, f32))
+def implied_vol_from_call(spot: f32, strike: f32, r: f32, t: f32, target_price: f32) -> f32 = implied_vol_bisect(spot, strike, r, t, target_price, cast(0.0001, f32), cast(5.0, f32), cast(60, int64), cast(1e-6, f32))
 def pow_f32(base: f32, expn: f32) -> f32 = exp(mul(expn, log(base)))
 def vs_sabr_atm_implied_vol(p: SABR, f: f32, t: f32) -> f32 = {
   one_minus_beta = sub(cast(1.0, f32), p.beta)
@@ -83,7 +82,7 @@ def vs_sabr_implied_vol(p: SABR, f: f32, k: f32, t: f32) -> f32 = {
   denom_correction = add(cast(1.0, f32), add(mul(div(one_minus_beta_sq, cast(24.0, f32)), log_fk_sq), mul(div(one_minus_beta_4, cast(1920.0, f32)), log_fk_4)))
   denominator = mul(fk_pow_half1mb, denom_correction)
   base_iv = div(numerator, denominator)
-  if lt(abs_f32(z), cast(0.0000001, f32)) then base_iv else mul(base_iv, div(z, x_z))
+  if lt(abs_f32(z), cast(1e-7, f32)) then base_iv else mul(base_iv, div(z, x_z))
 }
 def vs_sabr_shift_alpha(p: SABR, d: f32) -> SABR = SABR { alpha: add(p.alpha, d), beta: p.beta, rho: p.rho, nu: p.nu }
 def vs_sabr_shift_rho(p: SABR, d: f32) -> SABR = SABR { alpha: p.alpha, beta: p.beta, rho: add(p.rho, d), nu: p.nu }

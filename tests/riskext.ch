@@ -29,9 +29,9 @@ def test_scenario_pnl_grid_linear() -> unit ! { Test } = {
   v_mid = index(pnls_l, cast(2, int64))
   v_up = index(pnls_l, cast(4, int64))
   v_dn = index(pnls_l, cast(0, int64))
-  _ = assert_close(v_mid, cast(100.0, f32), cast(0.000001, f32), "base PnL at 0 shift")
-  _ = assert_close(v_up, cast(101.0, f32), cast(0.000001, f32), "+2% shift * 50/unit = +1.0")
-  assert_close(v_dn, cast(99.0, f32), cast(0.000001, f32), "-2% shift * 50/unit = -1.0")
+  _ = assert_close(v_mid, cast(100.0, f32), cast(1e-6, f32), "base PnL at 0 shift")
+  _ = assert_close(v_up, cast(101.0, f32), cast(1e-6, f32), "+2% shift * 50/unit = +1.0")
+  assert_close(v_dn, cast(99.0, f32), cast(1e-6, f32), "-2% shift * 50/unit = -1.0")
 }
 def test_kupiec_pof_at_expected_rate_near_zero() -> unit ! { Test } = {
   stat = kupiec_pof_statistic_simple(cast(5, int64), cast(100, int64), cast(0.05, f32))

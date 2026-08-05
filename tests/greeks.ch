@@ -11,9 +11,9 @@ def abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 def test_deltas_call_ad_matches_displayed_deriv() -> unit ! { Test } = {
   spots = to_tensor([cast(80.0, f32), cast(100.0, f32), cast(120.0, f32)])
   d = to_list(deltas_call(spots, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32)))
-  _ = assert_close(index(d, cast(0, int64)), cast(0.22192375, f32), cast(0.000005, f32), "AD delta s=80")
-  _ = assert_close(index(d, cast(1, int64)), cast(0.63683582, f32), cast(0.000005, f32), "AD delta ATM")
-  assert_close(index(d, cast(2, int64)), cast(0.89645624, f32), cast(0.000005, f32), "AD delta s=120")
+  _ = assert_close(index(d, cast(0, int64)), cast(0.22192375, f32), cast(5e-6, f32), "AD delta s=80")
+  _ = assert_close(index(d, cast(1, int64)), cast(0.63683582, f32), cast(5e-6, f32), "AD delta ATM")
+  assert_close(index(d, cast(2, int64)), cast(0.89645624, f32), cast(5e-6, f32), "AD delta s=120")
 }
 def test_vegas_call_ad_matches_displayed_deriv() -> unit ! { Test } = {
   spots = to_tensor([cast(80.0, f32), cast(100.0, f32), cast(120.0, f32)])
@@ -116,11 +116,11 @@ def test_pathwise_call_delta_in_money() -> unit ! { Test } = {
 }
 def test_pathwise_call_delta_otm_zero() -> unit ! { Test } = {
   d = pathwise_smooth_call_terminal_delta(cast(80.0, f32), cast(100.0, f32), cast(0.95, f32), cast(100.0, f32))
-  assert_close(d, cast(0.0, f32), cast(0.000001, f32), "pathwise delta on OTM single-path == 0")
+  assert_close(d, cast(0.0, f32), cast(1e-6, f32), "pathwise delta on OTM single-path == 0")
 }
 def test_lr_digital_delta_otm_zero_at_indicator() -> unit ! { Test } = {
   d = lr_digital_call_delta(cast(80.0, f32), cast(100.0, f32), cast(100.0, f32), cast(0.2, f32), cast(1.0, f32), cast(0.95, f32))
-  assert_close(d, cast(0.0, f32), cast(0.000001, f32), "LR digital delta on OTM single-path == 0 (indicator zero)")
+  assert_close(d, cast(0.0, f32), cast(1e-6, f32), "LR digital delta on OTM single-path == 0 (indicator zero)")
 }
 def test_lr_digital_delta_itm_nonzero() -> unit ! { Test } = {
   d = lr_digital_call_delta(cast(120.0, f32), cast(100.0, f32), cast(100.0, f32), cast(0.2, f32), cast(1.0, f32), cast(0.95, f32))

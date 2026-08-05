@@ -1,7 +1,7 @@
 module Shoals.SabrPaths
 import Nautilus.Distributions (normal_sample)
 export (sabr_qe_step, sabr_path_terminal, sabr_paths_terminal)
-def sabr_floor() -> f32 = cast(0.0000000001, f32)
+def sabr_floor() -> f32 = cast(1e-10, f32)
 def sabr_clamp_pos(x: f32) -> f32 = if lt(x, sabr_floor()) then sabr_floor() else x
 def sabr_qe_step(f: f32, alpha: f32, beta: f32, rho: f32, nu: f32, dt: f32, z_f: f32, z_alpha: f32) -> (f32, f32) = {
   one = cast(1.0, f32)

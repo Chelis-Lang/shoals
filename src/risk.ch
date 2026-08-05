@@ -20,7 +20,7 @@ def parametric_cvar[n](losses: tensor[n, f32], confidence: f32) -> f32 = {
   ratio = div(pdf_z, tail_prob)
   add(mu, mul(sigma_loss, ratio))
 }
-def historical_var[n](losses: tensor[n, f32], confidence: f32) -> f32 = { quantile_vec(losses, confidence) }
+def historical_var[n](losses: tensor[n, f32], confidence: f32) -> f32 = quantile_vec(losses, confidence)
 def historical_cvar[n](losses: tensor[n, f32], confidence: f32) -> f32 = {
   losses_copy = copy(losses)
   threshold = quantile_vec(copy(losses_copy), confidence)
@@ -35,4 +35,4 @@ def historical_cvar[n](losses: tensor[n, f32], confidence: f32) -> f32 = {
   c = acc.1
   if eq(c, cast(0, int64)) then threshold else div(s, cast(c, f32))
 }
-def empirical_loss_quantile[n](losses: tensor[n, f32], q: f32) -> f32 = { quantile_vec(losses, q) }
+def empirical_loss_quantile[n](losses: tensor[n, f32], q: f32) -> f32 = quantile_vec(losses, q)
