@@ -444,14 +444,16 @@ def fmt_const(v) -> str:
     return str(int(f)) + ".0" if f == int(f) else str(f)
 
 
-def check_precondition(where_ns: str, pc: dict, ctx: str) -> None:
-    lhs = pc["lhs"]
-    op = OP[pc["op"]]
-    rhs = pc["rhs"]
-    rhs_s = fmt_const(rhs["const"]) if "const" in rhs else rhs["input"]
-    needle = f"({lhs}{op}{rhs_s})"
-    if needle not in where_ns:
-        err(f"{ctx}: precondition {needle} not found in property where-clause")
+def check_precondition(header: str, pc: dict, ctx: str) -> None:
+    """Structural membership: the declared precondition must be one of the
+    property's parsed where-guards. Canonical Surf v0.19 (chelis#1031) strips
+    the redundant parens the old substring needle relied on, so the check
+    compares parsed guard tuples instead of spellings."""
+    guards, _ = parse_where_guards(header)
+    if canon_pc(pc) not in guards:
+        lhs, op, rhs = pc["lhs"], OP[pc["op"]], pc["rhs"]
+        rhs_s = fmt_const(rhs["const"]) if "const" in rhs else rhs["input"]
+        err(f"{ctx}: precondition ({lhs} {op} {rhs_s}) not found in property where-clause")
 
 
 def canon_pc(pc: dict) -> tuple:
@@ -473,16 +475,39 @@ def parse_where_guards(header: str) -> tuple[list[tuple], list[str]]:
         return [], []
     guards: list[tuple] = []
     unparsed: list[str] = []
-    for inner in re.findall(r"\(([^()]+)\)", w.group(1)):
-        g = re.match(r"\s*([A-Za-z_]\w*)\s*(>=|<=|==|>|<)\s*([A-Za-z0-9_.]+)\s*$", inner)
+    # Canonical Surf v0.19 (chelis#1031) spells the guard list comma-separated
+    # with no redundant parens (`where s > 1.0, s < 9.0:`); pre-v0.19 sources
+    # wrapped each guard (`where (s > 1.0), (s < 9.0):`). Split on top-level
+    # commas and strip one optional layer of surrounding parens so both parse.
+    body = w.group(1)
+    parts: list[str] = []
+    depth, cur = 0, ""
+    for ch in body:
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        if ch == "," and depth == 0:
+            parts.append(cur)
+            cur = ""
+        else:
+            cur += ch
+    parts.append(cur)
+    for inner in parts:
+        inner = inner.strip()
+        if not inner:
+            continue
+        if inner.startswith("(") and inner.endswith(")"):
+            inner = inner[1:-1]
+        g = re.match(r"\s*([A-Za-z_]\w*)\s*(>=|<=|==|>|<)\s*([A-Za-z0-9_.eE+-]+)\s*$", inner)
         if not g:
             unparsed.append(inner.strip())
             continue
         lhs, sym, rhs = g.groups()
         tok = SYM2TOK[sym]
-        if re.fullmatch(r"[0-9.]+", rhs):
+        try:
             guards.append((lhs, tok, ("const", float(rhs))))
-        else:
+        except ValueError:
             guards.append((lhs, tok, ("input", rhs)))
     return guards, unparsed
 
@@ -523,8 +548,16 @@ def self_test() -> None:
                 {"lhs": "b", "op": "lt", "rhs": {"const": 1.0}}]
     under = [{"lhs": "a", "op": "gt", "rhs": {"const": 0.0}}]  # missing (b < 1.0)
     hdr_rel = "@property y forall(a: f32, b: f32) where (b > a):"
+    hdr_v019 = "@property x forall(a: f32, b: f32) where a > 0.0, b < 1.0:"
+    hdr_v019_exp = "@property w forall(a: f32) where a > 1e-6:"
     checks = [
         ("complete accepted", completeness_errors(hdr, complete, "st") == []),
+        ("v0.19 paren-free complete accepted",
+            completeness_errors(hdr_v019, complete, "st") == []),
+        ("v0.19 paren-free under-declared caught",
+            len(completeness_errors(hdr_v019, under, "st")) == 1),
+        ("v0.19 exponent-literal guard parsed", completeness_errors(
+            hdr_v019_exp, [{"lhs": "a", "op": "gt", "rhs": {"const": 1e-6}}], "st") == []),
         ("under-declared caught", len(completeness_errors(hdr, under, "st")) == 1
             and "UNDER-DECLARED" in completeness_errors(hdr, under, "st")[0]),
         ("param-ref guard accepted", completeness_errors(
@@ -578,9 +611,8 @@ def check_instantiation(inv: dict, inst: dict, models: dict) -> None:
     # directions: declared subset of the guards (each declared appears in text)
     # AND declared superset of the guards (completeness -- no under-declaration).
     if where_block is not None:
-        where_ns = re.sub(r"\s+", "", where_block)
         for pc in inst.get("preconditions", []):
-            check_precondition(where_ns, pc, ctx)
+            check_precondition(where_block, pc, ctx)
         check_completeness(where_block, inst.get("preconditions", []), ctx)
 
 
