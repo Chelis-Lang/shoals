@@ -21,62 +21,46 @@ mechanical staleness audit (`scripts/audit_workarounds.py`) can find them.
 `scripts/audit_workarounds.py` (full mode) flags any `chelis#NNN` cited here or
 in code that is CLOSED upstream but not sitting in §Archived.
 
-> **0.18.3 release status (2026-08-04):** the published Chelis tag points
-> to `29700dd73c0e35b672bdd384493054b3107ce308`; its authenticated Darwin arm64
-> archive is `cc8737adf8c21040432d94b96635ef48895bd7ac8cdf94bd7696046c44bc7371`
+> **0.18.5 release status (2026-08-22):** the published Chelis tag points
+> to `6602f01719f55b8d4c7f52ee70e7c7b58f136107`; its authenticated Darwin arm64
+> archive is `0ff7b4e168d8b51277e05d44bfa658364630176d56d79c9cf8aceaea15335551`
 > and its extracted compiler payload is
-> `3a14b0d7e0a46a49c9b25f3dc61573d5972a91b411021672e09b8e3e0e9e1eba`. The
+> `bcf8da8bd2df9acb8816194f9251b26e23ec57527d4fc928bea6e1f6120628b2`, which is
+> byte-identical to the toolchain every re-probe below ran on. The
 > glibc-2.31 archive for the same tag is
-> `36789e3a260c61b5082bc8842ba7b975899796ddf17c7b971815a2ed112904a3` (payload
-> `ea0ba326b190366f905445b4996c3993fe6c5cc7214f14cf5d862a615b78badf`), verified
+> `6b9b944ccd96b0053fc071de0ecfbb9e80e02a07a6a176e87056267ae8e0c26a` (payload
+> `fc544b9362c9ff0c244c03216a6e44fbf4d36665802d11b5cf3514d017c1e29a`), verified
 > against its sidecar but exercised by CI rather than this gate run.
 >
-> **This bump skips 0.18.2: 0.18.1 → 0.18.3.** The 0.24.6 / 0.18.2 candidate
-> could not land — Nautilus 0.7.39 worked the chelis#759 float-to-integer trap
-> around with `floor(...)`, which has no compiled-lane expression identity, so
-> Coral's native build broke and its 0.7.36 release never happened. Chelis
-> 0.18.3 ships `cast_trunc` ([05-OP-6]) and Nautilus 0.7.40 moves onto it.
+> **The sibling half of the chain is staged, not published.** Reef enforces
+> exact compiler-pin equality on dependencies, so the hosted reef legs fail
+> until Nautilus 0.7.42 and Coral 0.7.39 exist as releases. Both were built
+> from source into an isolated private registry for local validation, and the
+> published sidecar-verified CHB and archive hashes enter this banner at the
+> release that consumes them. Coral artifact bytes remain install-path
+> dependent under chelis#1002, so the published values -- not any local
+> rebuild -- stay the authoritative ones.
 >
-> Nautilus 0.7.40 is published from commit `c8466b29ffbe4ebc4126363db8c62a06a5b10e7f`; its sidecar verifies CHB
-> `2ba0d478f55d5b270801ada1b51d8dbc75a4d721a24bb8aa42f6f663b0e19bad` and archive `a881f0b96a908a8356b720bfe21e6bde724bea204310e51957b452ad3740a47c`. Coral 0.7.37 is published from commit `8e38cd42aeb5e45d7ad5f92ed61143e1c121fb8b`;
-> its sidecar verifies CHB `b8c41f1b563c2d460c764fb4373a26c7c0c622bd905c6d39a9284349f9a224de` and archive `5358b34994df4637dfce7e0deb48d78c6c61ddb807ef50a25261427093973de9`. Both were installed
-> through `chelis reef install --from-github` and the full gate was re-run
-> against them. Note the Coral artifact bytes are install-path dependent under
-> chelis#1002, so these published values -- not any local rebuild -- are the
-> authoritative ones.
->
-> **chelis#680 is FIXED at this pin and moved to §Archived.** Its
-> `tests_blocked/` probe went FIX-DETECTED, was promoted to
-> `tests/mod_big_i64_precision.ch`, and `Shoals.Rng`'s internal bit-walk call
-> sites moved back onto the builtin `mod`. `tests_blocked/` is now empty; see
-> its README. Every other active entry below was re-probed against the 0.18.3
-> binary and this dependency chain and did not move; archived paragraphs retain
-> their historical pin evidence. Shoals#37's six risk invariants observed 25/25
+> **chelis#1200 is FIXED at this pin and moved to §Archived.** Its
+> `tests_blocked/` probe went FIX-DETECTED against a measured 0.18.4-vs-0.18.5
+> pair, was promoted to `tests/wildcard_discard_consume.ch`, and the 4
+> `asserted_N` workaround bindings in `tests/curves_basis.ch` reverted to
+> `_ =`. `tests_blocked/` is empty again and Shoals has no actively-blocking
+> entry; see the README. Every other active entry below was re-probed against
+> the 0.18.5 binary and did not move; archived paragraphs retain their
+> historical pin evidence. The keystone `scripts/prove_gate.py` self-audit is
+> green at this pin, holding all 37 manifest invariants at their expected
+> tiers -- Shoals#37's six risk invariants again observed 25/25
 > constraint-directed samples at seeds 0, 1, and 2 with in-domain corrupt
 > witnesses and exact compiler-owned function edges, including both additional
-> CVaR dependencies.
+> CVaR dependencies. That result also clears the one 0.18.5 BREAKING change
+> that could plausibly have reached the proof surface: `>` changed desugaring
+> from the operand-swapped `cmplt(b, a)` to `gt`, and every `@property` guard
+> spelled with `>` still lowers and discharges as before.
 
 ## Actively blocking
 
-- **`_ = f(x)` marks `x` consumed when `f` destructures a record parameter
-  (0.18.4 regression)** -- `chelis#1200`
-  ([Chelis-Lang/chelis#1200](https://github.com/Chelis-Lang/chelis/issues/1200)).
-  A `_ =` wildcard discard desugars with the `destructure: true` marker,
-  opening the Linearity-F2 destructure-consume scope over the rest of the
-  enclosing body; any later reuse of a variable that a record-destructuring
-  callee consumed is a hard `UseAfterConsume` instead of receiving the
-  implicit Copy a named binding gets. In Shoals this failed
-  `tests/curves_basis.ch` (through `Curves.basis_spread_at`) at the 0.18.4
-  bump.
-    - **Minimal reproducer:** `tests_blocked/linearity/wildcard_discard_consume.ch`.
-    - **Workaround:** bind, do not discard. 4 sites in
-      `tests/curves_basis.ch` rewritten to `asserted_N` bindings, each
-      carrying a `-- chelis#1200:` citation. `src/` needed no change.
-    - **Re-probe trigger:** every pin bump and the release resolving
-      chelis#1200. On pass, revert the cited bindings to `_ =` where the
-      name is unused and archive this entry.
-
-- **None other actively blocking.** The finance proof surface ships as documented in
+- **None actively blocking.** The finance proof surface ships as documented in
   `research/proof-infra/report.md`: the economic / dynamic-programming properties
   reach the SMT tier with no transcendental contract; the derivatives structural
   properties (`properties/composites.ch`: upper bound, put–call parity with
@@ -85,6 +69,9 @@ in code that is CLOSED upstream but not sitting in §Archived.
   the real `n_cdf`. Nothing upstream blocks shipping the current surface; the real
   transcendental pricing bodies degrade **honestly** to fuzz (never a false
   proven — the coupled-subterm goals stay deferred, see chelis#637 below).
+  The one entry that was actively blocking at the 0.18.4 pin is fixed at 0.18.5
+  and now sits in §Archived with its measured before/after evidence; its blocked
+  probe went FIX-DETECTED and all 4 of its workaround sites are reverted.
 
 ## Tracking
 
@@ -189,6 +176,33 @@ in code that is CLOSED upstream but not sitting in §Archived.
 No parked entries.
 
 ## Archived
+
+- **chelis#1200 — `_ = f(x)` marked `x` consumed when `f` destructured a record
+  parameter (0.18.4 regression; RESOLVED on 0.18.5).** A `_ =` wildcard discard
+  desugared with the `destructure: true` marker, opening the Linearity-F2
+  destructure-consume scope over the rest of the enclosing body; any later reuse
+  of a variable that a record-destructuring callee consumed was a hard
+  `UseAfterConsume` instead of receiving the implicit Copy a named binding gets.
+  In Shoals this failed `tests/curves_basis.ch` (through
+  `Curves.basis_spread_at`) at the 0.18.4 bump.
+    - **0.18.5 re-probe (2026-08-22, before/after against both binaries):** the
+      reproducer `tests_blocked/linearity/wildcard_discard_consume.ch` checks
+      with ``UseAfterConsume: variable `b` (from a destructured binding) was
+      already consumed by call to `blocked_tag_of` at surf:308..325; later use
+      at surf:343..344 is invalid`` on the 0.18.4 release binary and clean
+      (`errors: []`, score 1) on 0.18.5. Both runs used
+      `chelis +<ver> check wildcard_discard_consume.ch` on the identical file,
+      so this is a measured pair rather than a changelog reading. Fixed upstream
+      by [chelis#1208](https://github.com/Chelis-Lang/chelis/pull/1208)
+      (resolve Linearity-F2 per binding, not per block region) and further
+      hardened by [chelis#1254](https://github.com/Chelis-Lang/chelis/pull/1254)
+      (resolve linearity alias chains by binding generation, not name).
+    - **De-narrowing executed in the same change set:** the blocked probe went
+      FIX-DETECTED and was promoted to `tests/wildcard_discard_consume.ch`; the
+      4 cited `asserted_N` bindings in `tests/curves_basis.ch` were reverted to
+      `_ =`, restoring the pre-0.18.4 form byte-for-byte apart from the v0.19
+      canonical float respelling. `src/` never carried a workaround, so nothing
+      there had to be reverted. `tests_blocked/` is empty again; see its README.
 
 - **chelis#680 — i64 `mod`-path precision drift (class META chelis#695;
   RESOLVED on 0.18.3).** Builtin `mod(big_i64, m)` used to return a wrong

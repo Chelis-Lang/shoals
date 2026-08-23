@@ -5,7 +5,7 @@ to this file so Claude-style and Codex-style entry points do not drift.
 
 ## Repo Identity
 
-<!-- BEGIN CHELIS MANAGED BLOCK: agents-inheritance chelis@0.18.4 (sha256:758a5eb9aefb5c7e) -->
+<!-- BEGIN CHELIS MANAGED BLOCK: agents-inheritance chelis@0.18.5 (sha256:758a5eb9aefb5c7e) -->
 This repository is a downstream **shell** of the Chelis compiler. Its upstream
 of truth is `Chelis-Lang/chelis`: the monorepo `AGENTS.md` applies verbatim
 (machine-local environment sections excepted), and
