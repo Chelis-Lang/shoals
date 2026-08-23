@@ -9,9 +9,19 @@ entry in the same change set).
 
 ## Current probes
 
-**None — this directory is deliberately empty as of the chelis 0.18.3 bump.**
+**None — this directory is deliberately empty as of the chelis 0.18.5 bump.**
 
-`runtime/mod_big_i64_precision.ch` was the only probe here. At 0.18.3 it went
+`linearity/wildcard_discard_consume.ch` was the probe here. At 0.18.5 it went
+**FIX-DETECTED**: chelis#1200's wildcard-discard consume scope is fixed. The
+same reproducer checked with an `UseAfterConsume` on the 0.18.4 binary
+(``variable `b` (from a destructured binding) was already consumed by call to
+`blocked_tag_of` ``) and checks clean on 0.18.5 — a measured before/after pair
+run against both binaries, not a changelog reading. Per its sidecar it was
+promoted to `tests/wildcard_discard_consume.ch`, the 4 cited `asserted_N`
+bindings in `tests/curves_basis.ch` were reverted to `_ =`, and the
+`docs/UPSTREAM_BUGS.md` entry was archived — all in that change set.
+
+`runtime/mod_big_i64_precision.ch` was the probe before it. At 0.18.3 it went
 **FIX-DETECTED**: chelis#680's i64 `mod` f64-path precision drift is fixed
 (`mod(1103515245·1406938949 + 12345, 2147483647)` now returns the exact
 `178066070` on both the eval and compiled-C lanes; 0.18.1 returned `178065916`).

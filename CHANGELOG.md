@@ -4,6 +4,71 @@ All notable changes to this project are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.24.9] - 2026-08-22
+
+Compiler-pin and de-narrowing release for Chelis v0.18.5, on Nautilus 0.7.42
+and Coral 0.7.39. `chelis reef conform bump 0.18.5` advanced the compiler pin
+and every workflow audit mirror; the Shoals package version advanced from
+0.24.8 to 0.24.9.
+
+**chelis#1200 is FIXED at this pin and the workaround is gone.** The 0.18.4
+regression -- a `_ =` wildcard discard opened the Linearity-F2
+destructure-consume scope over the rest of the enclosing body, so a later reuse
+of a variable a record-destructuring callee had consumed was a hard
+`UseAfterConsume` -- is resolved upstream by chelis#1208 (resolve Linearity-F2
+per binding, not per block region) and further hardened by chelis#1254. Probed
+per surface rather than read off the changelog: the identical reproducer
+reports a hard `UseAfterConsume` naming the destructured binding and the
+consuming call on the 0.18.4 binary, and checks clean with an empty error list
+on 0.18.5. The de-narrowing landed in this change set --
+`tests_blocked/linearity/wildcard_discard_consume.ch` went FIX-DETECTED and was
+promoted to `tests/wildcard_discard_consume.ch`, the 4 cited `asserted_N`
+bindings in `tests/curves_basis.ch` reverted to `_ =` (restoring the pre-0.18.4
+form), and the `docs/UPSTREAM_BUGS.md` entry moved to §Archived.
+`tests_blocked/` is empty again and Shoals now has **no actively-blocking
+upstream entry**.
+
+**The three 0.18.5 BREAKING changes were probed, not assumed, and none reaches
+this shell.** Polymorphic recursion is now a check-time type error, but Shoals'
+7 self-recursive defs carrying a binder list (all in `src/modelfit.ch`) bind
+dimensions on `tensor[n, f32]` shapes rather than type variables inside a
+larger constructed type, and all still check. An integer literal in a bare type
+position is now a parse error; the corpus has none. `>` now evaluates its
+operands in authored order, but 346 of the corpus's 348 `>` occurrences are
+`@property` SMT guards and the other 2 are pure property bodies, so no operand
+is effectful or trapping and the reordering is unobservable here; the same
+retarget makes `>` borrow both operands where `cmplt` consumed its second,
+which is a loosening.
+
+**One real chelis#1264 instance fixed.** chelis#1264 is a checker-totality gap
+found by the Coral side of this wave: an unimported cross-module name passes
+`chelis check` and whole-package `chelis test`, and is caught only by a
+build-lane entry or single-file eval. `chelis reef build` covers this package's
+source roots and is green, so a static audit swept the roots the build lane
+never reaches. It found exactly one: `tests-manual/trees_heavy.ch` called
+`tr_trinomial_american_put` without naming it in its `import Shoals.Trees (...)`
+list, and the test exercising it passed anyway -- the #1264 signature. The
+import is now declared. Pre-existing defect, unrelated to the pin move; it
+survived because `tests-manual/` is the heavy nightly matrix, not a per-PR gate.
+
+**Validation on 0.18.5:** `chelis test tests/` **371 passed, 0 failed** (the
+0.18.4 baseline was 370/0; the one added test is the promoted probe); 3
+negative sidecars ok; `tests_blocked/` correctly reports NA now that it is
+empty; `chelis reef conform audit` conformant with no MUST failures and
+`bump-check` green; `chelis reef build` produced shoals 0.24.9; `fmt --check`
+clean across all 130 `.ch` files; `lint --check .` unchanged at its 43
+pre-existing blocking findings, none from a file this change set touched; the
+citation-staleness audit green with chelis#1200 recorded as an archived
+subject. The Chelis payload every measurement ran on is byte-identical to the
+sidecar-verified `v0.18.5` Darwin arm64 release asset.
+
+**Cascade state at authoring time:** Nautilus 0.7.42 (nautilus#43, head
+`c060cb9`) and Coral 0.7.39 (coral#27, head `d90ee05`) are staged in their own
+bump PRs and not yet released. Reef enforces exact compiler-pin equality on
+dependencies, so every hosted reef leg fails on the pin-equality check until
+those releases exist. Local validation built both siblings from those exact
+heads into an isolated private registry and ran the gate against them.
+
 ## [0.24.8] - 2026-08-05
 
 Compiler-pin, grammar-migration, and chelis#1200-workaround release for

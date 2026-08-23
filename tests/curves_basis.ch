@@ -43,11 +43,9 @@ def test_basis_spread_at_interpolates() -> unit ! { Test } = {
   b_spreads = to_tensor([cast(0.002, f32), cast(0.006, f32), cast(0.01, f32)])
   basis = curve_basis_from_pillars(b_times, b_spreads)
   s_mid = basis_spread_at(basis, cast(1.5, f32))
-  -- chelis#1200: bind, not discard -- a `_ =` wildcard opens the destructure-consume scope for the rest of the body
-  asserted_1 = assert_close(s_mid, cast(0.004, f32), cast(0.00001, f32), "linear interp midpoint between 1y and 2y pillars")
+  _ = assert_close(s_mid, cast(0.004, f32), cast(0.00001, f32), "linear interp midpoint between 1y and 2y pillars")
   s_pillar = basis_spread_at(basis, cast(2.0, f32))
-  -- chelis#1200: bind, not discard -- a `_ =` wildcard opens the destructure-consume scope for the rest of the body
-  asserted_2 = assert_close(s_pillar, cast(0.006, f32), cast(1e-7, f32), "pillar value exact at t=2")
+  _ = assert_close(s_pillar, cast(0.006, f32), cast(1e-7, f32), "pillar value exact at t=2")
   s_quarter = basis_spread_at(basis, cast(2.25, f32))
   assert_close(s_quarter, cast(0.007, f32), cast(0.00001, f32), "linear interp 25% between 2y and 3y pillars")
 }
@@ -61,9 +59,7 @@ def test_bootstrap_basis_curve_passes_through_quotes() -> unit ! { Test } = {
   s1 = basis_spread_at(basis, cast(1.0, f32))
   s2 = basis_spread_at(basis, cast(2.0, f32))
   s3 = basis_spread_at(basis, cast(3.0, f32))
-  -- chelis#1200: bind, not discard -- a `_ =` wildcard opens the destructure-consume scope for the rest of the body
-  asserted_3 = assert_close(s1, cast(0.002, f32), cast(1e-7, f32), "pass-through quote at 1y")
-  -- chelis#1200: bind, not discard -- a `_ =` wildcard opens the destructure-consume scope for the rest of the body
-  asserted_4 = assert_close(s2, cast(0.004, f32), cast(1e-7, f32), "pass-through quote at 2y")
+  _ = assert_close(s1, cast(0.002, f32), cast(1e-7, f32), "pass-through quote at 1y")
+  _ = assert_close(s2, cast(0.004, f32), cast(1e-7, f32), "pass-through quote at 2y")
   assert_close(s3, cast(0.006, f32), cast(1e-7, f32), "pass-through quote at 3y")
 }
