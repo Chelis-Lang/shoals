@@ -1,7 +1,7 @@
 module Shoals.Tests.TreesHeavy
 import Std.Test (assert_true)
 import Shoals.Pricing (bs_call_scalar)
-import Shoals.Trees (tr_crr_european_call, tr_crr_european_put, tr_crr_american_call, tr_crr_american_put, tr_tian_european_call, tr_jr_european_call, tr_trinomial_european_call)
+import Shoals.Trees (tr_crr_european_call, tr_crr_european_put, tr_crr_american_call, tr_crr_american_put, tr_tian_european_call, tr_jr_european_call, tr_trinomial_european_call, tr_trinomial_american_put)
 def tr_abs(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 def test_crr_european_call_converges_to_bs() -> unit ! { Test } = {
   s0 = cast(100.0, f32)

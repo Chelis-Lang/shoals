@@ -40,6 +40,17 @@ is effectful or trapping and the reordering is unobservable here; the same
 retarget makes `>` borrow both operands where `cmplt` consumed its second,
 which is a loosening.
 
+**One real chelis#1264 instance fixed.** chelis#1264 is a checker-totality gap
+found by the Coral side of this wave: an unimported cross-module name passes
+`chelis check` and whole-package `chelis test`, and is caught only by a
+build-lane entry or single-file eval. `chelis reef build` covers this package's
+source roots and is green, so a static audit swept the roots the build lane
+never reaches. It found exactly one: `tests-manual/trees_heavy.ch` called
+`tr_trinomial_american_put` without naming it in its `import Shoals.Trees (...)`
+list, and the test exercising it passed anyway -- the #1264 signature. The
+import is now declared. Pre-existing defect, unrelated to the pin move; it
+survived because `tests-manual/` is the heavy nightly matrix, not a per-PR gate.
+
 **Validation on 0.18.5:** `chelis test tests/` **371 passed, 0 failed** (the
 0.18.4 baseline was 370/0; the one added test is the promoted probe); 3
 negative sidecars ok; `tests_blocked/` correctly reports NA now that it is
