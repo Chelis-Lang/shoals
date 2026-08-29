@@ -58,8 +58,9 @@ module-only cost fell 37.0s -> 14.6s. `chelis reef build` fell 34.0s -> 18.7s
 and `scripts/prove_gate.py` with its fuzz lane on fell 3m29s -> 1m59s. But
 `chelis test tests/ --jobs auto` over the same 43 files and 371 tests went
 3m01s -> **7m54s**, and `--batch-mode file` is now more than twice as fast as
-the default (3m44s). Filed as
-`docs/issue_drafts/test_batch_mode_auto_regression_0186.md`; the nightly suite
+the default (3m44s). Recorded at authoring time as a local issue draft and
+filed upstream as **chelis#1391**, which is the citation every site now carries;
+the nightly suite
 budget is raised to `--suite-timeout 2400` / `timeout-minutes: 45` at that
 step, with the raise cited at the site and nothing about the tested
 configuration changed.
@@ -103,10 +104,18 @@ full mode; `fmt --check` clean across all 124 `.ch` files the CI globs cover
 (and over the wider 143-file sweep that adds `manual-gates/`, `metamorphic/`,
 and `research/`); `lint --check` over
 the CI directory list green (2 advisory warnings), and `lint --check .`
-unchanged at its 43 pre-existing blocking findings. `chelis reef conform audit`
-reports the single expected MUST failure described above. The Chelis payload
+unchanged at its 43 pre-existing blocking findings; `chelis reef conform audit`
+**conformant with no MUST failures** and `bump-check` green. The Chelis payload
 every measurement ran on is byte-identical to the sidecar-verified `v0.18.6`
-Darwin arm64 release asset.
+Darwin arm64 release asset, and the sibling artifacts are the published
+Nautilus 0.7.43 (CHB `c3e6fb6e…`) and Coral 0.7.40 (CHB `672297eb…`), each
+matched against its own release sidecar.
+
+The audit row 12 that chelis#1387 describes **did** fail before the `shoals#19`
+provenance note was respelled, and hosted CI recorded both states on this
+branch: the first head is red on that one row and the respelled head is green.
+The entry stays in `docs/UPSTREAM_BUGS.md` §Actively blocking because the guard
+defect is unfixed upstream, not because anything here is still failing.
 
 **Cascade state at authoring time:** Nautilus 0.7.43 (nautilus#50, head
 `7acc00c`) and Coral 0.7.40 (coral#29, head `7242e64`) are staged in their own
