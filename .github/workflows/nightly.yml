@@ -39,8 +39,8 @@ concurrency:
 # scripts/audit_workarounds.py --pins-only enforces it offline. The extract
 # step re-derives the pin from reef.toml only to assert this has not drifted.
 env:
-  CHELIS_TAG: v0.18.5
-  CHELIS_VERSION: 0.18.5
+  CHELIS_TAG: v0.18.6
+  CHELIS_VERSION: 0.18.6
 
 jobs:
   # The fast deterministic unit suite (tests/) — moved off the per-PR path.
@@ -102,9 +102,18 @@ jobs:
       - name: chelis reef build
         run: chelis reef build
 
+      # Budget raised at the 0.18.6 pin for
+      # docs/issue_drafts/test_batch_mode_auto_regression_0186.md: the default
+      # `--batch-mode auto` path went from 3m01s to 7m54s on the same 43 files,
+      # 371 tests, and one quiet 10-core machine with warm caches, so the old
+      # 1500s/30min budget no longer has headroom on a 2-vCPU hosted runner.
+      # This raises the budget ONLY. `--batch-mode file` measured more than
+      # twice as fast locally (3m44s), but switching it here would change what
+      # CI exercises on evidence taken from different hardware; lower this back
+      # and drop the raise when the upstream regression closes.
       - name: chelis test (tests/ fast unit suite)
-        timeout-minutes: 30
-        run: chelis test tests/ --timeout 1200 --suite-timeout 1500 --jobs auto
+        timeout-minutes: 45
+        run: chelis test tests/ --timeout 1200 --suite-timeout 2400 --jobs auto
 
   # The keystone canon self-audit against the pinned RELEASE binary — moved
   # off the per-PR path. Real-SMT ~8.6 min (the reef package load alone is

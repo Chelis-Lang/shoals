@@ -21,57 +21,121 @@ mechanical staleness audit (`scripts/audit_workarounds.py`) can find them.
 `scripts/audit_workarounds.py` (full mode) flags any `chelis#NNN` cited here or
 in code that is CLOSED upstream but not sitting in §Archived.
 
-> **0.18.5 release status (2026-08-22):** the published Chelis tag points
-> to `6602f01719f55b8d4c7f52ee70e7c7b58f136107`; its authenticated Darwin arm64
-> archive is `0ff7b4e168d8b51277e05d44bfa658364630176d56d79c9cf8aceaea15335551`
+> **0.18.6 release status (2026-08-29):** the published Chelis tag points
+> to `cf49f85bf0d1bca2c87c88a3e459c446912189c0`; its authenticated Darwin arm64
+> archive is `08580435570c6fd44716f4d5c64117e973e379808cefeaaa97c8faefa2588f6c`
 > and its extracted compiler payload is
-> `bcf8da8bd2df9acb8816194f9251b26e23ec57527d4fc928bea6e1f6120628b2`, which is
+> `1c88c737d7d3740eb4adbe7b50ea31d29ee64498b9d74b35664255ca16aea8d4`, which is
 > byte-identical to the toolchain every re-probe below ran on. The
 > glibc-2.31 archive for the same tag is
-> `6b9b944ccd96b0053fc071de0ecfbb9e80e02a07a6a176e87056267ae8e0c26a` (payload
-> `fc544b9362c9ff0c244c03216a6e44fbf4d36665802d11b5cf3514d017c1e29a`), verified
+> `fb9ef6701fbf0ef2532bcbafb213ca80c21d7b13da0b341b55c64ba89aa8e8fa`, verified
 > against its sidecar but exercised by CI rather than this gate run.
 >
 > **The sibling half of the chain is staged, not published.** Reef enforces
 > exact compiler-pin equality on dependencies, so the hosted reef legs fail
-> until Nautilus 0.7.42 and Coral 0.7.39 exist as releases. Both were built
+> until Nautilus 0.7.43 and Coral 0.7.40 exist as releases. Both were built
 > from source into an isolated private registry for local validation, and the
 > published sidecar-verified CHB and archive hashes enter this banner at the
 > release that consumes them. Coral artifact bytes remain install-path
 > dependent under chelis#1002, so the published values -- not any local
-> rebuild -- stay the authoritative ones.
+> rebuild -- stay the authoritative ones. The 0.18.5 chain's sibling releases
+> now exist and their sidecar-verified hashes were folded into
+> `docs/cnote-import-surface.json`'s retained-evidence list, closing the gap
+> PR #52 recorded.
 >
-> **chelis#1200 is FIXED at this pin and moved to §Archived.** Its
-> `tests_blocked/` probe went FIX-DETECTED against a measured 0.18.4-vs-0.18.5
-> pair, was promoted to `tests/wildcard_discard_consume.ch`, and the 4
-> `asserted_N` workaround bindings in `tests/curves_basis.ch` reverted to
-> `_ =`. `tests_blocked/` is empty again and Shoals has no actively-blocking
-> entry; see the README. Every other active entry below was re-probed against
-> the 0.18.5 binary and did not move; archived paragraphs retain their
-> historical pin evidence. The keystone `scripts/prove_gate.py` self-audit is
-> green at this pin, holding all 37 manifest invariants at their expected
+> **0.18.6 is the first pin at which Shoals carries actively-blocking
+> entries again**, and both are 0.18.6 regressions rather than latent gaps:
+> the conformance audit now reads an own-repo citation as an upstream blocker,
+> and `chelis test --batch-mode auto` slowed 2.6x on this suite. Both are
+> measured below against a 0.18.5-vs-0.18.6 pair, not read off the changelog.
+> Every §Tracking entry was re-probed against the 0.18.6 binary and none moved;
+> archived paragraphs retain their historical pin evidence. The keystone
+> `scripts/prove_gate.py` self-audit is green at this pin with its fuzz lane on
+> (`PROVE_GATE_FUZZ=1`), holding all 37 manifest invariants at their expected
 > tiers -- Shoals#37's six risk invariants again observed 25/25
 > constraint-directed samples at seeds 0, 1, and 2 with in-domain corrupt
 > witnesses and exact compiler-owned function edges, including both additional
-> CVaR dependencies. That result also clears the one 0.18.5 BREAKING change
-> that could plausibly have reached the proof surface: `>` changed desugaring
-> from the operand-swapped `cmplt(b, a)` to `gt`, and every `@property` guard
-> spelled with `>` still lowers and discharges as before.
+> CVaR dependencies. Of the 0.18.6 BREAKING changes, the only one that reached
+> this shell is the exported-stdlib cut: `Std.Test` no longer exports
+> `assert_eq_int` / `assert_eq_bool`, and 26 call sites across 7 files moved to
+> the polymorphic `assert_eq` (33 token occurrences with those files' `import
+> Std.Test (...)` lists). `tests_blocked/` remains empty -- neither new
+> entry is expressible as an expected-to-fail `.ch` probe (one is a
+> conformance-audit verdict, the other a wall-clock measurement).
 
 ## Actively blocking
 
-- **None actively blocking.** The finance proof surface ships as documented in
-  `research/proof-infra/report.md`: the economic / dynamic-programming properties
-  reach the SMT tier with no transcendental contract; the derivatives structural
-  properties (`properties/composites.ch`: upper bound, put–call parity with
-  reflection, delta ∈ [0,1]) reach SMT as **composites** — structure proven for
-  any `N` satisfying its contract, with that contract separately fuzz-validated on
-  the real `n_cdf`. Nothing upstream blocks shipping the current surface; the real
-  transcendental pricing bodies degrade **honestly** to fuzz (never a false
-  proven — the coupled-subterm goals stay deferred, see chelis#637 below).
-  The one entry that was actively blocking at the 0.18.4 pin is fixed at 0.18.5
-  and now sits in §Archived with its measured before/after evidence; its blocked
-  probe went FIX-DETECTED and all 4 of its workaround sites are reverted.
+- **`docs/issue_drafts/conform_row12_counts_own_repo_citations.md` --
+  `chelis reef conform audit` row 12 (`tests-blocked`, §5) reads an own-repo
+  citation as an upstream blocker.** chelis#1270 widened `scan_citations` to
+  recognize a registry sibling's `<repo>#NNN` and a shell's own `<self>#NNN`.
+  `check_tests_blocked` was not widened with it and still computes
+  `has_blocker = dir_has_ch(tests_blocked) || !collect_citations_in_dir("src").is_empty()`,
+  so any citation in `src/` demands a `tests_blocked/` probe.
+    - **Affected surface / narrowing:** Shoals has exactly one such citation --
+      `src/pricing.ch:72` names `shoals#19` in the Beacon-seam design comment.
+      `shoals#19` is an own-repo issue, already resolved, and already carried in
+      §Archived below, which is why row 9 (`staleness-audit`) correctly PASSES
+      on its coverage. **There is no narrowing:** the citation stays, no probe
+      is invented, and the `Conformance audit` CI step is expected red on this
+      one MUST failure until the fix lands upstream.
+    - **Measured 0.18.5-vs-0.18.6 pair (2026-08-29):** on the unmodified tree,
+      the 0.18.5 binary reports row 12 `NA` ("no open upstream blocker with an
+      expressible reproducer") and `conform audit` exits 0; the 0.18.6 binary
+      reports row 12 `FAIL` ("an upstream blocker is cited but tests_blocked/
+      has no probe") and exits 1. Rewriting that one token to
+      `(shoals issue 19)` and changing nothing else flips 0.18.6 back to `NA`
+      and exit 0, which localizes the cause to the token rather than to any
+      other edit in this change set.
+    - **Not expressible as a `tests_blocked/` probe:** the failing surface is a
+      `chelis reef conform audit` row verdict, not a compile or eval
+      diagnostic, so `chelis test --expect blocked` cannot express it. It is
+      re-probed by running `chelis reef conform audit` at every pin bump.
+    - **Re-probe trigger:** the assigned `chelis#NNN` closing, or any release
+      note naming `chelis-conformance` citation scanning or the §5 row. Re-run
+      `chelis reef conform audit` on the unmodified tree and require row 12
+      `NA`; then replace this draft path with the issue number everywhere it is
+      cited.
+
+- **`docs/issue_drafts/test_batch_mode_auto_regression_0186.md` --
+  `chelis test --batch-mode auto` regressed 2.6x on this suite.** On one quiet
+  10-core machine with warm caches, `chelis test tests/ --timeout 1200
+  --suite-timeout 1500 --jobs auto` over the same 43 files and 371 tests went
+  from **3m01s** (0.18.5, 4m27s user) to **7m54s** (0.18.6, 9m37s user, stable
+  across four runs). `--batch-mode file` is now more than twice as fast as the
+  default on this suite (3m44s vs 7m54s), inverting what the batching
+  optimization is for. This is not a general front-end slowdown -- the opposite
+  is true at file scale on the identical corpus and machine, where
+  `chelis check src/modelfit.ch` improved 67.6s -> 31.6s and six individual
+  `chelis test <file>.ch` runs came out within noise.
+    - **Affected surface / narrowing:** the nightly `chelis test (tests/ fast
+      unit suite)` step, budgeted `--suite-timeout 1500` under
+      `timeout-minutes: 30`. The narrowing is a budget raise at that step only
+      (`--suite-timeout 2400`, `timeout-minutes: 45`), cited at the site. The
+      tested configuration is deliberately unchanged: switching the step to
+      `--batch-mode file` would be the faster fix locally, but that is a change
+      of what CI exercises and no measurement exists for the 2-vCPU hosted
+      runner, so it is not made here.
+    - **Not expressible as a `tests_blocked/` probe:** the failing surface is
+      wall-clock, not a diagnostic; an expected-to-fail `.ch` cannot express
+      it. It is re-probed by timing the suite under both `--batch-mode` values
+      at every pin bump.
+    - **Re-probe trigger:** the assigned `chelis#NNN` closing, or any release
+      note naming `chelis test` batching, `BatchScope`, or front-end scaling at
+      compilation-unit size. Re-time both batch modes on the same machine and
+      require `auto` to beat `file` again before lowering the nightly budget
+      back.
+
+- **Nothing blocks shipping the current proof surface.** The finance proof
+  surface ships as documented in `research/proof-infra/report.md`: the economic
+  / dynamic-programming properties reach the SMT tier with no transcendental
+  contract; the derivatives structural properties
+  (`properties/composites.ch`: upper bound, put–call parity with reflection,
+  delta ∈ [0,1]) reach SMT as **composites** — structure proven for any `N`
+  satisfying its contract, with that contract separately fuzz-validated on the
+  real `n_cdf`. The real transcendental pricing bodies degrade **honestly** to
+  fuzz (never a false proven — the coupled-subterm goals stay deferred, see
+  chelis#637 below). Both entries above are tooling defects, not semantic ones.
 
 ## Tracking
 
@@ -90,6 +154,13 @@ in code that is CLOSED upstream but not sitting in §Archived.
       gates two fresh isolated Reef homes: one adversarially preseeded through
       mixed-case manual installs and one clean, requiring byte-identical lock,
       CHB, and archive payloads. This does not claim the compiler is fixed.
+    - **State at pin 0.18.6 (2026-08-29):** still OPEN upstream and the 0.18.6
+      changelog names no origin canonicalization, so the narrowing stays. The
+      adversarial pair (`scripts/check_release_artifact_determinism.py`) could
+      not be re-run at this pin: it installs both dependencies from published
+      GitHub releases, and Nautilus 0.7.43 / Coral 0.7.40 do not exist yet. It
+      runs at the release gate that consumes them, which is where its verdict
+      has always been taken.
     - **Re-probe trigger:** a Chelis release naming GitHub origin
       canonicalization or a chelis#1002 close. Repeat the adversarial pair
       without the reinstall workaround; remove the narrowing only when input
@@ -106,6 +177,11 @@ in code that is CLOSED upstream but not sitting in §Archived.
       local heavy matrices exclude only `tests-manual/modelfit_bfgs_heavy.ch`;
       all other reviewed manual shards remain present. The exclusion is locked
       by `scripts/test_release_workflow.py`.
+    - **State at pin 0.18.6 (2026-08-29):** still OPEN upstream, and the 0.18.6
+      changelog names no evaluator BFGS resource work. Not locally
+      reproducible by construction -- the failure is specific to a constrained
+      2-vCPU hosted runner and the fixture passes locally -- so the exclusion
+      and its `scripts/test_release_workflow.py` lock are unchanged.
     - **Re-probe trigger:** a chelis#408 close or a Chelis release naming
       evaluator BFGS resource usage, worker memory, or constrained-host
       supervision. Re-enable the exact fixture on a 2-vCPU hosted runner and
@@ -133,6 +209,16 @@ in code that is CLOSED upstream but not sitting in §Archived.
       (`properties/canontrees.ch`
       `crr_rn_call_intrinsic_lower_bound`) — the teaching exemplar of the
       genuine-vs-deferred split (`src/trees.ch`).
+    - **State at pin 0.18.6 (re-probed 2026-08-29):** unchanged, measured
+      per-surface rather than read off the changelog. `chelis prove
+      properties/canonpricing.ch --json --tier smt-only --smt-timeout 20000
+      --package .` against the 0.18.6 release binary returns `unsupported` /
+      `property does not lower to Tier B (smt-only)` at `proof_tier=smt` for
+      all 12 records -- `bs_call_price_nonneg`, `b76_call_price_nonneg`,
+      `bs_call_monotone_in_s`, `bs_call_vega_sign`, `bs_call_rho_sign`,
+      `bs_call_gamma_sign` and each corrupted twin. No direct property is
+      reported proven, so the manifest tiers stay `fuzz_validated` and the
+      green `scripts/prove_gate.py` run at this pin confirms it.
     - **Affected surface:** every `properties/` goal that would inline a real
       `bs_call`/`normal_cdf` body and whose truth depends on subterm
       coupling; `properties/canonpricing.ch` (expected tier stays
@@ -170,6 +256,14 @@ in code that is CLOSED upstream but not sitting in §Archived.
   `tests_blocked/` probe citing chelis#846 in the same change set
   (narrowing-citation rule). Re-probe trigger: `p07` landing, a chelis#846
   close, or any release note on Tier-B inlining depth.
+    - **State at pin 0.18.6 (re-probed 2026-08-29):** the cap is unchanged and
+      was measured against both binaries with one disposable source, not
+      inferred. A depth-3 goal chain (`goal -> level3 -> level2 -> level1`) is
+      `passed` at `proof_tier=smt`; the otherwise identical depth-4 chain is
+      `unsupported` with `property does not lower to Tier B (smt-only)`.
+      Identical verdicts on 0.18.5 and 0.18.6. Command:
+      `chelis prove <probe>.ch --json --tier smt-only --smt-timeout 20000`.
+      Still gates nothing on the current Shoals surface.
 
 ## Parked
 

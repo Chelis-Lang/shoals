@@ -40,8 +40,11 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
 (scheduled, NOT per-PR) — run this at least once at a pin bump
 (``AGENTS.md`` §Pin Bump Checklist) or before a release tag:
 
-  14. ``chelis test tests/ --timeout 1200 --suite-timeout 1500 --jobs auto`` — the fast unit
-      suite (~13 min of real-chelis wall; nightly in CI).
+  14. ``chelis test tests/ --timeout 1200 --suite-timeout 2400 --jobs auto`` — the fast unit
+      suite (nightly in CI). The suite budget was raised from 1500s at the
+      0.18.6 pin for
+      ``docs/issue_drafts/test_batch_mode_auto_regression_0186.md``; keep it
+      byte-aligned with the hosted nightly step.
   15. The weekly nightly ``heavy`` matrix, one ``tests-manual/<file>.ch`` at
       a time with ``--timeout 1500 --suite-timeout 1650 --jobs 1``. This
       explicitly raises Chelis 0.17.4's separate 600-second whole-suite
@@ -214,7 +217,7 @@ def main() -> int:
             "chelis test tests/ --jobs auto",
             [
                 "chelis", "test", "tests/", "--timeout", "1200",
-                "--suite-timeout", "1500", "--jobs", "auto",
+                "--suite-timeout", "2400", "--jobs", "auto",
             ],
         ),
         *[

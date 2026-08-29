@@ -1,5 +1,5 @@
 module Shoals.Tests.Orderbook
-import Std.Test (assert_close, assert_eq_int)
+import Std.Test (assert_close, assert_eq)
 import Shoals.Orderbook (Order, OrderBook, empty_book, add_bid, add_ask, best_bid, best_ask, bid_ask_spread, vwap, total_bid_qty, total_ask_qty)
 def order_price_of(o: Order) -> f32 =
   match o with {
