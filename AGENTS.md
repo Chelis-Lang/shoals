@@ -158,7 +158,17 @@ one change set (contract §7):
    release, **per-surface** — a changelog claim is not a verification. Re-prove
    the reproducer against the pinned binary.
 5. Refresh `docs/CHELIS_SURFACE.md`: header versions (pinned / latest upstream /
-   last-refreshed) and every `@pin` / `@upstream` marker.
+   last-refreshed) and every `@pin` / `@upstream` marker. When recording a
+   sibling's release commit there, **dereference the tag** —
+   `gh api repos/OWNER/REPO/git/ref/tags/TAG --jq .object.sha` returns the
+   *commit* for a lightweight tag but the *tag object* for an annotated one,
+   and the same command has produced both kinds of answer in this ecosystem
+   (nautilus `v0.7.42` is lightweight, `v0.7.43` is annotated). A tag object
+   recorded as a commit is a real git object that returns HTTP 422 from the
+   commits API, so it survives review and fails only for the reader who
+   chases it. Use `git rev-parse <tag>^{commit}`, or check `.object.type` and
+   dereference via `git/tags/<sha>` when it is `tag`. Record the commit: it is
+   what a reader chases and what downstream vendor reconstruction pins.
 6. Promote UPSTREAM_BUGS entries per the re-probe verdicts (→ §Archived, or back
    to §Tracking with the residue).
 7. Run the local gate before pushing: `python3 scripts/run_local_gate.py`
