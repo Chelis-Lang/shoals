@@ -58,8 +58,9 @@ module-only cost fell 37.0s -> 14.6s. `chelis reef build` fell 34.0s -> 18.7s
 and `scripts/prove_gate.py` with its fuzz lane on fell 3m29s -> 1m59s. But
 `chelis test tests/ --jobs auto` over the same 43 files and 371 tests went
 3m01s -> **7m54s**, and `--batch-mode file` is now more than twice as fast as
-the default (3m44s). Filed as
-`docs/issue_drafts/test_batch_mode_auto_regression_0186.md`; the nightly suite
+the default (3m44s). Recorded at authoring time as a local issue draft and
+filed upstream as **chelis#1391**, which is the citation every site now carries;
+the nightly suite
 budget is raised to `--suite-timeout 2400` / `timeout-minutes: 45` at that
 step, with the raise cited at the site and nothing about the tested
 configuration changed.

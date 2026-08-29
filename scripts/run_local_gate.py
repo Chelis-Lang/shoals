@@ -42,9 +42,8 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
 
   14. ``chelis test tests/ --timeout 1200 --suite-timeout 2400 --jobs auto`` — the fast unit
       suite (nightly in CI). The suite budget was raised from 1500s at the
-      0.18.6 pin for
-      ``docs/issue_drafts/test_batch_mode_auto_regression_0186.md``; keep it
-      byte-aligned with the hosted nightly step.
+      0.18.6 pin to work around chelis#1391, which is OPEN upstream -- a
+      narrowing, not a fix; keep it byte-aligned with the hosted nightly step.
   15. The weekly nightly ``heavy`` matrix, one ``tests-manual/<file>.ch`` at
       a time with ``--timeout 1500 --suite-timeout 1650 --jobs 1``. This
       explicitly raises Chelis 0.17.4's separate 600-second whole-suite

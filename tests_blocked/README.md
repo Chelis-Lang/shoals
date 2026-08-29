@@ -79,8 +79,8 @@ gate report.
   silence the finding rather than reproduce it, and the probe would have no
   honest expected diagnostic. Re-probed by running `chelis reef conform audit`
   on the unmodified tree at every pin bump; row 12 must report `NA`.
-- **`docs/issue_drafts/test_batch_mode_auto_regression_0186.md` —
-  `chelis test --batch-mode auto` regressed 2.6x on this suite at 0.18.6.** The
+- **chelis#1391 — `chelis test --batch-mode auto` regressed 2.6x on this
+  suite at 0.18.6.** The
   failing surface is wall-clock (3m01s at 0.18.5 vs 7m54s at 0.18.6 over the
   same 43 files and 371 tests on one quiet machine), and an expected-to-fail
   `.ch` carries no timing oracle. Re-probed by timing `chelis test tests/`

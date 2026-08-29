@@ -105,7 +105,7 @@ in code that is CLOSED upstream but not sitting in §Archived.
       `NA`; then replace this draft path with the issue number everywhere it is
       cited.
 
-- **`docs/issue_drafts/test_batch_mode_auto_regression_0186.md` --
+- **chelis#1391 --
   `chelis test --batch-mode auto` regressed 2.6x on this suite.** On one quiet
   10-core machine with warm caches, `chelis test tests/ --timeout 1200
   --suite-timeout 1500 --jobs auto` over the same 43 files and 371 tests went
