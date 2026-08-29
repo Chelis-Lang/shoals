@@ -4,6 +4,117 @@ All notable changes to this project are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.24.10] - 2026-08-29
+
+Compiler-pin release for Chelis v0.18.6, on Nautilus 0.7.43 and Coral 0.7.40.
+`chelis reef conform bump 0.18.6` advanced the compiler pin, every workflow
+audit mirror, and the managed blocks in `AGENTS.md` / `docs/CHELIS_SURFACE.md`
+/ `agent-skills/`; the Shoals package version advanced from 0.24.9 to 0.24.10.
+
+**The one 0.18.6 BREAKING change that reaches this shell: `Std.Test` lost its
+assertion aliases.** chelis#1293/chelis#1314 aligned the exported stdlib
+surface with `[05-OP-35]`, and `assert_eq_int`, `assert_eq_bool`,
+`assert_eq_string`, and `assert_eq_tensor_int64` are gone with no alias to fall
+back on. The replacement is one polymorphic
+`assert_eq[q](actual, expected, label)`. 26 call sites across 7 files moved to
+it, plus those files' 7 `import Std.Test (...)` lists (`tests/orderbook.ch`, `tests/tenor.ch`,
+`tests/wildcard_discard_consume.ch`, `tests_neg/tenor/parse_tenor_bad_suffix_neg.ch`,
+`tests/holidaycal.ch`, `tests/marketdata.ch`, `tests/volsurface.ch`). Probed as
+a measured pair rather than read off the changelog: the identical file runs
+`2 passed, 0 failed` on 0.18.5 and fails on 0.18.6 with ``module `Std.Test`
+does not export `assert_eq_int` for import into Probe.__Eval``. `assert_close`
+survives with a widened `[p_float]` signature, which is a loosening and needed
+no edit.
+
+**The other six BREAKING changes were probed against the corpus and none
+reaches this shell.** The C ABI replacement and the HIP `bool` rejection need a
+runtime consumer or a HIP target, and Shoals has neither. `diagonal` and
+`trace` returned out-of-bounds heap bytes for every axis pair except
+`(rank-2, rank-1)` (chelis#1349), but the corpus calls neither builtin --
+`bootstrap_grad_diagonal` in `src/curves.ch` is a local `def` whose name merely
+contains the word. `JsonBigInt(string)` makes a previously exhaustive `match`
+over `Json` non-exhaustive, but Shoals has no `Json` value and imports nothing
+from `Std.Io.Json`. `init/xavier::sample` and the legacy JSON aliases are
+unused. Cache invalidation is automatic.
+
+**The WireDag gate constant moved, and it was audited rather than accepted.**
+`sub` became a first-class WireDag identity ([05-OP-40], chelis#1306) instead of
+being reconstructed as negate-then-add, and WireDag advanced to schema 6
+(chelis#1287). `scripts/validate_bs_wire_root.py` pins the lowered
+Black-Scholes DAG byte-exactly, so both moved. The same `src/pricing.ch` was
+lowered under both binaries and the DAGs compared by op-kind histogram: exactly
+23 `sub` nodes appear while `add`, `neg`, and `drop` each fall by exactly 23 --
+the third being the dropped intermediate negation -- and every other op kind
+(cast, cmp_lt, const, copy, div, exp, load, log, mul, sqrt) is unchanged in
+count. Net 1018 -> 972 nodes, entry root 535 -> 512, root op `add` -> `sub`,
+raw sha256 `e32f0ee6…b24c` -> `0c85b5c0…fabe`, and `sub` joins `WIRE_OPS`.
+
+**The front end got about twice as fast, and the test suite got 2.6x slower.**
+Both measured on one quiet 10-core machine with warm caches, same corpus, both
+directions reproduced. `chelis check` improved across the board:
+`src/modelfit.ch` (427 lines, the chelis#1207 motivating case) 67.6s -> 31.6s,
+and the 3-line `src/core.ch` dependency-load floor 31.2s -> 17.0s, so the
+module-only cost fell 37.0s -> 14.6s. `chelis reef build` fell 34.0s -> 18.7s
+and `scripts/prove_gate.py` with its fuzz lane on fell 3m29s -> 1m59s. But
+`chelis test tests/ --jobs auto` over the same 43 files and 371 tests went
+3m01s -> **7m54s**, and `--batch-mode file` is now more than twice as fast as
+the default (3m44s). Filed as
+`docs/issue_drafts/test_batch_mode_auto_regression_0186.md`; the nightly suite
+budget is raised to `--suite-timeout 2400` / `timeout-minutes: 45` at that
+step, with the raise cited at the site and nothing about the tested
+configuration changed.
+
+**`conform audit` row 12 read an own-repo provenance note as an upstream
+blocker, and the note is respelled rather than the guard appeased.** chelis#1270
+widened `scan_citations` to recognize `<repo>#NNN` forms including a shell's own,
+but `check_tests_blocked` was not widened with it and still computes
+`has_blocker = dir_has_ch(tests_blocked) || !collect_citations_in_dir("src").is_empty()`,
+so any `src/` citation demands a `tests_blocked/` probe. Shoals had exactly one:
+`src/pricing.ch:72`'s `Pure tensor-DAG Black-Scholes helpers for the Beacon seam
+(shoals#19)`. Causally proven: rewriting that one token flips row 12 from `FAIL`
+to `NA` on the same tree and binary, and the same tree reports `NA` under 0.18.5,
+so it is a 0.18.6 regression rather than pre-existing state.
+
+**shoals#19 is CLOSED and that line is a section header, not a narrowing.** It
+records which piece of work produced the helpers below it; nothing about it is
+blocked, and there is no defect to write a probe for. The `#NNN` form carries a
+specific contract meaning -- a narrowing citation owing coverage -- so using it
+for resolved own-repo provenance was the inaccurate part. The line now reads
+`(shoals issue 19)`: the reference, the number, and the meaning are all
+preserved, and it stops asserting a blocker that does not exist. No citation was
+deleted, no probe was invented, and no evidence was dropped. The same repair was
+applied to nautilus 0.7.43 for four equivalent `nautilus#45` / `nautilus#47`
+section headers.
+
+The underlying guard defect stands regardless of this respelling and is filed
+upstream as **chelis#1387**; a shell whose own-repo citation marks something
+genuinely live would still be stuck, since row 12 accepts only a `.ch` probe and
+not the `tests_blocked/README.md` can't-be-probed note that row 9 takes.
+
+**Validation on 0.18.6:** `chelis test tests/` **371 passed, 0 failed**
+(matching the 0.18.5 baseline); 3 negative sidecars ok; `chelis reef build`
+produced shoals 0.24.10; `scripts/validate_bs_wire_root.py` green at the
+re-audited constants; `scripts/prove_gate.py` green with `PROVE_GATE_FUZZ=1`,
+holding all 37 manifest invariants at their expected tiers (18
+`fuzz_validated`, 14 `proven`, 2 `disproved`, 3 `proven_modulo_contract`);
+`scripts/contract_gate.py` green at pkg 0.24.10 / pin 0.18.6; the four offline
+regression suites green; `audit_workarounds.py` green in both `--pins-only` and
+full mode; `fmt --check` clean across all 124 `.ch` files the CI globs cover
+(and over the wider 143-file sweep that adds `manual-gates/`, `metamorphic/`,
+and `research/`); `lint --check` over
+the CI directory list green (2 advisory warnings), and `lint --check .`
+unchanged at its 43 pre-existing blocking findings. `chelis reef conform audit`
+reports the single expected MUST failure described above. The Chelis payload
+every measurement ran on is byte-identical to the sidecar-verified `v0.18.6`
+Darwin arm64 release asset.
+
+**Cascade state at authoring time:** Nautilus 0.7.43 (nautilus#50, head
+`7acc00c`) and Coral 0.7.40 (coral#29, head `7242e64`) are staged in their own
+bump PRs and not yet released. Reef enforces exact compiler-pin equality on
+dependencies, so every hosted reef leg fails on the pin-equality check until
+those releases exist. Local validation built both siblings from those exact
+heads into an isolated private registry and ran the gate against them.
+
 ## [0.24.9] - 2026-08-22
 
 Compiler-pin and de-narrowing release for Chelis v0.18.5, on Nautilus 0.7.42

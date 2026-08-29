@@ -69,7 +69,7 @@ def f64_col[n](xs: tensor[n, f64]) -> tensor[n, 1, f64] = {
   nn = cast(shape(copy(xs), cast(0, int32)), int64)
   reshape(xs, [nn, cast(1, int64)])
 }
--- Pure tensor-DAG Black-Scholes helpers for the Beacon seam (shoals#19).
+-- Pure tensor-DAG Black-Scholes helpers for the Beacon seam (shoals issue 19).
 -- Constants are point-valued tensor inputs because introducing them through
 -- host-only shape/vmap plumbing would erase the named WireDag root. The
 -- arithmetic and both erf branches mirror `erf64` above in f64.

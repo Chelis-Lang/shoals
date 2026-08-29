@@ -18,21 +18,27 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENTRY = "bs_call_wire_f64"
-EXPECTED_ENTRY_ROOT = 535
-EXPECTED_NODE_COUNT = 1018
-# Re-pinned at the chelis 0.18.4 bump (was
-# e1705cc66dc289f961355d123729877b53bf212176907d71b8e2f49a39aa98b0 at 0.18.3,
-# 39db5ba76af6f83643da14110f93d2973d38d24add43978a4091036fe00b7932 at 0.18.1).
-# The 0.18.4 drift was audited by lowering src/pricing.ch (pre-migration
-# spelling under 0.18.3, canonical-v0.19 spelling under 0.18.4 -- the
-# migration is formatter-level) and diffing the two artifacts node by node:
-# ZERO node diffs; the ONLY change is `schema_version` 4 -> 5 (chelis#1181
-# seals Pad fill values in ScalarValue, and this entry lowers no Pad). All
-# 1018 nodes, the entry roots, and named_roots are byte-equal, so this is a
-# serialization change and not a lowering change. The 0.18.3 re-pin's audit
-# (schema 3 -> 4 plus nine `const` dtype tags, chelis#1049) is retained above
-# for provenance.
-EXPECTED_RAW_SHA256 = "e32f0ee69a6894aba7b4f7cc3bea05df6d4632910219e252e1b9cda97e7ab24c"
+EXPECTED_ENTRY_ROOT = 512
+EXPECTED_NODE_COUNT = 972
+# Re-pinned at the chelis 0.18.6 bump (was
+# e32f0ee69a6894aba7b4f7cc3bea05df6d4632910219e252e1b9cda97e7ab24c at 0.18.4
+# and 0.18.5, e1705cc66dc289f961355d123729877b53bf212176907d71b8e2f49a39aa98b0
+# at 0.18.3, 39db5ba76af6f83643da14110f93d2973d38d24add43978a4091036fe00b7932
+# at 0.18.1). Unlike the 0.18.4 re-pin, 0.18.6 is a real lowering change and
+# was audited as one: the same src/pricing.ch was lowered under both binaries
+# and the two DAGs compared by op-kind histogram. `sub` becomes a first-class
+# WireDag identity ([05-OP-40], chelis#1306) instead of being reconstructed as
+# negate-then-add, so exactly 23 `sub` nodes appear while `add`, `neg`, and
+# `drop` each fall by exactly 23 (the third being the dropped intermediate
+# negation). Every other op kind -- cast, cmp_lt, const, copy, div, exp, load,
+# log, mul, sqrt -- is unchanged in count. Net 1018 -> 972 nodes, which moves
+# the entry root 535 -> 512 and every other named root by the same
+# construction. The schema also advances 5 -> 6 (chelis#1287/chelis#1306,
+# exact-only with no legacy aliases). The 0.18.4 audit (ZERO node diffs,
+# schema 4 -> 5 only, chelis#1181 sealing Pad fill values, which this entry
+# does not lower) and the 0.18.3 audit (schema 3 -> 4 plus nine `const` dtype
+# tags, chelis#1049) are retained above for provenance.
+EXPECTED_RAW_SHA256 = "0c85b5c010446f5704f4daa468b97916994668ff41b303968528ffe8b448fabe"
 FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
 EXPECTED_LOADS = {
     "a1",
@@ -51,11 +57,14 @@ EXPECTED_LOADS = {
     "t",
     "two_over_sqrt_pi",
 }
-# Bumped 4 -> 5 at the chelis 0.18.4 pin (chelis#1181 seals Pad fill values
-# in ScalarValue; 3 -> 4 was chelis#1049 after v0.18.1). Re-check this
-# constant against `crates/chelis-compiler-api/src/schema.rs` at every pin
-# bump; the gate fails closed on a mismatch rather than accepting any schema.
-WIRE_DAG_SCHEMA_VERSION = 5
+# Bumped 5 -> 6 at the chelis 0.18.6 pin (chelis#1287/chelis#1306: v6 carries
+# canonical Count axes, semantic dtype and shape validation, typed Pad
+# payloads, and the direct Sub/MinElem/MaxElem identities, exact-only with no
+# legacy aliases; 4 -> 5 was chelis#1181 after v0.18.4, 3 -> 4 was chelis#1049
+# after v0.18.1). Re-check this constant against
+# `crates/chelis-compiler-api/src/schema.rs` at every pin bump; the gate fails
+# closed on a mismatch rather than accepting any schema.
+WIRE_DAG_SCHEMA_VERSION = 6
 WIRE_OPS = {
     "add",
     "cast",
@@ -70,6 +79,7 @@ WIRE_OPS = {
     "mul",
     "neg",
     "sqrt",
+    "sub",
 }
 
 
@@ -105,7 +115,10 @@ def require_pinned_chelis(chelis: str) -> None:
 def validate_response(
     response: object,
     expected_loads: set[str] = EXPECTED_LOADS,
-    expected_root_op: str = "add",
+    # `sub` since the chelis 0.18.6 pin: the Black-Scholes payoff's final
+    # `S*N(d1) - K*exp(-rT)*N(d2)` lowered as `add(x, neg(y))` through 0.18.5
+    # and is now the direct [05-OP-40] `sub` identity (chelis#1306).
+    expected_root_op: str = "sub",
     expected_entry_root: int = EXPECTED_ENTRY_ROOT,
     expected_node_count: int = EXPECTED_NODE_COUNT,
 ) -> tuple[int, int]:

@@ -1,4 +1,4 @@
-<!-- BEGIN CHELIS MANAGED BLOCK: chelis-surface-header chelis@0.18.5 (sha256:28011bed9ccb5778) -->
+<!-- BEGIN CHELIS MANAGED BLOCK: chelis-surface-header chelis@0.18.6 (sha256:28011bed9ccb5778) -->
 This file is a domain-scoped view of the canonical Chelis capability surface,
 generated for the pinned toolchain. Each capability row is marked `@pin` (usable
 at the current pin) or `@upstream` (lands at the next bump). **Read it before
@@ -15,35 +15,66 @@ quantitative-finance domain this shell touches — numerical methods, pricing,
 Greeks, and the proof surface over them. **Read this before designing around a
 suspected language gap.**
 
-> **Pinned manifest:** Shoals 0.24.9; chelis 0.18.5 (chelis-std 0.4.0,
-> bundled), Nautilus 0.7.42, Coral 0.7.39 · **Last refreshed:** 2026-08-22
+> **Pinned manifest:** Shoals 0.24.10; chelis 0.18.6 (chelis-std 0.4.0,
+> bundled), Nautilus 0.7.43, Coral 0.7.40 · **Last refreshed:** 2026-08-29
 
-The published Chelis `v0.18.5` tag resolves to commit
-`6602f01719f55b8d4c7f52ee70e7c7b58f136107`. Release workflow `32605821845`
+The published Chelis `v0.18.6` tag resolves to commit
+`cf49f85bf0d1bca2c87c88a3e459c446912189c0`. Release workflow `33232762790`
 completed successfully; the publisher-authenticated Darwin arm64 archive
-has SHA-256 `0ff7b4e168d8b51277e05d44bfa658364630176d56d79c9cf8aceaea15335551`
+has SHA-256 `08580435570c6fd44716f4d5c64117e973e379808cefeaaa97c8faefa2588f6c`
 and its extracted compiler payload has SHA-256
-`bcf8da8bd2df9acb8816194f9251b26e23ec57527d4fc928bea6e1f6120628b2`. Both were
+`1c88c737d7d3740eb4adbe7b50ea31d29ee64498b9d74b35664255ca16aea8d4`. Both were
 re-derived from the downloaded asset here, and that payload hash is
 byte-identical to the toolchain every measurement in this bump ran on. The
 glibc-2.31 archive for the same tag has SHA-256
-`6b9b944ccd96b0053fc071de0ecfbb9e80e02a07a6a176e87056267ae8e0c26a`
-(payload `fc544b9362c9ff0c244c03216a6e44fbf4d36665802d11b5cf3514d017c1e29a`);
+`fb9ef6701fbf0ef2532bcbafb213ca80c21d7b13da0b341b55c64ba89aa8e8fa`;
 it is sidecar-verified but exercised by CI rather than this gate run.
 
-**Three front-end BREAKING changes ship in 0.18.5; none of them reaches this
-shell, each probed rather than assumed.** (1) Polymorphic recursion is now a
-check-time type error: Shoals' 7 self-recursive defs carrying a binder list
-(all in `src/modelfit.ch`) bind *dimensions* on `tensor[n, f32]` shapes, not
-type variables inside a larger constructed type, and every one still checks.
-(2) An integer literal in a bare type position is now a parse error: the corpus
-has none. (3) `>` evaluates its operands in authored order — it desugared to the
-operand-swapped `cmplt(b, a)` and now targets `gt`: 346 of the corpus's 348 `>`
-occurrences are `@property` SMT guards and the other 2 are pure property bodies
-(`canonrisk.ch`, `canonriskhistorical.ch`), so no operand is effectful or
-trapping and the reordering is unobservable here. That retarget also makes `>`
-*borrow* both operands where `cmplt` consumed its second, which is a loosening
-and cannot break existing source.
+**0.18.6 is the largest breaking cut since 0.18.0, and almost all of it is at
+a machine boundary this shell does not touch.** Probed against the corpus
+rather than reasoned about, one BREAKING change reaches Shoals and six do not.
+
+*Reaches this shell.* **The exported stdlib surface is aligned with
+`[05-OP-35]` (chelis#1293/chelis#1314).** `Std.Test` no longer exports
+`assert_eq_int`, `assert_eq_bool`, `assert_eq_string`, or
+`assert_eq_tensor_int64`; the replacement is one polymorphic
+`assert_eq[q](actual, expected, label)`. Shoals imported two of them (`assert_eq_int`,
+`assert_eq_bool`) at 26 call sites across 7 files, all migrated in this change
+set along with those files' 7 `import Std.Test (...)` lists -- 33 token
+occurrences in total. Confirmed as a measured
+pair, not read off the changelog: the identical file runs `2 passed, 0 failed`
+on 0.18.5 and fails on 0.18.6 with ``module `Std.Test` does not export
+`assert_eq_int` for import into Probe.__Eval``. `assert_close` survives with a
+widened signature (`[p_float]` rather than `f32`), which is a loosening and
+needed no edit. `assert_shape` also changed shape (`List[int64]` extents rather
+than a single `int64`) but Shoals never used it.
+
+*Does not reach this shell, each checked against the corpus.* (1) The **C ABI
+replacement** (`chelis_scalar` tagged carriers, `chelis_dtype`, dynamic-rank
+tensor metadata, one-byte `bool`) matters only to a consumer compiling against
+`chelis_runtime.h`; Shoals links no runtime and targets no HIP. (2) **`diagonal`
+and `trace` returned out-of-bounds heap bytes** for every axis pair except
+`(rank-2, rank-1)` (chelis#1349) — the corpus calls neither builtin at all;
+`bootstrap_grad_diagonal` in `src/curves.ch` is a local `def` whose name merely
+contains the word. (3) **`JsonBigInt(string)` is a new `Json` variant**, so a
+previously exhaustive `match` over `Json` is not exhaustive now — Shoals has no
+`Json` value, no `parse_json` call, and imports nothing from `Std.Io.Json`;
+Coral fixed its own two `match` sites. (4) **`init/xavier::sample` and the
+legacy JSON aliases are removed** — unused here. (5) **WireDag advances to
+schema 6, exact-only** — Shoals *does* consume this, but through its own gate
+rather than as a break; see the WireDag row below. (6) **HIP rejects `bool`
+tensors** and **every on-disk cache is invalidated** — no HIP target, and cache
+invalidation is automatic.
+
+*Not a break, but it changed a pinned artifact.* **`sub` became a first-class
+WireDag identity** ([05-OP-40], chelis#1306) instead of being reconstructed as
+negate-then-add. Shoals pins the lowered Black-Scholes DAG byte-exactly in
+`scripts/validate_bs_wire_root.py`, so this moved real numbers: 23 `sub` nodes
+appear while `add`, `neg`, and `drop` each fall by exactly 23, every other op
+kind is unchanged in count, and the DAG shrinks 1018 -> 972 nodes with the
+entry root moving 535 -> 512 and its op changing `add` -> `sub`. Audited by
+lowering the same `src/pricing.ch` under both binaries and comparing op-kind
+histograms, not by accepting the new hash.
 
 **0.18.2 is skipped.** The 0.24.6 / 0.18.2 candidate could not land: Nautilus
 0.7.39 worked the chelis#759 float-to-integer trap around with `floor(...)`,
@@ -53,30 +84,41 @@ and its 0.7.36 release never happened. Chelis 0.18.3 ships `cast_trunc`
 
 **The sibling half of this chain is staged, not yet published.** Reef enforces
 exact compiler-pin equality on dependencies, so Shoals cannot resolve against
-Nautilus 0.7.41 / Coral 0.7.38 (both declare `=0.18.4`) once this pin moves. The
+Nautilus 0.7.42 / Coral 0.7.39 (both declare `=0.18.5`) once this pin moves. The
 pins here name the versions the sibling bump PRs stage, each read off that PR's
-own `reef.toml` at its head rather than guessed: **Nautilus 0.7.42**
-(`Chelis-Lang/nautilus#43`, branch `bump/chelis-0.18.5`, head `c060cb9`) and
-**Coral 0.7.39** (`Chelis-Lang/coral#27`, same branch name, head `d90ee05`,
-which itself declares `nautilus = "0.7.42"`). Both declare
-`compiler = "=0.18.5"`. Until those releases exist, every hosted reef leg on
+own `reef.toml` at its head rather than guessed: **Nautilus 0.7.43**
+(`Chelis-Lang/nautilus#50`, branch `chore/chelis-0.18.6`, head `7acc00c`) and
+**Coral 0.7.40** (`Chelis-Lang/coral#29`, same branch name, head `7242e64`,
+which itself declares `nautilus = "0.7.43"`). Both declare
+`compiler = "=0.18.6"`. Until those releases exist, every hosted reef leg on
 this branch fails on the pin-equality check; that is the cascade, not a defect
 in this change set. Local validation built both siblings from those exact heads
 into an isolated private registry (`CHELIS_REEF_HOME` pointed away from the
-shared store) and ran the gate against them — Coral needed no source edit
-beyond its own manifest to build clean on 0.18.5. The published
-sidecar-verified CHB and archive hashes for both siblings enter this document
-at the release that consumes them, as every prior chain's did.
+shared store) and ran the gate against them — neither needed a source edit for
+Shoals' sake. Those local builds hash to Nautilus CHB
+`99cfc7e0700cdf7f884a71a2752e8916fe3255836b92c698eb9fe26513e27cb3` / archive
+`884f582328667a1617ad7b7aa371d96b6f99279e7e4c20700591dfde4d9fa306` and Coral
+CHB `d1d31ac2d3d1a7cf341cf24cb08e493fc2b4fa6b146e610b7676a5af2fe64317` /
+archive `d1446b5440aa3a6e5e629f6903a23a0f1d958ee7cdaa7fddecd474563116822c`.
+**Those four values carry no publisher checksum and are recorded as
+reproduction aids only** — they are deliberately kept out of
+`docs/cnote-import-surface.json`, whose retained-evidence list takes only
+sidecar-verified published hashes, which enter at the release that consumes
+them.
 
 The previous chain's published artifacts, retained for de-narrowing: Nautilus
-0.7.41 from commit `5bf6fd11ea4faa5bec0ca79e8974653b5e3158f8`, CHB
-`e92a47020f5691b49e5b39aba0094c7e1ed2e39d9dce55a9a135fd34480cc083`, archive
-`1bba785ccead8c38275f8daa111a27516b4f21d16eb3223c23dbb7bcb6a0a6f3`; Coral 0.7.38
-from commit `53a40e781d869c19529ae2e4fcdad780f0a97f1b`, CHB
-`a5be8783717b951db11f58beb9084a674ab86c7891cb847a6e74e4a04535e85e`, archive
-`e68ac948c3539c3eba95283b49a907a753acc1de540a4a3840410ae79bf70854`.
+0.7.42 from commit `85d88133b0aaf5fde3a0f425dca4a1e5fa1056de`, CHB
+`f5ed24c05c4e20fdf6c72601e2e9dd68cf46a63730eb79d9189adc493704f028`, archive
+`fcdf32e581d95a43b0c37d672ff241348f75f308179d0b03f6f79a5247506f95`; Coral 0.7.39
+from commit `8da830db79a561c5e97fb4592f3fea2fbc492641`, CHB
+`b54e8a410a3f747f0a02dc6fb8496d9fe868c288d6db1ffb2f634664f499835a`, archive
+`38149dab1bceed366dc93bc62f6e3f46e21fe4d27af49510ca024bc66d16a77f`. All four
+were re-derived from the downloaded assets here and match their published
+sidecars.
 
-The 0.24.7 release proof gate consumes this exact chain. Its
+The 0.24.10 candidate's `scripts/prove_gate.py` run consumes the 0.18.6 chain
+above with its fuzz lane on (`PROVE_GATE_FUZZ=1`), green in 1m59s against
+3m29s at 0.18.5 on the same machine. Its
 Shoals#37 lanes observed both risk families at `fuzz_validated`: all six
 properties accepted 25 constraint-directed samples at each seed 0, 1, and 2;
 every corrupt control produced an in-domain witness; and the compiler summary
@@ -105,7 +147,7 @@ SHA-256 values are
 `a3e04e308eb7d35c34fe4d6075c7e7626c57a6a9957fc6cf9926467b5787ec6c`
 and `fe41f1617b118eb1600d02518319a96780c77195cce4c836ec43776bd69e08b0`.
 
-Rows marked `@pin` carry 0.18.5-chain evidence. `@upstream` remains a
+Rows marked `@pin` carry 0.18.6-chain evidence. `@upstream` remains a
 later capability that is not shipped at this pin. Refresh this table at every pin bump
 (`AGENTS.md` §Pin Bump Checklist). The authoritative depth reference for the
 proof reachability map is
@@ -128,7 +170,7 @@ tiers: **A** (type/dimension/linearity), **B** (SMT via cvc5 over the reals),
 | Composite derivatives greens | `@pin` | `properties/composites.ch`: structure proven at Tier B for any `N` satisfying its contract, verdict `proven_modulo_fuzz_validated_contract`. This string is **legitimate here** (a real SMT base resting on a fuzz-validated contract); it was only a false-positive for **pure-fuzz** bases, fixed by chelis#435 (archived). Classify verdicts from `proof_tier`, never the string alone. |
 | Economic / dynamic-programming greens | `@pin` | Markov simplex preservation, Bellman monotonicity/boundedness/contraction, PV/Gordon positivity & monotonicity discharge at SMT with **no** transcendental contract (report §6). Structurally more complete than a derivatives green. |
 | Function-call inlining depth for SMT | `@pin` | Nested calls inline to `MAX_INLINE_DEPTH = 3` (`chelis-prove/src/tier_b_lower.rs`); deeper chains route to Tier C. No shoals goal hits this today; c-note probe `p07` pending (`UPSTREAM_BUGS.md`). |
-| Beacon (large-scale concrete verification) | `@upstream` | `beacon_available=false` in the release binary; gated on `CHELIS_BEACON_BIN`. Shoals now provides the real-pricer `bs_call_wire_f64` tensor root (shoals#19); bounded-domain consumption remains Beacon#74. |
+| Beacon (large-scale concrete verification) | `@upstream` | `beacon_available=false` in the release binary; gated on `CHELIS_BEACON_BIN`. Shoals now provides the real-pricer `bs_call_wire_f64` tensor root (shoals#19); bounded-domain consumption remains Beacon#74. The 0.18.6 Beacon request envelope moves to schema 2 with a `wire_dag_v6_base64` field, so a Beacon deployment must upgrade in lockstep; there is no one-way read migration as there was for v5. |
 | prove-side import resolution | `@pin` | `prove` resolves package imports, so a property targets the real exported function; standalone structural probes are self-contained (report §2). |
 | Constraint-directed property sampling | `@pin` | Chelis 0.18.3 ships chelis#977 guard-directed generation. Shoals#37 requires and observes 25/25 accepted samples at each of seeds 0, 1, and 2 for both parametric and historical risk families; a starved or partially accepted run fails the gate. |
 | Linked Nautilus quantile contract identity | `@pin` | Chelis 0.18.3 binds `std.quantile.monotonicity` only to the linker-owned `Nautilus.Stats.quantile_vec` (chelis#979). Shoals keeps historical wrapper claims at the observed `fuzz_validated` tier and never reconstructs the wrapper relation from source text. |
@@ -140,7 +182,10 @@ tiers: **A** (type/dimension/linearity), **B** (SMT via cvc5 over the reals),
 | Arithmetic `+ - * /`, comparisons | `@pin` | Lower to cvc5. Keep `/` out of SMT goals where possible; use multiplied-through polynomial form. |
 | `if/then/else` | `@pin` | Lowers as ITE in `QF_NRA`. |
 | `Option[T]`, `Some`/`None`, `match`; `@opaque` + `@invariant` | `@pin` | Opaque-invariant abstraction is the path from synthetic green to a green a quant recognizes (report §1, §3); producer obligations discharge at SMT. |
-| `Std.Test` (`assert_close`) | `@pin` | The executable numeric suites under `tests/` and `tests-manual/`. |
+| `Std.Test` (`assert_close`, `assert_eq`) | `@pin` | The executable numeric suites under `tests/` and `tests-manual/`. **Changed at 0.18.6:** `assert_eq_int` / `assert_eq_bool` / `assert_eq_string` / `assert_eq_tensor_int64` are gone with no alias; use the polymorphic `assert_eq[q](actual, expected, label)`. `assert_close` widened from `f32` to `[p_float]` — a loosening, and its tolerance must now share the tensors' dtype in `assert_close_tensor` (unused here). |
+| WireDag lowering (`chelis tide serve` `/lower`) | `@pin` | Schema **6** at this pin (was 5), exact-only with no legacy aliases (chelis#1287/chelis#1306). Shoals pins the lowered `bs_call_wire_f64` DAG byte-exactly in `scripts/validate_bs_wire_root.py`; the 0.18.6 direct-`sub` identity moved it to 972 nodes / entry root 512 / raw sha256 `0c85b5c0…fabe`. Re-audit that constant by op-kind histogram at every pin bump, never by accepting the new hash. |
+| Front-end check throughput | `@pin` | Substantially faster at 0.18.6 (chelis#1316/chelis#1207/chelis#1205): on this corpus `chelis check src/modelfit.ch` 67.6s → 31.6s and the 3-line `src/core.ch` dependency-load floor 31.2s → 17.0s. **But `chelis test --batch-mode auto` regressed 2.6x on `tests/`** (3m01s → 7m54s); see `docs/UPSTREAM_BUGS.md` §Actively blocking. |
+| `count` ([05-OP-29]), direct `sub` / `min_elem` ([05-OP-40]/[05-OP-41]), `stop_gradient` ([05-OP-42]) | `@upstream` | New at 0.18.6 but unused by this shell today. `stop_gradient` and relu's own adjoint are specified with `Unimplemented` backend cells (chelis#1312/chelis#1313) and are not usable at this pin. |
 | chelis-std / nautilus / coral module surface | `@pin` | Pricing, distributions, RNG, curves, dates, vol surfaces per `src/` + `references/`. |
 
 ## Automatic differentiation (`grad`) — the Greek-set surface

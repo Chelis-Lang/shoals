@@ -1,5 +1,5 @@
 module Shoals.Tests.VolSurface
-import Std.Test (assert_close, assert_true, assert_eq_bool)
+import Std.Test (assert_close, assert_true, assert_eq)
 import Shoals.Pricing (bs_call_scalar)
 import Shoals.VolSurface (SVI, vs_total_variance, vs_implied_vol, vs_shift_atm, vs_shift_skew, parallel_shift_atm_iv, smile_shift_skew_wing, implied_vol_from_call, implied_vol_bisect, is_iv_solver_failed, bracket_brackets_root, SABR, vs_sabr_implied_vol, vs_sabr_atm_implied_vol, vs_sabr_shift_alpha, vs_sabr_shift_rho, vs_sabr_shift_nu)
 def flat_svi() -> SVI = SVI { a: cast(0.04, f32), b: cast(0.0, f32), rho: cast(0.0, f32), m: cast(0.0, f32), sigma: cast(0.1, f32) }
@@ -115,7 +115,7 @@ def test_bracket_brackets_root_invalid() -> unit ! { Test } = {
   sigma_true = cast(0.2, f32)
   price = bs_call_scalar(spot, strike, r, sigma_true, t)
   bracket_ok = bracket_brackets_root(spot, strike, r, t, price, cast(0.3, f32), cast(0.5, f32))
-  assert_eq_bool(bracket_ok, false, "0.3 > 0.2 means lo and hi are same-sign; bracket invalid")
+  assert_eq(bracket_ok, false, "0.3 > 0.2 means lo and hi are same-sign; bracket invalid")
 }
 def test_sabr_atm_reduces_to_alpha_at_beta_1() -> unit ! { Test } = {
   p = SABR { alpha: cast(0.2, f32), beta: cast(1.0, f32), rho: cast(0.0, f32), nu: cast(0.0, f32) }

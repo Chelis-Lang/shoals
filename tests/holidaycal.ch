@@ -1,5 +1,5 @@
 module Shoals.Tests.HolidayCal
-import Std.Test (assert_true, assert_false, assert_eq_bool)
+import Std.Test (assert_true, assert_false, assert_eq)
 import Std.Time (date)
 import Shoals.HolidayCal (Calendar, is_holiday, is_business_day, hc_nyc_calendar, hc_ldn_calendar, joint_calendar, weekend_only_calendar, empty_calendar, easter_sunday_gregorian, good_friday, easter_monday, hc_nyc_calendar_multi, hc_ldn_calendar_multi)
 def test_nyc_new_year_is_holiday() -> unit ! { Test } = {
