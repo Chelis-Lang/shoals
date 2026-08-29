@@ -31,15 +31,18 @@ in code that is CLOSED upstream but not sitting in §Archived.
 > `fb9ef6701fbf0ef2532bcbafb213ca80c21d7b13da0b341b55c64ba89aa8e8fa`, verified
 > against its sidecar but exercised by CI rather than this gate run.
 >
-> **The sibling half of the chain is staged, not published.** Reef enforces
-> exact compiler-pin equality on dependencies, so the hosted reef legs fail
-> until Nautilus 0.7.43 and Coral 0.7.40 exist as releases. Both were built
-> from source into an isolated private registry for local validation, and the
-> published sidecar-verified CHB and archive hashes enter this banner at the
-> release that consumes them. Coral artifact bytes remain install-path
-> dependent under chelis#1002, so the published values -- not any local
-> rebuild -- stay the authoritative ones. The 0.18.5 chain's sibling releases
-> now exist and their sidecar-verified hashes were folded into
+> **The sibling half of the chain is published and the cascade is closed.**
+> Reef enforces exact compiler-pin equality on dependencies, so the hosted reef
+> legs could not pass until Nautilus 0.7.43 and Coral 0.7.40 existed as
+> releases; both landed ahead of the Shoals 0.24.10 release. Their
+> sidecar-verified CHB hashes are
+> `c3e6fb6e2c3a397726df0cc53587d854ac48cab416c9dea80c9df717bfe0ef4d` and
+> `672297eb6bafcffb8f3c4ad867f59aecece8cf114747fbfe2a112f3346edc2f1`; see
+> `docs/CHELIS_SURFACE.md` for the archive hashes and release commits. Coral
+> artifact bytes remain install-path dependent under chelis#1002, so the
+> published values -- not any local rebuild -- stay the authoritative ones.
+> The 0.18.5 chain's sibling releases likewise now exist and their
+> sidecar-verified hashes were folded into
 > `docs/cnote-import-surface.json`'s retained-evidence list, closing the gap
 > PR #52 recorded.
 >

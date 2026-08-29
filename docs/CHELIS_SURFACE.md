@@ -82,29 +82,33 @@ which has no compiled-lane expression identity, so Coral's native build broke
 and its 0.7.36 release never happened. Chelis 0.18.3 ships `cast_trunc`
 ([05-OP-6]) and Nautilus 0.7.40 moves onto it.
 
-**The sibling half of this chain is staged, not yet published.** Reef enforces
-exact compiler-pin equality on dependencies, so Shoals cannot resolve against
-Nautilus 0.7.42 / Coral 0.7.39 (both declare `=0.18.5`) once this pin moves. The
-pins here name the versions the sibling bump PRs stage, each read off that PR's
-own `reef.toml` at its head rather than guessed: **Nautilus 0.7.43**
-(`Chelis-Lang/nautilus#50`, branch `chore/chelis-0.18.6`, head `7acc00c`) and
-**Coral 0.7.40** (`Chelis-Lang/coral#29`, same branch name, head `7242e64`,
-which itself declares `nautilus = "0.7.43"`). Both declare
-`compiler = "=0.18.6"`. Until those releases exist, every hosted reef leg on
-this branch fails on the pin-equality check; that is the cascade, not a defect
-in this change set. Local validation built both siblings from those exact heads
-into an isolated private registry (`CHELIS_REEF_HOME` pointed away from the
-shared store) and ran the gate against them — neither needed a source edit for
-Shoals' sake. Those local builds hash to Nautilus CHB
-`99cfc7e0700cdf7f884a71a2752e8916fe3255836b92c698eb9fe26513e27cb3` / archive
-`884f582328667a1617ad7b7aa371d96b6f99279e7e4c20700591dfde4d9fa306` and Coral
-CHB `d1d31ac2d3d1a7cf341cf24cb08e493fc2b4fa6b146e610b7676a5af2fe64317` /
-archive `d1446b5440aa3a6e5e629f6903a23a0f1d958ee7cdaa7fddecd474563116822c`.
-**Those four values carry no publisher checksum and are recorded as
-reproduction aids only** — they are deliberately kept out of
+**The sibling half of this chain is published.** Reef enforces exact
+compiler-pin equality on dependencies, so this pin could not resolve against
+Nautilus 0.7.42 / Coral 0.7.39 (both declare `=0.18.5`); the sibling releases
+landed ahead of the Shoals 0.24.10 release and the cascade is closed.
+**Nautilus 0.7.43** (`Chelis-Lang/nautilus#50`, merged as
+`f3e97949e6ce336ed0a4ff1cddfec78aba3342d9`) has CHB
+`c3e6fb6e2c3a397726df0cc53587d854ac48cab416c9dea80c9df717bfe0ef4d` and archive
+`970fb4ff51e6dfdce3043bb6ad772a7df74fd4c05a0be2723d451b35ef7ddd05`;
+**Coral 0.7.40** (`Chelis-Lang/coral#29`, merged as
+`0a2c36295456c41fd8ace6fde86e9666d7e6bc8f`, itself declaring
+`nautilus = "0.7.43"`) has CHB
+`672297eb6bafcffb8f3c4ad867f59aecece8cf114747fbfe2a112f3346edc2f1` and archive
+`a6416fa595b092b34f1d5483429f65b4e19927db833288a18919d5b497ecc08f`. All four
+were re-derived from the downloaded assets and match their published sidecars,
+and both declare `compiler = "=0.18.6"`.
+
+The 0.24.10 gate ran against exactly those published artifacts, installed with
+`chelis reef install --from-github` into an isolated registry
+(`CHELIS_REEF_HOME` pointed away from the shared store). A downstream consumer
+declaring `shoals = { version = "0.24.10" }` resolves the whole chain and
+builds, which is the end-to-end check that matters for C Note. During
+authoring, before the sibling releases existed, the same gate ran against
+local builds of each sibling's PR head; those local hashes differ from the
+published ones (Coral artifact bytes remain install-path dependent under
+chelis#1002) and are deliberately **not** recorded here or in
 `docs/cnote-import-surface.json`, whose retained-evidence list takes only
-sidecar-verified published hashes, which enter at the release that consumes
-them.
+sidecar-verified published hashes.
 
 The previous chain's published artifacts, retained for de-narrowing: Nautilus
 0.7.42 from commit `85d88133b0aaf5fde3a0f425dca4a1e5fa1056de`, CHB
