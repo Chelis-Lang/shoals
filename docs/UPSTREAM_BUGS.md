@@ -65,7 +65,7 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 ## Actively blocking
 
-- **`docs/issue_drafts/conform_row12_counts_own_repo_citations.md` --
+- **chelis#1387 --
   `chelis reef conform audit` row 12 (`tests-blocked`, §5) reads an own-repo
   citation as an upstream blocker.** chelis#1270 widened `scan_citations` to
   recognize a registry sibling's `<repo>#NNN` and a shell's own `<self>#NNN`.
@@ -76,9 +76,14 @@ in code that is CLOSED upstream but not sitting in §Archived.
       `src/pricing.ch:72` names `shoals#19` in the Beacon-seam design comment.
       `shoals#19` is an own-repo issue, already resolved, and already carried in
       §Archived below, which is why row 9 (`staleness-audit`) correctly PASSES
-      on its coverage. **There is no narrowing:** the citation stays, no probe
-      is invented, and the `Conformance audit` CI step is expected red on this
-      one MUST failure until the fix lands upstream.
+      on its coverage. **There is no narrowing.** Because that line is a section
+      header recording which work produced the helpers below it -- not a citation
+      of anything blocked -- it now reads `(shoals issue 19)`. The reference and
+      its meaning are preserved; what is dropped is the `#NNN` form's claim to be
+      a narrowing citation owing coverage. No probe was invented and no evidence
+      was deleted. The guard defect itself is filed as chelis#1387 and stands:
+      a shell citing an own-repo issue that IS live would still be stuck, since
+      row 12 accepts only a `.ch` probe, not the can't-be-probed note row 9 takes.
     - **Measured 0.18.5-vs-0.18.6 pair (2026-08-29):** on the unmodified tree,
       the 0.18.5 binary reports row 12 `NA` ("no open upstream blocker with an
       expressible reproducer") and `conform audit` exits 0; the 0.18.6 binary

@@ -64,18 +64,32 @@ budget is raised to `--suite-timeout 2400` / `timeout-minutes: 45` at that
 step, with the raise cited at the site and nothing about the tested
 configuration changed.
 
-**Shoals carries actively-blocking upstream entries again, both 0.18.6
-regressions.** Besides the batching regression, `chelis reef conform audit` row
-12 (`tests-blocked`, §5) now reads an own-repo citation as an upstream blocker:
-chelis#1270 widened `scan_citations` to recognize `<repo>#NNN` forms but
-`check_tests_blocked` was not widened with it, so the single `shoals#19`
-citation in `src/pricing.ch:72` -- an own-repo issue that is resolved and
-already sits in `docs/UPSTREAM_BUGS.md` §Archived -- makes the row demand a
-`tests_blocked/` probe. Causally proven: rewriting that one token flips row 12
-from `FAIL` to `NA` on the same tree and binary, and the same tree reports `NA`
-under 0.18.5. The citation is deliberately kept and no probe is invented, so
-the `Conformance audit` step is expected red on that one MUST failure. Filed as
-`docs/issue_drafts/conform_row12_counts_own_repo_citations.md`.
+**`conform audit` row 12 read an own-repo provenance note as an upstream
+blocker, and the note is respelled rather than the guard appeased.** chelis#1270
+widened `scan_citations` to recognize `<repo>#NNN` forms including a shell's own,
+but `check_tests_blocked` was not widened with it and still computes
+`has_blocker = dir_has_ch(tests_blocked) || !collect_citations_in_dir("src").is_empty()`,
+so any `src/` citation demands a `tests_blocked/` probe. Shoals had exactly one:
+`src/pricing.ch:72`'s `Pure tensor-DAG Black-Scholes helpers for the Beacon seam
+(shoals#19)`. Causally proven: rewriting that one token flips row 12 from `FAIL`
+to `NA` on the same tree and binary, and the same tree reports `NA` under 0.18.5,
+so it is a 0.18.6 regression rather than pre-existing state.
+
+**shoals#19 is CLOSED and that line is a section header, not a narrowing.** It
+records which piece of work produced the helpers below it; nothing about it is
+blocked, and there is no defect to write a probe for. The `#NNN` form carries a
+specific contract meaning -- a narrowing citation owing coverage -- so using it
+for resolved own-repo provenance was the inaccurate part. The line now reads
+`(shoals issue 19)`: the reference, the number, and the meaning are all
+preserved, and it stops asserting a blocker that does not exist. No citation was
+deleted, no probe was invented, and no evidence was dropped. The same repair was
+applied to nautilus 0.7.43 for four equivalent `nautilus#45` / `nautilus#47`
+section headers.
+
+The underlying guard defect stands regardless of this respelling and is filed
+upstream as **chelis#1387**; a shell whose own-repo citation marks something
+genuinely live would still be stuck, since row 12 accepts only a `.ch` probe and
+not the `tests_blocked/README.md` can't-be-probed note that row 9 takes.
 
 **Validation on 0.18.6:** `chelis test tests/` **371 passed, 0 failed**
 (matching the 0.18.5 baseline); 3 negative sidecars ok; `chelis reef build`

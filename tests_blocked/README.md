@@ -71,7 +71,7 @@ gate report.
   promoted; monotonicity, Greeks, and risk surfaces still require dedicated
   per-surface probes.
 
-- **`docs/issue_drafts/conform_row12_counts_own_repo_citations.md` — row 12 of
+- **chelis#1387 — row 12 of
   `chelis reef conform audit` reads an own-repo citation as an upstream
   blocker.** The failing surface is an audit row verdict, not a compile or eval
   diagnostic. Writing a probe here would also be self-defeating: the row's
