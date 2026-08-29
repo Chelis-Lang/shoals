@@ -87,11 +87,11 @@ compiler-pin equality on dependencies, so this pin could not resolve against
 Nautilus 0.7.42 / Coral 0.7.39 (both declare `=0.18.5`); the sibling releases
 landed ahead of the Shoals 0.24.10 release and the cascade is closed.
 **Nautilus 0.7.43** (`Chelis-Lang/nautilus#50`, merged as
-`f3e97949e6ce336ed0a4ff1cddfec78aba3342d9`) has CHB
+`7e3451b4977922d0bda80883ba385c7da211fc9e`, tagged `v0.7.43`) has CHB
 `c3e6fb6e2c3a397726df0cc53587d854ac48cab416c9dea80c9df717bfe0ef4d` and archive
 `970fb4ff51e6dfdce3043bb6ad772a7df74fd4c05a0be2723d451b35ef7ddd05`;
 **Coral 0.7.40** (`Chelis-Lang/coral#29`, merged as
-`0a2c36295456c41fd8ace6fde86e9666d7e6bc8f`, itself declaring
+`301305312186888856d6645eb7c898c27af28ff3`, tagged `v0.7.40`, itself declaring
 `nautilus = "0.7.43"`) has CHB
 `672297eb6bafcffb8f3c4ad867f59aecece8cf114747fbfe2a112f3346edc2f1` and archive
 `a6416fa595b092b34f1d5483429f65b4e19927db833288a18919d5b497ecc08f`. All four
