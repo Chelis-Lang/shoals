@@ -7,6 +7,20 @@ export (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_
 -- f32-only and an f64 grad path needs an f64 erf. n_cdf(x) = 0.5 * erfc(-x/sqrt2)
 -- is the exact expression Shoals.References / Shoals.Greeks use. The displayed
 -- Greek is the AD derivative of THIS expression, so price and Greek agree.
+--
+-- ACCURACY (shoals#61). A&S 7.1.26's maximum absolute error is ~1.5e-7, and
+-- that is a property of the coefficients above, not of the arithmetic they are
+-- evaluated in. Widening to f64 removes rounding error that was already two
+-- orders of magnitude below the approximation error, so `erf64` is NOT more
+-- accurate than the f32 `Nautilus.Special.erf` it was copied from; measured at
+-- one point it carries 1.08x that error. The f64 signature exists to be
+-- callable from an f64 grad path, as the paragraph above says -- it is not an
+-- accuracy claim, and nothing downstream of it (`n_cdf64`, `bs_call_f64`, the
+-- Greeks) is accurate beyond ~1e-6 relative at any dtype.
+--
+-- Do not read the f64 entry point as the more precise one. Reaching f64 grade
+-- needs a different kernel, not a wider cast; chelis#902 would supply a
+-- canonical `erf` and is the preferred fix over hand-rolling one here.
 def abs_f64(x: f64) -> f64 = if lt(x, cast(0.0, f64)) then neg(x) else x
 def erf64(x: f64) -> f64 = {
   a1 = cast(0.254829592, f64)

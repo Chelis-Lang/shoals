@@ -169,7 +169,7 @@ tiers: **A** (type/dimension/linearity), **B** (SMT via cvc5 over the reals),
 | SMT prove tier (cvc5) shipped in the **release** tarball | `@pin` | SMT is in the released binary as of chelis 0.11.0 (no from-source `--features smt` build needed at this pin). Tier B lowers to cvc5 over the **reals** (`QF_NRA`, or `QF_NRAT` when a transcendental is present); a green is a real-arithmetic fact, **not** an IEEE-`f32` statement. `arith_model:"real"`. |
 | Transcendentals `exp`, `sqrt`, `sin`, `cos` lower to SMT | `@pin*` | These four **do** lower — cvc5 kinds `EXPONENTIAL`/`SQRT`/`SINE`/`COSINE`, selecting the `QF_NRAT` logic. *`QF_NRAT` is **incomplete**: cvc5 may return `unknown`, which chelis records as `unsupported` (solver capacity) and `--tier auto` degrades **honestly** to fuzz — never a false proven. Keep structural greens transcendental-free by construction where possible (report §3). |
 | Certified-envelope transcendental discharge (`erf`/`normal_cdf`/`exp`/`log`/`sqrt` subterms) | `@pin` | Shipped in 0.16.0 (**chelis#434, now CLOSED**): a soundly-boundable transcendental subterm is abstracted to a fresh variable over its Gappa/Arb-certified envelope hull and the goal discharges as **`proven_modulo_certified_envelope`** (strictly weaker than `proven_modulo_real_arithmetic`, disclosed in the verdict). Fail-closed on unboundable arguments. **Residual:** goals whose truth depends on the *coupling* between abstractions cannot reach an exact proven tier: direct BS/B76 call-price positivity and direct BS spot-monotonicity/delta, vega, rho, and gamma comparisons are observed only at `fuzz_validated`, while the direct intrinsic-lower-bound candidate remains `deferred_invariant` (**chelis#637**, open). See `UPSTREAM_BUGS.md`. |
-| `erf` / bundled `n_cdf` via an abstract-subterm contract | `@pin` | `erf` is not directly cvc5-lowerable, but the bundled normal-CDF **contract** (`0 ≤ N ≤ 1`, reflection `N(-x)=1-N(x)`) is discharged at the SMT tier as an abstract subterm (`chelis-prove/src/contracts.rs`), which is what lets the abstracted derivatives structure prove. The contract is separately fuzz-validated against the real `n_cdf` (max abs err ≈ 2 ulp vs scipy, report §7). |
+| `erf` / bundled `n_cdf` via an abstract-subterm contract | `@pin` | `erf` is not directly cvc5-lowerable, but the bundled normal-CDF **contract** (`0 ≤ N ≤ 1`, reflection `N(-x)=1-N(x)`) is discharged at the SMT tier as an abstract subterm (`chelis-prove/src/contracts.rs`), which is what lets the abstracted derivatives structure prove. The contract is separately fuzz-validated against the real `n_cdf` (max abs err ≈ 2 ulp vs scipy, report §7) — that is an **`f32`** measurement, where 2 ulp near 0.5 is ~6e-8 and consistent with A&S 7.1.26's ~1.5e-7 ceiling. It is not a claim about `n_cdf64`, which shares the same coefficients and the same ceiling; see the accuracy section below. |
 | Algebraic `abs`, `min`, `max` lower to SMT | `@pin` | In `CVC5_LOWERABLE`, `QF_NRA` (algebraic, not transcendental). `min`/`max` lower to ITE. |
 | Composite derivatives greens | `@pin` | `properties/composites.ch`: structure proven at Tier B for any `N` satisfying its contract, verdict `proven_modulo_fuzz_validated_contract`. This string is **legitimate here** (a real SMT base resting on a fuzz-validated contract); it was only a false-positive for **pure-fuzz** bases, fixed by chelis#435 (archived). Classify verdicts from `proof_tier`, never the string alone. |
 | Economic / dynamic-programming greens | `@pin` | Markov simplex preservation, Bellman monotonicity/boundedness/contraction, PV/Gordon positivity & monotonicity discharge at SMT with **no** transcendental contract (report §6). Structurally more complete than a derivatives green. |
@@ -191,6 +191,28 @@ tiers: **A** (type/dimension/linearity), **B** (SMT via cvc5 over the reals),
 | Front-end check throughput | `@pin` | Substantially faster at 0.18.6 (chelis#1316/chelis#1207/chelis#1205): on this corpus `chelis check src/modelfit.ch` 67.6s → 31.6s and the 3-line `src/core.ch` dependency-load floor 31.2s → 17.0s. **But `chelis test --batch-mode auto` regressed 2.6x on `tests/`** (3m01s → 7m54s); see `docs/UPSTREAM_BUGS.md` §Actively blocking. |
 | `count` ([05-OP-29]), direct `sub` / `min_elem` ([05-OP-40]/[05-OP-41]), `stop_gradient` ([05-OP-42]) | `@upstream` | New at 0.18.6 but unused by this shell today. `stop_gradient` and relu's own adjoint are specified with `Unimplemented` backend cells (chelis#1312/chelis#1313) and are not usable at this pin. |
 | chelis-std / nautilus / coral module surface | `@pin` | Pricing, distributions, RNG, curves, dates, vol surfaces per `src/` + `references/`. |
+
+## Numerical accuracy of shell-authored kernels
+
+This section states what the numeric entry points this shell exports actually
+guarantee. It exists because dtype is not accuracy: an `f64` signature says how
+the arithmetic is evaluated, not how good the approximation being evaluated is.
+
+| Entry point | Kernel | Bound | Notes |
+|---|---|---|---|
+| `Shoals.Pricing.erf64` | Abramowitz & Stegun 7.1.26 | **~1.5e-7 absolute** | Coefficients byte-identical to the `f32` `Nautilus.Special.erf`. The bound is a property of the coefficients, not of the arithmetic, so **the `f64` entry point is not more accurate than the `f32` one** — measured at one point it carries 1.08x its error (shoals#61). |
+| `Shoals.Pricing.n_cdf64` | `0.5 * erfc(-x/sqrt2)` over `erf64` | inherits ~1.5e-7 | |
+| `Shoals.Pricing.bs_call_f64`, `bs_put_scalar`, and every Greek | closed form over `n_cdf64` | **~1e-6 relative** | Observed 7.8e-7 relative at ATM, T=1. Tighter tolerances are unreachable at any dtype without a different `erf` kernel. |
+
+**Why the `f64` variant exists.** To be callable from an `f64` `grad` path — the
+`f32` package symbol could not be. It was never a precision claim. Reaching f64
+grade needs a different kernel rather than a wider cast; upstream chelis#902
+would supply a canonical `erf`, and calling that is preferred over hand-rolling
+one here.
+
+**Scope of this table.** It covers kernels this shell authors. Accuracy of
+chelis primitives themselves is upstream's, and upstream has no accuracy
+contract for shells to inherit — chelis#1563 proposes one.
 
 ## Automatic differentiation (`grad`) — the Greek-set surface
 
