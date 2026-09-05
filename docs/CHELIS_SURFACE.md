@@ -200,7 +200,7 @@ the arithmetic is evaluated, not how good the approximation being evaluated is.
 
 | Entry point | Kernel | Bound | Notes |
 |---|---|---|---|
-| `Shoals.Pricing.erf64` | Abramowitz & Stegun 7.1.26 | **~1.5e-7 absolute** | Coefficients byte-identical to the `f32` `Nautilus.Special.erf`. The bound is a property of the coefficients, not of the arithmetic, so **the `f64` entry point is not more accurate than the `f32` one** — measured at one point it carries 1.08x its error (shoals#61). |
+| `Shoals.Pricing.erf64` | Abramowitz & Stegun 7.1.26 | **~1.5e-7 absolute** | Coefficients byte-identical to the `f32` `Nautilus.Special.erf`. The bound is a property of the coefficients, not of the arithmetic, so **the `f64` entry point is not more accurate than the `f32` one** — measured at one point it carries 1.08x its error. |
 | `Shoals.Pricing.n_cdf64` | `0.5 * erfc(-x/sqrt2)` over `erf64` | inherits ~1.5e-7 | |
 | `Shoals.Pricing.bs_call_f64`, `bs_put_scalar`, and every Greek | closed form over `n_cdf64` | **~1e-6 relative** | Observed 7.8e-7 relative at ATM, T=1. Tighter tolerances are unreachable at any dtype without a different `erf` kernel. |
 

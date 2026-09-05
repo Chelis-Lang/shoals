@@ -8,7 +8,7 @@ export (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_
 -- is the exact expression Shoals.References / Shoals.Greeks use. The displayed
 -- Greek is the AD derivative of THIS expression, so price and Greek agree.
 --
--- ACCURACY (shoals#61). A&S 7.1.26's maximum absolute error is ~1.5e-7, and
+-- ACCURACY (this shell's issue 61). A&S 7.1.26's maximum absolute error is
 -- that is a property of the coefficients above, not of the arithmetic they are
 -- evaluated in. Widening to f64 removes rounding error that was already two
 -- orders of magnitude below the approximation error, so `erf64` is NOT more

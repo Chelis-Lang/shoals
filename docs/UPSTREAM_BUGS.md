@@ -147,6 +147,35 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 ## Tracking
 
+- **nautilus#12 / chelis#902 — no f64-callable `erf`, so the accuracy of the
+  f64 pricing path is bounded by an f32-era approximation.**
+  `Nautilus.Special.erf` is f32-only, so a Shoals f64 grad path cannot call it.
+  `Shoals.Pricing.erf64` is that function reimplemented at f64 with
+  byte-identical Abramowitz-Stegun 7.1.26 coefficients. The approximation's
+  ~1.5e-7 maximum absolute error is a property of those coefficients, not of
+  the arithmetic evaluating them, so the f64 entry point is no more accurate
+  than the f32 one; measured at one point (ATM, T=1) it carries 1.08x its
+  relative error.
+    - **Affected surface / narrowing:** `erf64`, `n_cdf64`, `bs_call_f64` and
+      every Greek differentiate through that kernel and inherit a ~1e-6
+      relative ceiling at any dtype. The narrowing is that the ceiling is now
+      stated rather than removed: `docs/CHELIS_SURFACE.md` carries an accuracy
+      section, and `src/pricing.ch` states it at the entry point, so a caller
+      comparing the f64 signature against the f32 one cannot conclude the f64
+      is more precise. No workaround changes the numbers.
+    - **State at pin 0.18.6 (2026-09-05):** both upstream issues OPEN.
+      `tests_blocked/special/erf_builtin_absent.ch` probes the reachable
+      symptom and reports `precision mismatch: expected f32, got f64` — the
+      package `erf` resolves and refuses the width. The two repairs are
+      disjoint: nautilus#12 grants f64 signatures and removes the reason to
+      duplicate the kernel, but leaves the A&S bound wherever the coefficients
+      are used; chelis#902 gives the language a canonical `erf` with a stated
+      accuracy and removes both. Neither is a chelis arithmetic defect.
+    - **Re-probe trigger:** the blocked probe passing, or either issue closing.
+      Follow that probe's sidecar — which repair landed decides whether the
+      accuracy rows survive unchanged or are re-derived from the new atom's
+      stated bound.
+
 - **chelis#1002 — Reef preserves caller-provided GitHub owner casing in
   `remote_origin`, making lock and package bytes registry-history-dependent.**
   Reproduced against the 0.18.1 release binary on 2026-08-01 with identical
