@@ -8,19 +8,29 @@ export (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_
 -- is the exact expression Shoals.References / Shoals.Greeks use. The displayed
 -- Greek is the AD derivative of THIS expression, so price and Greek agree.
 --
--- ACCURACY (this shell's issue 61). A&S 7.1.26's maximum absolute error is
--- that is a property of the coefficients above, not of the arithmetic they are
--- evaluated in. Widening to f64 removes rounding error that was already two
--- orders of magnitude below the approximation error, so `erf64` is NOT more
--- accurate than the f32 `Nautilus.Special.erf` it was copied from; measured at
--- one point it carries 1.08x that error. The f64 signature exists to be
--- callable from an f64 grad path, as the paragraph above says -- it is not an
--- accuracy claim, and nothing downstream of it (`n_cdf64`, `bs_call_f64`, the
--- Greeks) is accurate beyond ~1e-6 relative at any dtype.
+-- ACCURACY (this shell's issue 61; upstream nautilus#56, chelis#902).
+-- A&S 7.1.26's maximum absolute error is ~1.5e-7, and that is a property of
+-- the coefficients above rather than of the arithmetic evaluating them. So no
+-- dtype makes this function accurate beyond that, and the f64 signature is not
+-- an accuracy claim: it exists to be callable from an f64 grad path, since the
+-- package symbol is f32-only, exactly as the paragraph above says.
 --
--- Do not read the f64 entry point as the more precise one. Reaching f64 grade
--- needs a different kernel, not a wider cast; chelis#902 would supply a
--- canonical `erf` and is the preferred fix over hand-rolling one here.
+-- Widening is not worthless, and the honest figure is small. Measured over
+-- x in [0, 8], these coefficients give ~1.4e-7 max absolute error evaluated in
+-- f64 and ~4.6e-7 evaluated in f32, because `sub(one, mul(poly, e))` cancels
+-- badly in f32 near y ~ 0.04. So f64 buys roughly 3x, not the nine orders of
+-- magnitude a reader might infer from the dtype. The coefficients are the
+-- floor either way.
+--
+-- Everything downstream -- n_cdf64, bs_call_f64, and the AD Greeks that
+-- differentiate this expression -- inherits that floor. State it as an
+-- ABSOLUTE bound: relative error on an option price is unbounded as the price
+-- approaches zero, so a relative figure taken at the money is wrong off it.
+-- docs/CHELIS_SURFACE.md carries the numbers.
+--
+-- Reaching f64 grade needs a different kernel, not a wider cast. chelis#902
+-- would supply a canonical erf and is the preferred fix over hand-rolling one
+-- here; nautilus#56 tracks the same bound on the f32 original.
 def abs_f64(x: f64) -> f64 = if lt(x, cast(0.0, f64)) then neg(x) else x
 def erf64(x: f64) -> f64 = {
   a1 = cast(0.254829592, f64)

@@ -75,8 +75,12 @@ in code that is CLOSED upstream but not sitting in §Archived.
   `check_tests_blocked` was not widened with it and still computes
   `has_blocker = dir_has_ch(tests_blocked) || !collect_citations_in_dir("src").is_empty()`,
   so any citation in `src/` demands a `tests_blocked/` probe.
-    - **Affected surface / narrowing:** Shoals has exactly one such citation --
+    - **Affected surface / narrowing:** Shoals had exactly one such citation --
       `src/pricing.ch:72` names `shoals#19` in the Beacon-seam design comment.
+      **Amended 2026-09-05:** `src/pricing.ch` now also cites `chelis#902` and
+      `nautilus#56`, which are genuine upstream citations covered by the entry
+      above and by `tests_blocked/special/erf_builtin_absent.ch`, so row 12's
+      demand is satisfied on their account rather than evaded.
       `shoals#19` is an own-repo issue, already resolved, and already carried in
       §Archived below, which is why row 9 (`staleness-audit`) correctly PASSES
       on its coverage. **There is no narrowing.** Because that line is a section
@@ -100,10 +104,15 @@ in code that is CLOSED upstream but not sitting in §Archived.
       diagnostic, so `chelis test --expect blocked` cannot express it. It is
       re-probed by running `chelis reef conform audit` at every pin bump.
     - **Re-probe trigger:** the assigned `chelis#NNN` closing, or any release
-      note naming `chelis-conformance` citation scanning or the §5 row. Re-run
-      `chelis reef conform audit` on the unmodified tree and require row 12
-      `NA`; then replace this draft path with the issue number everywhere it is
-      cited.
+      note naming `chelis-conformance` citation scanning or the §5 row.
+      **Amended 2026-09-05:** `tests_blocked/` is no longer empty, so row 12
+      now reads `PASS` on the unmodified tree whether or not this defect is
+      fixed, and the old "require row 12 `NA`" criterion can no longer
+      discriminate. Re-probe by moving `tests_blocked/special/` aside and
+      re-running `chelis reef conform audit`: with the directory empty and the
+      `src/` citations still present, row 12 reads `NA` if fixed and `FAIL` if
+      not. Restore the directory afterwards. Then replace this draft path with
+      the issue number everywhere it is cited.
 
 - **chelis#1391 --
   `chelis test --batch-mode auto` regressed 2.6x on this suite.** On one quiet
@@ -147,8 +156,8 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 ## Tracking
 
-- **nautilus#12 / chelis#902 — no f64-callable `erf`, so the accuracy of the
-  f64 pricing path is bounded by an f32-era approximation.**
+- **nautilus#56 / chelis#902 — the erf kernel's bound is an f32-era constant,
+  and no f64-callable `erf` exists to replace it.**
   `Nautilus.Special.erf` is f32-only, so a Shoals f64 grad path cannot call it.
   `Shoals.Pricing.erf64` is that function reimplemented at f64 with
   byte-identical Abramowitz-Stegun 7.1.26 coefficients. The approximation's
@@ -167,10 +176,17 @@ in code that is CLOSED upstream but not sitting in §Archived.
       `tests_blocked/special/erf_builtin_absent.ch` probes the reachable
       symptom and reports `precision mismatch: expected f32, got f64` — the
       package `erf` resolves and refuses the width. The two repairs are
-      disjoint: nautilus#12 grants f64 signatures and removes the reason to
-      duplicate the kernel, but leaves the A&S bound wherever the coefficients
-      are used; chelis#902 gives the language a canonical `erf` with a stated
-      accuracy and removes both. Neither is a chelis arithmetic defect.
+      disjoint: nautilus#56 is the f32 original's own bound, and fixing it
+      changes the coefficients wherever they are used but not the signature
+      that forced the duplicate; chelis#902 gives the language a canonical
+      `erf` with a stated accuracy and removes both. Neither is a chelis
+      arithmetic defect.
+    - **The f32-only signature on `Nautilus.Special` has no filed issue.**
+      nautilus#12 is the LinAlg signature barrier and does not cover
+      `Nautilus.Special`; citing it here would make this entry's de-narrowing
+      branch unexecutable, since closing it would not give an f64 `erf`. The
+      draft is parked at `docs/issue_drafts/nautilus-special-f32-only.md`
+      pending filing.
     - **Re-probe trigger:** the blocked probe passing, or either issue closing.
       Follow that probe's sidecar — which repair landed decides whether the
       accuracy rows survive unchanged or are re-derived from the new atom's

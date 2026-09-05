@@ -1,5 +1,7 @@
 precision mismatch: expected f32, got f64
-Blocker: nautilus#12, with chelis#902 the structural fix. `Nautilus.Special.erf`
+Blocker: the f32-only signature on `Nautilus.Special` (draft parked at
+docs/issue_drafts/nautilus-special-f32-only.md), with nautilus#56 the sibling
+bound and chelis#902 the structural fix. `Nautilus.Special.erf`
 is f32-only, so a Shoals f64 grad path cannot call it. Shoals.Pricing therefore
 carries `erf64`, whose coefficients are byte-identical to the f32 original --
 Abramowitz-Stegun 7.1.26, ~1.5e-7 absolute by construction of those
@@ -8,21 +10,29 @@ point is no more accurate than the f32 one and the ~1e-6 relative ceiling on
 n_cdf64 / bs_call_f64 / the Greeks follows from that, at any dtype. This is
 disclosed in docs/CHELIS_SURFACE.md.
 
-Two upstream repairs would each retire this narrowing, and they are disjoint.
-nautilus#12 would grant f64 signatures, which removes the reason to duplicate
-the kernel but leaves the A&S bound wherever the coefficients are used.
-chelis#902 would give the language a canonical `erf` with a stated accuracy,
-which removes both. Neither is a chelis arithmetic defect: f64 arithmetic is
-evaluated correctly and the bound belongs to the approximation.
+Three upstream repairs bear on this and they are disjoint. An f64 signature on
+`Nautilus.Special` removes the reason to duplicate the kernel but leaves the
+A&S bound wherever the coefficients are used -- that is the one this probe
+detects, and it has no issue number yet. nautilus#56 is the f32 original's own
+bound: fixing it changes the coefficients but not the signature, so this probe
+would still fail. chelis#902 would give the language a canonical `erf` with a
+stated accuracy and removes both. Not a chelis arithmetic defect: f64
+arithmetic is evaluated correctly and the bound belongs to the approximation.
+
+Do not cite nautilus#12 here. It is the `Nautilus.LinAlg` signature barrier and
+says nothing about `Nautilus.Special`; an earlier revision of this sidecar
+cited it, which made the de-narrowing branch below unexecutable.
 
 Measured on 0.18.6: this exact probe reports `precision mismatch: expected f32,
 got f64`, i.e. the symbol resolves and refuses the width. An earlier draft of
 this probe assumed `erf` was absent entirely and expected `unbound variable`;
 running it is what corrected that.
 
-On pass: determine which repair landed. If nautilus#12, replace
-`Shoals.Pricing.erf64`'s body with the package `erf` and keep the accuracy rows
-in docs/CHELIS_SURFACE.md, since the coefficients are unchanged. If chelis#902,
-call the language `erf` and re-derive those rows from its [05-OP-N] atom's
-stated bound instead of from A&S. Either way promote this probe to tests/ and
-archive the docs/UPSTREAM_BUGS.md entry in the same change set.
+On pass: determine which repair landed. If `Nautilus.Special` gained an f64
+signature, replace `Shoals.Pricing.erf64`'s body with the package `erf` and
+keep the accuracy rows in docs/CHELIS_SURFACE.md, since the coefficients are
+unchanged -- unless nautilus#56 landed with it, in which case re-derive them
+from the new coefficients' bound. If chelis#902 landed, call the language `erf`
+and re-derive those rows from its [05-OP-N] atom's stated bound instead of from
+A&S. Either way promote this probe to tests/ and archive the
+docs/UPSTREAM_BUGS.md entry in the same change set.
