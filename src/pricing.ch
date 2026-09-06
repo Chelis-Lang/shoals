@@ -1,54 +1,90 @@
 module Shoals.Pricing
 import Nautilus.Distributions (normal_sample)
 export (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_wire_f64, call_prices, put_prices, call_total, put_total, deltas_call, deltas_put, vegas_call, rhos_call, thetas_call, gammas_call, volgas_call, vannas_call, mc_call_price)
--- One normal CDF behind both price and Greeks. erf is the Abramowitz-Stegun
--- 7.1.26 rational approximation in f64 -- byte-for-byte the same coefficients as
--- Nautilus.Special.erf, reimplemented in f64 because the package symbol is
--- f32-only and an f64 grad path needs an f64 erf. n_cdf(x) = 0.5 * erfc(-x/sqrt2)
+-- One normal CDF behind both price and Greeks. n_cdf(x) = 0.5 * erfc(-x/sqrt2)
 -- is the exact expression Shoals.References / Shoals.Greeks use. The displayed
 -- Greek is the AD derivative of THIS expression, so price and Greek agree.
 --
--- ACCURACY (this shell's issue 61; upstream nautilus#56, chelis#902).
--- A&S 7.1.26's maximum absolute error is ~1.5e-7, and that is a property of
--- the coefficients above rather than of the arithmetic evaluating them. So no
--- dtype makes this function accurate beyond that, and the f64 signature is not
--- an accuracy claim: it exists to be callable from an f64 grad path, since the
--- package symbol is f32-only, exactly as the paragraph above says.
+-- ACCURACY. `erf64` evaluates W. J. Cody's rational approximation (Math. Comp.
+-- 23, 1969): three ranges split at 0.5 and 4, saturating at 6 where erfc
+-- underflows f64. Measured on this compiled kernel against a 50-digit
+-- reference over 411 points spanning [0, 8], both branch boundaries and
+-- negatives: maximum absolute error 1.9e-16, about 0.9 ulp of 1.0.
 --
--- Widening is not worthless, and the honest figure is small. Measured over
--- x in [0, 8], these coefficients give ~1.4e-7 max absolute error evaluated in
--- f64 and ~4.6e-7 evaluated in f32, because `sub(one, mul(poly, e))` cancels
--- badly in f32 near y ~ 0.04. So f64 buys roughly 3x, not the nine orders of
--- magnitude a reader might infer from the dtype. The coefficients are the
--- floor either way.
+-- It replaced Abramowitz & Stegun 7.1.26 (this shell's issue 61), whose
+-- ~1.4e-7 bound is a property of its coefficients rather than of the
+-- arithmetic evaluating them -- so the f64 entry point had been no better than
+-- the f32 `Nautilus.Special.erf` whose coefficients it copied, and no wider
+-- cast could have improved it. That is a 7e8x reduction, and it moves the
+-- limiting factor off this kernel entirely: `bs_call_f64` at
+-- (100, 100, 0.05, 0.2, 1) now returns 10.450583572185565, matching the
+-- reference to every digit, and the f32 Greek exports land within ~1 f32 ulp
+-- of their true values, i.e. at their dtype's rounding.
 --
--- Everything downstream -- n_cdf64, bs_call_f64, and the AD Greeks that
--- differentiate this expression -- inherits that floor. State it as an
--- ABSOLUTE bound: relative error on an option price is unbounded as the price
--- approaches zero, so a relative figure taken at the money is wrong off it.
--- docs/CHELIS_SURFACE.md carries the numbers.
+-- The f32 sibling still carries the old bound; see nautilus#56. Chelis has no
+-- canonical erf to call instead (chelis#902), and `Nautilus.Special` is
+-- f32-only, which is why this kernel is hand-rolled here at all -- see
+-- docs/issue_drafts/nautilus-special-f32-only.md and
+-- tests_blocked/special/erf_builtin_absent.ch.
 --
--- Reaching f64 grade needs a different kernel, not a wider cast. chelis#902
--- would supply a canonical erf and is the preferred fix over hand-rolling one
--- here; nautilus#56 tracks the same bound on the f32 original.
+-- Kept as three named helpers rather than one expression because the AD Greeks
+-- differentiate through this path and each branch is separately checkable.
 def abs_f64(x: f64) -> f64 = if lt(x, cast(0.0, f64)) then neg(x) else x
+-- Cody region 1 (|x| <= 0.5): erf(x) = x * P(x^2)/Q(x^2), odd by construction.
+def erf64_core_small(x: f64) -> f64 = {
+  y = mul(x, x)
+  xnum0 = mul(cast(0.18577770618460315, f64), y)
+  xden0 = y
+  xnum1 = mul(add(xnum0, cast(3.1611237438705655, f64)), y)
+  xden1 = mul(add(xden0, cast(23.601290952344122, f64)), y)
+  xnum2 = mul(add(xnum1, cast(113.86415415105016, f64)), y)
+  xden2 = mul(add(xden1, cast(244.02463793444417, f64)), y)
+  xnum3 = mul(add(xnum2, cast(377.485237685302, f64)), y)
+  xden3 = mul(add(xden2, cast(1282.6165260773723, f64)), y)
+  mul(x, div(add(xnum3, cast(3209.3775891384694, f64)), add(xden3, cast(2844.236833439171, f64))))
+}
+-- Cody region 2 (0.5 < |x| <= 4): erfc(|x|) = exp(-x^2) * P(|x|)/Q(|x|).
+def erf64_core_erfc_mid(ax: f64) -> f64 = {
+  xnum0 = mul(cast(2.1531153547440383e-8, f64), ax)
+  xden0 = ax
+  xnum1 = mul(add(xnum0, cast(0.5641884969886701, f64)), ax)
+  xden1 = mul(add(xden0, cast(15.744926110709835, f64)), ax)
+  xnum2 = mul(add(xnum1, cast(8.883149794388377, f64)), ax)
+  xden2 = mul(add(xden1, cast(117.6939508913125, f64)), ax)
+  xnum3 = mul(add(xnum2, cast(66.11919063714163, f64)), ax)
+  xden3 = mul(add(xden2, cast(537.1811018620099, f64)), ax)
+  xnum4 = mul(add(xnum3, cast(298.6351381974001, f64)), ax)
+  xden4 = mul(add(xden3, cast(1621.3895745666903, f64)), ax)
+  xnum5 = mul(add(xnum4, cast(881.952221241769, f64)), ax)
+  xden5 = mul(add(xden4, cast(3290.7992357334597, f64)), ax)
+  xnum6 = mul(add(xnum5, cast(1712.0476126340707, f64)), ax)
+  xden6 = mul(add(xden5, cast(4362.619090143247, f64)), ax)
+  xnum7 = mul(add(xnum6, cast(2051.0783778260716, f64)), ax)
+  xden7 = mul(add(xden6, cast(3439.3676741437216, f64)), ax)
+  mul(exp(neg(mul(ax, ax))), div(add(xnum7, cast(1230.3393547979972, f64)), add(xden7, cast(1230.3393548037495, f64))))
+}
+-- Cody region 3 (4 < |x| < 6): erfc(|x|) = exp(-x^2)/|x| * (1/sqrt(pi) - R(1/x^2)).
+def erf64_core_erfc_tail(ax: f64) -> f64 = {
+  y = div(cast(1.0, f64), mul(ax, ax))
+  xnum0 = mul(cast(0.016315387137302097, f64), y)
+  xden0 = y
+  xnum1 = mul(add(xnum0, cast(0.30532663496123236, f64)), y)
+  xden1 = mul(add(xden0, cast(2.568520192289822, f64)), y)
+  xnum2 = mul(add(xnum1, cast(0.36034489994980445, f64)), y)
+  xden2 = mul(add(xden1, cast(1.8729528499234604, f64)), y)
+  xnum3 = mul(add(xnum2, cast(0.12578172611122926, f64)), y)
+  xden3 = mul(add(xden2, cast(0.5279051029514285, f64)), y)
+  xnum4 = mul(add(xnum3, cast(0.016083785148742275, f64)), y)
+  xden4 = mul(add(xden3, cast(0.06051834131244132, f64)), y)
+  r = mul(y, div(add(xnum4, cast(0.0006587491615298378, f64)), add(xden4, cast(0.0023352049762686918, f64))))
+  div(mul(exp(neg(mul(ax, ax))), sub(cast(0.5641895835477563, f64), r)), ax)
+}
+def erf64_erfc_abs(ax: f64) -> f64 = if lt(ax, cast(4.0, f64)) then erf64_core_erfc_mid(ax) else if lt(ax, cast(6.0, f64)) then erf64_core_erfc_tail(ax) else cast(0.0, f64)
 def erf64(x: f64) -> f64 = {
-  a1 = cast(0.254829592, f64)
-  a2 = cast(-0.284496736, f64)
-  a3 = cast(1.421413741, f64)
-  a4 = cast(-1.453152027, f64)
-  a5 = cast(1.061405429, f64)
-  p = cast(0.3275911, f64)
-  one = cast(1.0, f64)
   ax = abs_f64(x)
-  small = cast(0.00001, f64)
-  if lt(ax, small) then mul(x, cast(1.1283791670955126, f64)) else {
-    t = div(one, add(one, mul(p, ax)))
-    poly = mul(t, add(a1, mul(t, add(a2, mul(t, add(a3, mul(t, add(a4, mul(t, a5)))))))))
-    e = exp(neg(mul(ax, ax)))
-    y = sub(one, mul(poly, e))
-    if lt(x, cast(0.0, f64)) then neg(y) else y
-  }
+  y = sub(cast(1.0, f64), erf64_erfc_abs(ax))
+  signed = if lt(x, cast(0.0, f64)) then neg(y) else y
+  if lt(ax, cast(0.5, f64)) then erf64_core_small(x) else signed
 }
 def n_cdf64(x: f64) -> f64 = {
   inv_sqrt_2 = cast(0.7071067811865476, f64)

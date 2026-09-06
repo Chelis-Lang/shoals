@@ -156,41 +156,36 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 ## Tracking
 
-- **nautilus#56 / chelis#902 — the erf kernel's bound is an f32-era constant,
-  and no f64-callable `erf` exists to replace it.**
-  `Nautilus.Special.erf` is f32-only, so a Shoals f64 grad path cannot call it.
-  `Shoals.Pricing.erf64` is that function reimplemented at f64 with
-  byte-identical Abramowitz-Stegun 7.1.26 coefficients. The approximation's
-  ~1.5e-7 maximum absolute error is a property of those coefficients, not of
-  the arithmetic evaluating them, so the f64 entry point is no more accurate
-  than the f32 one; measured at one point (ATM, T=1) it carries 1.08x its
-  relative error.
-    - **Affected surface / narrowing:** `erf64`, `n_cdf64`, `bs_call_f64` and
-      every Greek differentiate through that kernel and inherit a ~1e-6
-      relative ceiling at any dtype. The narrowing is that the ceiling is now
-      stated rather than removed: `docs/CHELIS_SURFACE.md` carries an accuracy
-      section, and `src/pricing.ch` states it at the entry point, so a caller
-      comparing the f64 signature against the f32 one cannot conclude the f64
-      is more precise. No workaround changes the numbers.
-    - **State at pin 0.18.6 (2026-09-05):** both upstream issues OPEN.
-      `tests_blocked/special/erf_builtin_absent.ch` probes the reachable
-      symptom and reports `precision mismatch: expected f32, got f64` — the
-      package `erf` resolves and refuses the width. The two repairs are
-      disjoint: nautilus#56 is the f32 original's own bound, and fixing it
-      changes the coefficients wherever they are used but not the signature
-      that forced the duplicate; chelis#902 gives the language a canonical
-      `erf` with a stated accuracy and removes both. Neither is a chelis
-      arithmetic defect.
-    - **The f32-only signature on `Nautilus.Special` has no filed issue.**
-      nautilus#12 is the LinAlg signature barrier and does not cover
-      `Nautilus.Special`; citing it here would make this entry's de-narrowing
-      branch unexecutable, since closing it would not give an f64 `erf`. The
-      draft is parked at `docs/issue_drafts/nautilus-special-f32-only.md`
-      pending filing.
+- **nautilus#56 / chelis#902 — no f64-callable `erf`, so this shell carries its
+  own kernel.** `Nautilus.Special` is f32-only, so a Shoals f64 grad path
+  cannot call its `erf`; `Shoals.Pricing` therefore hand-rolls one. The
+  duplication is the narrowing. The accuracy problem that came with it is
+  fixed: `erf64` now evaluates Cody's rational approximation at a measured
+  1.9e-16 max absolute error (411 points, 50-digit reference), replacing the
+  Abramowitz & Stegun 7.1.26 coefficients it had copied from the f32 sibling
+  at ~1.4e-7.
+    - **Affected surface / narrowing:** a second implementation of `erf` lives
+      in this repo and must be maintained and measured here. `Shoals.Greeks`,
+      `Shoals.PricingExtended`, `references/blackscholes.ch` and
+      `pricing_wire_erf_f64` still carry A&S copies that this change did not
+      migrate; `docs/CHELIS_SURFACE.md` names them as uncovered.
+    - **State at pin 0.18.6 (2026-09-06):** both upstream issues OPEN.
+      `tests_blocked/special/erf_builtin_absent.ch` reports `precision
+      mismatch: expected f32, got f64` — the package `erf` resolves and refuses
+      the width. The repairs are disjoint: nautilus#56 is the f32 original's
+      own bound and fixing it changes those coefficients but not the signature
+      that forced the duplicate; an f64 signature on `Nautilus.Special` removes
+      the reason to duplicate but leaves the bound wherever A&S is still used;
+      chelis#902 supplies a canonical `erf` with a stated accuracy and removes
+      both. Neither is a chelis arithmetic defect.
+    - **The f32-only signature has no filed issue.** nautilus#12 is the LinAlg
+      signature barrier and does not cover `Nautilus.Special`; citing it would
+      make the de-narrowing branch unexecutable, since closing it would not
+      yield an f64 `erf`. Drafted at
+      `docs/issue_drafts/nautilus-special-f32-only.md`.
     - **Re-probe trigger:** the blocked probe passing, or either issue closing.
-      Follow that probe's sidecar — which repair landed decides whether the
-      accuracy rows survive unchanged or are re-derived from the new atom's
-      stated bound.
+      Follow that probe's sidecar; which repair landed decides whether this
+      kernel is deleted in favour of a callable one or merely re-pointed.
 
 - **chelis#1002 — Reef preserves caller-provided GitHub owner casing in
   `remote_origin`, making lock and package bytes registry-history-dependent.**

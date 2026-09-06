@@ -1,23 +1,18 @@
 precision mismatch: expected f32, got f64
 Blocker: the f32-only signature on `Nautilus.Special` (draft parked at
 docs/issue_drafts/nautilus-special-f32-only.md), with nautilus#56 the sibling
-bound and chelis#902 the structural fix. `Nautilus.Special.erf`
-is f32-only, so a Shoals f64 grad path cannot call it. Shoals.Pricing therefore
-carries `erf64`, whose coefficients are byte-identical to the f32 original --
-Abramowitz-Stegun 7.1.26, ~1.5e-7 absolute by construction of those
-coefficients. Widening the cast does not widen the accuracy, so the f64 entry
-point is no more accurate than the f32 one and the ~1e-6 relative ceiling on
-n_cdf64 / bs_call_f64 / the Greeks follows from that, at any dtype. This is
-disclosed in docs/CHELIS_SURFACE.md.
+bound and chelis#902 the structural fix. `Nautilus.Special.erf` is f32-only, so
+a Shoals f64 grad path cannot call it and `Shoals.Pricing` carries its own
+kernel. That kernel now evaluates Cody's rational approximation at a measured
+1.9e-16 max absolute error; the duplication is what remains, not the accuracy.
 
 Three upstream repairs bear on this and they are disjoint. An f64 signature on
-`Nautilus.Special` removes the reason to duplicate the kernel but leaves the
-A&S bound wherever the coefficients are used -- that is the one this probe
-detects, and it has no issue number yet. nautilus#56 is the f32 original's own
-bound: fixing it changes the coefficients but not the signature, so this probe
-would still fail. chelis#902 would give the language a canonical `erf` with a
-stated accuracy and removes both. Not a chelis arithmetic defect: f64
-arithmetic is evaluated correctly and the bound belongs to the approximation.
+`Nautilus.Special` removes the reason to duplicate -- that is the one this
+probe detects, and it has no issue number yet. nautilus#56 is the f32
+original's own A&S bound: fixing it changes those coefficients but not the
+signature, so this probe would still fail. chelis#902 would give the language a
+canonical `erf` with a stated accuracy and removes both. Not a chelis
+arithmetic defect: f64 arithmetic is evaluated correctly.
 
 Do not cite nautilus#12 here. It is the `Nautilus.LinAlg` signature barrier and
 says nothing about `Nautilus.Special`; an earlier revision of this sidecar

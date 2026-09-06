@@ -194,37 +194,59 @@ tiers: **A** (type/dimension/linearity), **B** (SMT via cvc5 over the reals),
 
 ## Numerical accuracy of shell-authored kernels
 
-What the kernels this shell authors actually guarantee. It exists because
-dtype is not accuracy: an `f64` signature says how the arithmetic is evaluated,
-not how good the approximation being evaluated is.
+What the kernels this shell authors actually guarantee. It exists because dtype
+is not accuracy: an `f64` signature says how the arithmetic is evaluated, not
+how good the approximation being evaluated is.
 
-**Bounds here are ABSOLUTE.** Relative error on an option price is unbounded as
-the price approaches zero — the same kernel that holds 7.8e-7 relative at the
-money reaches 8.7e-4 at K=200 and worse on short-dated OTM strikes. A caller
-who sets `rtol=1e-6` from an at-the-money observation will get silently wrong
-answers on ordinary out-of-the-money strikes.
+**Every figure below is measured on the compiled kernel against a 50-digit
+reference, not derived.** Where a bound is not measured it is not stated.
 
-| Kernel | Approximation | Absolute bound | Notes |
+| Kernel | Approximation | Measured max absolute error | Method |
 |---|---|---|---|
-| `erf64` (module-internal) | Abramowitz & Stegun 7.1.26 | **~1.4e-7** measured over x ∈ [0, 8] | Coefficients byte-identical to the `f32` `Nautilus.Special.erf`. The bound belongs to the coefficients, not the arithmetic, so **no dtype improves it**. The same coefficients evaluated in `f32` give ~4.6e-7, so `f64` buys ~3x — not the nine orders of magnitude the dtype suggests. |
-| `n_cdf64` (module-internal) | `0.5 * (1 - erf64(-x/√2))` | **~7.0e-8** measured | Half `erf64`'s bound, by the factor in the expression. |
-| `bs_call_f64`, `bs_put_f64`, `bs_call_scalar`, `bs_put_scalar`, `bs_call_f64_vector`, `bs_call_wire_f64`, `call_prices`, `put_prices`, `call_total`, `put_total`, and the AD Greeks | closed form over `n_cdf64` | **≲ (S + K·e^−rT) · 7.5e-8** | Follows from `n_cdf64`'s bound through the closed form. Observed 7.8e-7 *relative* at ATM/T=1 — that figure is one point, not a bound. |
+| `erf64` (module-internal) | W. J. Cody, Math. Comp. 23 (1969); three ranges split at 0.5 and 4, saturating at 6 | **1.9e-16** (~0.9 ulp of 1.0) | 411 points over [0, 8], both branch boundaries, negatives |
+| `n_cdf64` (module-internal) | `0.5 * (1 - erf64(-x/√2))` | inherits `erf64`'s, halved by the factor | by construction |
 
-**Not covered by the rows above, and inheriting the same A&S ceiling by their
-own copies of the kernel:** `Shoals.Greeks`'s `analytic_delta_call` /
-`analytic_delta_put` go through a local `n_cdf` over `Nautilus.Special.erfc`,
-which is the `f32` path and therefore the ~4.6e-7 one. `analytic_vega_call` and
-`analytic_gamma_call` use `n_pdf` and never touch `erf`, so no erf-derived
-bound applies to them. `Shoals.PricingExtended`'s `n_cdf_ext` is a third copy
-feeding the `bachelier_*`, `black_*`, `garman_kohlhagen_*`, `margrabe_*` and
-`pe_*` pricers, and `references/blackscholes.ch` a fourth. Stating those is
-tracked separately rather than folded in here.
+**The kernel is no longer the limiting factor.** `bs_call_f64(100, 100, 0.05,
+0.2, 1)` returns `10.450583572185565`, matching the reference to every digit,
+and the `f32` Greek exports land within ~1 `f32` ulp of their true values —
+that is their dtype's rounding, not the approximation's error:
 
-**Why the `f64` variant exists.** To be callable from an `f64` `grad` path —
-the `f32` package symbol could not be. It was never a precision claim.
-Upstream nautilus#56 tracks the same bound on the `f32` original, and
-chelis#902 would supply a canonical `erf` with a stated accuracy, which is the
-fix that removes the ceiling rather than documenting it.
+| export | error vs true | in `f32` ulp |
+|---|---|---|
+| `deltas_call` | 5.1e-8 | 1.35 |
+| `vegas_call` | 1.3e-6 | 0.59 |
+| `rhos_call` | 1.5e-6 | 0.46 |
+| `gammas_call` | 3.5e-10 | 0.31 |
+| `thetas_call` | 1.5e-7 | 0.40 |
+
+**No bound is stated for the Greeks.** The error of a derivative is not
+controlled by the error of the function — in Black–Scholes the true
+`S·φ(d1) − K'·φ(d2)` terms cancel exactly while an approximation's do not, and
+the residue is amplified by `√T/σ` or `1/(Sσ√T)`. The table above is a
+measurement at one parameter set, not a bound over the parameter space.
+Deriving one is out of scope here.
+
+**What this replaced.** Abramowitz & Stegun 7.1.26, whose ~1.4e-7 bound is a
+property of its coefficients rather than of the arithmetic evaluating them — so
+the `f64` entry point was no better than the `f32` `Nautilus.Special.erf` whose
+coefficients it copied, and no wider cast could have improved it. A 7e8x
+reduction. That was this shell's issue 61.
+
+**Still hand-rolled, and why.** Chelis has no canonical `erf` (chelis#902), and
+`Nautilus.Special` is f32-only so its `erf` cannot be called from an `f64` path
+— drafted at `docs/issue_drafts/nautilus-special-f32-only.md` and probed by
+`tests_blocked/special/erf_builtin_absent.ch`. The `f32` sibling still carries
+the A&S bound: nautilus#56.
+
+**Not covered here.** `Shoals.Greeks`'s `analytic_delta_call` /
+`analytic_delta_put` use a local `n_cdf` over `Nautilus.Special.erfc`, still the
+`f32` A&S path; `analytic_vega_call` / `analytic_gamma_call` use `n_pdf` and
+never touch `erf`; the `fd_*` Greeks and `src/volsurface.ch` / `src/dupire.ch`
+divide price differences by `h`, `h²` or vega and so amplify whatever error
+remains; `Shoals.PricingExtended`'s `n_cdf_ext`, `references/blackscholes.ch`
+and `pricing_wire_erf_f64` (whose coefficients are caller-supplied tensor
+parameters) are further copies of the A&S kernel that this change does not
+touch. Migrating them is tracked on this shell's issue 61.
 
 **Scope.** These are kernels this shell authors. Accuracy of chelis primitives
 is upstream's, and upstream has no accuracy contract for shells to inherit —
