@@ -20,8 +20,9 @@ def probe(x: f64) -> f64 = erf(x)
 ## What it costs downstream
 
 `Shoals.Pricing` needs an `erf` on an `f64` grad path, so it carries `erf64`:
-`Nautilus.Special.erf` reimplemented at `f64` with byte-identical Abramowitz &
-Stegun 7.1.26 coefficients. Two copies of one approximation in two
+`erf64`, which since this shell's issue 61 evaluates Cody's rational
+approximation (~2.7e-16) rather than the byte-identical Abramowitz & Stegun
+7.1.26 coefficients it originally copied. Two copies of one approximation in two
 repositories, and a third in `Shoals.PricingExtended`, a fourth in
 `references/blackscholes.ch`.
 

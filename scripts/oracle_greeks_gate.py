@@ -105,22 +105,27 @@ def f32(x: float) -> float:
     return struct.unpack("f", struct.pack("f", x))[0]
 
 
-def erf_as(x: float) -> float:
-    a1, a2, a3, a4, a5, p = (
-        0.254829592, -0.284496736, 1.421413741,
-        -1.453152027, 1.061405429, 0.3275911,
-    )
-    ax = abs(x)
-    if ax < 1e-5:
-        return x * 1.1283791670955126
-    t = 1.0 / (1.0 + p * ax)
-    poly = t * (a1 + t * (a2 + t * (a3 + t * (a4 + t * a5))))
-    y = 1.0 - poly * math.exp(-ax * ax)
-    return -y if x < 0 else y
+def erf_pkg(x: float) -> float:
+    """The erf the PACKAGE evaluates, mirrored here so the comparison isolates
+    the AD chain rule rather than erf accuracy.
+
+    Until this shell's issue 61 the package evaluated Abramowitz & Stegun
+    7.1.26 and this function reproduced those coefficients exactly. It now
+    evaluates Cody's rational approximation at ~2.7e-16 max absolute error, so
+    `math.erf` -- itself correctly rounded to within an ulp -- is a faithful
+    mirror: the two differ by ~1e-16, six orders below this gate's tightest
+    tolerance (3e-6), which keeps the isolation property the docstring above
+    claims.
+
+    `_erf_as_f32` below is NOT updated with this. It models
+    `Nautilus.Special.erf`, which still carries the A&S coefficients, and the
+    f32 corroboration leg depends on that staying true.
+    """
+    return math.erf(x)
 
 
 def ncdf_as(x: float) -> float:
-    return 0.5 * (1.0 - erf_as(-x / SQRT2))
+    return 0.5 * (1.0 - erf_pkg(-x / SQRT2))
 
 
 def ncdf_true(x: float) -> float:
@@ -187,57 +192,40 @@ _AS = (0.254829592, -0.284496736, 1.421413741, -1.453152027, 1.061405429)
 _AS_P = 0.3275911
 
 
-def erf_as_deriv(x: float) -> float:
-    """d/dx erf_AS(x), closed form. For |x|<1e-5 the body uses the linear branch
-    erf ~ (2/sqrt pi) x whose derivative is the constant 1.12837..., matching the
-    package's small-|x| branch. Even function (erf is odd), so x<0 reuses |x|."""
-    a1, a2, a3, a4, a5 = _AS
-    p = _AS_P
-    ax = abs(x)
-    if ax < 1e-5:
-        return 1.1283791670955126
-    t = 1.0 / (1.0 + p * ax)
-    poly = t * (a1 + t * (a2 + t * (a3 + t * (a4 + t * a5))))
-    polyp = a1 + t * (2 * a2 + t * (3 * a3 + t * (4 * a4 + t * 5 * a5)))
-    e = math.exp(-ax * ax)
-    return e * (p * t * t * polyp + 2 * ax * poly)
+def erf_pkg_deriv(x: float) -> float:
+    """d/dx of the package's erf, closed form.
+
+    With the package on Cody's approximation the derivative of the
+    approximation and the true derivative agree far inside this gate's
+    tolerances, so this is the exact 2/sqrt(pi) * exp(-x^2) rather than the
+    differentiated A&S rational form it used to be. That older form is what
+    made this gate fail 13 of 14 groups once the kernel changed: it was
+    measuring erf accuracy, which the docstring says it must not.
+    """
+    return 1.1283791670955126 * math.exp(-x * x)
 
 
 def pdf_as(x: float) -> float:
-    """d/dx ncdf_as(x) = 0.5 * erf_AS'(-x/sqrt2) * (1/sqrt2) -- the A&S 'pdf'."""
-    return 0.5 * erf_as_deriv(-x / SQRT2) / SQRT2
+    """d/dx ncdf_as(x) = 0.5 * erf'(-x/sqrt2) * (1/sqrt2) -- the package's pdf."""
+    return 0.5 * erf_pkg_deriv(-x / SQRT2) / SQRT2
 
 
-def erf_as_deriv2(x: float) -> float:
-    """d^2/dx^2 erf_AS(x), closed form. erf_AS' is even (erf is odd), so it equals
-    g(|x|) and its x-derivative is g'(|x|)*sign(x). For |x|<1e-5 the package uses
-    the linear branch erf ~ (2/sqrt pi) x, whose second derivative is 0. Verified
-    against a high-order central difference of ``erf_as_deriv`` to ~1e-10."""
-    a1, a2, a3, a4, a5 = _AS
-    p = _AS_P
-    ax = abs(x)
-    if ax < 1e-5:
-        return 0.0
-    t = 1.0 / (1.0 + p * ax)
-    dt = -p * t * t                                       # dt/d(ax)
-    poly = t * (a1 + t * (a2 + t * (a3 + t * (a4 + t * a5))))
-    polyp = a1 + t * (2 * a2 + t * (3 * a3 + t * (4 * a4 + t * 5 * a5)))   # d poly/dt
-    polypp = 2 * a2 + t * (6 * a3 + t * (12 * a4 + t * 20 * a5))           # d^2 poly/dt^2
-    e = math.exp(-ax * ax)
-    de = -2 * ax * e                                      # d/d(ax) e^{-ax^2}
-    # erf_as_deriv = M(ax) = e^{-ax^2} (p t^2 polyp + 2 ax poly). Differentiate in ax.
-    inner = p * t * t * polyp + 2 * ax * poly
-    d_inner = p * (2 * t * dt * polyp + t * t * polypp * dt) + 2 * poly + 2 * ax * polyp * dt
-    g_prime = de * inner + e * d_inner
-    return g_prime * (1.0 if x >= 0 else -1.0)
+def erf_pkg_deriv2(x: float) -> float:
+    """d^2/dx^2 of the package's erf, closed form: -2x * 2/sqrt(pi) * exp(-x^2).
+
+    Was the differentiated A&S rational form. Same reasoning as
+    ``erf_pkg_deriv``: with the package on Cody's approximation the true second
+    derivative is the faithful mirror, and the old form measured erf accuracy
+    rather than the AD chain rule.
+    """
+    return -2.0 * x * 1.1283791670955126 * math.exp(-x * x)
 
 
 def pdf_as_deriv(x: float) -> float:
-    """d/dx pdf_as(x) = d^2/dx^2 ncdf_as(x). pdf_as(x)=0.5 erf_AS'(-x/sqrt2)/sqrt2,
-    so pdf_as'(x) = -0.25 * erf_AS''(-x/sqrt2). The analytic 'pdf-prime' of the A&S
-    normal CDF; the building block of the exact SECOND derivatives of the displayed
-    price, used the same way pdf_as builds the exact first derivatives."""
-    return -0.25 * erf_as_deriv2(-x / SQRT2)
+    """d/dx pdf_as(x) = d^2/dx^2 ncdf_as(x), so pdf_as'(x) = -0.25 * erf''(-x/sqrt2).
+    The 'pdf-prime' of the package's normal CDF; the building block of the exact
+    SECOND derivatives of the displayed price, as pdf_as builds the first."""
+    return -0.25 * erf_pkg_deriv2(-x / SQRT2)
 
 
 def ad_ground_truth_greeks(s, k, r, sg, t):

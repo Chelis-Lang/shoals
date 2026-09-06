@@ -26,7 +26,7 @@ def test_vegas_call_ad_matches_displayed_deriv() -> unit ! { Test } = {
   v = to_list(vegas_call(spots, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32)))
   _ = assert_close(index(v, cast(0, int64)), cast(23.805729, f32), cast(0.002, f32), "AD vega s=80")
   _ = assert_close(index(v, cast(1, int64)), cast(37.524035, f32), cast(0.002, f32), "AD vega ATM")
-  assert_close(index(v, cast(2, int64)), cast(21.600513, f32), cast(0.002, f32), "AD vega s=120")
+  assert_close(index(v, cast(2, int64)), cast(21.600708, f32), cast(0.002, f32), "AD vega s=120")
 }
 def test_fd_delta_call_matches_analytic_atm() -> unit ! { Test } = {
   s = cast(100.0, f32)

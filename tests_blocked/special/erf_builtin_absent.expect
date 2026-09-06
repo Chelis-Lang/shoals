@@ -4,7 +4,7 @@ docs/issue_drafts/nautilus-special-f32-only.md), with nautilus#56 the sibling
 bound and chelis#902 the structural fix. `Nautilus.Special.erf` is f32-only, so
 a Shoals f64 grad path cannot call it and `Shoals.Pricing` carries its own
 kernel. That kernel now evaluates Cody's rational approximation at a measured
-1.9e-16 max absolute error; the duplication is what remains, not the accuracy.
+2.7e-16 max absolute error; the duplication is what remains, not the accuracy.
 
 Three upstream repairs bear on this and they are disjoint. An f64 signature on
 `Nautilus.Special` removes the reason to duplicate -- that is the one this
@@ -23,11 +23,18 @@ got f64`, i.e. the symbol resolves and refuses the width. An earlier draft of
 this probe assumed `erf` was absent entirely and expected `unbound variable`;
 running it is what corrected that.
 
-On pass: determine which repair landed. If `Nautilus.Special` gained an f64
-signature, replace `Shoals.Pricing.erf64`'s body with the package `erf` and
-keep the accuracy rows in docs/CHELIS_SURFACE.md, since the coefficients are
-unchanged -- unless nautilus#56 landed with it, in which case re-derive them
-from the new coefficients' bound. If chelis#902 landed, call the language `erf`
-and re-derive those rows from its [05-OP-N] atom's stated bound instead of from
-A&S. Either way promote this probe to tests/ and archive the
+On pass: determine which repair landed, and CHECK THE ACCURACY BEFORE
+SWITCHING. `Shoals.Pricing.erf64` evaluates Cody's approximation at ~2.7e-16;
+`Nautilus.Special.erf` evaluates A&S 7.1.26 at ~1.5e-7. Replacing this body
+with the package `erf` merely because it became callable would regress the
+kernel by nine orders of magnitude and leave docs/CHELIS_SURFACE.md asserting a
+bound the code no longer meets.
+
+So: if `Nautilus.Special` gained an f64 signature but nautilus#56 has NOT
+landed, do not switch -- record that the signature barrier is gone and that the
+duplication persists for an accuracy reason. If nautilus#56 landed too, compare
+its stated bound against Cody's before switching. If chelis#902 landed, read
+its [05-OP-N] atom's stated accuracy and switch only if it is at least as good,
+re-deriving the accuracy rows from that atom rather than from any measurement
+here. Either way promote this probe to tests/ and archive the
 docs/UPSTREAM_BUGS.md entry in the same change set.

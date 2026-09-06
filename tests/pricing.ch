@@ -1,6 +1,6 @@
 module Shoals.Tests.Pricing
 import Std.Test (assert_close, assert_true)
-import Shoals.Pricing (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_wire_f64, call_prices, put_prices, call_total, mc_call_price)
+import Shoals.Pricing (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_wire_f64, call_prices, put_prices, call_total, mc_call_price, deltas_call, gammas_call)
 def abs_f64_test(x: f64) -> f64 = if lt(x, cast(0.0, f64)) then neg(x) else x
 def assert_close_f64(actual: f64, expected: f64, tol: f64, label: string) -> unit ! { Test } = {
   diff = abs_f64_test(sub(actual, expected))
@@ -121,4 +121,29 @@ def test_mc_converges_to_bs() -> unit ! { Test } = {
   rel = div(abs_diff, bs_px)
   ok = lt(rel, cast(0.02, f32))
   assert_close(if ok then cast(1.0, f32) else cast(0.0, f32), cast(1.0, f32), cast(0.001, f32), "MC within 2% of BS at 20K paths")
+}
+-- chelis#1489-adjacent hazard, this shell's issue 61: `vmap` lowers `if` to a
+-- masked select that evaluates BOTH arms, so a branch the dispatcher never
+-- selects still runs. `erf64`'s tail branch divides by its operand twice, and
+-- at ax = 0 an unclamped divisor gives +inf, whose 0 * inf poisons the arm that
+-- WAS selected. Every tensor-lane price and every AD Greek returned NaN
+-- whenever d1 or d2 was exactly zero.
+--
+-- These inputs hit it exactly: 0.5 * 0.25^2 = 0.03125 is exact in binary, so
+-- r = +3.125% makes d2 exactly 0 and r = -3.125% makes d1 exactly 0. Nothing
+-- else in the suite reaches that point, which is why the defect shipped.
+def test_zero_d2_prices_are_not_nan() -> unit ! { Test } = {
+  spots = to_tensor([cast(100.0, f32)])
+  p = to_list(call_prices(spots, cast(100.0, f32), cast(0.03125, f32), cast(0.25, f32), cast(1.0, f32)))
+  assert_close(index(p, cast(0, int64)), cast(11.408971, f32), cast(0.0001, f32), "call_prices at d2=0")
+}
+def test_zero_d2_delta_is_not_nan() -> unit ! { Test } = {
+  spots = to_tensor([cast(100.0, f32)])
+  d = to_list(deltas_call(spots, cast(100.0, f32), cast(0.03125, f32), cast(0.25, f32), cast(1.0, f32)))
+  assert_close(index(d, cast(0, int64)), cast(0.5987063, f32), cast(0.00001, f32), "deltas_call at d2=0")
+}
+def test_zero_d1_gamma_is_not_nan() -> unit ! { Test } = {
+  spots = to_tensor([cast(100.0, f32)])
+  g = to_list(gammas_call(spots, cast(100.0, f32), cast(-0.03125, f32), cast(0.25, f32), cast(1.0, f32)))
+  assert_close(index(g, cast(0, int64)), cast(0.01595769, f32), cast(1e-6, f32), "gammas_call at d1=0")
 }

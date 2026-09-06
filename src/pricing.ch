@@ -8,8 +8,8 @@ export (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_
 -- ACCURACY. `erf64` evaluates W. J. Cody's rational approximation (Math. Comp.
 -- 23, 1969): three ranges split at 0.5 and 4, saturating at 6 where erfc
 -- underflows f64. Measured on this compiled kernel against a 50-digit
--- reference over 411 points spanning [0, 8], both branch boundaries and
--- negatives: maximum absolute error 1.9e-16, about 0.9 ulp of 1.0.
+-- reference over 571k points spanning [0, 8], both branch boundaries and
+-- negatives: maximum absolute error 2.7e-16, about 1.22 ulp of 1.0.
 --
 -- It replaced Abramowitz & Stegun 7.1.26 (this shell's issue 61), whose
 -- ~1.4e-7 bound is a property of its coefficients rather than of the
@@ -65,7 +65,19 @@ def erf64_core_erfc_mid(ax: f64) -> f64 = {
 }
 -- Cody region 3 (4 < |x| < 6): erfc(|x|) = exp(-x^2)/|x| * (1/sqrt(pi) - R(1/x^2)).
 def erf64_core_erfc_tail(ax: f64) -> f64 = {
-  y = div(cast(1.0, f64), mul(ax, ax))
+  -- The divisor is clamped, and that is load-bearing rather than defensive.
+  -- `vmap` lowers `if` to a masked select which evaluates BOTH arms, so this
+  -- branch runs even for operands the dispatcher sends elsewhere. At ax = 0 an
+  -- unclamped 1/(ax*ax) is +inf, and 0 * inf = NaN poisons the arm that was
+  -- actually selected -- which made every tensor-lane price and every AD Greek
+  -- return NaN whenever d1 or d2 was exactly zero (S=K=100, r=3.125%,
+  -- sigma=25%, T=1 hits it, since 0.5*0.25^2 is exact in binary).
+  --
+  -- Clamping to 1.0 changes nothing on this branch's real domain, ax > 4,
+  -- where the clamp never binds. The A&S kernel this replaced had no division
+  -- by ax and so never had the hazard.
+  guarded = if lt(ax, cast(1.0, f64)) then cast(1.0, f64) else ax
+  y = div(cast(1.0, f64), mul(guarded, guarded))
   xnum0 = mul(cast(0.016315387137302097, f64), y)
   xden0 = y
   xnum1 = mul(add(xnum0, cast(0.30532663496123236, f64)), y)
@@ -77,7 +89,7 @@ def erf64_core_erfc_tail(ax: f64) -> f64 = {
   xnum4 = mul(add(xnum3, cast(0.016083785148742275, f64)), y)
   xden4 = mul(add(xden3, cast(0.06051834131244132, f64)), y)
   r = mul(y, div(add(xnum4, cast(0.0006587491615298378, f64)), add(xden4, cast(0.0023352049762686918, f64))))
-  div(mul(exp(neg(mul(ax, ax))), sub(cast(0.5641895835477563, f64), r)), ax)
+  div(mul(exp(neg(mul(ax, ax))), sub(cast(0.5641895835477563, f64), r)), guarded)
 }
 def erf64_erfc_abs(ax: f64) -> f64 = if lt(ax, cast(4.0, f64)) then erf64_core_erfc_mid(ax) else if lt(ax, cast(6.0, f64)) then erf64_core_erfc_tail(ax) else cast(0.0, f64)
 def erf64(x: f64) -> f64 = {

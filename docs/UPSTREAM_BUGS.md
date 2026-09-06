@@ -161,7 +161,7 @@ in code that is CLOSED upstream but not sitting in §Archived.
   cannot call its `erf`; `Shoals.Pricing` therefore hand-rolls one. The
   duplication is the narrowing. The accuracy problem that came with it is
   fixed: `erf64` now evaluates Cody's rational approximation at a measured
-  1.9e-16 max absolute error (411 points, 50-digit reference), replacing the
+  2.7e-16 max absolute error (571k points, 50-digit reference), replacing the
   Abramowitz & Stegun 7.1.26 coefficients it had copied from the f32 sibling
   at ~1.4e-7.
     - **Affected surface / narrowing:** a second implementation of `erf` lives
