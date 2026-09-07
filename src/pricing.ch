@@ -120,9 +120,8 @@ def erf64_core_erfc_tail(axr: f64) -> f64 = {
 -- +/-inf still poisons a sibling arm wherever an untaken arm is unbounded.
 -- `abs_f64` uses the `abs` intrinsic for that reason; `min`/`max` would remove
 -- the rest but are unavailable at this pin: they type-check under vmap and
--- then fail at eval with `missing required input min`
--- (docs/issue_drafts/min-max-unavailable-under-vmap.md), which is why the
--- residual is genuinely upstream-blocked rather than unfixed here. The
+-- then fail at eval with `missing required input min` (chelis#1582), which
+-- is why the residual is genuinely upstream-blocked rather than unfixed here. The
 -- clamps never bind on the region the dispatcher actually routes to a core, so
 -- no returned value changes. An earlier revision guarded only the two
 -- divisions in region 3 and left regions 1 and 2 exposed, because their

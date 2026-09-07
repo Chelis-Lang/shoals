@@ -184,10 +184,11 @@ in code that is CLOSED upstream but not sitting in §Archived.
       all of f64. `+/-inf` still poisons a sibling arm wherever an untaken arm
       is unbounded. `min`/`max` would close that but are unavailable at this
       pin: they type-check under vmap and then fail at eval with `missing
-      required input min`, measured at 0.18.6. Not chelis#377 (that one needs a
-      top-level-binding capture; this reproducer captures nothing). Drafted at
-      `docs/issue_drafts/min-max-unavailable-under-vmap.md`, unfiled, so the
-      residual is upstream-blocked rather than unfixed.
+      required input min`, measured at 0.18.6. Filed as
+      [`chelis#1582`](https://github.com/Chelis-Lang/chelis/issues/1582). Not
+      chelis#377 (that one needs a top-level-binding capture; this reproducer
+      captures nothing), so the residual is upstream-blocked rather than
+      unfixed.
     - **Why the clamp is at every core, not at the observed failure:** an
       earlier revision guarded only the two divisions in region 3. Regions 1
       and 2 do not divide -- both are `P(y)/Q(y)` Horner chains with positive
