@@ -10,8 +10,12 @@ import Shoals.Pricing (gammas_call, volgas_call, vannas_call)
 -- because the kernel was inaccurate, so a true target could not be used. Since
 -- `erf64` moved to Cody's approximation (~2.7e-16, this shell's issue 61) the
 -- displayed price IS the true price at f64 and the two coincide. Four of the
--- eleven old targets breached tolerance; the other seven sat inside it by luck,
--- and all eleven were replaced so the suite does not pin an approximation the
+-- eleven old targets breached tolerance; the other seven sat inside it by luck.
+-- All TWELVE second-derivative targets are now regenerated -- the count was
+-- misstated as eleven, and `vanna ITM s=120` kept its A&S-displayed value for
+-- a further round, consuming 41% of its own tolerance band. Regenerating every
+-- target, not only the ones that breached, is what stops the suite pinning an
+-- approximation the
 -- code no longer computes. The closed-form chain rule in
 -- scripts/oracle_greeks_gate.py (validated there against true-BS analytic and
 -- tuned f64 finite differences of the displayed price). These tests pin the
@@ -59,5 +63,5 @@ def test_vannas_call_matches_displayed_2nd_deriv() -> unit ! { Test } = {
   _ = assert_close(index(v, cast(0, int64)), cast(0.42256851, f32), cast(0.00004, f32), "vanna neg-d1 s=60")
   _ = assert_close(index(v, cast(1, int64)), cast(1.43685094, f32), cast(0.00008, f32), "vanna s=80")
   _ = assert_close(index(v, cast(2, int64)), cast(-0.28143026, f32), cast(0.00004, f32), "vanna ATM s=100")
-  assert_close(index(v, cast(3, int64)), cast(-0.955503, f32), cast(0.00006, f32), "vanna ITM s=120")
+  assert_close(index(v, cast(3, int64)), cast(-0.95547831, f32), cast(0.00006, f32), "vanna ITM s=120")
 }

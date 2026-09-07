@@ -156,6 +156,42 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 ## Tracking
 
+- **chelis#1464 — `vmap`/`grad` evaluate untaken `if` branches, so every
+  `erf64` core must be total.** `spec/06-transformations.md` §2.10.1 states that
+  untaken branches contribute nothing and are not evaluated. The implementation
+  lowers a scalar `if` under `vmap`/`grad` to a masked select that evaluates
+  BOTH arms, so a core that returns a non-finite value outside its own region
+  poisons the arm that was actually selected (`0 * NaN = NaN`).
+    - **Affected surface / narrowing:** `erf64_core_small` and
+      `erf64_core_erfc_mid` clamp their argument at entry, and
+      `erf64_core_erfc_tail` clamps its LOWER end. `abs_f64` uses the `abs`
+      intrinsic rather than a hand-rolled `if`, and `erf64` guards NaN with
+      `eq(x, x)`. The clamps never bind on the region the dispatcher routes to
+      each core, so no returned value changes.
+    - **The rule, since a previous revision got it wrong:** a clamp is an `if`,
+      so under masked select it is safe only when its UNTAKEN arm is a bounded
+      constant. The tail's lower clamp qualifies (untaken arm `1.0`); an upper
+      clamp would not (untaken arm is the operand), and one added "for
+      uniformity" REMOVED that branch's totality at +inf. It is deleted.
+    - **Scope of the guarantee:** total over the FINITE f64 domain, not over
+      all of f64. `+/-inf` still poisons a sibling arm wherever an untaken arm
+      is unbounded. `min`/`max` would close that but are unavailable at this
+      pin (`missing required input min` under vmap), so the residual is
+      upstream-blocked rather than unfixed.
+    - **Why the clamp is at every core, not at the observed failure:** an
+      earlier revision guarded only the two divisions in region 3. Regions 1
+      and 2 do not divide -- both are `P(y)/Q(y)` Horner chains with positive
+      coefficients, so numerator and denominator both overflow to `+inf` and
+      `inf/inf = NaN`. Guarding the sites a review named, rather than the
+      class, let the same defect survive two repairs: measured, the f64 vector
+      price returned NaN at sigma = 1e-60 and the AD gamma at sigma = 1e-40, a
+      representable f32 subnormal.
+    - **State at pin 0.18.6 (2026-09-07):** OPEN upstream. Pinning is
+      per-clamp and was previously misstated as uniform: reverting the region-1
+      or region-2 clamp fails the subnormal-sigma cases; reverting the tail's
+      LOWER clamp fails the zero-`d` cases instead. The NaN guard and the `abs`
+      intrinsic are pinned by the non-finite-input cases.
+
 - **nautilus#56 / chelis#902 — no f64-callable `erf`, so this shell carries its
   own kernel.** `Nautilus.Special` is f32-only, so a Shoals f64 grad path
   cannot call its `erf`; `Shoals.Pricing` therefore hand-rolls one. The

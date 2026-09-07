@@ -17,9 +17,10 @@ export (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_
 -- the f32 `Nautilus.Special.erf` whose coefficients it copied, and no wider
 -- cast could have improved it. That is a 7e8x reduction, and it moves the
 -- limiting factor off this kernel entirely: `bs_call_f64` at
--- (100, 100, 0.05, 0.2, 1) now returns 10.450583572185565, matching the
--- reference to every digit, and the f32 Greek exports land within ~1 f32 ulp
--- of their true values, i.e. at their dtype's rounding.
+-- (100, 100, 0.05, 0.2, 1) now returns 10.450583572185565, one ulp from the
+-- correctly-rounded 10.450583572185566, and the f32 Greek exports land within
+-- 1 f32 ulp of their true values (worst measured 0.87), i.e. at their dtype's
+-- rounding. docs/CHELIS_SURFACE.md states the parameter set.
 --
 -- The f32 sibling still carries the old bound; see nautilus#56. Chelis has no
 -- canonical erf to call instead (chelis#902), and `Nautilus.Special` is
@@ -29,10 +30,16 @@ export (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_
 --
 -- Kept as three named helpers rather than one expression because the AD Greeks
 -- differentiate through this path and each branch is separately checkable.
-def abs_f64(x: f64) -> f64 = if lt(x, cast(0.0, f64)) then neg(x) else x
+-- The `abs` intrinsic, not a hand-rolled `if`. A hand-rolled
+-- `if lt(x, 0) then neg(x) else x` has the operand as its untaken arm, so
+-- under vmap's masked select it returns NaN at +inf (chelis#1464). The
+-- intrinsic is total there. Verified by round-5 review.
+def abs_f64(x: f64) -> f64 = abs(x)
 -- Cody region 1 (|x| <= 0.5): erf(x) = x * P(x^2)/Q(x^2), odd by construction.
 def erf64_core_small(x: f64) -> f64 = {
-  y = mul(x, x)
+  -- Domain clamp. See the note above `erf64` for why every core clamps.
+  xc = if lt(x, cast(-0.5, f64)) then cast(-0.5, f64) else if lt(cast(0.5, f64), x) then cast(0.5, f64) else x
+  y = mul(xc, xc)
   xnum0 = mul(cast(0.18577770618460315, f64), y)
   xden0 = y
   xnum1 = mul(add(xnum0, cast(3.1611237438705655, f64)), y)
@@ -41,10 +48,12 @@ def erf64_core_small(x: f64) -> f64 = {
   xden2 = mul(add(xden1, cast(244.02463793444417, f64)), y)
   xnum3 = mul(add(xnum2, cast(377.485237685302, f64)), y)
   xden3 = mul(add(xden2, cast(1282.6165260773723, f64)), y)
-  mul(x, div(add(xnum3, cast(3209.3775891384694, f64)), add(xden3, cast(2844.236833439171, f64))))
+  mul(xc, div(add(xnum3, cast(3209.3775891384694, f64)), add(xden3, cast(2844.236833439171, f64))))
 }
 -- Cody region 2 (0.5 < |x| <= 4): erfc(|x|) = exp(-x^2) * P(|x|)/Q(|x|).
-def erf64_core_erfc_mid(ax: f64) -> f64 = {
+def erf64_core_erfc_mid(axr: f64) -> f64 = {
+  -- Domain clamp. See the note above `erf64` for why every core clamps.
+  ax = if lt(cast(4.0, f64), axr) then cast(4.0, f64) else axr
   xnum0 = mul(cast(2.1531153547440383e-8, f64), ax)
   xden0 = ax
   xnum1 = mul(add(xnum0, cast(0.5641884969886701, f64)), ax)
@@ -64,19 +73,19 @@ def erf64_core_erfc_mid(ax: f64) -> f64 = {
   mul(exp(neg(mul(ax, ax))), div(add(xnum7, cast(1230.3393547979972, f64)), add(xden7, cast(1230.3393548037495, f64))))
 }
 -- Cody region 3 (4 < |x| < 6): erfc(|x|) = exp(-x^2)/|x| * (1/sqrt(pi) - R(1/x^2)).
-def erf64_core_erfc_tail(ax: f64) -> f64 = {
-  -- The divisor is clamped, and that is load-bearing rather than defensive.
-  -- `vmap` lowers `if` to a masked select which evaluates BOTH arms, so this
-  -- branch runs even for operands the dispatcher sends elsewhere. At ax = 0 an
-  -- unclamped 1/(ax*ax) is +inf, and 0 * inf = NaN poisons the arm that was
-  -- actually selected -- which made every tensor-lane price and every AD Greek
-  -- return NaN whenever d1 or d2 was exactly zero (S=K=100, r=3.125%,
-  -- sigma=25%, T=1 hits it, since 0.5*0.25^2 is exact in binary).
+def erf64_core_erfc_tail(axr: f64) -> f64 = {
+  -- LOWER clamp only, and the asymmetry is the point. A clamp is an `if`, so
+  -- under vmap's masked select BOTH arms evaluate -- and a clamp is safe only
+  -- when its UNTAKEN arm is a bounded constant. Here the untaken arm is the
+  -- constant 1.0, so an unbounded operand never reaches the multiply.
   --
-  -- Clamping to 1.0 changes nothing on this branch's real domain, ax > 4,
-  -- where the clamp never binds. The A&S kernel this replaced had no division
-  -- by ax and so never had the hazard.
-  guarded = if lt(ax, cast(1.0, f64)) then cast(1.0, f64) else ax
+  -- An upper clamp would have the operand itself as its untaken arm, so
+  -- `0 * inf = NaN` at ax = +inf. A previous revision added one "for
+  -- uniformity" and thereby REMOVED this branch's totality at +inf, which it
+  -- had before. Nothing pinned it: reverting it left all tests green. It is
+  -- deleted rather than pinned, because it bought nothing and cost that.
+  guarded = if lt(axr, cast(1.0, f64)) then cast(1.0, f64) else axr
+  ax = guarded
   y = div(cast(1.0, f64), mul(guarded, guarded))
   xnum0 = mul(cast(0.016315387137302097, f64), y)
   xden0 = y
@@ -91,12 +100,47 @@ def erf64_core_erfc_tail(ax: f64) -> f64 = {
   r = mul(y, div(add(xnum4, cast(0.0006587491615298378, f64)), add(xden4, cast(0.0023352049762686918, f64))))
   div(mul(exp(neg(mul(ax, ax))), sub(cast(0.5641895835477563, f64), r)), guarded)
 }
+-- EVERY core clamps its argument into its own region at entry, and that is
+-- load-bearing rather than defensive. Narrowing for chelis#1464; see
+-- docs/UPSTREAM_BUGS.md.
+--
+-- `vmap` lowers `if` to a masked select which evaluates BOTH arms (chelis#1464:
+-- `spec/06-transformations.md` §2.10.1 says untaken branches are not
+-- evaluated; the implementation evaluates them), so every core runs on every
+-- operand the dispatcher sees, including operands routed to a different
+-- branch. A core that returns a non-finite value outside its own region
+-- therefore poisons the arm that WAS selected, because 0 * NaN = NaN.
+--
+-- Clamping at each entry makes each core total over the FINITE f64 domain.
+-- Not over all of f64: the clamps and the dispatcher are themselves `if`s, so
+-- +/-inf still poisons a sibling arm wherever an untaken arm is unbounded.
+-- `abs_f64` uses the `abs` intrinsic for that reason; `min`/`max` would remove
+-- the rest but are unavailable at this pin (chelis 0.18.6 reports `missing
+-- required input min` under vmap), which is why the residual is genuinely
+-- upstream-blocked rather than unfixed here. The
+-- clamps never bind on the region the dispatcher actually routes to a core, so
+-- no returned value changes. An earlier revision guarded only the two
+-- divisions in region 3 and left regions 1 and 2 exposed, because their
+-- hazard is not division: both are P(y)/Q(y) Horner chains with positive
+-- coefficients, so numerator AND denominator overflow to +inf at large
+-- argument and inf/inf = NaN. Guarding the sites one review found, rather than
+-- the class, is what let the same defect survive two repairs.
 def erf64_erfc_abs(ax: f64) -> f64 = if lt(ax, cast(4.0, f64)) then erf64_core_erfc_mid(ax) else if lt(ax, cast(6.0, f64)) then erf64_core_erfc_tail(ax) else cast(0.0, f64)
 def erf64(x: f64) -> f64 = {
   ax = abs_f64(x)
   y = sub(cast(1.0, f64), erf64_erfc_abs(ax))
   signed = if lt(x, cast(0.0, f64)) then neg(y) else y
-  if lt(ax, cast(0.5, f64)) then erf64_core_small(x) else signed
+  finite = if lt(ax, cast(0.5, f64)) then erf64_core_small(x) else signed
+  -- NaN propagates rather than saturating. Every `lt` against NaN is false, so
+  -- without this guard the dispatcher falls through to the saturation arm and
+  -- returns 1.0: a negative spot then priced to a silent 0.0 where the A&S
+  -- kernel returned NaN. Answering zero is worse than answering NaN for a
+  -- pricing kernel, and it diverged between lanes (vmap still gave NaN).
+  --
+  -- `eq(x, x)` is false only for NaN. The guard is safe under masked select
+  -- because BOTH arms are finite whenever the input is: the untaken arm is
+  -- `x` itself for a finite operand, and the saturating 1.0 for a NaN one.
+  if eq(x, x) then finite else x
 }
 def n_cdf64(x: f64) -> f64 = {
   inv_sqrt_2 = cast(0.7071067811865476, f64)

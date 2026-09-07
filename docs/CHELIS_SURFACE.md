@@ -207,17 +207,25 @@ reference, not derived.** Where a bound is not measured it is not stated.
 | `n_cdf64` (module-internal) | `0.5 * (1 - erf64(-x/√2))` | inherits `erf64`'s, halved by the factor | by construction |
 
 **The kernel is no longer the limiting factor.** `bs_call_f64(100, 100, 0.05,
-0.2, 1)` returns `10.450583572185565`, matching the reference to every digit,
+0.2, 1)` returns `10.450583572185565`, one ulp from the correctly-rounded
+`10.450583572185566` (50-digit reference `10.45058357218556678`),
 and the `f32` Greek exports land within ~1 `f32` ulp of their true values —
 that is their dtype's rounding, not the approximation's error:
 
+Measured at `K=100, r=0.05, sigma=0.2, T=1`, worst case over
+`S in {60, 80, 100, 120}`, comparing the shipped `f32` exports (`chelis eval`)
+against a 50-digit `mpmath` reference evaluated at the same `f32`-rounded
+inputs. An earlier revision of this table stated no parameter set and its ulp
+column did not reproduce at any set — `deltas_call` was given as 1.35 ulp,
+contradicting the sentence above it.
+
 | export | error vs true | in `f32` ulp |
 |---|---|---|
-| `deltas_call` | 5.1e-8 | 1.35 |
-| `vegas_call` | 1.3e-6 | 0.59 |
-| `rhos_call` | 1.5e-6 | 0.46 |
-| `gammas_call` | 3.5e-10 | 0.31 |
-| `thetas_call` | 1.5e-7 | 0.40 |
+| `deltas_call` | 5.17e-8 | 0.87 |
+| `vegas_call` | 1.33e-6 | 0.37 |
+| `rhos_call` | 2.44e-6 | 0.41 |
+| `gammas_call` | 6.53e-10 | 0.35 |
+| `thetas_call` | 1.15e-7 | 0.32 |
 
 **No bound is stated for the Greeks.** The error of a derivative is not
 controlled by the error of the function — in Black–Scholes the true
