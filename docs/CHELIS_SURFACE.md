@@ -242,7 +242,7 @@ reduction. That was this shell's issue 61.
 
 **Still hand-rolled, and why.** Chelis has no canonical `erf` (chelis#902), and
 `Nautilus.Special` is f32-only so its `erf` cannot be called from an `f64` path
-— drafted at `docs/issue_drafts/nautilus-special-f32-only.md` and probed by
+— filed as nautilus#59 and probed by
 `tests_blocked/special/erf_builtin_absent.ch`. The `f32` sibling still carries
 the A&S bound: nautilus#56.
 

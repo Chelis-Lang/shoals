@@ -1,6 +1,6 @@
 precision mismatch: expected f32, got f64
 Blocker: the f32-only signature on `Nautilus.Special` (draft parked at
-docs/issue_drafts/nautilus-special-f32-only.md), with nautilus#56 the sibling
+nautilus#59), with nautilus#56 the sibling
 bound and chelis#902 the structural fix. `Nautilus.Special.erf` is f32-only, so
 a Shoals f64 grad path cannot call it and `Shoals.Pricing` carries its own
 kernel. That kernel now evaluates Cody's rational approximation at a measured

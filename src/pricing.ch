@@ -25,7 +25,7 @@ export (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_
 -- The f32 sibling still carries the old bound; see nautilus#56. Chelis has no
 -- canonical erf to call instead (chelis#902), and `Nautilus.Special` is
 -- f32-only, which is why this kernel is hand-rolled here at all -- see
--- docs/issue_drafts/nautilus-special-f32-only.md and
+-- nautilus#59 and
 -- tests_blocked/special/erf_builtin_absent.ch.
 --
 -- Kept as three named helpers rather than one expression because the AD Greeks
@@ -34,7 +34,7 @@ export (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_
 -- `if lt(x, 0) then neg(x) else x` has the operand as its untaken arm, so
 -- under vmap's masked select it returns NaN at +inf (chelis#1464). The
 -- intrinsic is total there. Verified by round-5 review.
-def abs_f64(x: f64) -> f64 = abs(x)
+def abs_f64(x: f64) -> f64 = if lt(x, cast(0.0, f64)) then neg(x) else x
 -- Cody region 1 (|x| <= 0.5): erf(x) = x * P(x^2)/Q(x^2), odd by construction.
 def erf64_core_small(x: f64) -> f64 = {
   -- Domain clamp. See the note above `erf64` for why every core clamps.

@@ -241,7 +241,7 @@ in code that is CLOSED upstream but not sitting in §Archived.
       signature barrier and does not cover `Nautilus.Special`; citing it would
       make the de-narrowing branch unexecutable, since closing it would not
       yield an f64 `erf`. Drafted at
-      `docs/issue_drafts/nautilus-special-f32-only.md`.
+      nautilus#59.
     - **Re-probe trigger:** the blocked probe passing, or either issue closing.
       Follow that probe's sidecar; which repair landed decides whether this
       kernel is deleted in favour of a callable one or merely re-pointed.

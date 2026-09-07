@@ -13,7 +13,7 @@ entry in the same change set).
 `Nautilus.Special`, which is why `Shoals.Pricing` carries its own `erf64`.
 Reports `precision mismatch: expected f32, got f64`: the package `erf`
 resolves and refuses the width. Blocker drafted at
-`docs/issue_drafts/nautilus-special-f32-only.md`; siblings are nautilus#56
+nautilus#59; siblings are nautilus#56
 (the approximation's own bound) and chelis#902 (a canonical `erf` in the
 language). Its sidecar's de-narrowing steps branch on which lands.
 
