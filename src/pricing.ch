@@ -76,11 +76,15 @@ def erf64_core_erfc_mid(axr: f64) -> f64 = {
 def erf64_core_erfc_tail(axr: f64) -> f64 = {
   -- LOWER clamp only, and the asymmetry is the point. A clamp is an `if`, so
   -- under vmap's masked select BOTH arms evaluate -- and a clamp is safe only
-  -- when its UNTAKEN arm is a bounded constant. Here the untaken arm is the
+  -- when its UNTAKEN arm is FINITE over the domain totality is claimed for.
+  -- A bounded constant is sufficient, not necessary: regions 1 and 2 clamp
+  -- with the operand itself as an untaken arm and are safe over the finite
+  -- domain, which is all this kernel claims. Here the untaken arm is the
   -- constant 1.0, so an unbounded operand never reaches the multiply.
   --
-  -- An upper clamp would have the operand itself as its untaken arm, so
-  -- `0 * inf = NaN` at ax = +inf. A previous revision added one "for
+  -- An upper clamp would have the operand itself as its untaken arm, and at
+  -- ax = +inf that arm is +inf, so `0 * inf = NaN` -- the one point where
+  -- this branch is total and regions 1 and 2 are not. A previous revision added one "for
   -- uniformity" and thereby REMOVED this branch's totality at +inf, which it
   -- had before. Nothing pinned it: reverting it left all tests green. It is
   -- deleted rather than pinned, because it bought nothing and cost that.
@@ -115,9 +119,10 @@ def erf64_core_erfc_tail(axr: f64) -> f64 = {
 -- Not over all of f64: the clamps and the dispatcher are themselves `if`s, so
 -- +/-inf still poisons a sibling arm wherever an untaken arm is unbounded.
 -- `abs_f64` uses the `abs` intrinsic for that reason; `min`/`max` would remove
--- the rest but are unavailable at this pin (chelis 0.18.6 reports `missing
--- required input min` under vmap), which is why the residual is genuinely
--- upstream-blocked rather than unfixed here. The
+-- the rest but are unavailable at this pin: they type-check under vmap and
+-- then fail at eval with `missing required input min`
+-- (docs/issue_drafts/min-max-unavailable-under-vmap.md), which is why the
+-- residual is genuinely upstream-blocked rather than unfixed here. The
 -- clamps never bind on the region the dispatcher actually routes to a core, so
 -- no returned value changes. An earlier revision guarded only the two
 -- divisions in region 3 and left regions 1 and 2 exposed, because their

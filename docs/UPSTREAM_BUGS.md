@@ -168,16 +168,26 @@ in code that is CLOSED upstream but not sitting in §Archived.
       intrinsic rather than a hand-rolled `if`, and `erf64` guards NaN with
       `eq(x, x)`. The clamps never bind on the region the dispatcher routes to
       each core, so no returned value changes.
-    - **The rule, since a previous revision got it wrong:** a clamp is an `if`,
-      so under masked select it is safe only when its UNTAKEN arm is a bounded
-      constant. The tail's lower clamp qualifies (untaken arm `1.0`); an upper
-      clamp would not (untaken arm is the operand), and one added "for
-      uniformity" REMOVED that branch's totality at +inf. It is deleted.
+    - **The rule, since two revisions got it wrong:** a clamp is an `if`, so
+      under masked select it is safe only when its UNTAKEN arm is FINITE over
+      the domain totality is claimed for. A bounded constant is sufficient but
+      NOT necessary -- an earlier revision of this line said "bounded
+      constant", which would condemn regions 1 and 2, whose clamps take the
+      operand itself as an untaken arm and are demonstrably safe over the
+      finite domain. The tail's lower clamp has the constant `1.0`; an upper
+      clamp would take the operand, which is +inf at ax = +inf, so one added
+      "for uniformity" REMOVED that branch's totality at the single point
+      where it had more than regions 1 and 2. It is deleted, and its absence
+      is unpinned: re-adding it leaves every test green, because the suite
+      claims nothing at +inf.
     - **Scope of the guarantee:** total over the FINITE f64 domain, not over
       all of f64. `+/-inf` still poisons a sibling arm wherever an untaken arm
       is unbounded. `min`/`max` would close that but are unavailable at this
-      pin (`missing required input min` under vmap), so the residual is
-      upstream-blocked rather than unfixed.
+      pin: they type-check under vmap and then fail at eval with `missing
+      required input min`, measured at 0.18.6. Not chelis#377 (that one needs a
+      top-level-binding capture; this reproducer captures nothing). Drafted at
+      `docs/issue_drafts/min-max-unavailable-under-vmap.md`, unfiled, so the
+      residual is upstream-blocked rather than unfixed.
     - **Why the clamp is at every core, not at the observed failure:** an
       earlier revision guarded only the two divisions in region 3. Regions 1
       and 2 do not divide -- both are `P(y)/Q(y)` Horner chains with positive
