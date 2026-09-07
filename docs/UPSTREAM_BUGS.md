@@ -189,8 +189,20 @@ in code that is CLOSED upstream but not sitting in §Archived.
     - **State at pin 0.18.6 (2026-09-07):** OPEN upstream. Pinning is
       per-clamp and was previously misstated as uniform: reverting the region-1
       or region-2 clamp fails the subnormal-sigma cases; reverting the tail's
-      LOWER clamp fails the zero-`d` cases instead. The NaN guard and the `abs`
-      intrinsic are pinned by the non-finite-input cases.
+      LOWER clamp fails the zero-`d` cases instead. The NaN guard is pinned by
+      the non-finite-input cases: removing it fails
+      `test_non_finite_input_propagates_rather_than_saturating` on the
+      negative-spot assertion.
+    - **The `abs` intrinsic is NOT pinned, and cannot be.** An earlier revision
+      of this entry claimed it was. Swapping `abs(x)` for a hand-rolled
+      `if lt(x, 0) then neg(x) else x` changes no observable output: measured
+      through `bs_call_f64_vector` (the vmap lane) at an infinite sigma and at
+      a negative spot, and through scalar `bs_call_f64`, both spellings return
+      NaN in every cell, and the full suite is unchanged. The two differ only
+      at a non-finite argument, and every path that reaches `abs_f64` with one
+      ends in NaN regardless. The intrinsic is kept because it is the
+      structurally simpler form -- one fewer `if` for the masked select to
+      duplicate -- not because a test defends it.
 
 - **nautilus#56 / chelis#902 — no f64-callable `erf`, so this shell carries its
   own kernel.** `Nautilus.Special` is f32-only, so a Shoals f64 grad path
