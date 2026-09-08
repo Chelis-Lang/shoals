@@ -169,8 +169,14 @@ in code that is CLOSED upstream but not sitting in §Archived.
       `eq(x, x)`. The clamps never bind on the region the dispatcher routes to
       each core, so no returned value changes.
     - **The rule, since two revisions got it wrong:** a clamp is an `if`, so
-      under masked select it is safe only when its UNTAKEN arm is FINITE over
-      the domain totality is claimed for. A bounded constant is sufficient but
+      under masked select it is safe only when its UNTAKEN arm has a finite
+      VALUE **and** a finite DERIVATIVE over the domain totality is claimed
+      for. The derivative half was missing from an earlier revision:
+      `if c then k else sqrt(x)` has a finite untaken value at x = 0 and an
+      infinite derivative, satisfies the weaker rule, and still NaNs under
+      `grad` because the adjoint multiplies that derivative by the 0 mask.
+      Measured at this pin; the shipped kernel is safe under the stronger
+      rule, since every untaken arm is a constant or the bare operand. A bounded constant is sufficient but
       NOT necessary -- an earlier revision of this line said "bounded
       constant", which would condemn regions 1 and 2, whose clamps take the
       operand itself as an untaken arm and are demonstrably safe over the

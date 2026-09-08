@@ -1,6 +1,6 @@
 module Shoals.Pricing
 import Nautilus.Distributions (normal_sample)
-export (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_wire_f64, call_prices, put_prices, call_total, put_total, deltas_call, deltas_put, vegas_call, rhos_call, thetas_call, gammas_call, volgas_call, vannas_call, mc_call_price)
+export (erf64, n_cdf64, bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_wire_f64, call_prices, put_prices, call_total, put_total, deltas_call, deltas_put, vegas_call, rhos_call, thetas_call, gammas_call, volgas_call, vannas_call, mc_call_price)
 -- One normal CDF behind both price and Greeks. n_cdf(x) = 0.5 * erfc(-x/sqrt2)
 -- is the exact expression Shoals.References / Shoals.Greeks use. The displayed
 -- Greek is the AD derivative of THIS expression, so price and Greek agree.
@@ -92,11 +92,27 @@ def erf64_core_erfc_mid(axr: f64) -> f64 = {
 def erf64_core_erfc_tail(axr: f64) -> f64 = {
   -- LOWER clamp only, and the asymmetry is the point. A clamp is an `if`, so
   -- under vmap's masked select BOTH arms evaluate -- and a clamp is safe only
-  -- when its UNTAKEN arm is FINITE over the domain totality is claimed for.
-  -- A bounded constant is sufficient, not necessary: regions 1 and 2 clamp
-  -- with the operand itself as an untaken arm and are safe over the finite
-  -- domain, which is all this kernel claims. Here the untaken arm is the
-  -- constant 1.0, so an unbounded operand never reaches the multiply.
+  -- when its UNTAKEN arm has a finite VALUE *and* a finite DERIVATIVE over
+  -- the domain totality is claimed for.
+  --
+  -- The derivative half is not decoration. An earlier revision of this rule
+  -- said "finite" and meant the value, which a maintainer can satisfy and
+  -- still ship a NaN. Measured at this pin:
+  --
+  --   def hazard(x: f64) -> f64 =
+  --     if lt(x, cast(1.0, f64)) then cast(2.0, f64) else sqrt(x)
+  --   value @ [0.0, 0.5, 4.0] = [2.0, 2.0, 2.0]      -- finite everywhere
+  --   grad  @ [0.0, 0.5, 4.0] = [NaN, 0.0, 0.25]     -- NaN at x = 0
+  --
+  -- `sqrt(0) = 0` is a finite untaken value, so the weaker rule is satisfied;
+  -- grad still NaNs, because the adjoint multiplies the untaken arm's
+  -- derivative (+inf) by the 0 mask.
+  --
+  -- A bounded constant is sufficient for both halves, but not necessary:
+  -- regions 1 and 2 clamp with the operand itself as an untaken arm, whose
+  -- derivative is 1, and are safe over the finite domain -- which is all this
+  -- kernel claims. Here the untaken arm is the constant 1.0, so an unbounded
+  -- operand never reaches the multiply.
   --
   -- An upper clamp would have the operand itself as its untaken arm, and at
   -- ax = +inf that arm is +inf, so `0 * inf = NaN` -- the one point where

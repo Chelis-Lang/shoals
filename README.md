@@ -219,6 +219,20 @@ each the AD derivative of the displayed price, with first-order standing
 assertions in `tests/greeks.ch`, second-order in
 `tests-manual/greeks_secondorder.ch`, and the full grid (analytic + FD +
 sign-fold + accuracy-monotone) in `scripts/oracle_greeks_gate.py`.
+
+`erf64`/`n_cdf64`'s published accuracy figures come from
+`scripts/oracle_erf64_accuracy.py`, not from prose. Run it whenever either
+kernel changes:
+
+```sh
+.venv/bin/python scripts/oracle_erf64_accuracy.py
+```
+
+Expected: exit 0 and a final `PASS: oracle_erf64_accuracy` line. It measures
+both kernels against an mpmath reference at 60 digits and fails if a documented
+figure exceeds what it can observe -- the figures are floors, and a floor above
+every observation is not one. Two consecutive reviews found a wrong number here
+when the figures were transcribed by hand, which is why they are output now.
 The v0.7.6 testing cutover timing is recorded in
 `docs/testing_cutover_0.7.6.json`: node-local `--jobs auto` ran 48
 tests in 1:04.89; serial `--jobs 1` ran the same suite in 1:25.44.
