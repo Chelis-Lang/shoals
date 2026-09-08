@@ -11,8 +11,11 @@ erf's odd reflection is exercised):
 
   1. ANALYTIC textbook closed forms (delta=N(d1), vega=S phi(d1) sqrt(t),
      rho=K t e^{-rt} N(d2), theta=-dC/dt) evaluated in this script through the
-     SAME Abramowitz-Stegun 7.1.26 erf the package body uses, so the comparison
-     isolates the AD chain rule, not erf accuracy.
+     same erf the package body evaluates, so the comparison isolates the AD
+     chain rule, not erf accuracy. Since this shell's issue 61 that is Cody's
+     approximation, mirrored here as `math.erf`; it was Abramowitz-Stegun
+     7.1.26 with the coefficients reproduced exactly, and the f32
+     corroboration leg still models A&S because `Nautilus.Special.erf` does.
   2. The shipped finite-difference Greeks in ``Shoals.Greeks`` (``fd_delta_call``
      etc.) INDEPENDENTLY CORROBORATE the closed-form ground truth: the assertion
      subject is ``ground_truth`` vs ``fd_*`` (not AD vs FD), bounded by an
@@ -92,9 +95,18 @@ def compiler_pin() -> str:
     return match.group(1)
 
 # --------------------------------------------------------------------------
-# Reference math (Python). erf is A&S 7.1.26 -- the SAME coefficients as the
-# package body -- so analytic mirrors isolate the AD chain rule, not erf error.
-# `_true` versions use math.erf for the accuracy-monotone guard's ground truth.
+# Reference math (Python). `erf_pkg` mirrors whatever erf the package body
+# evaluates, so analytic mirrors isolate the AD chain rule, not erf error.
+# That is `math.erf` since this shell's issue 61 -- see `erf_pkg` for why the
+# substitution is faithful. `_erf_as_f32` still models A&S because the f32
+# path still evaluates it. `_true` versions use math.erf for the
+# accuracy-monotone guard's ground truth.
+#
+# NAMING: docstrings below still say "the DISPLAYED A&S price". Read that as
+# "the price the package displays". The formulae are unchanged and correct;
+# only the kernel underneath moved, and at >= 3.45e-16 the displayed f64 price
+# now coincides with the true one. Renaming forty call sites would churn the
+# gate's whole vocabulary for no behavioural gain, so the note carries it.
 # --------------------------------------------------------------------------
 SQRT2 = math.sqrt(2.0)
 INV_SQRT_2PI = 1.0 / math.sqrt(2.0 * math.pi)
@@ -111,9 +123,10 @@ def erf_pkg(x: float) -> float:
 
     Until this shell's issue 61 the package evaluated Abramowitz & Stegun
     7.1.26 and this function reproduced those coefficients exactly. It now
-    evaluates Cody's rational approximation at ~2.7e-16 max absolute error, so
-    `math.erf` -- itself correctly rounded to within an ulp -- is a faithful
-    mirror: the two differ by ~1e-16, six orders below this gate's tightest
+    evaluates Cody's rational approximation at a worst observed absolute error
+    of >= 3.45e-16, so `math.erf` -- itself correctly rounded to within an ulp
+    -- is a faithful mirror: the two differ by ~1e-16, ten orders below this
+    gate's tightest
     tolerance (3e-6), which keeps the isolation property the docstring above
     claims.
 
@@ -862,9 +875,9 @@ def _finish(grid, refs, test_names, src, rc, per_test, summary, out, err,
         "tolerance_derivation": {
             "eps_f32": EPS_F32,
             "ad_vs_groundtruth (PRIMARY, gating)":
-                "max(16*eps_f32*|v|, 3e-6); AD vs exact f64 derivative of A&S price, f32 ULPs",
+                "max(16*eps_f32*|v|, 3e-6); AD vs exact f64 derivative of the displayed price, f32 ULPs",
             "ad_vs_analytic (secondary)":
-                "2*measured_A&S_model_err + max(8*eps_f32*|v|, 3e-6)",
+                "2*measured_displayed_model_err + max(8*eps_f32*|v|, 3e-6)",
             "groundtruth_vs_fd (secondary, INDEPENDENT corroboration)":
                 "2*|fd(h)-fd(2h)| (Richardson, a-priori) + 8*eps_f32*price/h + 3e-7; "
                 "subject is closed-form ground_truth vs in-package fd_*; band is "
@@ -872,9 +885,9 @@ def _finish(grid, refs, test_names, src, rc, per_test, summary, out, err,
                 "can fail if the closed form is wrong",
             "binding": "max(16*eps_f32*|price|, 1e-4); erf-impl rounding of same formula",
             "so_ad2_vs_groundtruth (PRIMARY, gating)":
-                "max(48*eps_f32*|v|, greek_floor); nested grad == exact f64 2nd-deriv of A&S price",
+                "max(48*eps_f32*|v|, greek_floor); nested grad == exact f64 2nd-deriv of the displayed price",
             "so_ad2_vs_analytic (secondary)":
-                "2*measured_A&S_2nd_deriv_model_err + primary_so_band",
+                "2*measured_displayed_2nd_deriv_model_err + primary_so_band",
             "so_groundtruth_vs_fd (secondary, INDEPENDENT corroboration)":
                 "2*|fd(h)-fd(2h)| (Richardson, a-priori) + 8*eps_f32*|v|/h^2 + 3e-7; "
                 "subject is closed-form 2nd-deriv ground_truth vs FD of displayed "

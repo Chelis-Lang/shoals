@@ -219,15 +219,22 @@ in code that is CLOSED upstream but not sitting in §Archived.
   own kernel.** `Nautilus.Special` is f32-only, so a Shoals f64 grad path
   cannot call its `erf`; `Shoals.Pricing` therefore hand-rolls one. The
   duplication is the narrowing. The accuracy problem that came with it is
-  fixed: `erf64` now evaluates Cody's rational approximation at a measured
-  2.7e-16 max absolute error (571k points, 50-digit reference), replacing the
+  fixed: `erf64` now evaluates Cody's rational approximation at a worst
+  observed absolute error of >= 3.45e-16 (~1.55 ulp, 50-digit reference; a
+  floor, since the error is jagged at ulp scale and a grid finds only the
+  worst point it samples), replacing the
   Abramowitz & Stegun 7.1.26 coefficients it had copied from the f32 sibling
   at ~1.4e-7.
     - **Affected surface / narrowing:** a second implementation of `erf` lives
       in this repo and must be maintained and measured here. `Shoals.Greeks`,
-      `Shoals.PricingExtended`, `references/blackscholes.ch` and
-      `pricing_wire_erf_f64` still carry A&S copies that this change did not
-      migrate; `docs/CHELIS_SURFACE.md` names them as uncovered.
+      `Shoals.PricingExtended` and `references/blackscholes.ch` all
+      `import Nautilus.Special (erfc)`: they are **call sites, not copies**,
+      and no file under `src/` or `references/` carries the A&S constants. An
+      earlier revision of this entry called them copies, which was false and
+      was repeated into nautilus#59. `pricing_wire_erf_f64` remains, its
+      coefficients caller-supplied tensor parameters. The real duplication is
+      one kernel per repository, and they are now different algorithms --
+      Cody's here, A&S upstream -- so it is drift, not redundancy.
     - **State at pin 0.18.6 (2026-09-06):** both upstream issues OPEN.
       `tests_blocked/special/erf_builtin_absent.ch` reports `precision
       mismatch: expected f32, got f64` — the package `erf` resolves and refuses

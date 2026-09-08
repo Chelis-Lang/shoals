@@ -8,7 +8,7 @@ import Shoals.Pricing (gammas_call, volgas_call, vannas_call)
 -- TRUE Black-Scholes price at 40 digits. They were previously the exact second
 -- derivatives of the displayed A&S-erf price -- an indirection that existed
 -- because the kernel was inaccurate, so a true target could not be used. Since
--- `erf64` moved to Cody's approximation (~2.7e-16, this shell's issue 61) the
+-- `erf64` moved to Cody's approximation (>= 3.45e-16, this shell's issue 61) the
 -- displayed price IS the true price at f64 and the two coincide. Four of the
 -- eleven old targets breached tolerance; the other seven sat inside it by luck.
 -- All TWELVE second-derivative targets are now regenerated -- the count was
