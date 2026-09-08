@@ -169,7 +169,7 @@ tiers: **A** (type/dimension/linearity), **B** (SMT via cvc5 over the reals),
 | SMT prove tier (cvc5) shipped in the **release** tarball | `@pin` | SMT is in the released binary as of chelis 0.11.0 (no from-source `--features smt` build needed at this pin). Tier B lowers to cvc5 over the **reals** (`QF_NRA`, or `QF_NRAT` when a transcendental is present); a green is a real-arithmetic fact, **not** an IEEE-`f32` statement. `arith_model:"real"`. |
 | Transcendentals `exp`, `sqrt`, `sin`, `cos` lower to SMT | `@pin*` | These four **do** lower — cvc5 kinds `EXPONENTIAL`/`SQRT`/`SINE`/`COSINE`, selecting the `QF_NRAT` logic. *`QF_NRAT` is **incomplete**: cvc5 may return `unknown`, which chelis records as `unsupported` (solver capacity) and `--tier auto` degrades **honestly** to fuzz — never a false proven. Keep structural greens transcendental-free by construction where possible (report §3). |
 | Certified-envelope transcendental discharge (`erf`/`normal_cdf`/`exp`/`log`/`sqrt` subterms) | `@pin` | Shipped in 0.16.0 (**chelis#434, now CLOSED**): a soundly-boundable transcendental subterm is abstracted to a fresh variable over its Gappa/Arb-certified envelope hull and the goal discharges as **`proven_modulo_certified_envelope`** (strictly weaker than `proven_modulo_real_arithmetic`, disclosed in the verdict). Fail-closed on unboundable arguments. **Residual:** goals whose truth depends on the *coupling* between abstractions cannot reach an exact proven tier: direct BS/B76 call-price positivity and direct BS spot-monotonicity/delta, vega, rho, and gamma comparisons are observed only at `fuzz_validated`, while the direct intrinsic-lower-bound candidate remains `deferred_invariant` (**chelis#637**, open). See `UPSTREAM_BUGS.md`. |
-| `erf` / bundled `n_cdf` via an abstract-subterm contract | `@pin` | `erf` is not directly cvc5-lowerable, but the bundled normal-CDF **contract** (`0 ≤ N ≤ 1`, reflection `N(-x)=1-N(x)`) is discharged at the SMT tier as an abstract subterm (`chelis-prove/src/contracts.rs`), which is what lets the abstracted derivatives structure prove. The contract is separately fuzz-validated against the real `n_cdf` (max abs err ≈ 2 ulp vs scipy, report §7) — that is an **`f32`** measurement: `research/proof-infra/oracle/compare_ncdf.py` uses `ULP_F32 = 2^-24 ≈ 5.96e-8` and `RESULTS.md` records the max as **1.22e-7 at x=0.75**. It is not a claim about `n_cdf64`, which no longer shares that kernel: `erf64` moved to Cody's approximation (>= 3.45e-16 observed) while `Nautilus.Special.erf` — the path this row measures — still evaluates A&S 7.1.26. The two are now different approximations, and the ~1.2e-7 figure belongs to the `f32` A&S one. See the accuracy section below. |
+| `erf` / bundled `n_cdf` via an abstract-subterm contract | `@pin` | `erf` is not directly cvc5-lowerable, but the bundled normal-CDF **contract** (`0 ≤ N ≤ 1`, reflection `N(-x)=1-N(x)`) is discharged at the SMT tier as an abstract subterm (`chelis-prove/src/contracts.rs`), which is what lets the abstracted derivatives structure prove. The contract is separately fuzz-validated against the real `n_cdf` (max abs err ≈ 2 ulp vs scipy, report §7) — that is an **`f32`** measurement: `research/proof-infra/oracle/compare_ncdf.py` uses `ULP_F32 = 2^-24 ≈ 5.96e-8` and `RESULTS.md` records the max as **1.22e-7 at x=0.75**. It is not a claim about `n_cdf64`, which no longer shares that kernel: `erf64` moved to Cody's approximation (>= 3.3675e-16 observed) while `Nautilus.Special.erf` — the path this row measures — still evaluates A&S 7.1.26. The two are now different approximations, and the ~1.2e-7 figure belongs to the `f32` A&S one. See the accuracy section below. |
 | Algebraic `abs`, `min`, `max` lower to SMT | `@pin` | In `CVC5_LOWERABLE`, `QF_NRA` (algebraic, not transcendental). `min`/`max` lower to ITE. |
 | Composite derivatives greens | `@pin` | `properties/composites.ch`: structure proven at Tier B for any `N` satisfying its contract, verdict `proven_modulo_fuzz_validated_contract`. This string is **legitimate here** (a real SMT base resting on a fuzz-validated contract); it was only a false-positive for **pure-fuzz** bases, fixed by chelis#435 (archived). Classify verdicts from `proof_tier`, never the string alone. |
 | Economic / dynamic-programming greens | `@pin` | Markov simplex preservation, Bellman monotonicity/boundedness/contraction, PV/Gordon positivity & monotonicity discharge at SMT with **no** transcendental contract (report §6). Structurally more complete than a derivatives green. |
@@ -201,10 +201,15 @@ how good the approximation being evaluated is.
 **Every figure below is measured on the compiled kernel against a 50-digit
 reference, not derived.** Where a bound is not measured it is not stated.
 
-| Kernel | Approximation | Measured max absolute error | Method |
+Measure in binary. The error is `mpf(f64_result) - erf(mpf(exact_f64_input))`
+at extended precision. Comparing decimal spellings on either side moves the
+answer by a few hundredths of an ulp, which is how a revision of this table
+published a floor higher than any observation.
+
+| Kernel | Approximation | Worst observed absolute error (a floor) | Method |
 |---|---|---|---|
-| `erf64` (module-internal) | W. J. Cody, Math. Comp. 23 (1969); three ranges split at 0.5 and 4, saturating at 6 | **>= 3.45e-16** (~1.55 ulp of 1.0), a floor | worst observed at x = 0.507001975; the error is jagged at ulp scale so any grid reports a floor. 571k points gave 2.7e-16, 44M gave 3.37e-16, the exact argmax gives 3.45e-16 |
-| `n_cdf64` (module-internal) | `0.5 * (1 - erf64(-x/√2))` | inherits `erf64`'s, halved by the factor | by construction |
+| `erf64` (module-internal) | W. J. Cody, Math. Comp. 23 (1969); three ranges split at 0.5 and 4, saturating at 6 | **>= 3.3675e-16** (~1.52 ulp of 1.0) | worst observed at x = 0.507001975; the error is jagged at ulp scale so any grid reports a floor. 571k points gave 2.7e-16, 44M gave 3.37e-16, the exact argmax gives 3.45e-16 |
+| `n_cdf64` (module-internal) | `0.5 * (1 - erf64(-x/√2))` | **>= 1.9496e-16** (~0.88 ulp of 1.0) | worst observed at x = -0.7170090691949448. NOT `erf64`'s halved: an earlier revision stated that by construction, and it is both underived and too small. The argument reduction `-x/√2` and the final `0.5 * (1 - e)` each round, so the factor does not simply halve the inherited error |
 
 **The kernel is no longer the limiting factor.** `bs_call_f64(100, 100, 0.05,
 0.2, 1)` returns `10.450583572185565`, one ulp from the correctly-rounded
@@ -237,7 +242,7 @@ Deriving one is out of scope here.
 **What this replaced.** Abramowitz & Stegun 7.1.26, whose ~1.4e-7 bound is a
 property of its coefficients rather than of the arithmetic evaluating them — so
 the `f64` entry point was no better than the `f32` `Nautilus.Special.erf` whose
-coefficients it copied, and no wider cast could have improved it. A 7e8x
+coefficients it copied, and no wider cast could have improved it. A ~4.1e8x
 reduction. That was this shell's issue 61.
 
 **Still hand-rolled, and why.** Chelis has no canonical `erf` (chelis#902), and
@@ -258,12 +263,19 @@ they inherit whatever that f32 kernel does and need no migration. An earlier
 revision of this paragraph called them "further copies of the A&S kernel",
 which is false: no file under `src/` or `references/` carries the A&S
 constants. `pricing_wire_erf_f64` is the real remaining case, and only in the
-sense that its coefficients are caller-supplied tensor parameters. The
-duplication that does exist is one kernel per repository --
-`Shoals.Pricing.erf64` (Cody's) against `Nautilus.Special.erf`/`erf_t`
-(A&S) -- and since they are now different algorithms rather than copies, it is
-drift rather than redundancy. Tracked on this shell's issue 61 and
-nautilus#59.
+sense that its coefficients are caller-supplied tensor parameters. The duplication that does exist is
+wider than "one kernel per repository", which an earlier revision of this
+paragraph claimed. Inside this repo there are four `.ch` erf bodies:
+`src/pricing.ch::erf64` (Cody's), `src/pricing.ch::pricing_wire_erf_f64`
+(A&S, caller-supplied coefficients), and A&S with hard-coded f64 literals in
+both `research/proof-infra/ad/src/bs.ch` and
+`research/proof-infra/graduation/src/probe.ch` -- each its own reef project,
+all in this repository -- plus a Python mirror in
+`research/proof-infra/ad/harness.py`. Add `Nautilus.Special.erf`/`erf_t`
+upstream. Since `erf64` moved to Cody's these are no longer copies of one
+algorithm but two different ones, so it is drift rather than redundancy, and
+drift is the harder case: a caller cannot assume they agree at all. Tracked on
+this shell's issue 61 and nautilus#59.
 
 **Scope.** These are kernels this shell authors. Accuracy of chelis primitives
 is upstream's, and upstream has no accuracy contract for shells to inherit —

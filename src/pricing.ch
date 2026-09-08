@@ -8,23 +8,30 @@ export (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_
 -- ACCURACY. `erf64` evaluates W. J. Cody's rational approximation (Math. Comp.
 -- 23, 1969): three ranges split at 0.5 and 4, saturating at 6 where erfc
 -- underflows f64. Measured on this compiled kernel against a 50-digit
--- reference: worst observed absolute error >= 3.45e-16, about 1.55 ulp of
+-- reference: worst observed absolute error >= 3.3675e-16, about 1.52 ulp of
 -- 1.0, at x = 0.507001975.
 --
 -- A FLOOR, not a maximum, and the distinction is the point. The error is
 -- jagged at ulp scale, so a grid reports only the worst point it happens to
 -- land on. A 571k-point sweep reported 2.7e-16 and this comment stated that
--- as the maximum; a 44M-point sweep found 3.37e-16, and evaluating the exact
--- argmax found 3.45e-16. A 1800-point refinement over [0.49, 0.53] -- finer
--- than either, but differently spaced -- peaks at 2.76e-16 and misses the
--- argmax entirely. Quote this as a floor and say what was sampled, or the
--- next denser sweep makes the sentence false again.
+-- as the maximum. A 1800-point refinement over [0.49, 0.53] -- finer than
+-- that, but differently spaced -- peaks at 2.76e-16 and misses the argmax
+-- entirely. An exhaustive scan of +/-150k consecutive doubles around the
+-- argmax reaches 3.3675e-16 and nothing else in that window passes 3.40e-16.
+--
+-- MEASURE IN BINARY, NOT DECIMAL. A revision of this comment published
+-- 3.45e-16 / 1.55 ulp, which is not the kernel's error at all: it compares
+-- the shortest round-trip DECIMAL of the kernel output against erf of the
+-- input's decimal spelling, and that round trip is worth ~0.04 ulp here. The
+-- error is `mpf(f64_result) - erf(mpf(exact_f64_input))` at extended
+-- precision. Rounding the reference to a double first is the same trap from
+-- the other side: it quantises every error to a multiple of an ulp.
 --
 -- It replaced Abramowitz & Stegun 7.1.26 (this shell's issue 61), whose
 -- ~1.4e-7 bound is a property of its coefficients rather than of the
 -- arithmetic evaluating them -- so the f64 entry point had been no better than
 -- the f32 `Nautilus.Special.erf` whose coefficients it copied, and no wider
--- cast could have improved it. That is a 7e8x reduction, and it moves the
+-- cast could have improved it. That is a ~4.1e8x reduction, and it moves the
 -- limiting factor off this kernel entirely: `bs_call_f64` at
 -- (100, 100, 0.05, 0.2, 1) now returns 10.450583572185565, one ulp from the
 -- correctly-rounded 10.450583572185566, and the f32 Greek exports land within

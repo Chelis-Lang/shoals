@@ -9,7 +9,7 @@ def abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 -- derivatives at 40 digits. They were previously the exact derivatives of the
 -- displayed A&S-erf price, which differ from the true ones by up to 5.2e-6 --
 -- past the 5e-6 tolerance below, which is how this test caught the kernel
--- change. Since `erf64` moved to Cody's approximation (>= 3.45e-16, this shell's
+-- change. Since `erf64` moved to Cody's approximation (>= 3.3675e-16, this shell's
 -- issue 61) the displayed price IS the true price at f64, so the two coincide
 -- and the indirection is gone. Five of the six old targets sat inside tolerance
 -- by luck rather than correctness; all six were replaced. The heavy

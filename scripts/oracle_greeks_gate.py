@@ -104,7 +104,7 @@ def compiler_pin() -> str:
 #
 # NAMING: docstrings below still say "the DISPLAYED A&S price". Read that as
 # "the price the package displays". The formulae are unchanged and correct;
-# only the kernel underneath moved, and at >= 3.45e-16 the displayed f64 price
+# only the kernel underneath moved, and at >= 3.3675e-16 the displayed f64 price
 # now coincides with the true one. Renaming forty call sites would churn the
 # gate's whole vocabulary for no behavioural gain, so the note carries it.
 # --------------------------------------------------------------------------
@@ -124,7 +124,7 @@ def erf_pkg(x: float) -> float:
     Until this shell's issue 61 the package evaluated Abramowitz & Stegun
     7.1.26 and this function reproduced those coefficients exactly. It now
     evaluates Cody's rational approximation at a worst observed absolute error
-    of >= 3.45e-16, so `math.erf` -- itself correctly rounded to within an ulp
+    of >= 3.3675e-16, so `math.erf` -- itself correctly rounded to within an ulp
     -- is a faithful mirror: the two differ by ~1e-16, ten orders below this
     gate's tightest
     tolerance (3e-6), which keeps the isolation property the docstring above
@@ -747,7 +747,12 @@ def main() -> int:
         price_true = call_price(s, k, r, sg, t, ncdf_true)
         # NEW path: A&S erf computed in f64 then downcast to f32 (bs_call_scalar).
         # OLD path: A&S erf computed in f32 arithmetic (Nautilus.Special.erfc).
-        # Both inherit the IDENTICAL A&S model error; the difference vs true is
+        # These no longer inherit one model error: since this shell's issue 61
+        # the new path evaluates Cody's and the old f32 path evaluates A&S, so
+        # this compares two approximations rather than isolating arithmetic
+        # precision. The guard still means "new is at least as accurate as
+        # old" -- measured 9.16e-7 against 3.64e-5 -- but not "same model,
+        # different width". The difference vs true is
         # the arithmetic precision. The monotone guard asserts new <= old.
         price_new_f32 = f32(price_as)
         price_old_f32 = call_price_old_f32(s, k, r, sg, t)
@@ -843,7 +848,7 @@ def _finish(grid, refs, test_names, src, rc, per_test, summary, out, err,
             for c, rf in zip(grid, refs) if c["tag"] != "grid"
         ],
         "second_order": {
-            "description": "gammas_call/volgas_call/vannas_call: nested-grad d2 of the displayed A&S price",
+            "description": "gammas_call/volgas_call/vannas_call: nested-grad d2 of the displayed price",
             "max_so_model_err_vs_trueBS": {
                 gk: max(abs(rf["so_analytic"][gk] - rf["so_ground_truth"][gk]) for rf in refs)
                 for gk in ("gamma", "volga", "vanna")

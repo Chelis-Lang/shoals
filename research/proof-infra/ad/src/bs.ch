@@ -13,7 +13,13 @@ module ProofInfraAd.Bs
 --    Nautilus.Special.erf (0.7.26 src/special.ch:15-37), reimplemented here
 --    in f64 because the package symbol is f32-only and not re-exported through
 --    the path the brief needs for self-contained grad. The `erf` value is thus
---    identical (up to f32->f64 widening of the literals) to what Shoals uses;
+--    identical (up to f32->f64 widening of the literals) to what
+--    `Nautilus.Special.erf` evaluates. It is NO LONGER what Shoals uses:
+--    this shell's issue 61 moved `Shoals.Pricing.erf64` to Cody's
+--    approximation, so the shipped kernel and this probe are now different
+--    approximations. The isolation argument below is unaffected, because it
+--    rests on this file and its oracle sharing one `n_cdf`, not on agreeing
+--    with the package;
 --    AD differentiates exactly this approximation, and the oracle below uses
 --    the same `n_cdf`, so the AD-vs-oracle comparison isolates the chain rule,
 --    not erf accuracy.

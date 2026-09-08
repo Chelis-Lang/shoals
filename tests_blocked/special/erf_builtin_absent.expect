@@ -4,7 +4,7 @@ nautilus#59), with nautilus#56 the sibling
 bound and chelis#902 the structural fix. `Nautilus.Special.erf` is f32-only, so
 a Shoals f64 grad path cannot call it and `Shoals.Pricing` carries its own
 kernel. That kernel now evaluates Cody's rational approximation at a measured
-2.7e-16 max absolute error; the duplication is what remains, not the accuracy.
+>= 3.3675e-16 worst observed absolute error (a floor); the duplication is what remains, not the accuracy.
 
 Three upstream repairs bear on this and they are disjoint. An f64 signature on
 `Nautilus.Special` removes the reason to duplicate -- that is the one this
@@ -24,7 +24,7 @@ this probe assumed `erf` was absent entirely and expected `unbound variable`;
 running it is what corrected that.
 
 On pass: determine which repair landed, and CHECK THE ACCURACY BEFORE
-SWITCHING. `Shoals.Pricing.erf64` evaluates Cody's approximation at ~2.7e-16;
+SWITCHING. `Shoals.Pricing.erf64` evaluates Cody's approximation at >= 3.3675e-16;
 `Nautilus.Special.erf` evaluates A&S 7.1.26 at ~1.5e-7. Replacing this body
 with the package `erf` merely because it became callable would regress the
 kernel by nine orders of magnitude and leave docs/CHELIS_SURFACE.md asserting a

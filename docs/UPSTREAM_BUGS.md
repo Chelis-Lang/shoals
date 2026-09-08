@@ -220,7 +220,7 @@ in code that is CLOSED upstream but not sitting in §Archived.
   cannot call its `erf`; `Shoals.Pricing` therefore hand-rolls one. The
   duplication is the narrowing. The accuracy problem that came with it is
   fixed: `erf64` now evaluates Cody's rational approximation at a worst
-  observed absolute error of >= 3.45e-16 (~1.55 ulp, 50-digit reference; a
+  observed absolute error of >= 3.3675e-16 (~1.52 ulp, 50-digit reference; a
   floor, since the error is jagged at ulp scale and a grid finds only the
   worst point it samples), replacing the
   Abramowitz & Stegun 7.1.26 coefficients it had copied from the f32 sibling
@@ -232,9 +232,13 @@ in code that is CLOSED upstream but not sitting in §Archived.
       and no file under `src/` or `references/` carries the A&S constants. An
       earlier revision of this entry called them copies, which was false and
       was repeated into nautilus#59. `pricing_wire_erf_f64` remains, its
-      coefficients caller-supplied tensor parameters. The real duplication is
-      one kernel per repository, and they are now different algorithms --
-      Cody's here, A&S upstream -- so it is drift, not redundancy.
+      coefficients caller-supplied tensor parameters. The real duplication is wider than one kernel
+      per repository: `src/pricing.ch` holds Cody's and the wire A&S form, and
+      `research/proof-infra/ad/src/bs.ch` and
+      `research/proof-infra/graduation/src/probe.ch` each hard-code the A&S
+      f64 literals again. They are now different algorithms -- Cody's in the
+      shipped kernel, A&S in the research probes and upstream -- so it is
+      drift, not redundancy.
     - **State at pin 0.18.6 (2026-09-06):** both upstream issues OPEN.
       `tests_blocked/special/erf_builtin_absent.ch` reports `precision
       mismatch: expected f32, got f64` — the package `erf` resolves and refuses
