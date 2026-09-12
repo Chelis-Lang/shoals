@@ -3,8 +3,8 @@ payoff from Python via the chelis package.
 
 Mirrors `bindings/python/tests/manual_phase3b.py` (the existing
 chelis-python manual gate) but parameterizes on a Shoals-shaped
-European-call discounted payoff. The full BS analytic price needs
-`Nautilus.Special.erfc` from a multi-module reef package, which the
+European-call discounted payoff. The full BS analytic price spans a
+multi-module reef package, which the
 Python binding does not (yet) link; this harness restricts to the
 subset of vector tensor ops that the binding's evaluator supports
 (elementwise sub/relu/mul, axis-0 mean), which is enough to run

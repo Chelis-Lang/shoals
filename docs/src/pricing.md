@@ -5,8 +5,10 @@ Module: `Shoals.Pricing`.
 This module provides the Black-Scholes call and put in closed form,
 vectorized price tensors over a set of spots, gradient-derived sensitivity
 vectors, and a Monte Carlo call pricer that carries the `Random` effect.
-The standard normal cumulative distribution is computed through
-`Nautilus.Special.erfc` as `0.5 * erfc(-x / sqrt(2))`.
+The standard normal cumulative distribution is computed by this module's own
+`n_cdf64`, because `Nautilus.Special` is f32-only and an f64 grad path cannot
+reach its `erfc`. `docs/CHELIS_SURFACE.md` states which approximation `erf64`
+evaluates and its measured accuracy.
 
 ## Closed-form scalars
 

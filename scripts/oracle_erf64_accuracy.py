@@ -42,9 +42,10 @@ CHELIS = os.environ.get("CHELIS_BIN") or "chelis"
 GEN = REPO_ROOT / ".gate-tmp" / "erf64accuracy.ch"
 
 # The floors. Measurement must reach at least these, and they must not exceed
-# it. Nine files publish these figures -- `git grep -l 3.3675e-16` is the
-# enumeration; do not hand-maintain a list here, since a subset is how a stale
-# figure survives a repair. shoals#64 covers checking them mechanically.
+# it. `git grep -l 3.3675e-16` enumerates the files that publish them. Do not
+# hand-maintain a list or a count here: a subset is how a stale figure survives
+# a repair, and a count rots the moment a carrier is added. shoals#64 covers
+# checking them mechanically.
 # A FLOOR ROUNDS DOWN. The first n_cdf64 figure written here was 1.9496e-16,
 # the measured 1.949591e-16 rounded to four places -- and rounding a floor UP
 # puts it above the observation it claims to sit under. This script caught
