@@ -18,8 +18,10 @@ backend-roadmap items.
 
 ## Pricing (`Shoals.Pricing`)
 
-One normal CDF sits behind both price and Greeks: an Abramowitz-Stegun 7.1.26 `erf` in
-f64 (the same coefficients as `Std.Contracts.normal_cdf` and `Nautilus.Special.erf`). The
+One normal CDF sits behind both price and Greeks: since shoals#61 that is W. J. Cody's
+rational approximation in f64, measured at a worst observed absolute error of
+`>= 3.3675e-16`. It replaced an Abramowitz-Stegun 7.1.26 `erf` that carried the same
+coefficients as `Std.Contracts.normal_cdf` and `Nautilus.Special.erf`, which still do. The
 f32 entry points compute the f64 body and downcast, and every Greek is the
 automatic-differentiation derivative of that displayed price, so the delta belongs to the
 number.

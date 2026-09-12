@@ -884,7 +884,8 @@ def _finish(grid, refs, test_names, src, rc, per_test, summary, out, err,
                 "subject is closed-form ground_truth vs in-package fd_*; band is "
                 "derived from h+precision alone (NOT from any gt-vs-fd gap), so it "
                 "can fail if the closed form is wrong",
-            "binding": "max(16*eps_f32*|price|, 1e-4); erf-impl rounding of same formula",
+            "binding": "max(16*eps_f32*|price|, 1e-4); f32 quantization plus the "
+                       "Cody-vs-A&S approximation gap, which sits far below it",
             "so_ad2_vs_groundtruth (PRIMARY, gating)":
                 "max(48*eps_f32*|v|, greek_floor); nested grad == exact f64 2nd-deriv of the displayed price",
             "so_ad2_vs_analytic (secondary)":
