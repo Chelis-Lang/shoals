@@ -214,7 +214,7 @@ These figures are **transcribed by hand from that script's output**, and
 nothing checks the transcription: the script compares its measurements against
 its own internal `DOCUMENTED` constants, never against this file, and it is not
 wired into any CI job. Re-run it and compare by eye after any kernel change.
-Closing that gap is tracked separately; see `docs/UPSTREAM_BUGS.md`.
+Closing that gap is shoals#64.
 
 | Kernel | Approximation | Worst observed absolute error (a floor) | Method |
 |---|---|---|---|

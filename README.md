@@ -234,7 +234,8 @@ own `DOCUMENTED` constants exceeds what it can observe -- the figures are
 floors, and a floor above every observation is not one. It does **not** read
 `docs/CHELIS_SURFACE.md` or any other published file, it is not wired into CI,
 and it exits 0 when mpmath is absent, so it cannot catch a figure that is wrong
-only in the docs. Run it by hand after any kernel change and compare.
+only in the docs (shoals#64). Run it by hand after any kernel change and
+compare.
 The v0.7.6 testing cutover timing is recorded in
 `docs/testing_cutover_0.7.6.json`: node-local `--jobs auto` ran 48
 tests in 1:04.89; serial `--jobs 1` ran the same suite in 1:25.44.
