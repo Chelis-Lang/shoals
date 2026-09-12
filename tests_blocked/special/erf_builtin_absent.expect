@@ -1,5 +1,5 @@
 precision mismatch: expected f32, got f64
-Blocker: the f32-only signature on `Nautilus.Special` (draft parked at
+Blocker: the f32-only signature on `Nautilus.Special` (filed as
 nautilus#59), with nautilus#56 the sibling
 bound and chelis#902 the structural fix. `Nautilus.Special.erf` is f32-only, so
 a Shoals f64 grad path cannot call it and `Shoals.Pricing` carries its own
@@ -8,7 +8,7 @@ kernel. That kernel now evaluates Cody's rational approximation at a measured
 
 Three upstream repairs bear on this and they are disjoint. An f64 signature on
 `Nautilus.Special` removes the reason to duplicate -- that is the one this
-probe detects, and it has no issue number yet. nautilus#56 is the f32
+probe detects, and it is nautilus#59. nautilus#56 is the f32
 original's own A&S bound: fixing it changes those coefficients but not the
 signature, so this probe would still fail. chelis#902 would give the language a
 canonical `erf` with a stated accuracy and removes both. Not a chelis

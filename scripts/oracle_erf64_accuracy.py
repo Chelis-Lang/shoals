@@ -54,9 +54,10 @@ CHELIS = os.environ.get("CHELIS_BIN") or "chelis"
 # Generated inside the package so `chelis eval` resolves Shoals.Pricing.
 GEN = REPO_ROOT / ".gate-tmp" / "erf64accuracy.ch"
 
-# The figures docs/CHELIS_SURFACE.md, docs/UPSTREAM_BUGS.md and src/pricing.ch
-# publish. Floors: measurement must reach at least these, and they must not
-# exceed it.
+# The floors. Measurement must reach at least these, and they must not exceed
+# it. Nine files publish these figures -- `git grep -l 3.3675e-16` is the
+# enumeration; do not hand-maintain a list here, since a subset is how a stale
+# figure survives a repair. shoals#64 covers checking them mechanically.
 # A FLOOR ROUNDS DOWN. The first n_cdf64 figure written here was 1.9496e-16,
 # the measured 1.949591e-16 rounded to four places -- and rounding a floor UP
 # puts it above the observation it claims to sit under. This script caught

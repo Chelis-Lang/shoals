@@ -12,7 +12,7 @@ entry in the same change set).
 **`special/erf_builtin_absent.ch`** — the f32-only signature on
 `Nautilus.Special`, which is why `Shoals.Pricing` carries its own `erf64`.
 Reports `precision mismatch: expected f32, got f64`: the package `erf`
-resolves and refuses the width. Blocker drafted at
+resolves and refuses the width. Blocker filed as
 nautilus#59; siblings are nautilus#56
 (the approximation's own bound) and chelis#902 (a canonical `erf` in the
 language). Its sidecar's de-narrowing steps branch on which lands.

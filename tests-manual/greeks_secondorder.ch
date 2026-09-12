@@ -13,12 +13,11 @@ import Shoals.Pricing (gammas_call, volgas_call, vannas_call)
 -- second-derivative targets are now regenerated; some of the old ones breached
 -- tolerance and the rest sat inside it by luck. `vanna ITM s=120` kept its
 -- A&S-displayed value for a further round, consuming 41% of its own tolerance
--- band. Regenerating every
--- target, not only the ones that breached, is what stops the suite pinning an
--- approximation the
--- code no longer computes. The closed-form chain rule in
--- scripts/oracle_greeks_gate.py (validated there against true-BS analytic and
--- tuned f64 finite differences of the displayed price). These tests pin the
+-- band. Regenerating every target, not only the ones that breached, is what
+-- stops the suite pinning an approximation the code no longer computes. The
+-- targets are computed off-line by the closed-form chain rule in
+-- scripts/oracle_greeks_gate.py, validated there against true-BS analytic and
+-- tuned f64 finite differences of the displayed price. These tests pin the
 -- nested-autodiff transform: the Greek vectors are rank-1 tensor[n, f32], so
 -- each element is indexable and Std.Test-assertable. Heavy (vmap over nested
 -- grad), hence in tests-manual/. Tolerances are precision-derived: relative band

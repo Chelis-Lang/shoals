@@ -226,9 +226,9 @@ in code that is CLOSED upstream but not sitting in §Archived.
   cannot call its `erf`; `Shoals.Pricing` therefore hand-rolls one. The
   duplication is the narrowing. The accuracy problem that came with it is
   fixed: `erf64` now evaluates Cody's rational approximation at a worst
-  observed absolute error of >= 3.3675e-16 (~1.52 ulp, 50-digit reference; a
-  floor, since the error is jagged at ulp scale and a grid finds only the
-  worst point it samples), replacing the
+  observed absolute error of >= 3.3675e-16 (~1.52 ulp, measured at 60 dps by
+  `scripts/oracle_erf64_accuracy.py`; a floor, since the error is jagged at ulp
+  scale and a grid finds only the worst point it samples), replacing the
   Abramowitz & Stegun 7.1.26 coefficients it had copied from the f32 sibling
   at ~1.4e-7.
     - **Affected surface / narrowing:** a second implementation of `erf` lives
@@ -256,11 +256,10 @@ in code that is CLOSED upstream but not sitting in §Archived.
       the reason to duplicate but leaves the bound wherever A&S is still used;
       chelis#902 supplies a canonical `erf` with a stated accuracy and removes
       both. Neither is a chelis arithmetic defect.
-    - **The f32-only signature has no filed issue.** nautilus#12 is the LinAlg
+    - **The f32-only signature is filed as nautilus#59.** nautilus#12 is the LinAlg
       signature barrier and does not cover `Nautilus.Special`; citing it would
       make the de-narrowing branch unexecutable, since closing it would not
-      yield an f64 `erf`. Drafted at
-      nautilus#59.
+      yield an f64 `erf`.
     - **Re-probe trigger:** the blocked probe passing, either issue closing, or
       any nautilus pin bump past 0.7.43. That last one is not redundant:
       nautilus#57 already switched `Special.erf` to a 4-term series below 0.25
