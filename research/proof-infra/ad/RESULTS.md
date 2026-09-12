@@ -4,6 +4,13 @@ Goal: establish whether Chelis automatic differentiation (`grad`) can produce
 the full option Greek set through a real Black-Scholes pricing body, validated
 against an oracle.
 
+> Dated run record. The `erf64` numbers below were measured against the A&S
+> kernel; shoals#61 replaced it with Cody's approximation, so the recorded
+> `grad(erf64)` residuals and the "same A&S coefficients as
+> `Nautilus.Special.erf`" statements no longer describe the shipped body.
+> Measured at that head: `grad(erf64)(0.5)` is within 8.5e-14 of analytic and
+> `grad(n_cdf64)(0.5)` within 5.6e-17, not the A&S-era residuals recorded here.
+
 Compiler: SMT-enabled chelis **0.7.27**
 (`/home/jeff/Documents/scratch/chelis/target/release/chelis`).
 All numbers below are reproduced by the captured command outputs in

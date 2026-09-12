@@ -80,15 +80,17 @@ hangs; the gate proves the corpus targeted.
 
 A composite green proves the financial structure for any `N` satisfying the declared,
 fuzz-validated contract on `Std.Contracts.normal_cdf` (f32). It is never "Black-Scholes
-proven." The shipped pricer computes its normal CDF in f64 (the f64 lift of the same A&S
-model `Std.Contracts.normal_cdf` certifies) because the bundled contract symbol is f32
-only and the Greek path needs f64 (gamma especially). Migrating the pricer to call the
+proven." The shipped pricer computes its normal CDF in f64, and since shoals#61 that is
+W. J. Cody's approximation — **not** the A&S model `Std.Contracts.normal_cdf` certifies.
+The contract symbol is f32 only and the Greek path needs f64 (gamma especially).
+Migrating the pricer to call the
 f32 contract symbol would split the body and break the correctness invariant (the delta
 would be the derivative of a different-precision function than the displayed price), so
 instead the binding is closed by `tests/composites_binding.ch`: the pricer's price agrees
 with a `Std.Contracts.normal_cdf`-based price within a stated f32 bound. So the corpus is
 proven about the certified f32 contract, and the cross-check shows the shipped f64 pricer
-realizes that same A&S model.
+agrees with it — measured agreement, not identity of model. At f32 output width that gap
+is dominated by quantization rather than by either approximation's error.
 
 ## Demos (`Shoals.Demos.Businesswrong`)
 

@@ -253,7 +253,7 @@ in code that is CLOSED upstream but not sitting in §Archived.
       nautilus#56 is the f32 original's own bound and changes coefficients, not
       the signature; nautilus#59 removes the reason to duplicate but leaves the
       bound wherever A&S is still used; chelis#902 supplies a canonical `erf`
-      and removes both. Neither is a chelis arithmetic defect.
+      and removes both. None is a chelis arithmetic defect.
     - **The f32-only signature is filed as nautilus#59.** nautilus#12 is the LinAlg
       signature barrier and does not cover `Nautilus.Special`; citing it would
       make the de-narrowing branch unexecutable, since closing it would not
