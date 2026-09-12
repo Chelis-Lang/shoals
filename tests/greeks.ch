@@ -5,8 +5,10 @@ import Shoals.Pricing (deltas_call, vegas_call)
 def abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 -- Light FIRST-ORDER AD-Greek standing smoke (single vmap(grad) -- fast enough for
 -- tests/). deltas_call and vegas_call are the AD derivatives of the displayed
--- f64 Black-Scholes body. The targets are the exact TRUE Black-Scholes
--- derivatives at 40 digits. They were previously the exact derivatives of the
+-- f64 Black-Scholes body. The targets are the TRUE Black-Scholes derivatives,
+-- computed in f64 by the closed forms in scripts/oracle_greeks_gate.py and
+-- correctly rounded at the precision printed here. They were previously the
+-- exact derivatives of the
 -- displayed A&S-erf price, which differ from the true ones by up to 5.2e-6 --
 -- past the 5e-6 tolerance below, which is how this test caught the kernel
 -- change. Since `erf64` moved to Cody's approximation (>= 3.3675e-16, this shell's

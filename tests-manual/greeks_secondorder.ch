@@ -4,8 +4,9 @@ import Shoals.Pricing (gammas_call, volgas_call, vannas_call)
 -- Standing assertions for the SECOND-ORDER AD Greeks shipped in Shoals.Pricing:
 -- gammas_call = d2C/dS2, volgas_call = d2C/dsigma2, vannas_call = d2C/dSdsigma,
 -- each computed by NESTED grad through the single f64 Black-Scholes body
--- (bs_call_f64). The asserted targets are the EXACT second derivatives of the
--- TRUE Black-Scholes price at 40 digits. They were previously the exact second
+-- (bs_call_f64). The asserted targets are the second derivatives of the TRUE
+-- Black-Scholes price, computed in f64 and correctly rounded at the precision
+-- printed here. They were previously the exact second
 -- derivatives of the displayed A&S-erf price -- an indirection that existed
 -- because the kernel was inaccurate, so a true target could not be used. Since
 -- `erf64` moved to Cody's approximation (>= 3.3675e-16, this shell's issue 61) the

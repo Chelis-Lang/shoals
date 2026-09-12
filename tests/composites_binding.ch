@@ -7,13 +7,16 @@ import Std.Contracts (normal_cdf)
 --
 -- The composites in Shoals.Properties.Composites are PROVEN about
 -- `Std.Contracts.normal_cdf` -- the certified f32 Abramowitz-Stegun normal CDF.
--- The shipped pricer `bs_call_scalar` does NOT call that f32 symbol: it computes
--- the SAME A&S model in an f64 body (`Shoals.Pricing.erf64`/`n_cdf64`, the
--- byte-identical 7.1.26 coefficients) and downcasts, because the Greeks need f64
--- precision and the single-body correctness invariant forbids a second CDF path.
+-- The shipped pricer `bs_call_scalar` does NOT call that f32 symbol, and since
+-- shoals#61 it does not evaluate the same approximation either:
+-- `Shoals.Pricing.erf64`/`n_cdf64` evaluate W. J. Cody's rational approximation
+-- in f64 and downcast, because the Greeks need f64 precision and the
+-- single-body correctness invariant forbids a second CDF path.
 --
--- This is the honest binding between the two: the shipped pricer's f64-lifted A&S
--- normal CDF realizes the same model the contract certifies. Each cell here
+-- So the binding is MEASURED AGREEMENT, not identity of model. Before shoals#61
+-- the two sides were the same A&S coefficients at two widths and this comment
+-- claimed identity; that claim is now false and the cross-check below is what
+-- carries the binding on its own. Each cell here
 -- rebuilds a Black-Scholes call price from `Std.Contracts.normal_cdf` (f32) and
 -- asserts agreement with `bs_call_scalar` within a stated f32 bound. Without this
 -- cross-check the composite proofs would be about a function the shipped pricer
@@ -22,11 +25,13 @@ import Std.Contracts (normal_cdf)
 -- This file is the fast CI smoke: a handful of representative cells (ATM, deep
 -- OTM/ITM, high-vol, short maturity). The full 405-cell grid sweep lives in
 -- `tests-manual/composites_binding_heavy.ch` (nightly), where the measured max
--- abs diff is 2.67e-5. The smoke cells here measure worst 7.63e-6 (deep ITM /
--- short maturity), so the asserted f32 bound is 5e-5 -- ~6.5x over the worst
--- measured gap, tight enough for per-PR regression sensitivity yet safely above
--- the f32-vs-f64 A&S rounding. The heavy nightly grid keeps its 1e-4 bound (its
--- 2.67e-5 worst leaves less than a 2x margin under 5e-5).
+-- abs diff was 2.67e-5, measured under the old A&S `erf64` and not re-measured
+-- since shoals#61; the grid still passes its 1e-4 bound. The smoke cells here
+-- measure worst 7.63e-6 (deep ITM / short maturity), re-measured under Cody and
+-- unchanged, so the asserted f32 bound is 5e-5 -- ~6.5x over the worst measured
+-- gap. It is unchanged because at f32 output width this gap is dominated by
+-- quantization, not by either approximation's error: 7.63e-6 is about 64 f32
+-- ulp at a price near 100, while Cody and A&S differ far below that.
 def d1_f32(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = {
   num = add(log(div(s, k)), mul(add(r, mul(cast(0.5, f32), mul(sigma, sigma))), t))
   div(num, mul(sigma, sqrt(t)))
