@@ -103,10 +103,8 @@ def compiler_pin() -> str:
 # accuracy-monotone guard's ground truth.
 #
 # NAMING: docstrings below still say "the DISPLAYED A&S price". Read that as
-# "the price the package displays". The formulae are unchanged and correct;
-# only the kernel underneath moved, and at >= 3.3675e-16 the displayed f64 price
-# now coincides with the true one. Renaming forty call sites would churn the
-# gate's whole vocabulary for no behavioural gain, so the note carries it.
+# "the price the package displays" -- the formulae are unchanged, only the
+# kernel underneath moved.
 # --------------------------------------------------------------------------
 SQRT2 = math.sqrt(2.0)
 INV_SQRT_2PI = 1.0 / math.sqrt(2.0 * math.pi)
@@ -121,28 +119,16 @@ def erf_pkg(x: float) -> float:
     """The erf the PACKAGE evaluates, mirrored here so the comparison isolates
     the AD chain rule rather than erf accuracy.
 
-    Until this shell's issue 61 the package evaluated Abramowitz & Stegun
-    7.1.26 and this function reproduced those coefficients exactly. It now
-    evaluates Cody's rational approximation at a worst observed absolute error
-    of >= 3.3675e-16, so `math.erf` -- itself correctly rounded to within an ulp
-    -- is a faithful mirror: the two differ by ~1e-16, ten orders below this
-    gate's tightest
-    tolerance (3e-6), which keeps the isolation property the docstring above
-    claims.
+    Since this shell's issue 61 the package evaluates Cody's approximation at
+    >= 3.3675e-16, so `math.erf` is a faithful mirror: the two differ by
+    ~1e-16, ten orders below this gate's tightest tolerance (3e-6).
 
     `_erf_as_f32` below is NOT updated with this. It models
-    `Nautilus.Special.erf`, which still carries the A&S coefficients, and the
-    f32 corroboration leg depends on that staying true.
-
-    THAT IS TRUE OF THE PINNED nautilus 0.7.43 AND NOT OF nautilus main.
-    nautilus#57 switched `Special.erf` to a 4-term series below 0.25; it is
-    merged to main and no tag contains it, so `reef.toml`'s `nautilus =
-    "0.7.43"` is what keeps this mirror faithful. A bump to the first release
-    carrying that commit invalidates this leg and it must be re-measured then.
-    `docs/UPSTREAM_BUGS.md` carries a pin-bump re-probe trigger for exactly
-    this. Do not rely on an issue transition instead: nautilus#56 closed on
-    2026-09-12 without changing the pinned kernel, and #57 can ship in a
-    release without closing anything.
+    `Nautilus.Special.erf`, which carries A&S at the PINNED nautilus 0.7.43 --
+    not on nautilus main, where nautilus#57 switched it to a 4-term series
+    below 0.25 with no tag yet carrying it. A pin bump invalidates this leg and
+    it must be re-measured; `docs/UPSTREAM_BUGS.md` holds that trigger. Do not
+    rely on an issue transition instead -- #57 can ship without closing one.
     """
     return math.erf(x)
 

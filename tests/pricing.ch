@@ -135,21 +135,17 @@ def test_mc_converges_to_bs() -> unit ! { Test } = {
 -- Cody region therefore poisons the arm that WAS selected, because
 -- 0 * NaN = NaN.
 --
--- There are THREE such cores and they fail by TWO different mechanisms, which
--- is why a first repair that fixed only one mechanism left the defect live:
+-- Two distinct mechanisms, both pinned below:
 --
 --   * region 3 (tail) divides by its operand twice; at ax = 0 an unclamped
---     divisor is +inf. Reached when d1 or d2 is exactly zero.
+--     divisor is +inf. Reached when d1 or d2 is exactly zero -- 0.5*0.25^2
+--     = 0.03125 is exact in binary, so r = +3.125% makes d2 exactly 0 and
+--     r = -3.125% makes d1 exactly 0.
 --   * regions 1 and 2 do not divide at all -- both are P(y)/Q(y) Horner chains
 --     with positive coefficients, so numerator AND denominator overflow to
 --     +inf at large argument and inf/inf = NaN. Reached when sigma is tiny
---     enough to make |d| enormous.
---
--- Both mechanisms are pinned below. The zero-d cases hit region 3: 0.5*0.25^2
--- = 0.03125 is exact in binary, so r = +3.125% makes d2 exactly 0 and
--- r = -3.125% makes d1 exactly 0. The subnormal-sigma cases hit regions 1 and
--- 2, and the AD lane trips at a larger sigma than the price lane -- 1e-40 is a
--- representable f32 subnormal, so this is reachable from f32 callers.
+--     enough to make |d| enormous; 1e-40 is a representable f32 subnormal, so
+--     this is reachable from f32 callers, and the AD lane trips first.
 def test_zero_d2_prices_are_not_nan() -> unit ! { Test } = {
   spots = to_tensor([cast(100.0, f32)])
   p = to_list(call_prices(spots, cast(100.0, f32), cast(0.03125, f32), cast(0.25, f32), cast(1.0, f32)))

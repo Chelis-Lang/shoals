@@ -1,33 +1,20 @@
 #!/usr/bin/env python3
 """Measure `erf64`/`n_cdf64` against a high-precision reference. shoals#61.
 
-The published accuracy figures were transcribed prose in nine files, and two
-consecutive red-team rounds each found a different instance of one defect: a
-number the measurement does not support. First a sample maximum presented as a
-maximum (2.7e-16), then a floor sitting ABOVE every observable value
-(3.45e-16), which came from comparing decimal spellings on both sides.
-
 This script computes those figures. It checks them ONLY against its own
 `DOCUMENTED` constants below: it does not read the published files, nothing
 invokes it, and it exits 0 when mpmath is absent. So it cannot catch a figure
 that is wrong only in a doc. That gap is shoals#64.
 
-MEASURE IN BINARY. The error is
+MEASURE IN BINARY: the error is `mpf(f64_result) - erf(mpf(exact_f64_input))`
+at extended precision. Comparing `mpf(repr(result))` against `mpf(decimal_input)`
+measures a decimal round trip instead (~0.04 ulp near the argmax), and rounding
+the reference to a double first quantises every error to a multiple of an ulp.
 
-    mpf(f64_result) - erf(mpf(exact_f64_input))
-
-at extended precision. Two ways to get this wrong, both of which produced a
-published number:
-
-  * comparing `mpf(repr(result))` against `mpf(decimal_input)` measures a
-    decimal round trip, worth ~0.04 ulp near the argmax;
-  * rounding the reference to a double first quantises every error to a
-    multiple of an ulp.
-
-FLOOR, NOT MAXIMUM. The error is jagged at ulp scale, so any grid reports only
-the worst point it lands on. A refinement finer than an earlier sweep but
-differently spaced misses the argmax entirely. The documented figure is a floor,
-and the check below enforces that for the `DOCUMENTED` constants.
+FLOOR, NOT MAXIMUM: the error is jagged at ulp scale, so any grid reports only
+the worst point it lands on, and a finer but differently spaced refinement can
+miss the argmax. The check below enforces the floor for the `DOCUMENTED`
+constants.
 
 Usage:
     oracle_erf64_accuracy.py            # measure and check the documented floors

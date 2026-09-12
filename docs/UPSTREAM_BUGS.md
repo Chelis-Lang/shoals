@@ -235,10 +235,9 @@ in code that is CLOSED upstream but not sitting in §Archived.
       in this repo and must be maintained and measured here. `Shoals.Greeks`,
       `Shoals.PricingExtended` and `references/blackscholes.ch` all
       `import Nautilus.Special (erfc)`: they are **call sites, not copies**,
-      and no file under `src/` or `references/` carries the A&S constants. An
-      earlier revision of this entry called them copies, which was false and
-      was repeated into nautilus#59. `pricing_wire_erf_f64` remains, its
-      coefficients caller-supplied tensor parameters. The real duplication is wider than one kernel
+      and no file under `src/` or `references/` carries the A&S constants.
+      `pricing_wire_erf_f64` remains, its coefficients caller-supplied tensor
+      parameters. The duplication is wider than one kernel
       per repository: `src/pricing.ch` holds Cody's and the wire A&S form, and
       `research/proof-infra/ad/src/bs.ch` and
       `research/proof-infra/graduation/src/probe.ch` each hard-code the A&S
@@ -250,23 +249,21 @@ in code that is CLOSED upstream but not sitting in §Archived.
       `tests_blocked/special/erf_builtin_absent.ch` reports `precision
       mismatch: expected f32, got f64` — the package `erf` resolves and refuses
       the width. nautilus#56 closing does not unblock it, because the f32-only
-      signature is nautilus#59's subject, not #56's. The repairs are disjoint: nautilus#56 is the f32 original's
-      own bound and fixing it changes those coefficients but not the signature
-      that forced the duplicate; an f64 signature on `Nautilus.Special` removes
-      the reason to duplicate but leaves the bound wherever A&S is still used;
-      chelis#902 supplies a canonical `erf` with a stated accuracy and removes
-      both. Neither is a chelis arithmetic defect.
+      signature is nautilus#59's subject. The three repairs are disjoint:
+      nautilus#56 is the f32 original's own bound and changes coefficients, not
+      the signature; nautilus#59 removes the reason to duplicate but leaves the
+      bound wherever A&S is still used; chelis#902 supplies a canonical `erf`
+      and removes both. Neither is a chelis arithmetic defect.
     - **The f32-only signature is filed as nautilus#59.** nautilus#12 is the LinAlg
       signature barrier and does not cover `Nautilus.Special`; citing it would
       make the de-narrowing branch unexecutable, since closing it would not
       yield an f64 `erf`.
     - **Re-probe trigger:** the blocked probe passing, either issue closing, or
-      any nautilus pin bump past 0.7.43. That last one is not redundant:
-      nautilus#57 already switched `Special.erf` to a 4-term series below 0.25
-      on main, and no tag yet carries it, so the kernel this shell mirrors in
-      `scripts/oracle_greeks_gate.py::_erf_as_f32` changes at the next release
-      and not at any issue transition. nautilus#56 closing on 2026-09-12 fired
-      the issue-closing clause without changing the pinned kernel at all.
+      **any nautilus pin bump past 0.7.43**. The pin clause is the load-bearing
+      one: nautilus#57 already switched `Special.erf` to a 4-term series below
+      0.25 on main with no tag yet carrying it, so the kernel this shell mirrors
+      in `scripts/oracle_greeks_gate.py::_erf_as_f32` changes at the next
+      release, not at any issue transition.
       Follow that probe's sidecar; which repair landed decides whether this
       kernel is deleted in favour of a callable one or merely re-pointed.
 

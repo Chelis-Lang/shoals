@@ -202,18 +202,12 @@ how good the approximation being evaluated is.
 `mpmath` reference, not derived.** Where a bound is not measured it is not
 stated.
 
-Measure in binary, and by running the oracle rather than by hand. The error is
-`mpf(f64_result) - erf(mpf(exact_f64_input))` at extended precision, and
-`scripts/oracle_erf64_accuracy.py` is what computes it. `erf64` and `n_cdf64`
-are exported for exactly that reason: a published bound that cannot be measured
-from outside the module is a bound nothing can check. Comparing decimal
-spellings on either side moves the answer by a few hundredths of an ulp.
-
-These figures are **transcribed by hand from that script's output**, and
-nothing checks the transcription: the script compares its measurements against
-its own internal `DOCUMENTED` constants, never against this file, and it is not
-wired into any CI job. Re-run it and compare by eye after any kernel change.
-Closing that gap is shoals#64.
+`scripts/oracle_erf64_accuracy.py` computes them, measuring in binary at
+extended precision; `erf64` and `n_cdf64` are exported so the bound can be
+measured from outside the module. The figures below are **transcribed by hand
+from that script's output** and nothing checks the transcription — the script
+compares against its own internal constants, not this file, and runs in no CI
+job (shoals#64). Re-run it and compare after any kernel change.
 
 | Kernel | Approximation | Worst observed absolute error (a floor) | Method |
 |---|---|---|---|
@@ -229,9 +223,8 @@ that is their dtype's rounding, not the approximation's error:
 Measured at `K=100, r=0.05, sigma=0.2, T=1`, worst case over
 `S in {60, 80, 100, 120}`, comparing the shipped `f32` exports (`chelis eval`)
 against a 50-digit `mpmath` reference evaluated at the same `f32`-rounded
-inputs. An earlier revision of this table stated no parameter set and its ulp
-column did not reproduce at any set — `deltas_call` was given as 1.35 ulp,
-contradicting the sentence above it.
+inputs. The two columns are each a worst case over those spots and need not
+fall at the same spot.
 
 | export | error vs true | in `f32` ulp |
 |---|---|---|

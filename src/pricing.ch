@@ -11,45 +11,28 @@ export (erf64, n_cdf64, bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_
 -- `scripts/oracle_erf64_accuracy.py` at 60 dps: worst observed absolute error
 -- >= 3.3675e-16, about 1.52 ulp of 1.0, at x = 0.507001975.
 --
--- A FLOOR, not a maximum, and the distinction is the point. The error is
--- jagged at ulp scale, so a grid reports only the worst point it happens to
--- land on. A 571k-point sweep reported 2.7e-16 and this comment stated that
--- as the maximum. A 1800-point refinement over [0.49, 0.53] -- finer than
--- that, but differently spaced -- peaks at 2.76e-16 and misses the argmax
--- entirely. An exhaustive scan of +/-150k consecutive doubles around the
--- argmax reaches 3.3675e-16 and nothing else in that window passes 3.40e-16.
+-- That is a FLOOR, not a maximum: the error is jagged at ulp scale, so a grid
+-- reports only the worst point it lands on. Re-measure by running the oracle,
+-- which measures in binary; comparing decimal spellings moves the answer by a
+-- few hundredths of an ulp.
 --
--- MEASURE IN BINARY, NOT DECIMAL. A revision of this comment published
--- 3.45e-16 / 1.55 ulp, which is not the kernel's error at all: it compares
--- the shortest round-trip DECIMAL of the kernel output against erf of the
--- input's decimal spelling, and that round trip is worth ~0.04 ulp here. The
--- error is `mpf(f64_result) - erf(mpf(exact_f64_input))` at extended
--- precision. Rounding the reference to a double first is the same trap from
--- the other side: it quantises every error to a multiple of an ulp.
+-- It replaced Abramowitz & Stegun 7.1.26 (this shell's issue 61), whose ~1.4e-7
+-- bound is a property of its coefficients rather than of the arithmetic
+-- evaluating them -- so the f64 entry point had been no better than the f32
+-- `Nautilus.Special.erf` whose coefficients it copied. The kernel is no longer
+-- the limiting factor; docs/CHELIS_SURFACE.md carries the measurements.
 --
--- It replaced Abramowitz & Stegun 7.1.26 (this shell's issue 61), whose
--- ~1.4e-7 bound is a property of its coefficients rather than of the
--- arithmetic evaluating them -- so the f64 entry point had been no better than
--- the f32 `Nautilus.Special.erf` whose coefficients it copied, and no wider
--- cast could have improved it. That is a ~4.1e8x reduction, and it moves the
--- limiting factor off this kernel entirely: `bs_call_f64` at
--- (100, 100, 0.05, 0.2, 1) now returns 10.450583572185565, one ulp from the
--- correctly-rounded 10.450583572185566, and the f32 Greek exports land within
--- 1 f32 ulp of their true values (worst measured 0.87), i.e. at their dtype's
--- rounding. docs/CHELIS_SURFACE.md states the parameter set.
---
--- The f32 sibling still carries the old bound; see nautilus#56. Chelis has no
--- canonical erf to call instead (chelis#902), and `Nautilus.Special` is
--- f32-only, which is why this kernel is hand-rolled here at all -- see
--- nautilus#59 and
--- tests_blocked/special/erf_builtin_absent.ch.
+-- Hand-rolled here because Chelis has no canonical erf (chelis#902) and
+-- `Nautilus.Special` is f32-only (nautilus#59,
+-- tests_blocked/special/erf_builtin_absent.ch). The f32 sibling carries the old
+-- bound (nautilus#56).
 --
 -- Kept as three named helpers rather than one expression because the AD Greeks
 -- differentiate through this path and each branch is separately checkable.
--- The `abs` intrinsic, not a hand-rolled `if`. A hand-rolled
+-- The `abs` intrinsic, not a hand-rolled `if`: a hand-rolled
 -- `if lt(x, 0) then neg(x) else x` has the operand as its untaken arm, so
 -- under vmap's masked select it returns NaN at +inf (chelis#1464). The
--- intrinsic is total there. Verified by round-5 review.
+-- intrinsic is total there.
 def abs_f64(x: f64) -> f64 = abs(x)
 -- Cody region 1 (|x| <= 0.5): erf(x) = x * P(x^2)/Q(x^2), odd by construction.
 def erf64_core_small(x: f64) -> f64 = {
@@ -91,35 +74,19 @@ def erf64_core_erfc_mid(axr: f64) -> f64 = {
 -- Cody region 3 (4 < |x| < 6): erfc(|x|) = exp(-x^2)/|x| * (1/sqrt(pi) - R(1/x^2)).
 def erf64_core_erfc_tail(axr: f64) -> f64 = {
   -- LOWER clamp only, and the asymmetry is the point. A clamp is an `if`, so
-  -- under vmap's masked select BOTH arms evaluate -- and a clamp is safe only
-  -- when its UNTAKEN arm has a finite VALUE *and* a finite DERIVATIVE over
-  -- the domain totality is claimed for.
+  -- under vmap's masked select BOTH arms evaluate, and a clamp is safe only
+  -- when its UNTAKEN arm has a finite VALUE *and* a finite DERIVATIVE over the
+  -- domain totality is claimed for. The derivative half is not decoration:
+  -- `if lt(x, 1.0) then 2.0 else sqrt(x)` has a finite untaken value at x = 0
+  -- (`sqrt(0) = 0`) and still grads to NaN there, because the adjoint
+  -- multiplies the untaken arm's derivative (+inf) by the 0 mask.
   --
-  -- The derivative half is not decoration. An earlier revision of this rule
-  -- said "finite" and meant the value, which a maintainer can satisfy and
-  -- still ship a NaN. Measured at this pin:
-  --
-  --   def hazard(x: f64) -> f64 =
-  --     if lt(x, cast(1.0, f64)) then cast(2.0, f64) else sqrt(x)
-  --   value @ [0.0, 0.5, 4.0] = [2.0, 2.0, 2.0]      -- finite everywhere
-  --   grad  @ [0.0, 0.5, 4.0] = [NaN, 0.0, 0.25]     -- NaN at x = 0
-  --
-  -- `sqrt(0) = 0` is a finite untaken value, so the weaker rule is satisfied;
-  -- grad still NaNs, because the adjoint multiplies the untaken arm's
-  -- derivative (+inf) by the 0 mask.
-  --
-  -- A bounded constant is sufficient for both halves, but not necessary:
-  -- regions 1 and 2 clamp with the operand itself as an untaken arm, whose
-  -- derivative is 1, and are safe over the finite domain -- which is all this
-  -- kernel claims. Here the untaken arm is the constant 1.0, so an unbounded
-  -- operand never reaches the multiply.
-  --
-  -- An upper clamp would have the operand itself as its untaken arm, and at
-  -- ax = +inf that arm is +inf, so `0 * inf = NaN` -- the one point where
-  -- this branch is total and regions 1 and 2 are not. A previous revision added one "for
-  -- uniformity" and thereby REMOVED this branch's totality at +inf, which it
-  -- had before. Nothing pinned it: reverting it left all tests green. It is
-  -- deleted rather than pinned, because it bought nothing and cost that.
+  -- A bounded constant satisfies both halves but is not necessary: regions 1
+  -- and 2 clamp with the operand itself, whose derivative is 1. Here the
+  -- untaken arm is the constant 1.0, so an unbounded operand never reaches the
+  -- multiply. NO UPPER CLAMP: its untaken arm would be the operand, +inf at
+  -- ax = +inf, so `0 * inf = NaN` -- and this branch is total at +inf where
+  -- regions 1 and 2 are not. Adding one for uniformity removes that.
   guarded = if lt(axr, cast(1.0, f64)) then cast(1.0, f64) else axr
   ax = guarded
   y = div(cast(1.0, f64), mul(guarded, guarded))
@@ -136,31 +103,23 @@ def erf64_core_erfc_tail(axr: f64) -> f64 = {
   r = mul(y, div(add(xnum4, cast(0.0006587491615298378, f64)), add(xden4, cast(0.0023352049762686918, f64))))
   div(mul(exp(neg(mul(ax, ax))), sub(cast(0.5641895835477563, f64), r)), guarded)
 }
--- EVERY core clamps its argument into its own region at entry, and that is
--- load-bearing rather than defensive. Narrowing for chelis#1464; see
--- docs/UPSTREAM_BUGS.md.
+-- EVERY core clamps its argument into its own region at entry: load-bearing,
+-- not defensive. Narrowing for chelis#1464 (`vmap` lowers `if` to a masked
+-- select which evaluates BOTH arms, against `spec/06-transformations.md`
+-- §2.10.1), so every core runs on every operand the dispatcher sees and a core
+-- returning a non-finite value outside its own region poisons the arm that WAS
+-- selected. See docs/UPSTREAM_BUGS.md.
 --
--- `vmap` lowers `if` to a masked select which evaluates BOTH arms (chelis#1464:
--- `spec/06-transformations.md` §2.10.1 says untaken branches are not
--- evaluated; the implementation evaluates them), so every core runs on every
--- operand the dispatcher sees, including operands routed to a different
--- branch. A core that returns a non-finite value outside its own region
--- therefore poisons the arm that WAS selected, because 0 * NaN = NaN.
+-- Every core needs one, not only region 3: regions 1 and 2 are P(y)/Q(y) Horner
+-- chains with positive coefficients, so numerator AND denominator overflow to
+-- +inf at large argument and inf/inf = NaN -- their hazard is not division.
+-- The clamps never bind on the region the dispatcher routes to a core, so no
+-- returned value changes.
 --
--- Clamping at each entry makes each core total over the FINITE f64 domain.
--- Not over all of f64: the clamps and the dispatcher are themselves `if`s, so
--- +/-inf still poisons a sibling arm wherever an untaken arm is unbounded.
--- `abs_f64` uses the `abs` intrinsic for that reason; `min`/`max` would remove
--- the rest but are unavailable at this pin: they type-check under vmap and
--- then fail at eval with `missing required input min` (chelis#1582), which
--- is why the residual is genuinely upstream-blocked rather than unfixed here. The
--- clamps never bind on the region the dispatcher actually routes to a core, so
--- no returned value changes. An earlier revision guarded only the two
--- divisions in region 3 and left regions 1 and 2 exposed, because their
--- hazard is not division: both are P(y)/Q(y) Horner chains with positive
--- coefficients, so numerator AND denominator overflow to +inf at large
--- argument and inf/inf = NaN. Guarding the sites one review found, rather than
--- the class, is what let the same defect survive two repairs.
+-- This makes each core total over the FINITE f64 domain, not over all of f64:
+-- the clamps and dispatcher are themselves `if`s, so +/-inf still poisons a
+-- sibling arm wherever an untaken arm is unbounded. `min`/`max` would remove
+-- the rest but fail at eval under vmap at this pin (chelis#1582).
 def erf64_erfc_abs(ax: f64) -> f64 = if lt(ax, cast(4.0, f64)) then erf64_core_erfc_mid(ax) else if lt(ax, cast(6.0, f64)) then erf64_core_erfc_tail(ax) else cast(0.0, f64)
 def erf64(x: f64) -> f64 = {
   ax = abs_f64(x)
