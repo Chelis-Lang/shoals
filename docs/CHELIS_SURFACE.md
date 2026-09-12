@@ -198,8 +198,10 @@ What the kernels this shell authors actually guarantee. It exists because dtype
 is not accuracy: an `f64` signature says how the arithmetic is evaluated, not
 how good the approximation being evaluated is.
 
-**Every figure below is measured on the compiled kernel against a 60-digit
-reference, not derived.** Where a bound is not measured it is not stated.
+**Every figure below is measured on the compiled kernel against a high-precision
+`mpmath` reference, not derived.** Where a bound is not measured it is not
+stated. Each row states the precision it was measured at; they are not all the
+same, so no single figure is given here.
 
 Measure in binary, and by running the oracle rather than by hand. The error is
 `mpf(f64_result) - erf(mpf(exact_f64_input))` at extended precision, and
@@ -216,8 +218,8 @@ Closing that gap is tracked separately; see `docs/UPSTREAM_BUGS.md`.
 
 | Kernel | Approximation | Worst observed absolute error (a floor) | Method |
 |---|---|---|---|
-| `erf64` | W. J. Cody, Math. Comp. 23 (1969); three ranges split at 0.5 and 4, saturating at 6 | **>= 3.3675e-16** (~1.52 ulp of 1.0) | worst observed at x = 0.507001975; the error is jagged at ulp scale so any grid reports a floor |
-| `n_cdf64` | `0.5 * (1 - erf64(-x/√2))` | **>= 1.9495e-16** (~0.88 ulp of 1.0) | worst observed at x = -0.7170090691949448. NOT `erf64`'s halved: the argument reduction `-x/√2` and the final `0.5 * (1 - e)` each round, so the factor does not simply halve the inherited error |
+| `erf64` | W. J. Cody, Math. Comp. 23 (1969); three ranges split at 0.5 and 4, saturating at 6 | **>= 3.3675e-16** (~1.52 ulp of 1.0) | worst observed at x = 0.507001975, measured at 60 dps by `scripts/oracle_erf64_accuracy.py`; the error is jagged at ulp scale so any grid reports a floor |
+| `n_cdf64` | `0.5 * (1 - erf64(-x/√2))` | **>= 1.9495e-16** (~0.88 ulp of 1.0) | worst observed at x = -0.7170090691949448, measured at 60 dps by the same oracle. NOT `erf64`'s halved: the argument reduction `-x/√2` and the final `0.5 * (1 - e)` each round, so the factor does not simply halve the inherited error |
 
 **The kernel is no longer the limiting factor.** `bs_call_f64(100, 100, 0.05,
 0.2, 1)` returns `10.450583572185565`, one ulp from the correctly-rounded
