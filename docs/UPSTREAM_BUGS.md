@@ -259,7 +259,12 @@ in code that is CLOSED upstream but not sitting in §Archived.
       make the de-narrowing branch unexecutable, since closing it would not
       yield an f64 `erf`. Drafted at
       nautilus#59.
-    - **Re-probe trigger:** the blocked probe passing, or either issue closing.
+    - **Re-probe trigger:** the blocked probe passing, either issue closing, or
+      any nautilus pin bump past 0.7.43. That last one is not redundant:
+      nautilus#57 already switched `Special.erf` to a 4-term series below 0.25
+      on main, and it is only "Part of" nautilus#56, so the kernel this shell
+      mirrors in `scripts/oracle_greeks_gate.py::_erf_as_f32` can change while
+      both issues stay open and the blocked probe keeps failing.
       Follow that probe's sidecar; which repair landed decides whether this
       kernel is deleted in favour of a callable one or merely re-pointed.
 

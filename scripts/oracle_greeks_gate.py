@@ -133,6 +133,15 @@ def erf_pkg(x: float) -> float:
     `_erf_as_f32` below is NOT updated with this. It models
     `Nautilus.Special.erf`, which still carries the A&S coefficients, and the
     f32 corroboration leg depends on that staying true.
+
+    THAT IS TRUE OF THE PINNED nautilus 0.7.43 AND NOT OF nautilus main.
+    nautilus#57 switched `Special.erf` to a 4-term series below 0.25; it is
+    merged to main and no tag contains it, so `reef.toml`'s `nautilus =
+    "0.7.43"` is what keeps this mirror faithful. A bump to the first release
+    carrying that commit invalidates this leg and it must be re-measured then.
+    Note the re-probe trigger recorded for nautilus#56 in
+    `docs/UPSTREAM_BUGS.md` does NOT fire on that bump: #57 is only "Part of"
+    #56, so the issue can stay open while the kernel underneath this changes.
     """
     return math.erf(x)
 

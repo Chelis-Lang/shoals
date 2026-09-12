@@ -78,6 +78,13 @@ def test_bs_call_f64_vector_matches_scalar_desk_rows() -> unit ! { Test } = {
 }
 def constant_3(v: f64) -> tensor[3, f64] = to_tensor([v, v, v])
 def constant_1(v: f64) -> tensor[1, f64] = to_tensor([v])
+-- These wire-vs-scalar rows were written to lock STRUCTURAL AGREEMENT: both
+-- sides evaluated the same kernel, so they agreed exactly. That is no longer
+-- what they test. `bs_call_f64` evaluates Cody while `bs_call_wire_f64` still
+-- evaluates A&S from caller-supplied coefficients, so the rows now pass on
+-- ~19-78% tolerance headroom and would keep passing through a real structural
+-- divergence. They are a smoke test until the wire path migrates; see the
+-- uncovered-surface list in `docs/CHELIS_SURFACE.md`.
 def test_bs_call_wire_f64_matches_real_scalar_pricer() -> unit ! { Test } = {
   spots = to_tensor([cast(60.0, f64), cast(100.0, f64), cast(140.0, f64)])
   strikes = to_tensor([cast(130.0, f64), cast(100.0, f64), cast(70.0, f64)])

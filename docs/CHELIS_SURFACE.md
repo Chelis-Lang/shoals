@@ -198,22 +198,26 @@ What the kernels this shell authors actually guarantee. It exists because dtype
 is not accuracy: an `f64` signature says how the arithmetic is evaluated, not
 how good the approximation being evaluated is.
 
-**Every figure below is measured on the compiled kernel against a 50-digit
+**Every figure below is measured on the compiled kernel against a 60-digit
 reference, not derived.** Where a bound is not measured it is not stated.
 
 Measure in binary, and by running the oracle rather than by hand. The error is
 `mpf(f64_result) - erf(mpf(exact_f64_input))` at extended precision, and
-`scripts/oracle_erf64_accuracy.py` is what computes it -- these figures are its
-output, not a transcription. `erf64` and `n_cdf64` are exported for exactly
-that reason: a published bound that cannot be measured from outside the module
-is a bound nothing can check. Comparing decimal spellings on either side moves the
-answer by a few hundredths of an ulp, which is how a revision of this table
-published a floor higher than any observation.
+`scripts/oracle_erf64_accuracy.py` is what computes it. `erf64` and `n_cdf64`
+are exported for exactly that reason: a published bound that cannot be measured
+from outside the module is a bound nothing can check. Comparing decimal
+spellings on either side moves the answer by a few hundredths of an ulp.
+
+These figures are **transcribed by hand from that script's output**, and
+nothing checks the transcription: the script compares its measurements against
+its own internal `DOCUMENTED` constants, never against this file, and it is not
+wired into any CI job. Re-run it and compare by eye after any kernel change.
+Closing that gap is tracked separately; see `docs/UPSTREAM_BUGS.md`.
 
 | Kernel | Approximation | Worst observed absolute error (a floor) | Method |
 |---|---|---|---|
-| `erf64` | W. J. Cody, Math. Comp. 23 (1969); three ranges split at 0.5 and 4, saturating at 6 | **>= 3.3675e-16** (~1.52 ulp of 1.0) | worst observed at x = 0.507001975; the error is jagged at ulp scale so any grid reports a floor. 571k points gave 2.7e-16, 44M gave 3.37e-16, the exact argmax gives 3.45e-16 |
-| `n_cdf64` | `0.5 * (1 - erf64(-x/√2))` | **>= 1.9495e-16** (~0.88 ulp of 1.0) | worst observed at x = -0.7170090691949448. NOT `erf64`'s halved: an earlier revision stated that by construction, and it is both underived and too small. The argument reduction `-x/√2` and the final `0.5 * (1 - e)` each round, so the factor does not simply halve the inherited error |
+| `erf64` | W. J. Cody, Math. Comp. 23 (1969); three ranges split at 0.5 and 4, saturating at 6 | **>= 3.3675e-16** (~1.52 ulp of 1.0) | worst observed at x = 0.507001975; the error is jagged at ulp scale so any grid reports a floor |
+| `n_cdf64` | `0.5 * (1 - erf64(-x/√2))` | **>= 1.9495e-16** (~0.88 ulp of 1.0) | worst observed at x = -0.7170090691949448. NOT `erf64`'s halved: the argument reduction `-x/√2` and the final `0.5 * (1 - e)` each round, so the factor does not simply halve the inherited error |
 
 **The kernel is no longer the limiting factor.** `bs_call_f64(100, 100, 0.05,
 0.2, 1)` returns `10.450583572185565`, one ulp from the correctly-rounded

@@ -229,10 +229,12 @@ kernel changes:
 ```
 
 Expected: exit 0 and a final `PASS: oracle_erf64_accuracy` line. It measures
-both kernels against an mpmath reference at 60 digits and fails if a documented
-figure exceeds what it can observe -- the figures are floors, and a floor above
-every observation is not one. Two consecutive reviews found a wrong number here
-when the figures were transcribed by hand, which is why they are output now.
+both kernels against an mpmath reference at 60 digits and fails if one of its
+own `DOCUMENTED` constants exceeds what it can observe -- the figures are
+floors, and a floor above every observation is not one. It does **not** read
+`docs/CHELIS_SURFACE.md` or any other published file, it is not wired into CI,
+and it exits 0 when mpmath is absent, so it cannot catch a figure that is wrong
+only in the docs. Run it by hand after any kernel change and compare.
 The v0.7.6 testing cutover timing is recorded in
 `docs/testing_cutover_0.7.6.json`: node-local `--jobs auto` ran 48
 tests in 1:04.89; serial `--jobs 1` ran the same suite in 1:25.44.
