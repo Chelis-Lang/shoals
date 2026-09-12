@@ -245,10 +245,12 @@ in code that is CLOSED upstream but not sitting in §Archived.
       f64 literals again. They are now different algorithms -- Cody's in the
       shipped kernel, A&S in the research probes and upstream -- so it is
       drift, not redundancy.
-    - **State at pin 0.18.6 (2026-09-06):** both upstream issues OPEN.
+    - **State at pin 0.18.6 (re-probed 2026-09-12):** nautilus#56 CLOSED,
+      nautilus#59 and chelis#902 OPEN. The probe still blocks:
       `tests_blocked/special/erf_builtin_absent.ch` reports `precision
       mismatch: expected f32, got f64` — the package `erf` resolves and refuses
-      the width. The repairs are disjoint: nautilus#56 is the f32 original's
+      the width. nautilus#56 closing does not unblock it, because the f32-only
+      signature is nautilus#59's subject, not #56's. The repairs are disjoint: nautilus#56 is the f32 original's
       own bound and fixing it changes those coefficients but not the signature
       that forced the duplicate; an f64 signature on `Nautilus.Special` removes
       the reason to duplicate but leaves the bound wherever A&S is still used;
@@ -262,9 +264,10 @@ in code that is CLOSED upstream but not sitting in §Archived.
     - **Re-probe trigger:** the blocked probe passing, either issue closing, or
       any nautilus pin bump past 0.7.43. That last one is not redundant:
       nautilus#57 already switched `Special.erf` to a 4-term series below 0.25
-      on main, and it is only "Part of" nautilus#56, so the kernel this shell
-      mirrors in `scripts/oracle_greeks_gate.py::_erf_as_f32` can change while
-      both issues stay open and the blocked probe keeps failing.
+      on main, and no tag yet carries it, so the kernel this shell mirrors in
+      `scripts/oracle_greeks_gate.py::_erf_as_f32` changes at the next release
+      and not at any issue transition. nautilus#56 closing on 2026-09-12 fired
+      the issue-closing clause without changing the pinned kernel at all.
       Follow that probe's sidecar; which repair landed decides whether this
       kernel is deleted in favour of a callable one or merely re-pointed.
 

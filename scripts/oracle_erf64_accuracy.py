@@ -7,8 +7,10 @@ number the measurement does not support. First a sample maximum presented as a
 maximum (2.7e-16), then a floor sitting ABOVE every observable value
 (3.45e-16), which came from comparing decimal spellings on both sides.
 
-So the figures are output now, not prose. This script computes them; the docs
-quote it. A wrong method fails here instead of shipping in nine files.
+This script computes those figures. It checks them ONLY against its own
+`DOCUMENTED` constants below: it does not read the published files, nothing
+invokes it, and it exits 0 when mpmath is absent. So it cannot catch a figure
+that is wrong only in a doc. That gap is shoals#64.
 
 MEASURE IN BINARY. The error is
 
@@ -24,9 +26,8 @@ published number:
 
 FLOOR, NOT MAXIMUM. The error is jagged at ulp scale, so any grid reports only
 the worst point it lands on. A refinement finer than an earlier sweep but
-differently spaced misses the argmax entirely. The documented figure is a floor
-and this script enforces exactly that: the docs may not claim MORE than was
-measured.
+differently spaced misses the argmax entirely. The documented figure is a floor,
+and the check below enforces that for the `DOCUMENTED` constants.
 
 Usage:
     oracle_erf64_accuracy.py            # measure and check the documented floors

@@ -200,8 +200,7 @@ how good the approximation being evaluated is.
 
 **Every figure below is measured on the compiled kernel against a high-precision
 `mpmath` reference, not derived.** Where a bound is not measured it is not
-stated. Each row states the precision it was measured at; they are not all the
-same, so no single figure is given here.
+stated.
 
 Measure in binary, and by running the oracle rather than by hand. The error is
 `mpf(f64_result) - erf(mpf(exact_f64_input))` at extended precision, and

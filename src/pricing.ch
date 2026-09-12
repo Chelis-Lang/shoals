@@ -7,9 +7,9 @@ export (erf64, n_cdf64, bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_
 --
 -- ACCURACY. `erf64` evaluates W. J. Cody's rational approximation (Math. Comp.
 -- 23, 1969): three ranges split at 0.5 and 4, saturating at 6 where erfc
--- underflows f64. Measured on this compiled kernel against a 50-digit
--- reference: worst observed absolute error >= 3.3675e-16, about 1.52 ulp of
--- 1.0, at x = 0.507001975.
+-- underflows f64. Measured on this compiled kernel by
+-- `scripts/oracle_erf64_accuracy.py` at 60 dps: worst observed absolute error
+-- >= 3.3675e-16, about 1.52 ulp of 1.0, at x = 0.507001975.
 --
 -- A FLOOR, not a maximum, and the distinction is the point. The error is
 -- jagged at ulp scale, so a grid reports only the worst point it happens to

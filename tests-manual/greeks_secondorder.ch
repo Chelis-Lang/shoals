@@ -9,11 +9,11 @@ import Shoals.Pricing (gammas_call, volgas_call, vannas_call)
 -- derivatives of the displayed A&S-erf price -- an indirection that existed
 -- because the kernel was inaccurate, so a true target could not be used. Since
 -- `erf64` moved to Cody's approximation (>= 3.3675e-16, this shell's issue 61) the
--- displayed price IS the true price at f64 and the two coincide. Four of the
--- eleven old targets breached tolerance; the other seven sat inside it by luck.
--- All TWELVE second-derivative targets are now regenerated -- the count was
--- misstated as eleven, and `vanna ITM s=120` kept its A&S-displayed value for
--- a further round, consuming 41% of its own tolerance band. Regenerating every
+-- displayed price IS the true price at f64 and the two coincide. All TWELVE
+-- second-derivative targets are now regenerated; some of the old ones breached
+-- tolerance and the rest sat inside it by luck. `vanna ITM s=120` kept its
+-- A&S-displayed value for a further round, consuming 41% of its own tolerance
+-- band. Regenerating every
 -- target, not only the ones that breached, is what stops the suite pinning an
 -- approximation the
 -- code no longer computes. The closed-form chain rule in

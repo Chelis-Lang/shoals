@@ -139,9 +139,10 @@ def erf_pkg(x: float) -> float:
     merged to main and no tag contains it, so `reef.toml`'s `nautilus =
     "0.7.43"` is what keeps this mirror faithful. A bump to the first release
     carrying that commit invalidates this leg and it must be re-measured then.
-    Note the re-probe trigger recorded for nautilus#56 in
-    `docs/UPSTREAM_BUGS.md` does NOT fire on that bump: #57 is only "Part of"
-    #56, so the issue can stay open while the kernel underneath this changes.
+    `docs/UPSTREAM_BUGS.md` carries a pin-bump re-probe trigger for exactly
+    this. Do not rely on an issue transition instead: nautilus#56 closed on
+    2026-09-12 without changing the pinned kernel, and #57 can ship in a
+    release without closing anything.
     """
     return math.erf(x)
 
