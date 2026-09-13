@@ -40,9 +40,12 @@ These two satisfy put-call parity: `c - p == s - k * exp(-r * t)`.
 consumers such as Beacon. It accepts same-length f64 tensors for the five market
 inputs and for the A-S constants. The constants are explicit point-valued
 inputs because host-side broadcasting (`vmap`, `shape`, scalar conversion, or
-list mapping) would erase the compiler-owned WireDag root. Its arithmetic and
-small-x/sign branches mirror `bs_call_f64`; representative deep-OTM, ATM, and
-deep-ITM rows are checked against that scalar pricer with a scale-aware bound.
+list mapping) would erase the compiler-owned WireDag root. It does **not**
+evaluate the same erf as `bs_call_f64`: its normal CDF is A-S 7.1.26 from those
+caller-supplied coefficients, while the scalar kernel moved to a different
+approximation, so the two agree only to the bound below. Representative
+deep-OTM, ATM, and deep-ITM rows are checked against that scalar pricer with a
+scale-aware bound.
 The executable comparison uses `1e-5 + 1e-8 * abs(expected)`, retaining the
 absolute floor near zero while remaining scale-aware for large prices, and
 covers both three-row and shape-one inputs.

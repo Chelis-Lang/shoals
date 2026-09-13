@@ -182,8 +182,13 @@ def f64_col[n](xs: tensor[n, f64]) -> tensor[n, 1, f64] = {
 }
 -- Pure tensor-DAG Black-Scholes helpers for the Beacon seam (shoals issue 19).
 -- Constants are point-valued tensor inputs because introducing them through
--- host-only shape/vmap plumbing would erase the named WireDag root. The
--- arithmetic and both erf branches mirror `erf64` above in f64.
+-- host-only shape/vmap plumbing would erase the named WireDag root.
+--
+-- This path does NOT evaluate `erf64`. Its erf is Abramowitz & Stegun 7.1.26
+-- built from the caller-supplied coefficients, so it kept the ~1.4e-7 bound
+-- that this shell's issue 61 removed from the scalar kernel. The two are different
+-- approximations and agree only to the scale-aware bound `tests/pricing.ch`
+-- asserts. Migrating it is separate work; see docs/CHELIS_SURFACE.md.
 def pricing_wire_select_f64[n](mask: &tensor[n, f64], a: tensor[n, f64], b: tensor[n, f64], half: &tensor[n, f64]) -> tensor[n, f64] = {
   one = add(copy(half), copy(half))
   add(mul(copy(mask), a), mul(sub(one, copy(mask)), b))
