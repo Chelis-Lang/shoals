@@ -13,8 +13,9 @@ import Std.Contracts (normal_cdf)
 -- passes. The two sides are NOT the same model any more -- `erf64` evaluates
 -- Cody's approximation while the contract symbol is f32 A&S -- so the binding
 -- that scopes the S8 composites to the shipped pricer is measured agreement,
--- not identity. At f32 output width the gap is dominated by quantization rather
--- than by either approximation's error.
+-- not identity. The 1e-4 bound is what carries that scoping; the two
+-- approximations are not interchangeable below it, differing by up to ~8.2e-6
+-- at the money at price level.
 --
 -- It is in tests-manual/ because the host evaluator runs the grid through the
 -- full Pricing module graph interpretively (~3 min), which overruns the fast

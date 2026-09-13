@@ -91,8 +91,9 @@ would be the derivative of a different-precision function than the displayed pri
 instead the binding is closed by `tests/composites_binding.ch`: the pricer's price agrees
 with a `Std.Contracts.normal_cdf`-based price within a stated f32 bound. So the corpus is
 proven about the certified f32 contract, and the cross-check shows the shipped f64 pricer
-agrees with it — measured agreement, not identity of model. At f32 output width that gap
-is dominated by quantization rather than by either approximation's error.
+agrees with it — measured agreement, not identity of model. The agreement is what the
+cross-check measures; do not infer that the two approximations are interchangeable, since
+at price level they differ by up to ~8.2e-6 at the money.
 
 ## Demos (`Shoals.Demos.Businesswrong`)
 

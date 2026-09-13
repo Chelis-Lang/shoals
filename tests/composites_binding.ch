@@ -29,9 +29,12 @@ import Std.Contracts (normal_cdf)
 -- since shoals#61; the grid still passes its 1e-4 bound. The smoke cells here
 -- measure worst 7.63e-6 (deep ITM / short maturity), re-measured under Cody and
 -- unchanged, so the asserted f32 bound is 5e-5 -- ~6.5x over the worst measured
--- gap. It is unchanged because at f32 output width this gap is dominated by
--- quantization, not by either approximation's error: 7.63e-6 is about 64 f32
--- ulp at a price near 100, while Cody and A&S differ far below that.
+-- gap. Every measured gap is an exact f32 ulp multiple of its own cell's price:
+-- 7.63e-6 is 1 ulp at the deep-ITM price and 4 ulp at the short-maturity one,
+-- and the ATM and high-vol cells are 3 and 1. Do NOT read that as the
+-- approximations being interchangeable here: at PRICE level Cody and A&S differ
+-- by up to 8.2e-6 at ATM, which is larger than the gap itself. The ~1.4e-7 A&S
+-- figure is an erf-level bound and does not convert into these units.
 def d1_f32(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = {
   num = add(log(div(s, k)), mul(add(r, mul(cast(0.5, f32), mul(sigma, sigma))), t))
   div(num, mul(sigma, sqrt(t)))

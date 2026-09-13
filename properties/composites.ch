@@ -20,9 +20,10 @@ import Std.Contracts (normal_cdf)
 -- pricer (`Shoals.Pricing.bs_call_scalar`) computes a DIFFERENT approximation in
 -- an f64 body: since shoals#61 `erf64`/`n_cdf64` evaluate W. J. Cody's rational
 -- approximation, NOT A&S. So the binding is measured agreement, not identity of
--- model: the two are compared and shown to agree inside a stated f32 bound,
--- which at f32 output width is dominated by quantization rather than by either
--- approximation's error. That binding is the S7 cross-check
+-- model: the two are compared and shown to agree inside a stated f32 bound.
+-- That bound is what licenses the scoping, and nothing weaker does -- at price
+-- level the two approximations differ by up to ~8.2e-6 at the money, so they
+-- are not interchangeable outside it. That binding is the S7 cross-check
 -- (`tests/composites_binding.ch`), not a value-level proof, because erf/log are
 -- not cvc5-lowerable so the link from the abstract symbol to the real N is
 -- asserted-and-fuzz-validated, never machine-checked.

@@ -456,9 +456,11 @@ No parked entries.
       identical results before and after.
 
 - **shoals#19 — real Black-Scholes tensor `WireDag` producer seam.** Resolved
-  by `Shoals.Pricing.bs_call_wire_f64`: a pure f64 tensor-DAG entry with the
-  same A-S coefficients and branch structure as `bs_call_f64`, no host/vmap
-  bridge, and representative scalar-equivalence coverage. The executable
+  by `Shoals.Pricing.bs_call_wire_f64`: a pure f64 tensor-DAG entry evaluating
+  A-S 7.1.26 from caller-supplied coefficients -- NOT the scalar kernel, which
+  moved to Cody's approximation under this shell's issue 61 -- with no host/vmap
+  bridge and representative scalar-equivalence coverage. Migrating it is still
+  open; see the erf entry above. The executable
   `scripts/validate_bs_wire_root.py` gate lowers the real source with Chelis
   0.17.5 and observes a non-empty named root. Beacon's bounded-domain consumer
   and report contract remain tracked by Beacon#74.

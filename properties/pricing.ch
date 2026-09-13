@@ -27,7 +27,8 @@ def call_bounded_by_spot(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool = {
 -- bs_put_scalar route through one f64 body and downcast, while the reference is the
 -- f32 Nautilus-erfc evaluation of A&S. Since shoals#61 those are DIFFERENT
 -- approximations -- the f64 body evaluates Cody's -- so the two differ by f32
--- quantization plus an approximation gap far below it, amplified by the price's
+-- quantization plus a genuine approximation gap (up to ~8.2e-6 at the money at
+-- price level, not the ~1.4e-7 erf-level figure), amplified by the price's
 -- cancellation. Worst over the exercised fixed points: K=110 call 1.14e-5,
 -- ATM put 1.05e-5, most cells ~1e-6, all measured under the old A&S body and not
 -- re-measured since; the fixed points still pass. The bound is 5e-5 -- ~4.4x over
