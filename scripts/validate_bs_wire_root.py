@@ -30,13 +30,21 @@ EXPECTED_NODE_COUNT = 1488
 # The public entry now has a Copy wrapper around its final Sub operation.
 # The former schema-6 raw hash was
 # 0c85b5c010446f5704f4daa468b97916994668ff41b303968528ffe8b448fabe.
-# Provenance: EXPECTED_RAW_SHA256, EXPECTED_ENTRY_ROOT (770) and
-# EXPECTED_NODE_COUNT (1488) were audited on an artifact lowered under the
-# 0.18.7 candidate (landing/shoals-wire-audit/new-migrated.json), not the
-# pinned 0.18.9 binary. They must be re-validated against the published
-# 0.18.9 binary at the release gate; the gate fails closed on any mismatch
-# rather than accepting a different hash, root, or node count.
-EXPECTED_RAW_SHA256 = "ca707901945f5fea9df94eee0a5af62fc0053ae1a2971669212bd329284f9989"
+# Provenance: re-validated against the published Chelis 0.18.9 binary at the
+# release gate. EXPECTED_ENTRY_ROOT (770), EXPECTED_NODE_COUNT (1488) and
+# WIRE_DAG_SCHEMA_VERSION (11) reproduce byte-for-byte under 0.18.9. The
+# full-DAG op-kind histogram (add 59, cast 13, cmp_lt 13, copy 314, div 8,
+# drop 717, exp 5, extent_witness 166, load 48, log 2, mul 91, neg 17,
+# sqrt 3, sub 32) and the entry-reachable subgraph are identical to the
+# 0.18.7-candidate reference (landing/shoals-wire-audit/new-migrated.json,
+# raw ca707901945f5fea9df94eee0a5af62fc0053ae1a2971669212bd329284f9989).
+# The only byte difference between the two responses is per-node merged_spans
+# and span_id source-offset metadata, which is non-semantic and excluded from
+# the arithmetic comparison; every node id/op/name/inputs, the roots list and
+# named_roots are identical. The raw hash therefore moves from the 0.18.7
+# capture to the 0.18.9 value below. The gate still fails closed on any
+# mismatch rather than accepting a different hash, root, or node count.
+EXPECTED_RAW_SHA256 = "955c1df66a5731182646ae23d66d15308d4c63991810f41baf3ab425f48cabd2"
 FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
 EXPECTED_LOADS = {
     "a1",
