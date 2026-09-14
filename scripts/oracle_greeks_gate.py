@@ -11,8 +11,11 @@ erf's odd reflection is exercised):
 
   1. ANALYTIC textbook closed forms (delta=N(d1), vega=S phi(d1) sqrt(t),
      rho=K t e^{-rt} N(d2), theta=-dC/dt) evaluated in this script through the
-     SAME Abramowitz-Stegun 7.1.26 erf the package body uses, so the comparison
-     isolates the AD chain rule, not erf accuracy.
+     same erf the package body evaluates, so the comparison isolates the AD
+     chain rule, not erf accuracy. Since this shell's issue 61 that is Cody's
+     approximation, mirrored here as `math.erf`; it was Abramowitz-Stegun
+     7.1.26 with the coefficients reproduced exactly, and the f32
+     corroboration leg still models A&S because `Nautilus.Special.erf` does.
   2. The shipped finite-difference Greeks in ``Shoals.Greeks`` (``fd_delta_call``
      etc.) INDEPENDENTLY CORROBORATE the closed-form ground truth: the assertion
      subject is ``ground_truth`` vs ``fd_*`` (not AD vs FD), bounded by an
@@ -92,9 +95,16 @@ def compiler_pin() -> str:
     return match.group(1)
 
 # --------------------------------------------------------------------------
-# Reference math (Python). erf is A&S 7.1.26 -- the SAME coefficients as the
-# package body -- so analytic mirrors isolate the AD chain rule, not erf error.
-# `_true` versions use math.erf for the accuracy-monotone guard's ground truth.
+# Reference math (Python). `erf_pkg` mirrors whatever erf the package body
+# evaluates, so analytic mirrors isolate the AD chain rule, not erf error.
+# That is `math.erf` since this shell's issue 61 -- see `erf_pkg` for why the
+# substitution is faithful. `_erf_as_f32` still models A&S because the f32
+# path still evaluates it. `_true` versions use math.erf for the
+# accuracy-monotone guard's ground truth.
+#
+# NAMING: docstrings below still say "the DISPLAYED A&S price". Read that as
+# "the price the package displays" -- the formulae are unchanged, only the
+# kernel underneath moved.
 # --------------------------------------------------------------------------
 SQRT2 = math.sqrt(2.0)
 INV_SQRT_2PI = 1.0 / math.sqrt(2.0 * math.pi)
@@ -105,22 +115,26 @@ def f32(x: float) -> float:
     return struct.unpack("f", struct.pack("f", x))[0]
 
 
-def erf_as(x: float) -> float:
-    a1, a2, a3, a4, a5, p = (
-        0.254829592, -0.284496736, 1.421413741,
-        -1.453152027, 1.061405429, 0.3275911,
-    )
-    ax = abs(x)
-    if ax < 1e-5:
-        return x * 1.1283791670955126
-    t = 1.0 / (1.0 + p * ax)
-    poly = t * (a1 + t * (a2 + t * (a3 + t * (a4 + t * a5))))
-    y = 1.0 - poly * math.exp(-ax * ax)
-    return -y if x < 0 else y
+def erf_pkg(x: float) -> float:
+    """The erf the PACKAGE evaluates, mirrored here so the comparison isolates
+    the AD chain rule rather than erf accuracy.
+
+    Since this shell's issue 61 the package evaluates Cody's approximation at
+    >= 3.3675e-16, so `math.erf` is a faithful mirror: the two differ by
+    ~1e-16, ten orders below this gate's tightest tolerance (3e-6).
+
+    `_erf_as_f32` below is NOT updated with this. It models
+    `Nautilus.Special.erf`, which carries A&S at the PINNED nautilus 0.7.43 --
+    not on nautilus main, where nautilus#57 switched it to a 4-term series
+    below 0.25 with no tag yet carrying it. A pin bump invalidates this leg and
+    it must be re-measured; `docs/UPSTREAM_BUGS.md` holds that trigger. Do not
+    rely on an issue transition instead -- #57 can ship without closing one.
+    """
+    return math.erf(x)
 
 
 def ncdf_as(x: float) -> float:
-    return 0.5 * (1.0 - erf_as(-x / SQRT2))
+    return 0.5 * (1.0 - erf_pkg(-x / SQRT2))
 
 
 def ncdf_true(x: float) -> float:
@@ -183,61 +197,42 @@ def analytic_greeks(s, k, r, sg, t, ncdf):
     return {"delta": delta, "vega": vega, "rho": rho, "theta": theta}
 
 
-_AS = (0.254829592, -0.284496736, 1.421413741, -1.453152027, 1.061405429)
-_AS_P = 0.3275911
 
 
-def erf_as_deriv(x: float) -> float:
-    """d/dx erf_AS(x), closed form. For |x|<1e-5 the body uses the linear branch
-    erf ~ (2/sqrt pi) x whose derivative is the constant 1.12837..., matching the
-    package's small-|x| branch. Even function (erf is odd), so x<0 reuses |x|."""
-    a1, a2, a3, a4, a5 = _AS
-    p = _AS_P
-    ax = abs(x)
-    if ax < 1e-5:
-        return 1.1283791670955126
-    t = 1.0 / (1.0 + p * ax)
-    poly = t * (a1 + t * (a2 + t * (a3 + t * (a4 + t * a5))))
-    polyp = a1 + t * (2 * a2 + t * (3 * a3 + t * (4 * a4 + t * 5 * a5)))
-    e = math.exp(-ax * ax)
-    return e * (p * t * t * polyp + 2 * ax * poly)
+def erf_pkg_deriv(x: float) -> float:
+    """d/dx of the package's erf, closed form.
+
+    With the package on Cody's approximation the derivative of the
+    approximation and the true derivative agree far inside this gate's
+    tolerances, so this is the exact 2/sqrt(pi) * exp(-x^2) rather than the
+    differentiated A&S rational form it used to be. That older form is what
+    made this gate fail 13 of 14 groups once the kernel changed: it was
+    measuring erf accuracy, which the docstring says it must not.
+    """
+    return 1.1283791670955126 * math.exp(-x * x)
 
 
 def pdf_as(x: float) -> float:
-    """d/dx ncdf_as(x) = 0.5 * erf_AS'(-x/sqrt2) * (1/sqrt2) -- the A&S 'pdf'."""
-    return 0.5 * erf_as_deriv(-x / SQRT2) / SQRT2
+    """d/dx ncdf_as(x) = 0.5 * erf'(-x/sqrt2) * (1/sqrt2) -- the package's pdf."""
+    return 0.5 * erf_pkg_deriv(-x / SQRT2) / SQRT2
 
 
-def erf_as_deriv2(x: float) -> float:
-    """d^2/dx^2 erf_AS(x), closed form. erf_AS' is even (erf is odd), so it equals
-    g(|x|) and its x-derivative is g'(|x|)*sign(x). For |x|<1e-5 the package uses
-    the linear branch erf ~ (2/sqrt pi) x, whose second derivative is 0. Verified
-    against a high-order central difference of ``erf_as_deriv`` to ~1e-10."""
-    a1, a2, a3, a4, a5 = _AS
-    p = _AS_P
-    ax = abs(x)
-    if ax < 1e-5:
-        return 0.0
-    t = 1.0 / (1.0 + p * ax)
-    dt = -p * t * t                                       # dt/d(ax)
-    poly = t * (a1 + t * (a2 + t * (a3 + t * (a4 + t * a5))))
-    polyp = a1 + t * (2 * a2 + t * (3 * a3 + t * (4 * a4 + t * 5 * a5)))   # d poly/dt
-    polypp = 2 * a2 + t * (6 * a3 + t * (12 * a4 + t * 20 * a5))           # d^2 poly/dt^2
-    e = math.exp(-ax * ax)
-    de = -2 * ax * e                                      # d/d(ax) e^{-ax^2}
-    # erf_as_deriv = M(ax) = e^{-ax^2} (p t^2 polyp + 2 ax poly). Differentiate in ax.
-    inner = p * t * t * polyp + 2 * ax * poly
-    d_inner = p * (2 * t * dt * polyp + t * t * polypp * dt) + 2 * poly + 2 * ax * polyp * dt
-    g_prime = de * inner + e * d_inner
-    return g_prime * (1.0 if x >= 0 else -1.0)
+def erf_pkg_deriv2(x: float) -> float:
+    """d^2/dx^2 of the package's erf, closed form: -2x * 2/sqrt(pi) * exp(-x^2).
+
+    Was the differentiated A&S rational form. Same reasoning as
+    ``erf_pkg_deriv``: with the package on Cody's approximation the true second
+    derivative is the faithful mirror, and the old form measured erf accuracy
+    rather than the AD chain rule.
+    """
+    return -2.0 * x * 1.1283791670955126 * math.exp(-x * x)
 
 
 def pdf_as_deriv(x: float) -> float:
-    """d/dx pdf_as(x) = d^2/dx^2 ncdf_as(x). pdf_as(x)=0.5 erf_AS'(-x/sqrt2)/sqrt2,
-    so pdf_as'(x) = -0.25 * erf_AS''(-x/sqrt2). The analytic 'pdf-prime' of the A&S
-    normal CDF; the building block of the exact SECOND derivatives of the displayed
-    price, used the same way pdf_as builds the exact first derivatives."""
-    return -0.25 * erf_as_deriv2(-x / SQRT2)
+    """d/dx pdf_as(x) = d^2/dx^2 ncdf_as(x), so pdf_as'(x) = -0.25 * erf''(-x/sqrt2).
+    The 'pdf-prime' of the package's normal CDF; the building block of the exact
+    SECOND derivatives of the displayed price, as pdf_as builds the first."""
+    return -0.25 * erf_pkg_deriv2(-x / SQRT2)
 
 
 def ad_ground_truth_greeks(s, k, r, sg, t):
@@ -746,7 +741,12 @@ def main() -> int:
         price_true = call_price(s, k, r, sg, t, ncdf_true)
         # NEW path: A&S erf computed in f64 then downcast to f32 (bs_call_scalar).
         # OLD path: A&S erf computed in f32 arithmetic (Nautilus.Special.erfc).
-        # Both inherit the IDENTICAL A&S model error; the difference vs true is
+        # These no longer inherit one model error: since this shell's issue 61
+        # the new path evaluates Cody's and the old f32 path evaluates A&S, so
+        # this compares two approximations rather than isolating arithmetic
+        # precision. The guard still means "new is at least as accurate as
+        # old" -- measured 9.16e-7 against 3.64e-5 -- but not "same model,
+        # different width". The difference vs true is
         # the arithmetic precision. The monotone guard asserts new <= old.
         price_new_f32 = f32(price_as)
         price_old_f32 = call_price_old_f32(s, k, r, sg, t)
@@ -842,7 +842,7 @@ def _finish(grid, refs, test_names, src, rc, per_test, summary, out, err,
             for c, rf in zip(grid, refs) if c["tag"] != "grid"
         ],
         "second_order": {
-            "description": "gammas_call/volgas_call/vannas_call: nested-grad d2 of the displayed A&S price",
+            "description": "gammas_call/volgas_call/vannas_call: nested-grad d2 of the displayed price",
             "max_so_model_err_vs_trueBS": {
                 gk: max(abs(rf["so_analytic"][gk] - rf["so_ground_truth"][gk]) for rf in refs)
                 for gk in ("gamma", "volga", "vanna")
@@ -874,19 +874,20 @@ def _finish(grid, refs, test_names, src, rc, per_test, summary, out, err,
         "tolerance_derivation": {
             "eps_f32": EPS_F32,
             "ad_vs_groundtruth (PRIMARY, gating)":
-                "max(16*eps_f32*|v|, 3e-6); AD vs exact f64 derivative of A&S price, f32 ULPs",
+                "max(16*eps_f32*|v|, 3e-6); AD vs exact f64 derivative of the displayed price, f32 ULPs",
             "ad_vs_analytic (secondary)":
-                "2*measured_A&S_model_err + max(8*eps_f32*|v|, 3e-6)",
+                "2*measured_displayed_model_err + max(8*eps_f32*|v|, 3e-6)",
             "groundtruth_vs_fd (secondary, INDEPENDENT corroboration)":
                 "2*|fd(h)-fd(2h)| (Richardson, a-priori) + 8*eps_f32*price/h + 3e-7; "
                 "subject is closed-form ground_truth vs in-package fd_*; band is "
                 "derived from h+precision alone (NOT from any gt-vs-fd gap), so it "
                 "can fail if the closed form is wrong",
-            "binding": "max(16*eps_f32*|price|, 1e-4); erf-impl rounding of same formula",
+            "binding": "max(16*eps_f32*|price|, 1e-4); f32 quantization plus the "
+                       "Cody-vs-A&S approximation gap, which sits far below it",
             "so_ad2_vs_groundtruth (PRIMARY, gating)":
-                "max(48*eps_f32*|v|, greek_floor); nested grad == exact f64 2nd-deriv of A&S price",
+                "max(48*eps_f32*|v|, greek_floor); nested grad == exact f64 2nd-deriv of the displayed price",
             "so_ad2_vs_analytic (secondary)":
-                "2*measured_A&S_2nd_deriv_model_err + primary_so_band",
+                "2*measured_displayed_2nd_deriv_model_err + primary_so_band",
             "so_groundtruth_vs_fd (secondary, INDEPENDENT corroboration)":
                 "2*|fd(h)-fd(2h)| (Richardson, a-priori) + 8*eps_f32*|v|/h^2 + 3e-7; "
                 "subject is closed-form 2nd-deriv ground_truth vs FD of displayed "

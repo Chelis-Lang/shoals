@@ -169,7 +169,7 @@ tiers: **A** (type/dimension/linearity), **B** (SMT via cvc5 over the reals),
 | SMT prove tier (cvc5) shipped in the **release** tarball | `@pin` | SMT is in the released binary as of chelis 0.11.0 (no from-source `--features smt` build needed at this pin). Tier B lowers to cvc5 over the **reals** (`QF_NRA`, or `QF_NRAT` when a transcendental is present); a green is a real-arithmetic fact, **not** an IEEE-`f32` statement. `arith_model:"real"`. |
 | Transcendentals `exp`, `sqrt`, `sin`, `cos` lower to SMT | `@pin*` | These four **do** lower — cvc5 kinds `EXPONENTIAL`/`SQRT`/`SINE`/`COSINE`, selecting the `QF_NRAT` logic. *`QF_NRAT` is **incomplete**: cvc5 may return `unknown`, which chelis records as `unsupported` (solver capacity) and `--tier auto` degrades **honestly** to fuzz — never a false proven. Keep structural greens transcendental-free by construction where possible (report §3). |
 | Certified-envelope transcendental discharge (`erf`/`normal_cdf`/`exp`/`log`/`sqrt` subterms) | `@pin` | Shipped in 0.16.0 (**chelis#434, now CLOSED**): a soundly-boundable transcendental subterm is abstracted to a fresh variable over its Gappa/Arb-certified envelope hull and the goal discharges as **`proven_modulo_certified_envelope`** (strictly weaker than `proven_modulo_real_arithmetic`, disclosed in the verdict). Fail-closed on unboundable arguments. **Residual:** goals whose truth depends on the *coupling* between abstractions cannot reach an exact proven tier: direct BS/B76 call-price positivity and direct BS spot-monotonicity/delta, vega, rho, and gamma comparisons are observed only at `fuzz_validated`, while the direct intrinsic-lower-bound candidate remains `deferred_invariant` (**chelis#637**, open). See `UPSTREAM_BUGS.md`. |
-| `erf` / bundled `n_cdf` via an abstract-subterm contract | `@pin` | `erf` is not directly cvc5-lowerable, but the bundled normal-CDF **contract** (`0 ≤ N ≤ 1`, reflection `N(-x)=1-N(x)`) is discharged at the SMT tier as an abstract subterm (`chelis-prove/src/contracts.rs`), which is what lets the abstracted derivatives structure prove. The contract is separately fuzz-validated against the real `n_cdf` (max abs err ≈ 2 ulp vs scipy, report §7). |
+| `erf` / bundled `n_cdf` via an abstract-subterm contract | `@pin` | `erf` is not directly cvc5-lowerable, but the bundled normal-CDF **contract** (`0 ≤ N ≤ 1`, reflection `N(-x)=1-N(x)`) is discharged at the SMT tier as an abstract subterm (`chelis-prove/src/contracts.rs`), which is what lets the abstracted derivatives structure prove. The contract is separately fuzz-validated against the real `n_cdf` (max abs err ≈ 2 ulp vs scipy, report §7) — that is an **`f32`** measurement: `research/proof-infra/oracle/compare_ncdf.py` uses `ULP_F32 = 2^-24 ≈ 5.96e-8` and `RESULTS.md` records the max as **1.22e-7 at x=0.75**. It is not a claim about `n_cdf64`, which no longer shares that kernel: `erf64` moved to Cody's approximation (>= 3.3675e-16 observed) while `Nautilus.Special.erf` — the path this row measures — still evaluates A&S 7.1.26. The two are now different approximations, and the ~1.2e-7 figure belongs to the `f32` A&S one. See the accuracy section below. |
 | Algebraic `abs`, `min`, `max` lower to SMT | `@pin` | In `CVC5_LOWERABLE`, `QF_NRA` (algebraic, not transcendental). `min`/`max` lower to ITE. |
 | Composite derivatives greens | `@pin` | `properties/composites.ch`: structure proven at Tier B for any `N` satisfying its contract, verdict `proven_modulo_fuzz_validated_contract`. This string is **legitimate here** (a real SMT base resting on a fuzz-validated contract); it was only a false-positive for **pure-fuzz** bases, fixed by chelis#435 (archived). Classify verdicts from `proof_tier`, never the string alone. |
 | Economic / dynamic-programming greens | `@pin` | Markov simplex preservation, Bellman monotonicity/boundedness/contraction, PV/Gordon positivity & monotonicity discharge at SMT with **no** transcendental contract (report §6). Structurally more complete than a derivatives green. |
@@ -191,6 +191,119 @@ tiers: **A** (type/dimension/linearity), **B** (SMT via cvc5 over the reals),
 | Front-end check throughput | `@pin` | Substantially faster at 0.18.6 (chelis#1316/chelis#1207/chelis#1205): on this corpus `chelis check src/modelfit.ch` 67.6s → 31.6s and the 3-line `src/core.ch` dependency-load floor 31.2s → 17.0s. **But `chelis test --batch-mode auto` regressed 2.6x on `tests/`** (3m01s → 7m54s); see `docs/UPSTREAM_BUGS.md` §Actively blocking. |
 | `count` ([05-OP-29]), direct `sub` / `min_elem` ([05-OP-40]/[05-OP-41]), `stop_gradient` ([05-OP-42]) | `@upstream` | New at 0.18.6 but unused by this shell today. `stop_gradient` and relu's own adjoint are specified with `Unimplemented` backend cells (chelis#1312/chelis#1313) and are not usable at this pin. |
 | chelis-std / nautilus / coral module surface | `@pin` | Pricing, distributions, RNG, curves, dates, vol surfaces per `src/` + `references/`. |
+
+## Numerical accuracy of shell-authored kernels
+
+What the kernels this shell authors actually guarantee. It exists because dtype
+is not accuracy: an `f64` signature says how the arithmetic is evaluated, not
+how good the approximation being evaluated is.
+
+**Every figure below is measured on the compiled kernel against a high-precision
+`mpmath` reference, not derived.** Where a bound is not measured it is not
+stated.
+
+`scripts/oracle_erf64_accuracy.py` computes them, measuring in binary at
+extended precision; `erf64` and `n_cdf64` are exported so the bound can be
+measured from outside the module. The figures below are **transcribed by hand
+from that script's output** and nothing checks the transcription — the script
+compares against its own internal constants, not this file, and runs in no CI
+job (shoals#64). Re-run it and compare after any kernel change.
+
+| Kernel | Approximation | Worst observed absolute error (a floor) | Method |
+|---|---|---|---|
+| `erf64` | W. J. Cody, Math. Comp. 23 (1969); three ranges split at 0.5 and 4, saturating at 6 | **>= 3.3675e-16** (~1.52 ulp of 1.0) | worst observed at x = 0.507001975, measured at 60 dps by `scripts/oracle_erf64_accuracy.py`; the error is jagged at ulp scale so any grid reports a floor |
+| `n_cdf64` | `0.5 * (1 - erf64(-x/√2))` | **>= 1.9495e-16** (~0.88 ulp of 1.0) | worst observed at x = -0.7170090691949448, measured at 60 dps by the same oracle. NOT `erf64`'s halved: the argument reduction `-x/√2` and the final `0.5 * (1 - e)` each round. **ABSOLUTE only — see the left-tail limitation below** |
+
+**`n_cdf64` has no useful RELATIVE accuracy in the left tail.** Both figures above
+are absolute errors, and the oracle that produces them sweeps absolute error over
+±6.5, so it cannot observe this. `erf64_erfc_abs` computes `erfc` to ~1 ulp, but
+`n_cdf64` routes it through `1 - erf64` and `erf64` is itself `1 - erfc`, so the
+two subtractions cancel that precision away as the result approaches zero.
+Measured on the shipped kernel: **2.3e-6 relative at x = -7, 1.8% relative at
+x = -8, and exactly `0.0` below about x = -8.3** where the true value is ~1e-17.
+Do not use `n_cdf64` for deep-tail probabilities. Routing the negative branch
+straight through `erf64_erfc_abs` would keep the relative accuracy; that is
+shoals#68.
+
+**The kernel is no longer the limiting factor for the price and the Greeks**
+(the left-tail exception above is `n_cdf64`'s spelling, not the kernel).
+`bs_call_f64(100, 100, 0.05, 0.2, 1)` returns `10.450583572185565`. Against the
+f64 values of those decimal inputs — the ones the kernel actually receives — the
+exact price is `10.450583572185567346`, whose correctly-rounded f64 is
+`10.450583572185568`, so the returned value is 1.51 ulp (two representable
+steps) from it. Quoting a reference computed from the decimal spellings instead
+gives `10.45058357218556678` and makes it look like one ulp; the figure above
+uses the f64 inputs, matching the `f32`-rounded-input discipline the Greek table
+below states. The `f32` Greek exports land within ~1 `f32` ulp of their true
+values —
+that is their dtype's rounding, not the approximation's error:
+
+Measured at `K=100, r=0.05, sigma=0.2, T=1`, worst case over
+`S in {60, 80, 100, 120}`, comparing the shipped `f32` exports (`chelis eval`)
+against a 50-digit `mpmath` reference evaluated at the same `f32`-rounded
+inputs. The two columns are each a worst case over those spots and need not
+fall at the same spot.
+
+| export | error vs true | in `f32` ulp |
+|---|---|---|
+| `deltas_call` | 5.17e-8 | 0.87 |
+| `vegas_call` | 1.33e-6 | 0.37 |
+| `rhos_call` | 2.44e-6 | 0.41 |
+| `gammas_call` | 6.53e-10 | 0.35 |
+| `thetas_call` | 1.15e-7 | 0.32 |
+
+**No bound is stated for the Greeks.** The error of a derivative is not
+controlled by the error of the function — in Black–Scholes the true
+`S·φ(d1) − K'·φ(d2)` terms cancel exactly while an approximation's do not, and
+the residue is amplified by `√T/σ` or `1/(Sσ√T)`. The table above is a
+measurement at one parameter set, not a bound over the parameter space.
+Deriving one is out of scope here.
+
+**What this replaced.** Abramowitz & Stegun 7.1.26, whose ~1.4e-7 bound is a
+property of its coefficients rather than of the arithmetic evaluating them — so
+the `f64` entry point was no better than the `f32` `Nautilus.Special.erf` whose
+coefficients it copied, and no wider cast could have improved it. A ~4.1e8x
+reduction. That was this shell's issue 61.
+
+**Still hand-rolled, and why.** Chelis has no canonical `erf` (chelis#902), and
+`Nautilus.Special` is f32-only so its `erf` cannot be called from an `f64` path
+— filed as nautilus#59 and probed by
+`tests_blocked/special/erf_builtin_absent.ch`. The `f32` sibling still carries
+the A&S bound: nautilus#56.
+
+**Not covered here.** `Shoals.Greeks`'s `analytic_delta_call` /
+`analytic_delta_put` use a local `n_cdf` over `Nautilus.Special.erfc`, still the
+`f32` A&S path; `analytic_vega_call` / `analytic_gamma_call` use `n_pdf` and
+never touch `erf`; the `fd_*` Greeks and `src/volsurface.ch` / `src/dupire.ch`
+divide price differences by `h`, `h²` or vega and so amplify whatever error
+remains; `Shoals.PricingExtended`'s `n_cdf_ext` and
+`references/blackscholes.ch` are **call sites, not copies** -- both
+`import Nautilus.Special (erfc)` and carry no coefficients of their own, so
+they inherit whatever that f32 kernel does and need no migration. An earlier
+revision of this paragraph called them "further copies of the A&S kernel",
+which is false: no file under `src/` or `references/` carries the A&S
+constants. `pricing_wire_erf_f64` is the real remaining case, and only in the
+sense that its coefficients are caller-supplied tensor parameters. The duplication that does exist is
+wider than "one kernel per repository", which an earlier revision of this
+paragraph claimed. Inside this repo there are four `.ch` erf bodies:
+`src/pricing.ch::erf64` (Cody's), `src/pricing.ch::pricing_wire_erf_f64`
+(A&S, caller-supplied coefficients), and A&S with hard-coded f64 literals in
+both `research/proof-infra/ad/src/bs.ch` and
+`research/proof-infra/graduation/src/probe.ch` -- each its own reef project,
+all in this repository -- plus TWO Python mirrors,
+`research/proof-infra/ad/harness.py` and
+`scripts/oracle_greeks_gate.py::_erf_as_f32`. The second is the one with a live
+maintenance trigger: it models `Nautilus.Special.erf` and must be re-measured at
+the next nautilus pin bump past 0.7.43 (see `docs/UPSTREAM_BUGS.md`).
+Add `Nautilus.Special.erf`/`erf_t`
+upstream. Since `erf64` moved to Cody's these are no longer copies of one
+algorithm but two different ones, so it is drift rather than redundancy, and
+drift is the harder case: a caller cannot assume they agree at all. Tracked on
+this shell's issue 61 and nautilus#59.
+
+**Scope.** These are kernels this shell authors. Accuracy of chelis primitives
+is upstream's, and upstream has no accuracy contract for shells to inherit —
+chelis#1563 proposes one.
 
 ## Automatic differentiation (`grad`) — the Greek-set surface
 

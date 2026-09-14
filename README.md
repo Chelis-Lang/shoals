@@ -219,6 +219,23 @@ each the AD derivative of the displayed price, with first-order standing
 assertions in `tests/greeks.ch`, second-order in
 `tests-manual/greeks_secondorder.ch`, and the full grid (analytic + FD +
 sign-fold + accuracy-monotone) in `scripts/oracle_greeks_gate.py`.
+
+`erf64`/`n_cdf64`'s published accuracy figures come from
+`scripts/oracle_erf64_accuracy.py`, not from prose. Run it whenever either
+kernel changes:
+
+```sh
+.venv/bin/python scripts/oracle_erf64_accuracy.py
+```
+
+Expected: exit 0 and a final `PASS: oracle_erf64_accuracy` line. It measures
+both kernels against an mpmath reference at 60 digits and fails if one of its
+own `DOCUMENTED` constants exceeds what it can observe -- the figures are
+floors, and a floor above every observation is not one. It does **not** read
+`docs/CHELIS_SURFACE.md` or any other published file, it is not wired into CI,
+and it exits 0 when mpmath is absent, so it cannot catch a figure that is wrong
+only in the docs (shoals#64). Run it by hand after any kernel change and
+compare.
 The v0.7.6 testing cutover timing is recorded in
 `docs/testing_cutover_0.7.6.json`: node-local `--jobs auto` ran 48
 tests in 1:04.89; serial `--jobs 1` ran the same suite in 1:25.44.
@@ -255,13 +272,12 @@ monorepo oracle remains a separate manual gate.
    multi-instrument bootstrap (deposits + FRAs + futures + swaps)
    with implicit-differentiation gradient through the joint solve is
    an M2-continuation candidate per `docs/plan-quant-surface.md`.
-5. **`erfc` direct routing.** Per Chelis architecture, special
-   functions live in `Nautilus.Special`. Since Nautilus 0.7.27 (including the
-   pinned 0.7.38),
-   Shoals routes Black-Scholes through `Nautilus.Special.erfc`
-   directly (computing `0.5 * erfc(-x / sqrt(2))` for the standard
-   normal CDF), bypassing the higher-level distribution wrapper. No
-   shell-private special functions are shipped.
+5. **The normal CDF is shell-private.** Per Chelis architecture special
+   functions live in `Nautilus.Special`, but that module is f32-only, so an
+   f64 grad path cannot reach its `erf`/`erfc` (nautilus#59) and Chelis has no
+   canonical `erf` (chelis#902). `Shoals.Pricing` therefore ships its own
+   `erf64` and `n_cdf64`. `docs/CHELIS_SURFACE.md` states which approximation
+   they evaluate and its measured accuracy; this file does not restate it.
 
 ### Canonical layout
 
@@ -353,7 +369,7 @@ PASS: chelis Python binding evaluates a Shoals-shaped program
   `mean`, etc.) reliably and host-list comprehensions only on the
   paths covered by `manual_phase3b.py`.
 - The binding does not link multi-module reef packages — Shoals's
-  full `bs_call_scalar` (which imports `Nautilus.Special.erfc`)
+  full `bs_call_scalar` (which spans a multi-module reef package)
   cannot be evaluated through `chelis.eval(...)` until the binding
   acquires reef-aware loading. The harness above demonstrates the
   shape that does work today.

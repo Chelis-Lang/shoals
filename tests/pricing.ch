@@ -1,6 +1,6 @@
 module Shoals.Tests.Pricing
 import Std.Test (assert_close, assert_true)
-import Shoals.Pricing (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_wire_f64, call_prices, put_prices, call_total, mc_call_price)
+import Shoals.Pricing (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_wire_f64, call_prices, put_prices, call_total, mc_call_price, deltas_call, gammas_call)
 def abs_f64_test(x: f64) -> f64 = if lt(x, cast(0.0, f64)) then neg(x) else x
 def assert_close_f64(actual: f64, expected: f64, tol: f64, label: string) -> unit ! { Test } = {
   diff = abs_f64_test(sub(actual, expected))
@@ -78,6 +78,11 @@ def test_bs_call_f64_vector_matches_scalar_desk_rows() -> unit ! { Test } = {
 }
 def constant_3(v: f64) -> tensor[3, f64] = to_tensor([v, v, v])
 def constant_1(v: f64) -> tensor[1, f64] = to_tensor([v])
+-- These rows were written to lock STRUCTURAL AGREEMENT, when both sides
+-- evaluated one kernel and agreed exactly. `bs_call_f64` now evaluates Cody
+-- while `bs_call_wire_f64` still evaluates A&S from caller-supplied
+-- coefficients, so they pass on ~19-78% headroom and would survive a real
+-- divergence: a smoke test until the wire path migrates.
 def test_bs_call_wire_f64_matches_real_scalar_pricer() -> unit ! { Test } = {
   spots = to_tensor([cast(60.0, f64), cast(100.0, f64), cast(140.0, f64)])
   strikes = to_tensor([cast(130.0, f64), cast(100.0, f64), cast(70.0, f64)])
@@ -121,4 +126,68 @@ def test_mc_converges_to_bs() -> unit ! { Test } = {
   rel = div(abs_diff, bs_px)
   ok = lt(rel, cast(0.02, f32))
   assert_close(if ok then cast(1.0, f32) else cast(0.0, f32), cast(1.0, f32), cast(0.001, f32), "MC within 2% of BS at 20K paths")
+}
+-- chelis#1464-adjacent hazard: `vmap` lowers `if` to a masked select that
+-- evaluates BOTH arms, so a core returning a non-finite value outside its own
+-- Cody region poisons the arm that WAS selected. Two distinct mechanisms, both
+-- pinned below:
+--
+--   * region 3 (tail) divides by its operand twice; at ax = 0 an unclamped
+--     divisor is +inf. Reached when d1 or d2 is exactly zero -- 0.5*0.25^2
+--     = 0.03125 is exact in binary, so r = +3.125% makes d2 exactly 0 and
+--     r = -3.125% makes d1 exactly 0.
+--   * regions 1 and 2 do not divide at all -- both are P(y)/Q(y) Horner chains
+--     with positive coefficients, so numerator AND denominator overflow to
+--     +inf at large argument and inf/inf = NaN. Reached when sigma is tiny
+--     enough to make |d| enormous; 1e-40 is a representable f32 subnormal, so
+--     this is reachable from f32 callers, and the AD lane trips first.
+def test_zero_d2_prices_are_not_nan() -> unit ! { Test } = {
+  spots = to_tensor([cast(100.0, f32)])
+  p = to_list(call_prices(spots, cast(100.0, f32), cast(0.03125, f32), cast(0.25, f32), cast(1.0, f32)))
+  assert_close(index(p, cast(0, int64)), cast(11.408971, f32), cast(0.0001, f32), "call_prices at d2=0")
+}
+def test_zero_d2_delta_is_not_nan() -> unit ! { Test } = {
+  spots = to_tensor([cast(100.0, f32)])
+  d = to_list(deltas_call(spots, cast(100.0, f32), cast(0.03125, f32), cast(0.25, f32), cast(1.0, f32)))
+  assert_close(index(d, cast(0, int64)), cast(0.5987063, f32), cast(0.00001, f32), "deltas_call at d2=0")
+}
+def test_zero_d1_gamma_is_not_nan() -> unit ! { Test } = {
+  spots = to_tensor([cast(100.0, f32)])
+  g = to_list(gammas_call(spots, cast(100.0, f32), cast(-0.03125, f32), cast(0.25, f32), cast(1.0, f32)))
+  assert_close(index(g, cast(0, int64)), cast(0.01595769, f32), cast(1e-6, f32), "gammas_call at d1=0")
+}
+def test_tiny_sigma_price_is_not_nan() -> unit ! { Test } = {
+  spots = to_tensor([cast(100.0, f64)])
+  strikes = to_tensor([cast(100.0, f64)])
+  rates = to_tensor([cast(0.05, f64)])
+  sigmas = to_tensor([cast(1e-60, f64)])
+  times = to_tensor([cast(1.0, f64)])
+  prices = to_list(bs_call_f64_vector(spots, strikes, rates, sigmas, times))
+  assert_close_f64(index(prices, cast(0, int64)), cast(4.877057549928594, f64), cast(1e-9, f64), "f64 vector price at sigma=1e-60")
+}
+def test_subnormal_sigma_price_is_not_nan() -> unit ! { Test } = {
+  spots = to_tensor([cast(100.0, f64)])
+  strikes = to_tensor([cast(100.0, f64)])
+  rates = to_tensor([cast(0.05, f64)])
+  sigmas = to_tensor([cast(1e-41, f64)])
+  times = to_tensor([cast(1.0, f64)])
+  prices = to_list(bs_call_f64_vector(spots, strikes, rates, sigmas, times))
+  assert_close_f64(index(prices, cast(0, int64)), cast(4.877057549928594, f64), cast(1e-9, f64), "f64 vector price at sigma=1e-41")
+}
+def test_non_finite_input_propagates_rather_than_saturating() -> unit ! { Test } = {
+  -- Every `lt` against NaN is false, so without an explicit guard the
+  -- dispatcher falls through to its saturation arm and returns 1.0 -- pricing
+  -- a negative spot to a silent 0.0 where the pre-Cody kernel returned NaN,
+  -- and diverging from the vmap lane, which still gave NaN. Answering zero is
+  -- worse than answering NaN for a pricing kernel.
+  neg_spot = bs_call_f64(cast(-100.0, f64), cast(100.0, f64), cast(0.05, f64), cast(0.2, f64), cast(1.0, f64))
+  _ = assert_true(neq(neg_spot, neg_spot), "a negative spot must not price to a finite 0.0")
+  inf_sigma = bs_call_f64(cast(100.0, f64), cast(100.0, f64), cast(0.05, f64), div(cast(1.0, f64), cast(0.0, f64)), cast(1.0, f64))
+  assert_true(neq(inf_sigma, inf_sigma), "an infinite sigma must not price to a finite 0.0")
+}
+def test_subnormal_sigma_gamma_is_not_nan() -> unit ! { Test } = {
+  spots = to_tensor([cast(100.0, f32)])
+  g = to_list(gammas_call(spots, cast(100.0, f32), cast(0.05, f32), cast(1e-40, f32), cast(1.0, f32)))
+  gv = index(g, cast(0, int64))
+  assert_close(sub(gv, gv), cast(0.0, f32), cast(0.0, f32), "AD gamma at sigma=1e-40 is finite")
 }

@@ -18,8 +18,7 @@ its smallest reproducible artifact.
 ## What it does NOT prove
 
 - Multi-module reef packages are not linked through the binding —
-  `Shoals.Pricing.bs_call_scalar` (which imports
-  `Nautilus.Special.erfc`) cannot be evaluated end-to-end here. The
+  `Shoals.Pricing.bs_call_scalar` cannot be evaluated end-to-end here. The
   harness inlines the discounted-payoff arithmetic shape.
 - The entrypoint name must be `loss` — this is a property of the
   binding's EvalResult contract, not of Shoals.

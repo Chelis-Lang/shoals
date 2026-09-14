@@ -1,31 +1,138 @@
 module Shoals.Pricing
 import Nautilus.Distributions (normal_sample)
-export (bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_wire_f64, call_prices, put_prices, call_total, put_total, deltas_call, deltas_put, vegas_call, rhos_call, thetas_call, gammas_call, volgas_call, vannas_call, mc_call_price)
--- One normal CDF behind both price and Greeks. erf is the Abramowitz-Stegun
--- 7.1.26 rational approximation in f64 -- byte-for-byte the same coefficients as
--- Nautilus.Special.erf, reimplemented in f64 because the package symbol is
--- f32-only and an f64 grad path needs an f64 erf. n_cdf(x) = 0.5 * erfc(-x/sqrt2)
+export (erf64, n_cdf64, bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_wire_f64, call_prices, put_prices, call_total, put_total, deltas_call, deltas_put, vegas_call, rhos_call, thetas_call, gammas_call, volgas_call, vannas_call, mc_call_price)
+-- One normal CDF behind both price and Greeks. n_cdf(x) = 0.5 * erfc(-x/sqrt2)
 -- is the exact expression Shoals.References / Shoals.Greeks use. The displayed
 -- Greek is the AD derivative of THIS expression, so price and Greek agree.
-def abs_f64(x: f64) -> f64 = if lt(x, cast(0.0, f64)) then neg(x) else x
-def erf64(x: f64) -> f64 = {
-  a1 = cast(0.254829592, f64)
-  a2 = cast(-0.284496736, f64)
-  a3 = cast(1.421413741, f64)
-  a4 = cast(-1.453152027, f64)
-  a5 = cast(1.061405429, f64)
-  p = cast(0.3275911, f64)
-  one = cast(1.0, f64)
-  ax = abs_f64(x)
-  small = cast(0.00001, f64)
-  if lt(ax, small) then mul(x, cast(1.1283791670955126, f64)) else {
-    t = div(one, add(one, mul(p, ax)))
-    poly = mul(t, add(a1, mul(t, add(a2, mul(t, add(a3, mul(t, add(a4, mul(t, a5)))))))))
-    e = exp(neg(mul(ax, ax)))
-    y = sub(one, mul(poly, e))
-    if lt(x, cast(0.0, f64)) then neg(y) else y
-  }
+--
+-- ACCURACY. `erf64` evaluates W. J. Cody's rational approximation (Math. Comp.
+-- 23, 1969): three ranges split at 0.5 and 4, saturating at 6 where erfc
+-- underflows f64. Worst observed absolute error >= 3.3675e-16 (~1.52 ulp of
+-- 1.0) at x = 0.507001975, measured at 60 dps by
+-- `scripts/oracle_erf64_accuracy.py`. That is a FLOOR: the error is jagged at
+-- ulp scale, so a grid reports only the worst point it lands on. Re-measure by
+-- running the oracle; docs/CHELIS_SURFACE.md carries the figures.
+--
+-- It replaced Abramowitz & Stegun 7.1.26 (this shell's issue 61), whose ~1.4e-7
+-- bound is a property of its coefficients rather than of the arithmetic, so the
+-- f64 entry point had been no better than the f32 `Nautilus.Special.erf` whose
+-- coefficients it copied. Hand-rolled here because Chelis has no canonical erf
+-- (chelis#902) and `Nautilus.Special` is f32-only (nautilus#59,
+-- tests_blocked/special/erf_builtin_absent.ch); the f32 sibling keeps the old
+-- bound (nautilus#56).
+--
+-- Three named helpers rather than one expression, because the AD Greeks
+-- differentiate through this path and each branch is separately checkable.
+-- `abs` is the intrinsic, not a hand-rolled `if`: that would have the operand
+-- as its untaken arm, which under vmap's masked select returns NaN at +inf
+-- (chelis#1464).
+def abs_f64(x: f64) -> f64 = abs(x)
+-- Cody region 1 (|x| <= 0.5): erf(x) = x * P(x^2)/Q(x^2), odd by construction.
+def erf64_core_small(x: f64) -> f64 = {
+  -- Domain clamp. See the note above `erf64` for why every core clamps.
+  xc = if lt(x, cast(-0.5, f64)) then cast(-0.5, f64) else if lt(cast(0.5, f64), x) then cast(0.5, f64) else x
+  y = mul(xc, xc)
+  xnum0 = mul(cast(0.18577770618460315, f64), y)
+  xden0 = y
+  xnum1 = mul(add(xnum0, cast(3.1611237438705655, f64)), y)
+  xden1 = mul(add(xden0, cast(23.601290952344122, f64)), y)
+  xnum2 = mul(add(xnum1, cast(113.86415415105016, f64)), y)
+  xden2 = mul(add(xden1, cast(244.02463793444417, f64)), y)
+  xnum3 = mul(add(xnum2, cast(377.485237685302, f64)), y)
+  xden3 = mul(add(xden2, cast(1282.6165260773723, f64)), y)
+  mul(xc, div(add(xnum3, cast(3209.3775891384694, f64)), add(xden3, cast(2844.236833439171, f64))))
 }
+-- Cody region 2 (0.5 < |x| < 4): erfc(|x|) = exp(-x^2) * P(|x|)/Q(|x|).
+-- The dispatcher routes |x| == 4 to region 3; Cody's CALERF puts it here
+-- (`IF (Y .LE. FOUR)`), where it is one ulp better. See this shell's issue 68.
+def erf64_core_erfc_mid(axr: f64) -> f64 = {
+  -- Domain clamp. See the note above `erf64` for why every core clamps.
+  ax = if lt(cast(4.0, f64), axr) then cast(4.0, f64) else axr
+  xnum0 = mul(cast(2.1531153547440383e-8, f64), ax)
+  xden0 = ax
+  xnum1 = mul(add(xnum0, cast(0.5641884969886701, f64)), ax)
+  xden1 = mul(add(xden0, cast(15.744926110709835, f64)), ax)
+  xnum2 = mul(add(xnum1, cast(8.883149794388377, f64)), ax)
+  xden2 = mul(add(xden1, cast(117.6939508913125, f64)), ax)
+  xnum3 = mul(add(xnum2, cast(66.11919063714163, f64)), ax)
+  xden3 = mul(add(xden2, cast(537.1811018620099, f64)), ax)
+  xnum4 = mul(add(xnum3, cast(298.6351381974001, f64)), ax)
+  xden4 = mul(add(xden3, cast(1621.3895745666903, f64)), ax)
+  xnum5 = mul(add(xnum4, cast(881.952221241769, f64)), ax)
+  xden5 = mul(add(xden4, cast(3290.7992357334597, f64)), ax)
+  xnum6 = mul(add(xnum5, cast(1712.0476126340707, f64)), ax)
+  xden6 = mul(add(xden5, cast(4362.619090143247, f64)), ax)
+  xnum7 = mul(add(xnum6, cast(2051.0783778260716, f64)), ax)
+  xden7 = mul(add(xden6, cast(3439.3676741437216, f64)), ax)
+  mul(exp(neg(mul(ax, ax))), div(add(xnum7, cast(1230.3393547979972, f64)), add(xden7, cast(1230.3393548037495, f64))))
+}
+-- Cody region 3 (4 <= |x| < 6): erfc(|x|) = exp(-x^2)/|x| * (1/sqrt(pi) - R(1/x^2)).
+def erf64_core_erfc_tail(axr: f64) -> f64 = {
+  -- LOWER clamp only, and the asymmetry is the point. A clamp is safe only when
+  -- its UNTAKEN arm has a finite VALUE *and* a finite DERIVATIVE. The
+  -- derivative half is not decoration: `if lt(x, 1.0) then 2.0 else sqrt(x)`
+  -- has a finite untaken value at x = 0 and still grads to NaN, because the
+  -- adjoint multiplies the untaken arm's derivative (+inf) by the 0 mask. Here
+  -- the untaken arm is the constant 1.0, so an unbounded operand never reaches
+  -- the multiply. NO UPPER CLAMP: its untaken arm would be the operand, +inf at
+  -- ax = +inf, so `0 * inf = NaN` -- and this branch is total at +inf where
+  -- regions 1 and 2 are not. Adding one for uniformity removes that.
+  guarded = if lt(axr, cast(1.0, f64)) then cast(1.0, f64) else axr
+  ax = guarded
+  y = div(cast(1.0, f64), mul(guarded, guarded))
+  xnum0 = mul(cast(0.016315387137302097, f64), y)
+  xden0 = y
+  xnum1 = mul(add(xnum0, cast(0.30532663496123236, f64)), y)
+  xden1 = mul(add(xden0, cast(2.568520192289822, f64)), y)
+  xnum2 = mul(add(xnum1, cast(0.36034489994980445, f64)), y)
+  xden2 = mul(add(xden1, cast(1.8729528499234604, f64)), y)
+  xnum3 = mul(add(xnum2, cast(0.12578172611122926, f64)), y)
+  xden3 = mul(add(xden2, cast(0.5279051029514285, f64)), y)
+  xnum4 = mul(add(xnum3, cast(0.016083785148742275, f64)), y)
+  xden4 = mul(add(xden3, cast(0.06051834131244132, f64)), y)
+  r = mul(y, div(add(xnum4, cast(0.0006587491615298378, f64)), add(xden4, cast(0.0023352049762686918, f64))))
+  div(mul(exp(neg(mul(ax, ax))), sub(cast(0.5641895835477563, f64), r)), guarded)
+}
+-- EVERY core clamps its argument into its own region at entry: load-bearing,
+-- not defensive. Narrowing for chelis#1464 (`vmap` lowers `if` to a masked
+-- select which evaluates BOTH arms, against `spec/06-transformations.md`
+-- §2.10.1), so every core runs on every operand the dispatcher sees, and a core
+-- returning a non-finite value outside its own region poisons the arm that WAS
+-- selected. Every core needs one, not only region 3: regions 1 and 2 are
+-- P(y)/Q(y) Horner chains with positive coefficients, so numerator AND
+-- denominator overflow to +inf and inf/inf = NaN -- their hazard is not
+-- division. The clamps never bind where the dispatcher routes, so no returned
+-- value changes.
+--
+-- This makes each core total over the FINITE f64 domain, not over all of f64:
+-- the clamps and dispatcher are themselves `if`s, so +/-inf still poisons a
+-- sibling arm wherever an untaken arm is unbounded. `min`/`max` would remove
+-- the rest but fail at eval under vmap at this pin (chelis#1582).
+def erf64_erfc_abs(ax: f64) -> f64 = if lt(ax, cast(4.0, f64)) then erf64_core_erfc_mid(ax) else if lt(ax, cast(6.0, f64)) then erf64_core_erfc_tail(ax) else cast(0.0, f64)
+def erf64(x: f64) -> f64 = {
+  ax = abs_f64(x)
+  y = sub(cast(1.0, f64), erf64_erfc_abs(ax))
+  signed = if lt(x, cast(0.0, f64)) then neg(y) else y
+  finite = if lt(ax, cast(0.5, f64)) then erf64_core_small(x) else signed
+  -- NaN propagates rather than saturating. Every `lt` against NaN is false, so
+  -- without this guard the dispatcher falls through to the saturation arm and
+  -- returns 1.0: a negative spot then priced to a silent 0.0 where the A&S
+  -- kernel returned NaN. Answering zero is worse than answering NaN for a
+  -- pricing kernel, and it diverged between lanes (vmap still gave NaN).
+  --
+  -- `eq(x, x)` is false only for NaN. The guard is safe under masked select
+  -- because BOTH arms are finite whenever the input is: the untaken arm is
+  -- `x` itself for a finite operand, and the saturating 1.0 for a NaN one.
+  if eq(x, x) then finite else x
+}
+-- ABSOLUTE accuracy only. `erf64_erfc_abs` computes erfc to ~1 ulp, but this
+-- spelling routes it through `1 - erf64`, and `erf64` is itself `1 - erfc`, so
+-- the two subtractions cancel away the relative precision in the LEFT TAIL.
+-- Measured on the shipped kernel: n_cdf64(-7) is 2.3e-6 relative, n_cdf64(-8)
+-- is 1.8% relative, and below about -8.3 it returns exactly 0.0 where the true
+-- value is ~1e-17. Do not use this for deep-tail probabilities. Routing the
+-- negative branch straight through `erf64_erfc_abs` would keep the full
+-- relative accuracy; that is this shell's issue 68, deliberately not done here.
 def n_cdf64(x: f64) -> f64 = {
   inv_sqrt_2 = cast(0.7071067811865476, f64)
   mul(cast(0.5, f64), sub(cast(1.0, f64), erf64(neg(mul(x, inv_sqrt_2)))))
@@ -71,8 +178,13 @@ def f64_col[n](xs: tensor[n, f64]) -> tensor[n, 1, f64] = {
 }
 -- Pure tensor-DAG Black-Scholes helpers for the Beacon seam (shoals issue 19).
 -- Constants are point-valued tensor inputs because introducing them through
--- host-only shape/vmap plumbing would erase the named WireDag root. The
--- arithmetic and both erf branches mirror `erf64` above in f64.
+-- host-only shape/vmap plumbing would erase the named WireDag root.
+--
+-- This path does NOT evaluate `erf64`. Its erf is Abramowitz & Stegun 7.1.26
+-- built from the caller-supplied coefficients, so it kept the ~1.4e-7 bound
+-- that this shell's issue 61 removed from the scalar kernel. The two are different
+-- approximations and agree only to the scale-aware bound `tests/pricing.ch`
+-- asserts. Migrating it is separate work; see docs/CHELIS_SURFACE.md.
 def pricing_wire_select_f64[n](mask: &tensor[n, f64], a: tensor[n, f64], b: tensor[n, f64], half: &tensor[n, f64]) -> tensor[n, f64] = {
   one = add(copy(half), copy(half))
   add(mul(copy(mask), a), mul(sub(one, copy(mask)), b))

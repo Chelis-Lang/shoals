@@ -8,10 +8,15 @@ import Std.Contracts (normal_cdf)
 -- this file sweeps the whole 5*3*3*3*3 grid of (spot, strike, rate, sigma,
 -- maturity) and asserts the worst-cell abs diff between the shipped f64-erf
 -- pricer `bs_call_scalar` and a Black-Scholes price rebuilt from the certified
--- f32 `Std.Contracts.normal_cdf` stays under 1e-4. Measured worst cell: 2.67e-5
--- (f32-vs-f64 rounding of identical A&S math, amplified by the call's
--- cancellation). This is the same A&S model both sides compute, so the agreement
--- is the binding that scopes the S8 composites to the shipped pricer.
+-- f32 `Std.Contracts.normal_cdf` stays under 1e-4. Worst cell 2.67e-5, measured
+-- under the old A&S `erf64` and not re-measured since shoals#61; the grid still
+-- passes. The two sides are NOT the same model any more -- `erf64` evaluates
+-- Cody's approximation while the contract symbol is f32 A&S -- so the binding
+-- that scopes the S8 composites to the shipped pricer is measured agreement,
+-- not identity. The 1e-4 bound is what carries that scoping, and nothing
+-- weaker does: the two approximations are NOT interchangeable below it. Their
+-- price-level gap grows with spot and with maturity, so any figure quoted for
+-- it is a maximum over one region and does not transfer to another.
 --
 -- It is in tests-manual/ because the host evaluator runs the grid through the
 -- full Pricing module graph interpretively (~3 min), which overruns the fast

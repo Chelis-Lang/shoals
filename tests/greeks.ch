@@ -5,22 +5,31 @@ import Shoals.Pricing (deltas_call, vegas_call)
 def abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 -- Light FIRST-ORDER AD-Greek standing smoke (single vmap(grad) -- fast enough for
 -- tests/). deltas_call and vegas_call are the AD derivatives of the displayed
--- f64 Black-Scholes body; the targets are the exact derivatives of THAT displayed
--- A&S-erf price (closed form, validated in scripts/oracle_greeks_gate.py). The
--- heavy nested-grad second-order Greeks live in tests-manual/greeks_secondorder.ch.
+-- f64 Black-Scholes body. The targets are the TRUE Black-Scholes derivatives,
+-- computed in f64 by the closed forms in scripts/oracle_greeks_gate.py and
+-- correctly rounded at the precision printed here. They were previously the
+-- exact derivatives of the
+-- displayed A&S-erf price, which differ from the true ones by up to 5.2e-6 --
+-- past the 5e-6 tolerance below, which is how this test caught the kernel
+-- change. Since `erf64` moved to Cody's approximation (>= 3.3675e-16, this shell's
+-- issue 61) the displayed price is within a few f64 ulp of the true one -- not
+-- exact, but ~9 orders inside this file's 5e-6 band -- so the two coincide
+-- and the indirection is gone. Five of the six old targets sat inside tolerance
+-- by luck rather than correctness; all six were replaced. The heavy
+-- nested-grad second-order Greeks live in tests-manual/greeks_secondorder.ch.
 def test_deltas_call_ad_matches_displayed_deriv() -> unit ! { Test } = {
   spots = to_tensor([cast(80.0, f32), cast(100.0, f32), cast(120.0, f32)])
   d = to_list(deltas_call(spots, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32)))
-  _ = assert_close(index(d, cast(0, int64)), cast(0.22192375, f32), cast(5e-6, f32), "AD delta s=80")
-  _ = assert_close(index(d, cast(1, int64)), cast(0.63683582, f32), cast(5e-6, f32), "AD delta ATM")
-  assert_close(index(d, cast(2, int64)), cast(0.89645624, f32), cast(5e-6, f32), "AD delta s=120")
+  _ = assert_close(index(d, cast(0, int64)), cast(0.22192213, f32), cast(5e-6, f32), "AD delta s=80")
+  _ = assert_close(index(d, cast(1, int64)), cast(0.63683065, f32), cast(5e-6, f32), "AD delta ATM")
+  assert_close(index(d, cast(2, int64)), cast(0.89645502, f32), cast(5e-6, f32), "AD delta s=120")
 }
 def test_vegas_call_ad_matches_displayed_deriv() -> unit ! { Test } = {
   spots = to_tensor([cast(80.0, f32), cast(100.0, f32), cast(120.0, f32)])
   v = to_list(vegas_call(spots, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32)))
-  _ = assert_close(index(v, cast(0, int64)), cast(23.805821, f32), cast(0.002, f32), "AD vega s=80")
-  _ = assert_close(index(v, cast(1, int64)), cast(37.523872, f32), cast(0.002, f32), "AD vega ATM")
-  assert_close(index(v, cast(2, int64)), cast(21.600513, f32), cast(0.002, f32), "AD vega s=120")
+  _ = assert_close(index(v, cast(0, int64)), cast(23.805729, f32), cast(0.002, f32), "AD vega s=80")
+  _ = assert_close(index(v, cast(1, int64)), cast(37.524035, f32), cast(0.002, f32), "AD vega ATM")
+  assert_close(index(v, cast(2, int64)), cast(21.600708, f32), cast(0.002, f32), "AD vega s=120")
 }
 def test_fd_delta_call_matches_analytic_atm() -> unit ! { Test } = {
   s = cast(100.0, f32)

@@ -75,6 +75,13 @@ is a backend item (a coupling-aware abstraction), not a corpus authoring choice.
 
 ## S7 binding cross-check (raw: `s8_binding_test.txt`)
 
+> This section records the run as it stood and is no longer a description of
+> the shipped pricer. shoals#61 replaced `erf64`'s A&S kernel with Cody's
+> approximation, so the "SAME A&S model" premise below held at the time of this
+> run and does not hold now. The binding survives as measured agreement rather
+> than identity of model; `tests/composites_binding.ch` carries the current
+> statement.
+
 The composites are proven about `Std.Contracts.normal_cdf` (the certified f32
 A&S normal CDF). The shipped `bs_call_scalar` uses the f64 lift of that SAME A&S
 model (`Shoals.Pricing.erf64`/`n_cdf64`, byte-identical 7.1.26 coefficients), kept
