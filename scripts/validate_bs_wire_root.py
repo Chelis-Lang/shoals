@@ -30,6 +30,12 @@ EXPECTED_NODE_COUNT = 1488
 # The public entry now has a Copy wrapper around its final Sub operation.
 # The former schema-6 raw hash was
 # 0c85b5c010446f5704f4daa468b97916994668ff41b303968528ffe8b448fabe.
+# Provenance: EXPECTED_RAW_SHA256, EXPECTED_ENTRY_ROOT (770) and
+# EXPECTED_NODE_COUNT (1488) were audited on an artifact lowered under the
+# 0.18.7 candidate (landing/shoals-wire-audit/new-migrated.json), not the
+# pinned 0.18.9 binary. They must be re-validated against the published
+# 0.18.9 binary at the release gate; the gate fails closed on any mismatch
+# rather than accepting a different hash, root, or node count.
 EXPECTED_RAW_SHA256 = "ca707901945f5fea9df94eee0a5af62fc0053ae1a2971669212bd329284f9989"
 FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
 EXPECTED_LOADS = {

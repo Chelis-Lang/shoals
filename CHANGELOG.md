@@ -9,7 +9,11 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 Compiler-pin and migration release for Chelis v0.18.9, on Nautilus 0.7.44 and
 Coral 0.7.41. The compiler pin, every workflow audit mirror, and the managed
 block stamps in `AGENTS.md` and `docs/CHELIS_SURFACE.md` advanced together; the
-Shoals package version advanced from 0.24.10 to 0.24.11.
+Shoals package version advanced from 0.24.10 to 0.24.11. The shared skill files
+under `agent-skills/` (`phase-gate`, `spec-sync`, `redteam-exec`,
+`issue-resolution`) were resynced verbatim from the monorepo under the
+Scaffolding Drift Rule and are byte-identical to the Chelis and Nautilus
+copies at this release.
 
 **Existing consumers need explicit exports, and they get them (shoals#66).**
 The generic lattice `tr_binom_european_call_generic` in `src/trees.ch`, the
@@ -25,8 +29,10 @@ count.
 constant (shoals#67).** `pricing_wire_abs_f64` and `pricing_wire_erf_f64`
 compared a tensor against `cast(0.0, f64)`, which the compiler's tensor/scalar
 operand rules now reject; both compute `sub(half, half)` instead, which keeps
-the scalar-pricer comparisons in `tests/pricing.ch` byte-identical.
-`tests_neg/wire_tensor_scalar_comparison` pins the rejection. **This release
+the scalar-pricer comparisons in `tests/pricing.ch` byte-identical. The one
+edit in that test file is a parameter-type repair, `label: str` to
+`label: string` on `assert_call_tensor_matches_scalar`; the assert lines are
+unchanged. `tests_neg/wire_tensor_scalar_comparison` pins the rejection. **This release
 does not change the erf approximation**: the Cody `erf64` kernel from 0.24.10
 (#62) is untouched, and the A&S 7.1.26 wire path keeps its coefficients.
 
