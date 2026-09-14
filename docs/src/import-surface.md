@@ -92,8 +92,8 @@ instead the binding is closed by `tests/composites_binding.ch`: the pricer's pri
 with a `Std.Contracts.normal_cdf`-based price within a stated f32 bound. So the corpus is
 proven about the certified f32 contract, and the cross-check shows the shipped f64 pricer
 agrees with it — measured agreement, not identity of model. The agreement is what the
-cross-check measures; do not infer that the two approximations are interchangeable, since
-at price level they differ by up to ~8.2e-6 at the money.
+cross-check measures over its own cells; do not infer that the two approximations are
+interchangeable generally, since their price-level gap grows with spot and maturity.
 
 ## Demos (`Shoals.Demos.Businesswrong`)
 

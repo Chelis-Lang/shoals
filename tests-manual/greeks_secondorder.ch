@@ -10,7 +10,8 @@ import Shoals.Pricing (gammas_call, volgas_call, vannas_call)
 -- derivatives of the displayed A&S-erf price -- an indirection that existed
 -- because the kernel was inaccurate, so a true target could not be used. Since
 -- `erf64` moved to Cody's approximation (>= 3.3675e-16, this shell's issue 61) the
--- displayed price IS the true price at f64 and the two coincide. All TWELVE
+-- displayed price is within a few f64 ulp of the true one -- not exact, but far
+-- inside this file's bands -- so the two coincide here. All TWELVE
 -- second-derivative targets are now regenerated; some of the old ones breached
 -- tolerance and the rest sat inside it by luck. `vanna ITM s=120` kept its
 -- A&S-displayed value for a further round, consuming 41% of its own tolerance

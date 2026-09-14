@@ -12,7 +12,8 @@ def abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 -- displayed A&S-erf price, which differ from the true ones by up to 5.2e-6 --
 -- past the 5e-6 tolerance below, which is how this test caught the kernel
 -- change. Since `erf64` moved to Cody's approximation (>= 3.3675e-16, this shell's
--- issue 61) the displayed price IS the true price at f64, so the two coincide
+-- issue 61) the displayed price is within a few f64 ulp of the true one -- not
+-- exact, but ~9 orders inside this file's 5e-6 band -- so the two coincide
 -- and the indirection is gone. Five of the six old targets sat inside tolerance
 -- by luck rather than correctness; all six were replaced. The heavy
 -- nested-grad second-order Greeks live in tests-manual/greeks_secondorder.ch.
