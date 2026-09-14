@@ -78,13 +78,11 @@ def test_bs_call_f64_vector_matches_scalar_desk_rows() -> unit ! { Test } = {
 }
 def constant_3(v: f64) -> tensor[3, f64] = to_tensor([v, v, v])
 def constant_1(v: f64) -> tensor[1, f64] = to_tensor([v])
--- These wire-vs-scalar rows were written to lock STRUCTURAL AGREEMENT: both
--- sides evaluated the same kernel, so they agreed exactly. That is no longer
--- what they test. `bs_call_f64` evaluates Cody while `bs_call_wire_f64` still
--- evaluates A&S from caller-supplied coefficients, so the rows now pass on
--- ~19-78% tolerance headroom and would keep passing through a real structural
--- divergence. They are a smoke test until the wire path migrates; see the
--- uncovered-surface list in `docs/CHELIS_SURFACE.md`.
+-- These rows were written to lock STRUCTURAL AGREEMENT, when both sides
+-- evaluated one kernel and agreed exactly. `bs_call_f64` now evaluates Cody
+-- while `bs_call_wire_f64` still evaluates A&S from caller-supplied
+-- coefficients, so they pass on ~19-78% headroom and would survive a real
+-- divergence: a smoke test until the wire path migrates.
 def test_bs_call_wire_f64_matches_real_scalar_pricer() -> unit ! { Test } = {
   spots = to_tensor([cast(60.0, f64), cast(100.0, f64), cast(140.0, f64)])
   strikes = to_tensor([cast(130.0, f64), cast(100.0, f64), cast(70.0, f64)])
@@ -129,13 +127,10 @@ def test_mc_converges_to_bs() -> unit ! { Test } = {
   ok = lt(rel, cast(0.02, f32))
   assert_close(if ok then cast(1.0, f32) else cast(0.0, f32), cast(1.0, f32), cast(0.001, f32), "MC within 2% of BS at 20K paths")
 }
--- chelis#1464-adjacent hazard, this shell's issue 61: `vmap` lowers `if` to a
--- masked select that evaluates BOTH arms, so a branch the dispatcher never
--- selects still runs. A core that returns a non-finite value outside its own
--- Cody region therefore poisons the arm that WAS selected, because
--- 0 * NaN = NaN.
---
--- Two distinct mechanisms, both pinned below:
+-- chelis#1464-adjacent hazard: `vmap` lowers `if` to a masked select that
+-- evaluates BOTH arms, so a core returning a non-finite value outside its own
+-- Cody region poisons the arm that WAS selected. Two distinct mechanisms, both
+-- pinned below:
 --
 --   * region 3 (tail) divides by its operand twice; at ax = 0 an unclamped
 --     divisor is +inf. Reached when d1 or d2 is exactly zero -- 0.5*0.25^2

@@ -7,32 +7,25 @@ export (erf64, n_cdf64, bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_
 --
 -- ACCURACY. `erf64` evaluates W. J. Cody's rational approximation (Math. Comp.
 -- 23, 1969): three ranges split at 0.5 and 4, saturating at 6 where erfc
--- underflows f64. Measured on this compiled kernel by
--- `scripts/oracle_erf64_accuracy.py` at 60 dps: worst observed absolute error
--- >= 3.3675e-16, about 1.52 ulp of 1.0, at x = 0.507001975.
---
--- That is a FLOOR, not a maximum: the error is jagged at ulp scale, so a grid
--- reports only the worst point it lands on. Re-measure by running the oracle,
--- which measures in binary; comparing decimal spellings moves the answer by a
--- few hundredths of an ulp.
+-- underflows f64. Worst observed absolute error >= 3.3675e-16 (~1.52 ulp of
+-- 1.0) at x = 0.507001975, measured at 60 dps by
+-- `scripts/oracle_erf64_accuracy.py`. That is a FLOOR: the error is jagged at
+-- ulp scale, so a grid reports only the worst point it lands on. Re-measure by
+-- running the oracle; docs/CHELIS_SURFACE.md carries the figures.
 --
 -- It replaced Abramowitz & Stegun 7.1.26 (this shell's issue 61), whose ~1.4e-7
--- bound is a property of its coefficients rather than of the arithmetic
--- evaluating them -- so the f64 entry point had been no better than the f32
--- `Nautilus.Special.erf` whose coefficients it copied. The kernel is no longer
--- the limiting factor; docs/CHELIS_SURFACE.md carries the measurements.
---
--- Hand-rolled here because Chelis has no canonical erf (chelis#902) and
--- `Nautilus.Special` is f32-only (nautilus#59,
--- tests_blocked/special/erf_builtin_absent.ch). The f32 sibling carries the old
+-- bound is a property of its coefficients rather than of the arithmetic, so the
+-- f64 entry point had been no better than the f32 `Nautilus.Special.erf` whose
+-- coefficients it copied. Hand-rolled here because Chelis has no canonical erf
+-- (chelis#902) and `Nautilus.Special` is f32-only (nautilus#59,
+-- tests_blocked/special/erf_builtin_absent.ch); the f32 sibling keeps the old
 -- bound (nautilus#56).
 --
--- Kept as three named helpers rather than one expression because the AD Greeks
+-- Three named helpers rather than one expression, because the AD Greeks
 -- differentiate through this path and each branch is separately checkable.
--- The `abs` intrinsic, not a hand-rolled `if`: a hand-rolled
--- `if lt(x, 0) then neg(x) else x` has the operand as its untaken arm, so
--- under vmap's masked select it returns NaN at +inf (chelis#1464). The
--- intrinsic is total there.
+-- `abs` is the intrinsic, not a hand-rolled `if`: that would have the operand
+-- as its untaken arm, which under vmap's masked select returns NaN at +inf
+-- (chelis#1464).
 def abs_f64(x: f64) -> f64 = abs(x)
 -- Cody region 1 (|x| <= 0.5): erf(x) = x * P(x^2)/Q(x^2), odd by construction.
 def erf64_core_small(x: f64) -> f64 = {
@@ -73,18 +66,13 @@ def erf64_core_erfc_mid(axr: f64) -> f64 = {
 }
 -- Cody region 3 (4 < |x| < 6): erfc(|x|) = exp(-x^2)/|x| * (1/sqrt(pi) - R(1/x^2)).
 def erf64_core_erfc_tail(axr: f64) -> f64 = {
-  -- LOWER clamp only, and the asymmetry is the point. A clamp is an `if`, so
-  -- under vmap's masked select BOTH arms evaluate, and a clamp is safe only
-  -- when its UNTAKEN arm has a finite VALUE *and* a finite DERIVATIVE over the
-  -- domain totality is claimed for. The derivative half is not decoration:
-  -- `if lt(x, 1.0) then 2.0 else sqrt(x)` has a finite untaken value at x = 0
-  -- (`sqrt(0) = 0`) and still grads to NaN there, because the adjoint
-  -- multiplies the untaken arm's derivative (+inf) by the 0 mask.
-  --
-  -- A bounded constant satisfies both halves but is not necessary: regions 1
-  -- and 2 clamp with the operand itself, whose derivative is 1. Here the
-  -- untaken arm is the constant 1.0, so an unbounded operand never reaches the
-  -- multiply. NO UPPER CLAMP: its untaken arm would be the operand, +inf at
+  -- LOWER clamp only, and the asymmetry is the point. A clamp is safe only when
+  -- its UNTAKEN arm has a finite VALUE *and* a finite DERIVATIVE. The
+  -- derivative half is not decoration: `if lt(x, 1.0) then 2.0 else sqrt(x)`
+  -- has a finite untaken value at x = 0 and still grads to NaN, because the
+  -- adjoint multiplies the untaken arm's derivative (+inf) by the 0 mask. Here
+  -- the untaken arm is the constant 1.0, so an unbounded operand never reaches
+  -- the multiply. NO UPPER CLAMP: its untaken arm would be the operand, +inf at
   -- ax = +inf, so `0 * inf = NaN` -- and this branch is total at +inf where
   -- regions 1 and 2 are not. Adding one for uniformity removes that.
   guarded = if lt(axr, cast(1.0, f64)) then cast(1.0, f64) else axr
@@ -106,15 +94,13 @@ def erf64_core_erfc_tail(axr: f64) -> f64 = {
 -- EVERY core clamps its argument into its own region at entry: load-bearing,
 -- not defensive. Narrowing for chelis#1464 (`vmap` lowers `if` to a masked
 -- select which evaluates BOTH arms, against `spec/06-transformations.md`
--- §2.10.1), so every core runs on every operand the dispatcher sees and a core
+-- §2.10.1), so every core runs on every operand the dispatcher sees, and a core
 -- returning a non-finite value outside its own region poisons the arm that WAS
--- selected. See docs/UPSTREAM_BUGS.md.
---
--- Every core needs one, not only region 3: regions 1 and 2 are P(y)/Q(y) Horner
--- chains with positive coefficients, so numerator AND denominator overflow to
--- +inf at large argument and inf/inf = NaN -- their hazard is not division.
--- The clamps never bind on the region the dispatcher routes to a core, so no
--- returned value changes.
+-- selected. Every core needs one, not only region 3: regions 1 and 2 are
+-- P(y)/Q(y) Horner chains with positive coefficients, so numerator AND
+-- denominator overflow to +inf and inf/inf = NaN -- their hazard is not
+-- division. The clamps never bind where the dispatcher routes, so no returned
+-- value changes.
 --
 -- This makes each core total over the FINITE f64 domain, not over all of f64:
 -- the clamps and dispatcher are themselves `if`s, so +/-inf still poisons a
