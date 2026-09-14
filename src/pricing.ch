@@ -42,7 +42,9 @@ def erf64_core_small(x: f64) -> f64 = {
   xden3 = mul(add(xden2, cast(1282.6165260773723, f64)), y)
   mul(xc, div(add(xnum3, cast(3209.3775891384694, f64)), add(xden3, cast(2844.236833439171, f64))))
 }
--- Cody region 2 (0.5 < |x| <= 4): erfc(|x|) = exp(-x^2) * P(|x|)/Q(|x|).
+-- Cody region 2 (0.5 < |x| < 4): erfc(|x|) = exp(-x^2) * P(|x|)/Q(|x|).
+-- The dispatcher routes |x| == 4 to region 3; Cody's CALERF puts it here
+-- (`IF (Y .LE. FOUR)`), where it is one ulp better. See this shell's issue 68.
 def erf64_core_erfc_mid(axr: f64) -> f64 = {
   -- Domain clamp. See the note above `erf64` for why every core clamps.
   ax = if lt(cast(4.0, f64), axr) then cast(4.0, f64) else axr
@@ -64,7 +66,7 @@ def erf64_core_erfc_mid(axr: f64) -> f64 = {
   xden7 = mul(add(xden6, cast(3439.3676741437216, f64)), ax)
   mul(exp(neg(mul(ax, ax))), div(add(xnum7, cast(1230.3393547979972, f64)), add(xden7, cast(1230.3393548037495, f64))))
 }
--- Cody region 3 (4 < |x| < 6): erfc(|x|) = exp(-x^2)/|x| * (1/sqrt(pi) - R(1/x^2)).
+-- Cody region 3 (4 <= |x| < 6): erfc(|x|) = exp(-x^2)/|x| * (1/sqrt(pi) - R(1/x^2)).
 def erf64_core_erfc_tail(axr: f64) -> f64 = {
   -- LOWER clamp only, and the asymmetry is the point. A clamp is safe only when
   -- its UNTAKEN arm has a finite VALUE *and* a finite DERIVATIVE. The
@@ -123,6 +125,14 @@ def erf64(x: f64) -> f64 = {
   -- `x` itself for a finite operand, and the saturating 1.0 for a NaN one.
   if eq(x, x) then finite else x
 }
+-- ABSOLUTE accuracy only. `erf64_erfc_abs` computes erfc to ~1 ulp, but this
+-- spelling routes it through `1 - erf64`, and `erf64` is itself `1 - erfc`, so
+-- the two subtractions cancel away the relative precision in the LEFT TAIL.
+-- Measured on the shipped kernel: n_cdf64(-7) is 2.3e-6 relative, n_cdf64(-8)
+-- is 1.8% relative, and below about -8.3 it returns exactly 0.0 where the true
+-- value is ~1e-17. Do not use this for deep-tail probabilities. Routing the
+-- negative branch straight through `erf64_erfc_abs` would keep the full
+-- relative accuracy; that is this shell's issue 68, deliberately not done here.
 def n_cdf64(x: f64) -> f64 = {
   inv_sqrt_2 = cast(0.7071067811865476, f64)
   mul(cast(0.5, f64), sub(cast(1.0, f64), erf64(neg(mul(x, inv_sqrt_2)))))

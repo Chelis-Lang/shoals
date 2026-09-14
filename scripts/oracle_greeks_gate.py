@@ -197,8 +197,6 @@ def analytic_greeks(s, k, r, sg, t, ncdf):
     return {"delta": delta, "vega": vega, "rho": rho, "theta": theta}
 
 
-_AS = (0.254829592, -0.284496736, 1.421413741, -1.453152027, 1.061405429)
-_AS_P = 0.3275911
 
 
 def erf_pkg_deriv(x: float) -> float:

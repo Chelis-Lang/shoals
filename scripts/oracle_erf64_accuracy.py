@@ -16,6 +16,11 @@ the worst point it lands on, and a finer but differently spaced refinement can
 miss the argmax. The check below enforces the floor for the `DOCUMENTED`
 constants.
 
+ABSOLUTE, NOT RELATIVE, and the sweep is bounded to +/-6.5. It therefore cannot
+observe `n_cdf64`'s left-tail cancellation (1.8% relative at x = -8, exactly 0.0
+below about -8.3) -- see this shell's issue 68. A figure produced here bounds absolute error
+on that interval and nothing else.
+
 Usage:
     oracle_erf64_accuracy.py            # measure and check the documented floors
     oracle_erf64_accuracy.py --json     # machine-readable summary

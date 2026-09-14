@@ -212,12 +212,30 @@ job (shoals#64). Re-run it and compare after any kernel change.
 | Kernel | Approximation | Worst observed absolute error (a floor) | Method |
 |---|---|---|---|
 | `erf64` | W. J. Cody, Math. Comp. 23 (1969); three ranges split at 0.5 and 4, saturating at 6 | **>= 3.3675e-16** (~1.52 ulp of 1.0) | worst observed at x = 0.507001975, measured at 60 dps by `scripts/oracle_erf64_accuracy.py`; the error is jagged at ulp scale so any grid reports a floor |
-| `n_cdf64` | `0.5 * (1 - erf64(-x/√2))` | **>= 1.9495e-16** (~0.88 ulp of 1.0) | worst observed at x = -0.7170090691949448, measured at 60 dps by the same oracle. NOT `erf64`'s halved: the argument reduction `-x/√2` and the final `0.5 * (1 - e)` each round, so the factor does not simply halve the inherited error |
+| `n_cdf64` | `0.5 * (1 - erf64(-x/√2))` | **>= 1.9495e-16** (~0.88 ulp of 1.0) | worst observed at x = -0.7170090691949448, measured at 60 dps by the same oracle. NOT `erf64`'s halved: the argument reduction `-x/√2` and the final `0.5 * (1 - e)` each round. **ABSOLUTE only — see the left-tail limitation below** |
 
-**The kernel is no longer the limiting factor.** `bs_call_f64(100, 100, 0.05,
-0.2, 1)` returns `10.450583572185565`, one ulp from the correctly-rounded
-`10.450583572185566` (50-digit reference `10.45058357218556678`),
-and the `f32` Greek exports land within ~1 `f32` ulp of their true values —
+**`n_cdf64` has no useful RELATIVE accuracy in the left tail.** Both figures above
+are absolute errors, and the oracle that produces them sweeps absolute error over
+±6.5, so it cannot observe this. `erf64_erfc_abs` computes `erfc` to ~1 ulp, but
+`n_cdf64` routes it through `1 - erf64` and `erf64` is itself `1 - erfc`, so the
+two subtractions cancel that precision away as the result approaches zero.
+Measured on the shipped kernel: **2.3e-6 relative at x = -7, 1.8% relative at
+x = -8, and exactly `0.0` below about x = -8.3** where the true value is ~1e-17.
+Do not use `n_cdf64` for deep-tail probabilities. Routing the negative branch
+straight through `erf64_erfc_abs` would keep the relative accuracy; that is
+shoals#68.
+
+**The kernel is no longer the limiting factor for the price and the Greeks**
+(the left-tail exception above is `n_cdf64`'s spelling, not the kernel).
+`bs_call_f64(100, 100, 0.05, 0.2, 1)` returns `10.450583572185565`. Against the
+f64 values of those decimal inputs — the ones the kernel actually receives — the
+exact price is `10.450583572185567346`, whose correctly-rounded f64 is
+`10.450583572185568`, so the returned value is 1.51 ulp (two representable
+steps) from it. Quoting a reference computed from the decimal spellings instead
+gives `10.45058357218556678` and makes it look like one ulp; the figure above
+uses the f64 inputs, matching the `f32`-rounded-input discipline the Greek table
+below states. The `f32` Greek exports land within ~1 `f32` ulp of their true
+values —
 that is their dtype's rounding, not the approximation's error:
 
 Measured at `K=100, r=0.05, sigma=0.2, T=1`, worst case over
@@ -272,8 +290,12 @@ paragraph claimed. Inside this repo there are four `.ch` erf bodies:
 (A&S, caller-supplied coefficients), and A&S with hard-coded f64 literals in
 both `research/proof-infra/ad/src/bs.ch` and
 `research/proof-infra/graduation/src/probe.ch` -- each its own reef project,
-all in this repository -- plus a Python mirror in
-`research/proof-infra/ad/harness.py`. Add `Nautilus.Special.erf`/`erf_t`
+all in this repository -- plus TWO Python mirrors,
+`research/proof-infra/ad/harness.py` and
+`scripts/oracle_greeks_gate.py::_erf_as_f32`. The second is the one with a live
+maintenance trigger: it models `Nautilus.Special.erf` and must be re-measured at
+the next nautilus pin bump past 0.7.43 (see `docs/UPSTREAM_BUGS.md`).
+Add `Nautilus.Special.erf`/`erf_t`
 upstream. Since `erf64` moved to Cody's these are no longer copies of one
 algorithm but two different ones, so it is drift rather than redundancy, and
 drift is the harder case: a caller cannot assume they agree at all. Tracked on
