@@ -1,0 +1,4 @@
+`lt` does not admit a scalar beside a tensor
+
+Assumption: the tensor-DAG pricing comparisons require shape-matched tensor
+operands. An implicit scalar zero must be rejected.

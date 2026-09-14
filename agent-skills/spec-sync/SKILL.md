@@ -26,11 +26,13 @@ Use this skill whenever a change affects public language/compiler behavior.
 
 ## Verification
 
-Run the minimum repo gate after the edits:
+Run the pre-push gate after the edits, then require applicable CI checks to pass on
+the pushed candidate before ready-for-review:
 
 ```sh
-cargo build --workspace --all-targets
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
-cargo fmt --all -- --check
+python3 scripts/gate.py --fast
 ```
+
+`python3 scripts/gate.py --local` is optional for troubleshooting or additional local
+validation. It is not a per-PR requirement and does not replace a named acceptance
+oracle or manual gate.

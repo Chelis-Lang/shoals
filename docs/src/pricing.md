@@ -48,11 +48,13 @@ deep-OTM, ATM, and deep-ITM rows are checked against that scalar pricer with a
 scale-aware bound.
 The executable comparison uses `1e-5 + 1e-8 * abs(expected)`, retaining the
 absolute floor near zero while remaining scale-aware for large prices, and
-covers both three-row and shape-one inputs.
+covers both three-row and shape-one inputs. The sign comparisons derive a
+shape-matched zero as `half - half`; callers must supply the documented
+finite point-valued constants.
 
 `python3 scripts/validate_bs_wire_root.py` enforces the `reef.toml` Chelis pin,
 compares raw artifacts from independent cold Tide processes, and validates
-schema 3, graph integrity, the named f64 tensor root, its exact reachable input
+schema 11, graph integrity, the named f64 tensor root, its exact reachable input
 set, its compiler-reported operation closure, and the reviewed raw SHA/root/node
 commitment. Any compiler or source change must deliberately refresh that
 commitment instead of accepting a merely plausible redirected graph. The result

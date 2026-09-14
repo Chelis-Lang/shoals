@@ -33,7 +33,7 @@ def test_call_prices_vector() -> unit ! { Test } = {
   _ = assert_close(index(pl, cast(1, int64)), cast(10.4506, f32), cast(0.001, f32), "ATM call")
   assert_close(index(pl, cast(2, int64)), cast(26.169, f32), cast(0.001, f32), "ITM call")
 }
-def assert_call_tensor_matches_scalar(s: f32, k: f32, r: f32, sigma: f32, t: f32, label: str) -> unit ! { Test } = {
+def assert_call_tensor_matches_scalar(s: f32, k: f32, r: f32, sigma: f32, t: f32, label: string) -> unit ! { Test } = {
   prices = to_list(call_prices(to_tensor([s]), k, r, sigma, t))
   tensor_px = index(prices, cast(0, int64))
   scalar_px = bs_call_scalar(s, k, r, sigma, t)

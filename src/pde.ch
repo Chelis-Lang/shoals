@@ -1,5 +1,5 @@
 module Shoals.Pde
-export (pde_european_call_cn, pde_european_put_cn, pde_american_put_cn, pde_spread_option_adi)
+export (pde_european_call_cn, pde_european_put_cn, pde_american_put_cn, pde_spread_option_adi, pde_thomas_solve)
 def pde_zero() -> f32 = cast(0.0, f32)
 def pde_one() -> f32 = cast(1.0, f32)
 def pde_half() -> f32 = cast(0.5, f32)

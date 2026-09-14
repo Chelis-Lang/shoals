@@ -39,8 +39,8 @@ concurrency:
 # scripts/audit_workarounds.py --pins-only enforces it offline. The extract
 # step re-derives the pin from reef.toml only to assert this has not drifted.
 env:
-  CHELIS_TAG: v0.18.6
-  CHELIS_VERSION: 0.18.6
+  CHELIS_TAG: v0.18.7
+  CHELIS_VERSION: 0.18.7
 
 jobs:
   # The fast deterministic unit suite (tests/) — moved off the per-PR path.

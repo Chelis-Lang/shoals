@@ -1,4 +1,5 @@
 module Shoals.Dupire
+import Nautilus.LinAlg (la_basis_n_f32)
 import Shoals.Pricing (bs_call_scalar)
 import Nautilus.Interpolation (linear_interp_sorted, spline_eval)
 export (du_bs_call_q, du_forward, du_local_vol_from_iv_surface, du_local_vol_from_call_closure, du_cubic_log_moneyness_interp, du_local_vol_sentinel, du_is_local_vol_sentinel)

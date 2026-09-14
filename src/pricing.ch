@@ -190,7 +190,7 @@ def pricing_wire_select_f64[n](mask: &tensor[n, f64], a: tensor[n, f64], b: tens
   add(mul(copy(mask), a), mul(sub(one, copy(mask)), b))
 }
 def pricing_wire_abs_f64[n](x: &tensor[n, f64], half: &tensor[n, f64]) -> tensor[n, f64] = {
-  neg_mask = cast(lt(copy(x), cast(0.0, f64)), f64)
+  neg_mask = cast(lt(copy(x), sub(copy(half), copy(half))), f64)
   pricing_wire_select_f64(&neg_mask, neg(copy(x)), copy(x), half)
 }
 def pricing_wire_erf_f64[n](x: &tensor[n, f64], a1: &tensor[n, f64], a2: &tensor[n, f64], a3: &tensor[n, f64], a4: &tensor[n, f64], a5: &tensor[n, f64], p: &tensor[n, f64], two_over_sqrt_pi: &tensor[n, f64], small: &tensor[n, f64], half: &tensor[n, f64]) -> tensor[n, f64] = {
@@ -200,7 +200,7 @@ def pricing_wire_erf_f64[n](x: &tensor[n, f64], a1: &tensor[n, f64], a2: &tensor
   t_v = div(copy(&one), add(copy(&one), mul(copy(p), copy(&ax))))
   poly = mul(copy(&t_v), add(copy(a1), mul(copy(&t_v), add(copy(a2), mul(copy(&t_v), add(copy(a3), mul(copy(&t_v), add(copy(a4), mul(copy(&t_v), copy(a5))))))))))
   y = sub(one, mul(poly, exp(neg(mul(copy(&ax), copy(&ax))))))
-  neg_mask = cast(lt(copy(x), cast(0.0, f64)), f64)
+  neg_mask = cast(lt(copy(x), sub(copy(half), copy(half))), f64)
   signed = pricing_wire_select_f64(&neg_mask, neg(copy(&y)), y, half)
   small_mask = cast(lt(mul(copy(x), copy(x)), mul(copy(small), copy(small))), f64)
   pricing_wire_select_f64(&small_mask, linear, signed, half)
