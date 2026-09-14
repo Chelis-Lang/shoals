@@ -1,5 +1,5 @@
 module Shoals.Trees
-export (tr_crr_european_call, tr_crr_european_put, tr_crr_american_call, tr_crr_american_put, tr_tian_european_call, tr_tian_european_put, tr_jr_european_call, tr_jr_european_put, tr_trinomial_european_call, tr_trinomial_american_put, tr_crr_call_2step, tr_crr_call_2step_nodisc, tr_crr_call_2step_rn)
+export (tr_crr_european_call, tr_crr_european_put, tr_crr_american_call, tr_crr_american_put, tr_tian_european_call, tr_tian_european_put, tr_jr_european_call, tr_jr_european_put, tr_trinomial_european_call, tr_trinomial_american_put, tr_crr_call_2step, tr_crr_call_2step_nodisc, tr_crr_call_2step_rn, tr_binom_european_call_generic)
 -- Closed-form 2-step CRR European call: the fully expanded binomial value with
 -- move factors u/d, risk-neutral probability q, and per-step discount as GUARDED
 -- INPUTS. Pure arithmetic + ITE (relu), no transcendentals, so the pricing

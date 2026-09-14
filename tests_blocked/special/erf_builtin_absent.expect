@@ -20,7 +20,13 @@ branch below unexecutable.
 
 Measured on 0.18.6: this exact probe reports `precision mismatch: expected f32,
 got f64`, i.e. the symbol resolves and refuses the width -- not `unbound
-variable`; the symbol is present.
+variable`; the symbol is present. Re-measured on 0.18.9 with nautilus 0.7.44:
+the same width refusal reproduces, but only once `erf` is imported from
+`Nautilus.Special`. Chelis 0.18.9 stopped resolving a bare dependency-exported
+name, so an unimported `erf(x)` now reports `unbound variable: erf`; the probe
+carries the explicit import so the pinned diagnostic still measures the f32-only
+signature, which nautilus 0.7.44 keeps as `def erf(x: f32) -> f32`. The blocker
+is unchanged; only the name-resolution surface tightened.
 
 On pass: determine which repair landed, and CHECK THE ACCURACY BEFORE
 SWITCHING. `Shoals.Pricing.erf64` evaluates Cody's approximation at >= 3.3675e-16;

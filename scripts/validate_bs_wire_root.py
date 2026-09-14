@@ -18,27 +18,33 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENTRY = "bs_call_wire_f64"
-EXPECTED_ENTRY_ROOT = 512
-EXPECTED_NODE_COUNT = 972
-# Re-pinned at the chelis 0.18.6 bump (was
-# e32f0ee69a6894aba7b4f7cc3bea05df6d4632910219e252e1b9cda97e7ab24c at 0.18.4
-# and 0.18.5, e1705cc66dc289f961355d123729877b53bf212176907d71b8e2f49a39aa98b0
-# at 0.18.3, 39db5ba76af6f83643da14110f93d2973d38d24add43978a4091036fe00b7932
-# at 0.18.1). Unlike the 0.18.4 re-pin, 0.18.6 is a real lowering change and
-# was audited as one: the same src/pricing.ch was lowered under both binaries
-# and the two DAGs compared by op-kind histogram. `sub` becomes a first-class
-# WireDag identity ([05-OP-40], chelis#1306) instead of being reconstructed as
-# negate-then-add, so exactly 23 `sub` nodes appear while `add`, `neg`, and
-# `drop` each fall by exactly 23 (the third being the dropped intermediate
-# negation). Every other op kind -- cast, cmp_lt, const, copy, div, exp, load,
-# log, mul, sqrt -- is unchanged in count. Net 1018 -> 972 nodes, which moves
-# the entry root 535 -> 512 and every other named root by the same
-# construction. The schema also advances 5 -> 6 (chelis#1287/chelis#1306,
-# exact-only with no legacy aliases). The 0.18.4 audit (ZERO node diffs,
-# schema 4 -> 5 only, chelis#1181 sealing Pad fill values, which this entry
-# does not lower) and the 0.18.3 audit (schema 3 -> 4 plus nine `const` dtype
-# tags, chelis#1049) are retained above for provenance.
-EXPECTED_RAW_SHA256 = "0c85b5c010446f5704f4daa468b97916994668ff41b303968528ffe8b448fabe"
+EXPECTED_ENTRY_ROOT = 770
+EXPECTED_NODE_COUNT = 1488
+# Schema-11 migration: the two comparisons use half - half as tensor zero.
+# Sonar records old-source/old-compiler, new-source/old-compiler and
+# new-source/new-compiler artifacts in landing/shoals-wire-audit/. All six
+# named arithmetic expressions match across compilers after eliding Copy and
+# symbolic shape names. This comparison does not certify shape semantics.
+# Source change: 972 -> 990 nodes. Compiler change: 990 -> 1488, comprising
+# 83 Copy, 249 Drop and 166 ExtentWitness nodes; arithmetic op counts agree.
+# The public entry now has a Copy wrapper around its final Sub operation.
+# The former schema-6 raw hash was
+# 0c85b5c010446f5704f4daa468b97916994668ff41b303968528ffe8b448fabe.
+# Provenance: re-validated against the published Chelis 0.18.9 binary at the
+# release gate. EXPECTED_ENTRY_ROOT (770), EXPECTED_NODE_COUNT (1488) and
+# WIRE_DAG_SCHEMA_VERSION (11) reproduce byte-for-byte under 0.18.9. The
+# full-DAG op-kind histogram (add 59, cast 13, cmp_lt 13, copy 314, div 8,
+# drop 717, exp 5, extent_witness 166, load 48, log 2, mul 91, neg 17,
+# sqrt 3, sub 32) and the entry-reachable subgraph are identical to the
+# 0.18.7-candidate reference (landing/shoals-wire-audit/new-migrated.json,
+# raw ca707901945f5fea9df94eee0a5af62fc0053ae1a2971669212bd329284f9989).
+# The only byte difference between the two responses is per-node merged_spans
+# and span_id source-offset metadata, which is non-semantic and excluded from
+# the arithmetic comparison; every node id/op/name/inputs, the roots list and
+# named_roots are identical. The raw hash therefore moves from the 0.18.7
+# capture to the 0.18.9 value below. The gate still fails closed on any
+# mismatch rather than accepting a different hash, root, or node count.
+EXPECTED_RAW_SHA256 = "955c1df66a5731182646ae23d66d15308d4c63991810f41baf3ab425f48cabd2"
 FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
 EXPECTED_LOADS = {
     "a1",
@@ -57,14 +63,8 @@ EXPECTED_LOADS = {
     "t",
     "two_over_sqrt_pi",
 }
-# Bumped 5 -> 6 at the chelis 0.18.6 pin (chelis#1287/chelis#1306: v6 carries
-# canonical Count axes, semantic dtype and shape validation, typed Pad
-# payloads, and the direct Sub/MinElem/MaxElem identities, exact-only with no
-# legacy aliases; 4 -> 5 was chelis#1181 after v0.18.4, 3 -> 4 was chelis#1049
-# after v0.18.1). Re-check this constant against
-# `crates/chelis-compiler-api/src/schema.rs` at every pin bump; the gate fails
-# closed on a mismatch rather than accepting any schema.
-WIRE_DAG_SCHEMA_VERSION = 6
+# Exact version, checked against each published compiler during a pin bump.
+WIRE_DAG_SCHEMA_VERSION = 11
 WIRE_OPS = {
     "add",
     "cast",
@@ -238,7 +238,13 @@ def validate_response(
         raise ValidationError(f"{ENTRY} root is not f64")
     if output_type.get("dims") != [expected_dim]:
         raise ValidationError(f"{ENTRY} root is not tensor[n, f64]")
-    root_op = by_id[root].get("op")
+    semantic_root = root
+    while by_id[semantic_root].get("op", {}).get("kind") == "copy":
+        inputs = by_id[semantic_root]["inputs"]
+        if len(inputs) != 1:
+            raise ValidationError(f"{ENTRY} root Copy must have one input")
+        semantic_root = inputs[0]
+    root_op = by_id[semantic_root].get("op")
     root_kind = root_op.get("kind") if isinstance(root_op, dict) else None
     if root_kind != expected_root_op:
         raise ValidationError(
