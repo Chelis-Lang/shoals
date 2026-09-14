@@ -4,6 +4,46 @@ All notable changes to this project are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.24.11] - 2026-09-14
+
+Compiler-pin and migration release for Chelis v0.18.9, on Nautilus 0.7.44 and
+Coral 0.7.41. The compiler pin, every workflow audit mirror, and the managed
+block stamps in `AGENTS.md` and `docs/CHELIS_SURFACE.md` advanced together; the
+Shoals package version advanced from 0.24.10 to 0.24.11.
+
+**Existing consumers need explicit exports, and they get them (shoals#66).**
+The generic lattice `tr_binom_european_call_generic` in `src/trees.ch`, the
+international holiday predicates in `src/holidaycal.ch`, and the tridiagonal
+solver `pde_thomas_solve` in `src/pde.ch` are added to their modules' `export`
+lists, and `src/dupire.ch` imports `Nautilus.LinAlg` explicitly instead of
+reaching it transitively. The generic lattice remains the function addressed by
+its deferred properties; `tests/tree_generic_export.ch` pins the export and
+`tests_neg/tree_generic_step_type` pins the rejection of a floating-point step
+count.
+
+**The pure tensor pricing helpers derive tensor zero from the supplied half
+constant (shoals#67).** `pricing_wire_abs_f64` and `pricing_wire_erf_f64`
+compared a tensor against `cast(0.0, f64)`, which the compiler's tensor/scalar
+operand rules now reject; both compute `sub(half, half)` instead, which keeps
+the scalar-pricer comparisons in `tests/pricing.ch` byte-identical.
+`tests_neg/wire_tensor_scalar_comparison` pins the rejection. **This release
+does not change the erf approximation**: the Cody `erf64` kernel from 0.24.10
+(#62) is untouched, and the A&S 7.1.26 wire path keeps its coefficients.
+
+**The graph gate moves to WireDag schema 11.** `scripts/validate_bs_wire_root.py`
+commits to an audited exact hash, entry root, and node count, follows
+transparent `Copy` wrappers to the final `Sub`, and retains the cold-run byte
+identity and input/operation checks. A recorded three-artifact comparison
+separates the source changes above from compiler lowering changes: all six
+named arithmetic expressions agree across compilers after eliding `Copy` and
+symbolic shape metadata. That comparison does not independently verify shape
+semantics.
+
+**Invariant tiers are carried, not promoted.** Every active invariant in
+`docs/cnote-import-surface.json` has an explicit `0.18.9` expected tier equal
+to its observed `0.18.6` tier; the release gate re-observes each one against
+the published chain before tagging, and no tier is upgraded in this release.
+
 ## [0.24.10] - 2026-08-29
 
 Compiler-pin release for Chelis v0.18.6, on Nautilus 0.7.43 and Coral 0.7.40.
