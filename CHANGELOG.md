@@ -4,6 +4,86 @@ All notable changes to this project are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.24.12] - 2026-09-15
+
+Compiler-pin and migration release for Chelis v0.18.10, on Nautilus 0.7.45 and
+Coral 0.7.42. `chelis reef conform bump 0.18.10` advanced the compiler pin
+(`reef.toml` `compiler = "=0.18.10"`), every workflow audit mirror
+(`CHELIS_TAG: v0.18.10` / `CHELIS_VERSION: 0.18.10` in `ci.yml`, `nightly.yml`,
+`release.yml`), and the managed block stamps in `AGENTS.md` and
+`docs/CHELIS_SURFACE.md` together; the Shoals package version advanced from
+0.24.11 to 0.24.12. The nautilus dependency moved 0.7.44 → 0.7.45 and coral
+0.7.41 → 0.7.42 in `reef.toml`, and `reef.lock` was regenerated against the
+published chain (chelis-std 0.4.0 bundled, nautilus 0.7.45, coral 0.7.42, all
+`compiler = "=0.18.10"`). The shared `agent-skills/` files were already
+byte-identical to the monorepo at 0.24.11 and did not move.
+
+**This is a pure pin bump; no 0.18.10 change reaches the Shoals corpus.** Unlike
+0.24.11 (shoals#66 exports, shoals#67 tensor-zero), 0.18.10 introduces no
+breaking change that touches this shell's sources. `chelis fmt --check`,
+`chelis lint --check`, `chelis reef build`, and the `tests_neg/` /
+`tests_blocked/` expect suites all pass unmodified on the new pin, and
+`tests_blocked/ --expect blocked` stays blocked (no FIX-detected probe).
+
+**Chelis 0.18.10 release identity.** Source commit
+`b9095ccf2c0b76859aa447c6febe699fd287f1d2`; annotated tag object
+`e247a5d33cd2df552f57e3efddfd4ea30846b3b8` (`v0.18.10`); release run
+`34966582543`. Darwin arm64 asset archive sha256
+`80c9c5b42a8fbcee6884915df1a4dafb8bcc1cae33199ded060d8b2ebece8bf0`, bin/chelis
+payload sha256
+`a6af380886b21761bc2822a814e4fef4232e8b8551922d32bca722cd4e04e1e2`. Linux
+glibc2.31 asset archive sha256
+`0843697e0a7783e383df0347ae431ae56f62b5a5ae34a7aa72ac37ee91df1e0b`, bin/chelis
+payload sha256
+`6622e40bc786c562b5b66d370a84e46ded551dee70abfc617a71d026c0119b00`. The Merton
+re-timing below ran on the darwin payload.
+
+**#2059 is fixed on a real Reef-package workload — the Merton re-timing proves
+it directly.** Under chelis 0.18.9 the `tests/stochastic_extended.ch` Merton
+suite regressed from ~62s (0.18.6) to ~578s, a #2059 blowup on the
+closure-heavy prove/package route exercised by a real workload. Re-run on the
+published 0.18.10 darwin binary
+(`chelis test tests/stochastic_extended.ch --jobs 1 --timeout 1200`,
+9 passed / 0 failed): **169.65s wall on a cold run, 140.82s on a warm confirm
+run** — a 3.4–4.1× drop from the ~578s 0.18.9 spike. The ~10-minute closure
+blowup is gone. It does not return all the way to the ~62s 0.18.6 baseline: the
+~140–170s residual is consistent with the still-open general suite-weight
+regression **chelis#1391** (the ~2.6× default-batch-mode slowdown recorded at
+the 0.18.6 pin; 62s × 2.6 ≈ 161s), which is a separate issue from #2059 and
+whose `--suite-timeout` raise is retained (see below). Net: #2059's real-code
+closure regression is resolved; #1391's general weight remains and is honestly
+attributed to suite/runner weight, not to #2059.
+
+**No #2059 bandaid existed in Shoals, and none was added or removed.** Shoals PR
+CI runs no heavy suites, so there was no prove-gate #2059 workaround to revert.
+The two `--suite-timeout` raises in `nightly.yml` are unrelated to #2059 and are
+retained: the `tests/` fast-suite raise to `--suite-timeout 2400` /
+`timeout-minutes: 45` is cited to the OPEN **chelis#1391** (a narrowing, not a
+fix), and the `tests-manual/` heavy-suite `--suite-timeout 1650` accommodates
+Chelis 0.17.4's independent 600s whole-suite watchdog. Neither is a #2059 route.
+
+**The Black-Scholes WireDag gate moves to schema 13, and it was re-audited
+rather than accepted.** `scripts/validate_bs_wire_root.py` pins the lowered
+`bs_call_wire_f64` DAG byte-exactly. Under 0.18.10 the two independent cold
+lowerings are byte-deterministic and the schema advanced 11 → 13, entry root
+770 → 773, node count 1488 → 1494. The +6 nodes are exactly +3 `Copy` and +3
+`Drop` plumbing nodes: the full-DAG op-kind histogram is add 59, cast 13,
+cmp_lt 13, copy 317, div 8, drop 720, exp 5, extent_witness 166, load 48, log 2,
+mul 91, neg 17, sqrt 3, sub 32 — every arithmetic op count is byte-identical to
+the 0.18.9 capture. The entry-reachable subgraph is unchanged: the 15 named
+loads match exactly, the copy-elided semantic root is still `sub`, and the root
+output type is still `tensor[n, f64]`. The gate's pinned raw hash moves 11 →
+`955c1df6…` → 13 `6ecfa7b7621d6490244083fdde6c1de5222b3548fbe93194fb21cddd4e3a0418`
+and still fails closed on any mismatch of hash, root, node count, or schema.
+
+**Invariant tiers are carried, not promoted.** Every one of the 37 active
+invariants in `docs/cnote-import-surface.json` gets an explicit `0.18.10`
+expected tier equal to its `0.18.9` tier (no promotions), and each below-proven
+tier retains its `tier_upgrade_trigger`. `pkg_version` advanced to 0.24.12 and
+`chelis_pin` to 0.18.10; `scripts/contract_gate.py` reports 0 issues (37
+invariants, 10 models). The release gate re-observes each tier against the
+published 0.18.10 / 0.7.45 / 0.7.42 chain before tagging.
+
 ## [0.24.11] - 2026-09-14
 
 Compiler-pin and migration release for Chelis v0.18.9, on Nautilus 0.7.44 and

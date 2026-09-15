@@ -18,33 +18,29 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENTRY = "bs_call_wire_f64"
-EXPECTED_ENTRY_ROOT = 770
-EXPECTED_NODE_COUNT = 1488
-# Schema-11 migration: the two comparisons use half - half as tensor zero.
-# Sonar records old-source/old-compiler, new-source/old-compiler and
-# new-source/new-compiler artifacts in landing/shoals-wire-audit/. All six
-# named arithmetic expressions match across compilers after eliding Copy and
-# symbolic shape names. This comparison does not certify shape semantics.
-# Source change: 972 -> 990 nodes. Compiler change: 990 -> 1488, comprising
-# 83 Copy, 249 Drop and 166 ExtentWitness nodes; arithmetic op counts agree.
-# The public entry now has a Copy wrapper around its final Sub operation.
-# The former schema-6 raw hash was
-# 0c85b5c010446f5704f4daa468b97916994668ff41b303968528ffe8b448fabe.
-# Provenance: re-validated against the published Chelis 0.18.9 binary at the
-# release gate. EXPECTED_ENTRY_ROOT (770), EXPECTED_NODE_COUNT (1488) and
-# WIRE_DAG_SCHEMA_VERSION (11) reproduce byte-for-byte under 0.18.9. The
-# full-DAG op-kind histogram (add 59, cast 13, cmp_lt 13, copy 314, div 8,
-# drop 717, exp 5, extent_witness 166, load 48, log 2, mul 91, neg 17,
-# sqrt 3, sub 32) and the entry-reachable subgraph are identical to the
-# 0.18.7-candidate reference (landing/shoals-wire-audit/new-migrated.json,
-# raw ca707901945f5fea9df94eee0a5af62fc0053ae1a2971669212bd329284f9989).
-# The only byte difference between the two responses is per-node merged_spans
-# and span_id source-offset metadata, which is non-semantic and excluded from
-# the arithmetic comparison; every node id/op/name/inputs, the roots list and
-# named_roots are identical. The raw hash therefore moves from the 0.18.7
-# capture to the 0.18.9 value below. The gate still fails closed on any
-# mismatch rather than accepting a different hash, root, or node count.
-EXPECTED_RAW_SHA256 = "955c1df66a5731182646ae23d66d15308d4c63991810f41baf3ab425f48cabd2"
+EXPECTED_ENTRY_ROOT = 773
+EXPECTED_NODE_COUNT = 1494
+# Schema-13 migration (Chelis 0.18.10). The 0.18.9 pin captured schema 11 with
+# entry root 770 and 1488 nodes (raw hash 955c1df6...). Under the published
+# 0.18.10 binary the same src/pricing.ch lowers to schema 13, entry root 773
+# and 1494 nodes: exactly +3 Copy and +3 Drop plumbing nodes over 0.18.9, and
+# nothing else moved. The full-DAG op-kind histogram is add 59, cast 13,
+# cmp_lt 13, copy 317, div 8, drop 720, exp 5, extent_witness 166, load 48,
+# log 2, mul 91, neg 17, sqrt 3, sub 32 -- every arithmetic op count (add,
+# cast, cmp_lt, div, exp, extent_witness, load, log, mul, neg, sqrt, sub) is
+# byte-identical to the 0.18.9 capture; only copy (+3) and drop (+3) grew. The
+# entry-reachable subgraph is unchanged: the 15 named loads match
+# EXPECTED_LOADS exactly, the copy-elided semantic root is still `sub`, and the
+# root output type is still tensor[n, f64]. The public entry keeps its Copy
+# wrapper around the final Sub. This comparison does not certify shape
+# semantics. The two independent cold lowerings are byte-deterministic. Former
+# raw hashes: schema-6
+# 0c85b5c010446f5704f4daa468b97916994668ff41b303968528ffe8b448fabe; schema-11
+# 955c1df66a5731182646ae23d66d15308d4c63991810f41baf3ab425f48cabd2. Provenance:
+# re-observed against the published Chelis 0.18.10 darwin binary at release
+# prep and re-validated at the release gate; the gate fails closed on any
+# mismatch of hash, root, node count, or schema.
+EXPECTED_RAW_SHA256 = "6ecfa7b7621d6490244083fdde6c1de5222b3548fbe93194fb21cddd4e3a0418"
 FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
 EXPECTED_LOADS = {
     "a1",
@@ -64,7 +60,7 @@ EXPECTED_LOADS = {
     "two_over_sqrt_pi",
 }
 # Exact version, checked against each published compiler during a pin bump.
-WIRE_DAG_SCHEMA_VERSION = 11
+WIRE_DAG_SCHEMA_VERSION = 13
 WIRE_OPS = {
     "add",
     "cast",
