@@ -1,11 +1,11 @@
 [package]
 name = "shoals"
-version = "0.24.11"
-compiler = "=0.18.9"
+version = "0.24.12"
+compiler = "=0.18.10"
 module_prefix = "Shoals"
 additional_sources = ["properties", "references", "demos"]
 
 [dependencies]
 chelis-std = { version = "0.4.0" }
-nautilus = { version = "0.7.44" }
-coral = { version = "0.7.41" }
+nautilus = { version = "0.7.45" }
+coral = { version = "0.7.42" }
