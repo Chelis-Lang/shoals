@@ -242,13 +242,14 @@ def cur_pillars_admit(inst: Instrument, times_so_far: List[f32]) -> bool =
     | ZeroCoupon { tenor: _, price: _ } => true
     | ParSwap { tenor: t, par_rate: _, payments_per_year: _ } => cur_increasing_pillars_below(times_so_far, t)
   }
--- An invalid instrument, or a par swap whose pillars are out of order, has
--- no bootstrapped rate: NaN, never a guessed schedule or bracket.
+-- A malformed instrument, or a par swap whose pillars are out of order, is a
+-- structural error with no meaningful rate to propagate: fail loudly rather
+-- than guess a schedule or bracket.
 def solve_pillar_rate(inst: Instrument, times_so_far: List[f32], rates_so_far: List[f32]) -> f32 =
   if instrument_validate(inst) then if cur_pillars_admit(inst, times_so_far) then {
     f_at = fn (z: f32) -> bootstrap_residual_at_pillar(inst, times_so_far, rates_so_far, z)
     brent(f_at, cast(-0.5, f32), cast(2.0, f32), cast(1e-7, f32), cast(100, int64))
-  } else cur_nan_f32() else cur_nan_f32()
+  } else fail("Shoals.Curves.bootstrap_multi: par swap pillars must be strictly increasing and end before its tenor") else fail("Shoals.Curves.bootstrap_multi: invalid instrument (see instrument_validate)")
 def bootstrap_multi(instruments: List[Instrument]) -> (List[f32], List[f32]) = {
   init = ([], [])
   fold(fn (state: (List[f32], List[f32]), inst: Instrument) -> {

@@ -32,30 +32,38 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   cumulative discount sum cannot express an interpolated coupon schedule.
 - `instrument_validate` rejects a par swap with non-positive
   `payments_per_year` or a tenor that is not a whole number of periods.
-  `bootstrap_multi` returns `NaN` for any invalid instrument, and for a par
-  swap whose earlier pillars are not strictly increasing or whose tenor does
-  not exceed them. Deposits and zero-coupons stay pillar-local and carry no
-  ordering requirement.
+  `bootstrap_multi`, `bootstrap_grad_at_solution`, and `fd_bump_pillar_rate`
+  now raise a runtime `fail` on any invalid instrument, and on a par swap
+  whose earlier pillars are not strictly increasing or whose tenor does not
+  exceed them. Previously they returned a value, or NaN, silently. Deposits
+  and zero-coupons stay pillar-local and carry no ordering requirement.
+  `bootstrap_grad_full_jacobian` keeps its documented up-front validation and
+  sentinel-NaN Jacobian.
 
 ### Tests
 
 - `tests/curves_bootstrap_schedule.ch`: gapped-annual and semiannual reference
   zero rates from an independent float64 model, par repricing through
   `discount_factor`, monotonicity, frequency sensitivity, the unchanged
-  consecutive-annual layout, and negative cases for validity and NaN results.
-  Reintroducing the old accrual rule fails six of the ten tests. Removing the
-  whole-period check fails two, and removing the ordering guard fails one.
+  consecutive-annual layout, and swap validity. `tests_neg/curves/` pins the
+  two loud failures by message. Reintroducing the old accrual rule fails six of
+  the eight tests. Removing the whole-period check fails the validity test and
+  the invalid-schedule negative test. Removing the ordering guard fails the
+  out-of-order negative test.
 - `tests/curves_bootstrap_ift_full.ch`: the FD Jacobian oracle uses central
-  differences at step 1e-2, since forward differences at 1e-3 are dominated by
-  f32 and brent noise on the new off-diagonal entries. A new test pins all 25
-  Jacobian entries to a float64 reference.
+  differences at step 1e-2, with the tolerance unchanged. In a float64 model
+  the old forward difference at 1e-3 passes on all 25 entries. Under f32 and
+  brent 1e-7 it fails on exactly one off-diagonal entry, dz(3y)/d(1y deposit
+  quote), whose reference is -0.01627. The failure is therefore f32 solve
+  noise, not FD truncation. A new test pins all 25 Jacobian entries to a
+  float64 reference.
 
 ### Docs
 
 - `docs/src/curves.md` and `docs/src/scope.md` said the multi-instrument
   bootstrap "is not part of this surface" while the module exported it; they
   now document `Instrument`, the swap valuation convention, validation, and
-  NaN results.
+  the loud failures.
 
 ## [0.24.12] - 2026-09-15
 

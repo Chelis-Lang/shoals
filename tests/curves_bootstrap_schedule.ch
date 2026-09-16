@@ -74,15 +74,3 @@ def test_par_swap_validity_requires_whole_periods_and_positive_frequency() -> un
   _ = assert_true(if instrument_validate(cur_par_swap(cast(2.0, f32), cast(0.04, f32), cast(0, int64))) then false else true, "zero payments per year is invalid")
   assert_true(if instrument_validate(cur_par_swap(cast(2.0, f32), cast(0.04, f32), cast(-2, int64))) then false else true, "negative payments per year is invalid")
 }
-def test_bootstrap_returns_nan_for_invalid_instrument() -> unit ! { Test } = {
-  rates = bootstrap_multi([deposit(cast(1.0, f32), cast(0.04, f32)), cur_par_swap(cast(2.3, f32), cast(0.045, f32), cast(1, int64))]).1
-  z = index(rates, cast(1, int64))
-  assert_true(neq(z, z), "a swap whose tenor is not a whole number of periods bootstraps to NaN, not a snapped schedule")
-}
-def test_bootstrap_returns_nan_for_non_increasing_tenor() -> unit ! { Test } = {
-  rates = bootstrap_multi([deposit(cast(1.0, f32), cast(0.04, f32)), cur_par_swap(cast(3.0, f32), cast(0.045, f32), cast(1, int64)), cur_par_swap(cast(2.0, f32), cast(0.044, f32), cast(1, int64))]).1
-  z_ok = index(rates, cast(1, int64))
-  z_bad = index(rates, cast(2, int64))
-  _ = assert_true(eq(z_ok, z_ok), "increasing pillars before the offending instrument still solve")
-  assert_true(neq(z_bad, z_bad), "an instrument whose tenor does not exceed the previous pillar bootstraps to NaN")
-}

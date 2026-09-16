@@ -140,9 +140,11 @@ instrument, in list order, and returns the pillar times and rates.
 `instrument_validate` rejects a non-positive tenor, a deposit rate at or
 below `-1`, a zero-coupon price outside `(0, 1]`, a non-positive
 `payments_per_year`, and a swap tenor that is not a whole number of payment
-periods. The bootstrap returns `NaN` for a pillar whose instrument is invalid,
-and for a par swap whose earlier pillars are not strictly increasing or whose
-tenor does not exceed them. It never snaps a schedule or re-sorts pillars.
+periods. The bootstrap raises a runtime `fail` naming
+`Shoals.Curves.bootstrap_multi` when an instrument is invalid, or when a par
+swap's earlier pillars are not strictly increasing or its tenor does not
+exceed them. It never snaps a schedule, re-sorts pillars, or returns a
+sentinel.
 From `tests/curves_bootstrap_schedule.ch`, a gapped annual strip:
 
 ```chelis
