@@ -18,15 +18,15 @@ def cbif_bump_jth(instruments: List[Instrument], j: int64, step: f32) -> List[In
     if eq(i, j) then match inst with {
       | Deposit { tenor: t, rate: r } => deposit(t, add(r, step))
       | ZeroCoupon { tenor: t, price: p } => zero_coupon(t, add(p, step))
-      | ParSwap { tenor: t, par_rate: r } => cur_par_swap(t, add(r, step))
+      | ParSwap { tenor: t, par_rate: r, payments_per_year: f } => cur_par_swap(t, add(r, step), f)
     } else inst
   }, pairs)
 }
 def cbif_fd_column(instruments: List[Instrument], j: int64, step: f32) -> List[f32] = {
-  base = bootstrap_multi(instruments).1
-  bumped = bootstrap_multi(cbif_bump_jth(instruments, j, step)).1
-  pairs = zip(base, bumped)
-  map(fn (e: (f32, f32)) -> div(sub(e.1, e.0), step), pairs)
+  down = bootstrap_multi(cbif_bump_jth(instruments, j, neg(step))).1
+  up = bootstrap_multi(cbif_bump_jth(instruments, j, step)).1
+  pairs = zip(down, up)
+  map(fn (e: (f32, f32)) -> div(sub(e.1, e.0), mul(cast(2.0, f32), step)), pairs)
 }
 def test_full_jacobian_diagonal_only_for_zero_coupons() -> unit ! { Test } = {
   insts = [zero_coupon(cast(1.0, f32), cast(0.95, f32)), zero_coupon(cast(2.0, f32), cast(0.9, f32)), zero_coupon(cast(3.0, f32), cast(0.85, f32))]
@@ -40,7 +40,7 @@ def test_full_jacobian_diagonal_only_for_zero_coupons() -> unit ! { Test } = {
   assert_true(lt(off_diag_max, cast(1e-6, f32)), "all-zero-coupon Jacobian: off-diagonal entries are zero (residuals are pillar-local)")
 }
 def test_full_jacobian_par_swap_off_diagonal_nonzero() -> unit ! { Test } = {
-  insts = [deposit(cast(1.0, f32), cast(0.05, f32)), cur_par_swap(cast(2.0, f32), cast(0.04, f32))]
+  insts = [deposit(cast(1.0, f32), cast(0.05, f32)), cur_par_swap(cast(2.0, f32), cast(0.04, f32), cast(1, int64))]
   jac = bootstrap_grad_full_jacobian(copy(cbif_template_2()), insts)
   flat = to_list(reshape(jac, [cast(4, int64)]))
   j_10 = index(flat, cast(2, int64))
@@ -62,10 +62,10 @@ def cbif_entry_ok(api_val: f32, fd_val: f32, rel_tol: f32, abs_tol: f32) -> bool
   if lt(abs_diff, abs_tol) then true else lt(cbif_rel_err(api_val, fd_val), rel_tol)
 }
 def test_full_jacobian_matches_fd_bump() -> unit ! { Test } = {
-  insts = [zero_coupon(cast(0.5, f32), cast(0.98, f32)), deposit(cast(1.0, f32), cast(0.04, f32)), cur_par_swap(cast(2.0, f32), cast(0.045, f32)), cur_par_swap(cast(3.0, f32), cast(0.05, f32)), cur_par_swap(cast(5.0, f32), cast(0.055, f32))]
+  insts = [zero_coupon(cast(0.5, f32), cast(0.98, f32)), deposit(cast(1.0, f32), cast(0.04, f32)), cur_par_swap(cast(2.0, f32), cast(0.045, f32), cast(1, int64)), cur_par_swap(cast(3.0, f32), cast(0.05, f32), cast(1, int64)), cur_par_swap(cast(5.0, f32), cast(0.055, f32), cast(1, int64))]
   jac = bootstrap_grad_full_jacobian(copy(cbif_template_5()), insts)
   flat = to_list(reshape(jac, [cast(25, int64)]))
-  step = cast(0.001, f32)
+  step = cast(0.01, f32)
   col_idxs = range(cast(0, int64), cast(5, int64))
   per_col_ok = map(fn (j: int64) -> {
     fd_col = cbif_fd_column(insts, j, step)
@@ -79,10 +79,10 @@ def test_full_jacobian_matches_fd_bump() -> unit ! { Test } = {
     fold(fn (acc: bool, b: bool) -> if acc then b else false, true, per_row_ok)
   }, col_idxs)
   all_ok = fold(fn (acc: bool, b: bool) -> if acc then b else false, true, per_col_ok)
-  assert_true(all_ok, "well-conditioned 5-instrument bootstrap: full IFT Jacobian agrees with FD-bump Jacobian within 2% relative or 1e-4 absolute per entry (FD step = 1e-3; smaller steps are eaten by brent-1e-7 + f32 noise on the chained par-swap residuals, larger steps overshoot first-order)")
+  assert_true(all_ok, "well-conditioned 5-instrument bootstrap (0.5y zero-coupon, 1y deposit, 2y/3y/5y annual swaps): full IFT Jacobian agrees with a central-difference FD Jacobian within 2% relative or 1e-4 absolute per entry (FD step = 1e-2; central differences keep truncation error near 1e-4 while brent-1e-7 + f32 noise stays near 1e-5, whereas a forward step small enough to bound truncation is swamped by that noise on the off-diagonal entries)")
 }
 def test_full_jacobian_diagonal_matches_diagonal_helper() -> unit ! { Test } = {
-  insts = [zero_coupon(cast(0.5, f32), cast(0.98, f32)), deposit(cast(1.0, f32), cast(0.04, f32)), cur_par_swap(cast(2.0, f32), cast(0.045, f32)), cur_par_swap(cast(3.0, f32), cast(0.05, f32)), cur_par_swap(cast(5.0, f32), cast(0.055, f32))]
+  insts = [zero_coupon(cast(0.5, f32), cast(0.98, f32)), deposit(cast(1.0, f32), cast(0.04, f32)), cur_par_swap(cast(2.0, f32), cast(0.045, f32), cast(1, int64)), cur_par_swap(cast(3.0, f32), cast(0.05, f32), cast(1, int64)), cur_par_swap(cast(5.0, f32), cast(0.055, f32), cast(1, int64))]
   jac = bootstrap_grad_full_jacobian(copy(cbif_template_5()), insts)
   diag_list = bootstrap_grad_at_solution(insts)
   flat = to_list(reshape(jac, [cast(25, int64)]))
@@ -99,7 +99,7 @@ def test_full_jacobian_diagonal_matches_diagonal_helper() -> unit ! { Test } = {
 def test_instrument_validate_rejects_negative_tenor() -> unit ! { Test } = {
   bad_dep = deposit(cast(-0.5, f32), cast(0.05, f32))
   bad_zc_tenor = zero_coupon(cast(-1.0, f32), cast(0.9, f32))
-  bad_ps_tenor = cur_par_swap(cast(-2.0, f32), cast(0.04, f32))
+  bad_ps_tenor = cur_par_swap(cast(-2.0, f32), cast(0.04, f32), cast(1, int64))
   _ = assert_true(if instrument_validate(bad_dep) then false else true, "deposit with negative tenor is invalid")
   _ = assert_true(if instrument_validate(bad_zc_tenor) then false else true, "zero-coupon with negative tenor is invalid")
   assert_true(if instrument_validate(bad_ps_tenor) then false else true, "par-swap with negative tenor is invalid")
@@ -138,4 +138,18 @@ def test_instrument_validate_zc_price_boundary() -> unit ! { Test } = {
 def test_instrument_validate_deposit_rate_boundary() -> unit ! { Test } = {
   _ = assert_true(not(instrument_validate(deposit(cast(1.0, f32), cast(-1.0, f32)))), "Deposit at r=-1 rejected (boundary)")
   assert_true(instrument_validate(deposit(cast(1.0, f32), cast(-0.999, f32))), "Deposit at r=-0.999 accepted")
+}
+def test_full_jacobian_matches_float64_reference() -> unit ! { Test } = {
+  insts = [zero_coupon(cast(0.5, f32), cast(0.98, f32)), deposit(cast(1.0, f32), cast(0.04, f32)), cur_par_swap(cast(2.0, f32), cast(0.045, f32), cast(1, int64)), cur_par_swap(cast(3.0, f32), cast(0.05, f32), cast(1, int64)), cur_par_swap(cast(5.0, f32), cast(0.055, f32), cast(1, int64))]
+  flat = to_list(reshape(bootstrap_grad_full_jacobian(copy(cbif_template_5()), insts), [cast(25, int64)]))
+  -- Row-major dz_i/dquote_j from an independent float64 model of the
+  -- schedule-aware bootstrap (fixed leg over annual coupon dates, zero rates
+  -- linear between pillars) whose analytic Jacobian agrees with a 1e-6
+  -- float64 finite difference to five decimals.
+  expected = [cast(-2.04082, f32), cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(0.96154, f32), cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(-0.02174, f32), cast(0.98098, f32), cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(-0.01627, f32), cast(-0.03304, f32), cast(1.00796, f32), cast(0.0, f32), cast(0.0, f32), cast(-0.01092, f32), cast(-0.02216, f32), cast(-0.05683, f32), cast(1.04954, f32)]
+  worst = fold(fn (acc: f32, k: int64) -> {
+    d = cbif_abs_f32(sub(index(flat, k), index(expected, k)))
+    if gt(d, acc) then d else acc
+  }, cast(0.0, f32), range(cast(0, int64), cast(25, int64)))
+  assert_true(lt(worst, cast(0.0001, f32)), "full IFT Jacobian matches the float64 reference within 1e-4 per entry, including the off-diagonal coupon-schedule coupling that the one-coupon-per-pillar rule got wrong")
 }

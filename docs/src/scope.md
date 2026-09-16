@@ -45,9 +45,12 @@ is outside what these functions provide.
 ## Curves
 
 - `bootstrap_zero_from_par` handles the single-curve case with one coupon per
-  pillar at integer-year spacing. A multi-instrument bootstrap that solves
-  deposits, FRAs, futures, and swaps together in one joint solve is not part
-  of this surface.
+  pillar at integer-year spacing.
+- `bootstrap_multi` bootstraps deposits, zero-coupons, and par swaps
+  sequentially, one pillar per instrument. FRAs and futures are not
+  instruments, and there is no joint (global) solve. Swap coupon dates are
+  `k / payments_per_year` year fractions, not calendar-rolled dates.
+- The curves and the bootstrap are f32-only (shoals#72).
 - The day-count year fraction is available in `Shoals.Date`, but the curve
   interpolators take maturities directly as `f32` year fractions; they do not
   consult a calendar.

@@ -107,9 +107,61 @@ curve = bootstrap_zero_from_par(times, pars)
 // the two-year par bond reprices to 1.0
 ```
 
-The multi-instrument bootstrap (deposits, FRAs, futures, and swaps in one
-joint solve) is not part of this surface; see
-[Scope and limitations](scope.md).
+### Instrument bootstrap
+
+```chelis
+type Instrument =
+  | Deposit { tenor: f32, rate: f32 }
+  | ZeroCoupon { tenor: f32, price: f32 }
+  | ParSwap { tenor: f32, par_rate: f32, payments_per_year: int64 }
+
+def deposit(tenor: f32, rate: f32) -> Instrument
+def zero_coupon(tenor: f32, price: f32) -> Instrument
+def cur_par_swap(tenor: f32, par_rate: f32, payments_per_year: int64) -> Instrument
+def instrument_validate(inst: Instrument) -> bool
+def bootstrap_multi(instruments: List[Instrument]) -> (List[f32], List[f32])
+def bootstrap_multi_curve[n](instruments: List[Instrument], times_template: tensor[n, f32]) -> YieldCurve[n]
+```
+
+`bootstrap_multi` solves one continuously compounded zero rate per
+instrument, in list order, and returns the pillar times and rates.
+`bootstrap_multi_curve` wraps the same result as a `YieldCurve`.
+
+- A deposit is simple interest: `DF(t) = 1 / (1 + rate * t)`.
+- A zero-coupon price is the discount factor at its tenor.
+- A par swap's fixed leg pays `par_rate / payments_per_year` on each date
+  `k / payments_per_year` for `k = 1..N`, where `N = tenor * payments_per_year`,
+  and the solved pillar satisfies `par_rate * annuity + DF(tenor) = 1`.
+  Discount factors at coupon dates between pillars come from the curve being
+  built under the `rate_at` convention: zero rates are linear between pillars
+  and flat outside them. A bootstrapped curve therefore reprices each input
+  swap through `discount_factor`.
+
+`instrument_validate` rejects a non-positive tenor, a deposit rate at or
+below `-1`, a zero-coupon price outside `(0, 1]`, a non-positive
+`payments_per_year`, and a swap tenor that is not a whole number of payment
+periods. The bootstrap returns `NaN` for a pillar whose instrument is invalid,
+and for a par swap whose earlier pillars are not strictly increasing or whose
+tenor does not exceed them. It never snaps a schedule or re-sorts pillars.
+From `tests/curves_bootstrap_schedule.ch`, a gapped annual strip:
+
+```chelis
+insts = [
+  deposit(cast(0.5, f32), cast(0.041, f32)),
+  deposit(cast(1.0, f32), cast(0.042, f32)),
+  cur_par_swap(cast(2.0, f32), cast(0.0435, f32), cast(1, int64)),
+  cur_par_swap(cast(5.0, f32), cast(0.0452, f32), cast(1, int64)),
+  cur_par_swap(cast(10.0, f32), cast(0.0468, f32), cast(1, int64))
+]
+rates = bootstrap_multi(insts).1
+// 10y zero rate ~0.0460236
+```
+
+`bootstrap_grad_at_solution` and `bootstrap_grad_full_jacobian` return the
+implicit-function-theorem sensitivities of the solved zero rates to the
+instrument quotes, over the same coupon schedule and interpolation. FRAs and
+futures are not instruments here, and the solve is sequential rather than
+joint; see [Scope and limitations](scope.md).
 
 ## Sensitivity shifts
 

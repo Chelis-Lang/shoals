@@ -21,7 +21,7 @@ def test_grad_deposit_matches_analytic() -> unit ! { Test } = {
   assert_close(g0, expected, cast(0.0001, f32), "deposit IFT grad = 1/(1+r*t)")
 }
 def test_grad_par_swap_single_pillar() -> unit ! { Test } = {
-  ps = cur_par_swap(cast(1.0, f32), cast(0.05, f32))
+  ps = cur_par_swap(cast(1.0, f32), cast(0.05, f32), cast(1, int64))
   grads = bootstrap_grad_at_solution([ps])
   g0 = index(grads, cast(0, int64))
   out = bootstrap_multi([ps])
@@ -63,7 +63,7 @@ def test_grad_near_collinear_finite_and_bounded() -> unit ! { Test } = {
 }
 def test_grad_fd_step_size_stability() -> unit ! { Test } = {
   inst = zero_coupon(cast(2.0, f32), cast(0.9, f32))
-  ift_grad = bootstrap_grad_diagonal(inst, div(neg(log(cast(0.9, f32))), cast(2.0, f32)), cast(0.0, f32))
+  ift_grad = bootstrap_grad_diagonal(inst, [], [], div(neg(log(cast(0.9, f32))), cast(2.0, f32)))
   fd_e2 = fd_bump_pillar_rate(inst, [], [], cast(0.01, f32))
   fd_e4 = fd_bump_pillar_rate(inst, [], [], cast(0.0001, f32))
   fd_e6 = fd_bump_pillar_rate(inst, [], [], cast(1e-6, f32))

@@ -35,7 +35,8 @@ own chapter:
   expected-shortfall helper, a scenario PnL grid, and the Kupiec
   proportion-of-failures backtest statistic.
 - **Yield curves.** Linear, spline, log-linear, and Nelson-Siegel-Svensson
-  interpolation, discount factors, a single-curve par bootstrap, curve-kind
+  interpolation, discount factors, a single-curve par bootstrap, a
+  deposit/zero-coupon/par-swap instrument bootstrap with IFT sensitivities, curve-kind
   metadata, and sensitivity operators.
 - **Dates, calendars, tenors.** Day-count conventions, business-day
   rolling, holiday calendars, and tenor arithmetic.
