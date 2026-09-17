@@ -51,9 +51,9 @@ def test_full_jacobian_par_swap_off_diagonal_nonzero() -> unit ! { Test } = {
   is_nonzero_10 = gt(cbif_abs_f32(j_10), cast(0.001, f32))
   is_zero_01 = lt(cbif_abs_f32(j_01), cast(1e-6, f32))
   _ = assert_true(is_finite_10, "J[1, 0] = dz_1/dx_0 is finite for deposit+par-swap")
-  _ = assert_true(is_nonzero_10, "J[1, 0] = dz_1/dx_0 is non-trivially non-zero (par-swap residual depends on z_0 via cum_pv)")
+  _ = assert_true(is_nonzero_10, "J[1, 0] = dz_1/dx_0 is non-trivially non-zero (the par-swap fixed leg discounts its 1y coupon at pillar 0)")
   _ = assert_true(is_zero_01, "J[0, 1] = dz_0/dx_1 is zero (deposit pillar 0 does not depend on later par-swap rate)")
-  _ = assert_true(lt(j_10, cast(0.0, f32)), "J[1, 0] sign: raising deposit rate raises z_0, raises cum_pv, lowers required z_1 (negative)")
+  _ = assert_true(lt(j_10, cast(0.0, f32)), "J[1, 0] sign: raising deposit rate raises z_0, lowers the 1y coupon discount factor, lowers required z_1 (negative)")
   _ = assert_close(j_00, div(cast(1.0, f32), cast(1.05, f32)), cast(0.001, f32), "J[0, 0] = 1/(1+r*t) for deposit pillar")
   assert_true(gt(j_11, cast(0.0, f32)), "J[1, 1] > 0 (raising par_rate raises implied z_1 in this regime)")
 }
@@ -152,4 +152,19 @@ def test_full_jacobian_matches_float64_reference() -> unit ! { Test } = {
     if gt(d, acc) then d else acc
   }, cast(0.0, f32), range(cast(0, int64), cast(25, int64)))
   assert_true(lt(worst, cast(0.0001, f32)), "full IFT Jacobian matches the float64 reference within 1e-4 per entry, including the off-diagonal coupon-schedule coupling that the one-coupon-per-pillar rule got wrong")
+}
+def test_full_jacobian_non_annual_matches_float64_reference() -> unit ! { Test } = {
+  insts = [deposit(cast(0.5, f32), cast(0.04, f32)), cur_par_swap(cast(1.0, f32), cast(0.042, f32), cast(2, int64)), cur_par_swap(cast(2.0, f32), cast(0.044, f32), cast(2, int64)), cur_par_swap(cast(3.0, f32), cast(0.046, f32), cast(4, int64))]
+  template = to_tensor([cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(0.0, f32)])
+  flat = to_list(reshape(bootstrap_grad_full_jacobian(template, insts), [cast(16, int64)]))
+  -- Row-major dz_i/dquote_j for a 0.5y deposit and 1y/2y semiannual plus 3y
+  -- quarterly swaps, from the independent float64 model (analytic Jacobian
+  -- within 1.4e-10 of a 1e-6 central difference). Accrual is not 1 here, so
+  -- the entries pin the coupon accrual inside the swap derivatives.
+  expected = [cast(0.98039, f32), cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(-0.0103, f32), cast(0.99022, f32), cast(0.0, f32), cast(0.0, f32), cast(-0.0054, f32), cast(-0.01918, f32), cast(1.00439, f32), cast(0.0, f32), cast(-0.00431, f32), cast(-0.01349, f32), cast(-0.03143, f32), cast(1.04182, f32)]
+  worst = fold(fn (acc: f32, k: int64) -> {
+    d = cbif_abs_f32(sub(index(flat, k), index(expected, k)))
+    if gt(d, acc) then d else acc
+  }, cast(0.0, f32), range(cast(0, int64), cast(16, int64)))
+  assert_true(lt(worst, cast(0.0001, f32)), "semiannual/quarterly full IFT Jacobian matches the float64 reference within 1e-4 per entry")
 }

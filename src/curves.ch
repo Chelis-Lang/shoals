@@ -229,27 +229,22 @@ def bootstrap_residual_at_pillar(inst: Instrument, times_so_far: List[f32], rate
     | ZeroCoupon { tenor: t, price: p } => sub(zero_rate_candidate, zero_coupon_implied_zero(t, p))
     | ParSwap { tenor: t, par_rate: r, payments_per_year: f } => cur_par_swap_residual(t, r, f, times_so_far, rates_so_far, zero_rate_candidate)
   }
--- A par swap reads every earlier pillar through interpolation, so it needs
--- strictly increasing earlier pillars and a tenor beyond the last of them.
--- Deposits and zero-coupons are pillar-local and carry no ordering need.
+-- The returned curve is read through `rate_at`, which is only defined over
+-- strictly increasing pillar times, and a par swap interpolates over every
+-- earlier pillar. Each instrument's tenor must therefore exceed all earlier
+-- pillars, whatever its kind; a duplicate or shorter tenor cannot reprice.
 def cur_increasing_pillars_below(times_so_far: List[f32], tenor: f32) -> bool = {
   bound = fold(fn (acc: (bool, f32), t: f32) -> (if acc.0 then gt(t, acc.1) else false, t), (true, neg(cast(1.0, f32))), times_so_far)
   if bound.0 then gt(tenor, bound.1) else false
 }
-def cur_pillars_admit(inst: Instrument, times_so_far: List[f32]) -> bool =
-  match inst with {
-    | Deposit { tenor: _, rate: _ } => true
-    | ZeroCoupon { tenor: _, price: _ } => true
-    | ParSwap { tenor: t, par_rate: _, payments_per_year: _ } => cur_increasing_pillars_below(times_so_far, t)
-  }
--- A malformed instrument, or a par swap whose pillars are out of order, is a
--- structural error with no meaningful rate to propagate: fail loudly rather
--- than guess a schedule or bracket.
+-- A malformed instrument, or a tenor that does not extend the pillars already
+-- solved, is a structural error with no meaningful rate to propagate: fail
+-- loudly rather than guess a schedule, bracket, or ordering.
 def solve_pillar_rate(inst: Instrument, times_so_far: List[f32], rates_so_far: List[f32]) -> f32 =
-  if instrument_validate(inst) then if cur_pillars_admit(inst, times_so_far) then {
+  if instrument_validate(inst) then if cur_increasing_pillars_below(times_so_far, instrument_tenor(inst)) then {
     f_at = fn (z: f32) -> bootstrap_residual_at_pillar(inst, times_so_far, rates_so_far, z)
     brent(f_at, cast(-0.5, f32), cast(2.0, f32), cast(1e-7, f32), cast(100, int64))
-  } else fail("Shoals.Curves.bootstrap_multi: par swap pillars must be strictly increasing and end before its tenor") else fail("Shoals.Curves.bootstrap_multi: invalid instrument (see instrument_validate)")
+  } else fail("Shoals.Curves.bootstrap_multi: instrument tenors must be strictly increasing") else fail("Shoals.Curves.bootstrap_multi: invalid instrument (see instrument_validate)")
 def bootstrap_multi(instruments: List[Instrument]) -> (List[f32], List[f32]) = {
   init = ([], [])
   fold(fn (state: (List[f32], List[f32]), inst: Instrument) -> {
@@ -312,7 +307,7 @@ def instrument_validate(inst: Instrument) -> bool =
   match inst with {
     | Deposit { tenor: t, rate: r } => if lte(t, cast(0.0, f32)) then false else if lte(r, cast(-1.0, f32)) then false else true
     | ZeroCoupon { tenor: t, price: p } => if lte(t, cast(0.0, f32)) then false else if lte(p, cast(0.0, f32)) then false else if gt(p, cast(1.0, f32)) then false else true
-    | ParSwap { tenor: t, par_rate: _, payments_per_year: f } => if lte(t, cast(0.0, f32)) then false else if lte(f, cast(0, int64)) then false else cur_whole_periods(t, f)
+    | ParSwap { tenor: t, par_rate: _, payments_per_year: f } => if neq(sub(t, t), cast(0.0, f32)) then false else if lte(t, cast(0.0, f32)) then false else if lte(f, cast(0, int64)) then false else cur_whole_periods(t, f)
   }
 def cur_all_instruments_valid(instruments: List[Instrument]) -> bool = fold(fn (acc: bool, inst: Instrument) -> if acc then instrument_validate(inst) else false, true, instruments)
 def cur_l_row_for_pillar(inst: Instrument, t_i: f32, z_i: f32, times_so_far: List[f32], rates_so_far: List[f32]) -> List[f32] =

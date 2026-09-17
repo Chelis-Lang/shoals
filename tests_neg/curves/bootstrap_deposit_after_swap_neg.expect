@@ -1,0 +1,6 @@
+Shoals.Curves.bootstrap_multi: instrument tenors must be strictly increasing
+
+A 1y deposit after a 2y swap would leave pillar times [2, 1]. `rate_at` on
+the returned curve would then read the 2y discount factor from the deposit's
+rate, so the swap no longer reprices. The ordering guard covers every
+instrument kind, not only par swaps.

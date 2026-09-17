@@ -155,7 +155,8 @@ single-curve par-bond bootstrap. Extensions:
   interpolation the curve exposes, so the result reprices every input
   instrument. The gradient differentiates that same valuation. An instrument
   the valuation cannot represent (a tenor that is not a whole number of
-  periods, or pillars out of order) is rejected loudly rather than
+  periods, or instrument tenors that are not strictly increasing) is rejected
+  loudly rather than
   approximated.
 - **Curve-derivative type:** the gradient of a price with respect to
   a `Curve` is a `Curve`-shaped object (per-pillar sensitivities), not

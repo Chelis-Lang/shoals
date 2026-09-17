@@ -74,3 +74,9 @@ def test_par_swap_validity_requires_whole_periods_and_positive_frequency() -> un
   _ = assert_true(if instrument_validate(cur_par_swap(cast(2.0, f32), cast(0.04, f32), cast(0, int64))) then false else true, "zero payments per year is invalid")
   assert_true(if instrument_validate(cur_par_swap(cast(2.0, f32), cast(0.04, f32), cast(-2, int64))) then false else true, "negative payments per year is invalid")
 }
+def test_par_swap_validity_rejects_non_finite_tenor() -> unit ! { Test } = {
+  nan_t = div(cast(0.0, f32), cast(0.0, f32))
+  inf_t = div(cast(1.0, f32), cast(0.0, f32))
+  _ = assert_true(if instrument_validate(cur_par_swap(nan_t, cast(0.04, f32), cast(2, int64))) then false else true, "a NaN par-swap tenor is invalid rather than trapping in cast_trunc")
+  assert_true(if instrument_validate(cur_par_swap(inf_t, cast(0.04, f32), cast(2, int64))) then false else true, "an infinite par-swap tenor is invalid rather than trapping in cast_trunc")
+}

@@ -141,10 +141,11 @@ instrument, in list order, and returns the pillar times and rates.
 below `-1`, a zero-coupon price outside `(0, 1]`, a non-positive
 `payments_per_year`, and a swap tenor that is not a whole number of payment
 periods. The bootstrap raises a runtime `fail` naming
-`Shoals.Curves.bootstrap_multi` when an instrument is invalid, or when a par
-swap's earlier pillars are not strictly increasing or its tenor does not
-exceed them. It never snaps a schedule, re-sorts pillars, or returns a
-sentinel.
+`Shoals.Curves.bootstrap_multi` when an instrument is invalid, or when any
+instrument's tenor does not exceed every earlier pillar (instruments must be
+listed in strictly increasing tenor). It never snaps a schedule or re-sorts
+pillars. A rate the root finder cannot bracket in `[-0.5, 2.0]`, or a `NaN`
+quote, still comes back as `NaN`.
 From `tests/curves_bootstrap_schedule.ch`, a gapped annual strip:
 
 ```chelis

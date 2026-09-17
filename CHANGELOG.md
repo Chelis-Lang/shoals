@@ -33,30 +33,37 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - `instrument_validate` rejects a par swap with non-positive
   `payments_per_year` or a tenor that is not a whole number of periods.
   `bootstrap_multi`, `bootstrap_grad_at_solution`, and `fd_bump_pillar_rate`
-  now raise a runtime `fail` on any invalid instrument, and on a par swap
-  whose earlier pillars are not strictly increasing or whose tenor does not
-  exceed them. Previously they returned a value, or NaN, silently. Deposits
-  and zero-coupons stay pillar-local and carry no ordering requirement.
-  `bootstrap_grad_full_jacobian` keeps its documented up-front validation and
-  sentinel-NaN Jacobian.
+  now raise a runtime `fail` on any invalid instrument, and on any
+  instrument whose tenor does not exceed every earlier pillar, since the
+  returned curve is read through `rate_at` over strictly increasing times.
+  Previously they returned a value, or NaN, silently. Duplicate tenors are
+  rejected too. `bootstrap_grad_full_jacobian` keeps its up-front validation
+  and sentinel-NaN Jacobian for invalid instruments, but fails loudly on
+  out-of-order or duplicate tenors. `instrument_validate` also rejects a
+  non-finite par-swap tenor instead of trapping in `cast_trunc`. A quote the
+  root finder cannot bracket, or a `NaN` quote, still yields `NaN`.
 
 ### Tests
 
 - `tests/curves_bootstrap_schedule.ch`: gapped-annual and semiannual reference
   zero rates from an independent float64 model, par repricing through
   `discount_factor`, monotonicity, frequency sensitivity, the unchanged
-  consecutive-annual layout, and swap validity. `tests_neg/curves/` pins the
-  two loud failures by message. Reintroducing the old accrual rule fails six of
-  the eight tests. Removing the whole-period check fails the validity test and
-  the invalid-schedule negative test. Removing the ordering guard fails the
-  out-of-order negative test.
+  consecutive-annual layout, and swap validity (including non-finite tenors). `tests_neg/curves/` pins the
+  loud failures by message: an invalid swap schedule, a swap after a longer
+  swap, a deposit after a longer swap, and a duplicate tenor. Reintroducing the
+  old accrual rule fails six of the nine tests. Removing the whole-period
+  check fails the validity test and the invalid-schedule negative test.
+- `tests/curves_bootstrap_ift.ch`: the pathological-pillar test used two
+  zero-coupons at the same tenor, which are now rejected; it now covers extreme
+  but valid spacing (0.01y then 50y).
 - `tests/curves_bootstrap_ift_full.ch`: the FD Jacobian oracle uses central
   differences at step 1e-2, with the tolerance unchanged. In a float64 model
   the old forward difference at 1e-3 passes on all 25 entries. Under f32 and
   brent 1e-7 it fails on exactly one off-diagonal entry, dz(3y)/d(1y deposit
-  quote), whose reference is -0.01627. The failure is therefore f32 solve
-  noise, not FD truncation. A new test pins all 25 Jacobian entries to a
-  float64 reference.
+  quote), whose reference is -0.01627. That rules out FD truncation; the exact
+  f32 mechanism is not established. New tests pin all 25 entries of that
+  Jacobian, and all 16 entries of a semiannual/quarterly Jacobian, to float64
+  references.
 
 ### Docs
 

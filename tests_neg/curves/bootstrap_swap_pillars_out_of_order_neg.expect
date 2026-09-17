@@ -1,6 +1,6 @@
-Shoals.Curves.bootstrap_multi: par swap pillars must be strictly increasing and end before its tenor
+Shoals.Curves.bootstrap_multi: instrument tenors must be strictly increasing
 
 A par swap's fixed leg interpolates discount factors over the pillars already
-solved, which is only defined when they are strictly increasing and precede
-the swap's tenor. Deposits and zero-coupons are pillar-local and carry no
-ordering requirement.
+solved, and the returned curve is read through `rate_at`; both are only
+defined over strictly increasing pillar times. A tenor that does not exceed
+every earlier pillar is rejected, whatever the instrument kind.
