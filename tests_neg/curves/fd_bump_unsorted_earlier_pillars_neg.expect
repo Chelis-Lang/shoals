@@ -1,0 +1,6 @@
+Shoals.Curves.bootstrap_multi: instrument tenors must be strictly increasing
+
+`fd_bump_pillar_rate` accepts caller-supplied earlier pillars. The ordering
+guard checks that those pillars are themselves strictly increasing, not only
+that the bumped instrument's tenor exceeds the last one, so an unsorted list
+is rejected before any solve.
