@@ -15,8 +15,10 @@ Probes (per plan):
      and matches the analytic single-pillar value).
   4. FD step-size sensitivity (IFT matches FD@1e-4 within the f32+
      brent-1e-7 precision floor; FD coarse/fine spread bounded).
-  5. Pathological pillar spacing (two instruments at the same tenor;
-     diagonal IFT matches analytic on both, no silent garbage).
+  5. Pathological pillar spacing (extreme but valid spacing, 0.01y then
+     50y; diagonal IFT matches analytic on both, no silent garbage).
+     Duplicate tenors are rejected loudly by the bootstrap (shoals#75)
+     and pinned in tests_neg/curves/bootstrap_duplicate_tenor_neg.ch.
 
 Exit 0 on PASS, 1 on FAIL. Final stdout line is `PASS:` or `FAIL:`
 followed by the gate name and a one-sentence summary.
@@ -148,11 +150,11 @@ def main() -> int:
             "difference comparison would be expected behavior, not a gate failure."
         ),
         "pathological_pillar_methodology": (
-            "Two zero-coupon instruments at the same tenor t=1.0 with different "
-            "prices — the diagonal IFT correctly returns the per-instrument analytic "
-            "(-1/(t*p)) for each, with no silent NaN/Inf. A full bootstrap Jacobian "
-            "would be singular at this configuration, but the per-pillar diagonal "
-            "stays well-defined."
+            "Zero-coupon instruments at 0.01y and 50y, four orders of magnitude "
+            "apart: the diagonal IFT returns the per-instrument analytic "
+            "(-1/(t*p)) for each, with no silent NaN/Inf. Duplicate tenors no "
+            "longer reach this probe: the bootstrap rejects them loudly "
+            "(shoals#75, tests_neg/curves/bootstrap_duplicate_tenor_neg.ch)."
         ),
     }
     sys.stdout.write(json.dumps(report, indent=2) + "\n")

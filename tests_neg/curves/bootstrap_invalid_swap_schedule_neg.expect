@@ -1,0 +1,6 @@
+Shoals.Curves.bootstrap_multi: invalid instrument (see instrument_validate)
+
+`solve_pillar_rate` checks `instrument_validate` before solving. A par swap
+whose tenor is not a whole number of `payments_per_year` periods is malformed,
+so the bootstrap raises a runtime `fail` naming the entry point instead of
+valuing a snapped schedule or returning NaN.

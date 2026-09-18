@@ -11,7 +11,7 @@ def test_zero_coupon_instrument_price() -> unit ! { Test } = {
   assert_close(instrument_market_price_or_rate(zc), cast(0.95, f32), cast(1e-6, f32), "zero-coupon price preserved")
 }
 def test_par_swap_instrument_par_rate() -> unit ! { Test } = {
-  ps = cur_par_swap(cast(5.0, f32), cast(0.045, f32))
+  ps = cur_par_swap(cast(5.0, f32), cast(0.045, f32), cast(1, int64))
   assert_close(instrument_market_price_or_rate(ps), cast(0.045, f32), cast(1e-6, f32), "par swap rate preserved")
 }
 def test_bootstrap_single_deposit_reproduces_implied_zero() -> unit ! { Test } = {
@@ -31,7 +31,7 @@ def test_bootstrap_single_zero_coupon_reproduces_implied_zero() -> unit ! { Test
   assert_close(z0, expected, cast(1e-6, f32), "2y zero-coupon at 0.9 gives -log(0.9)/2")
 }
 def test_bootstrap_par_swap_reproduces_par_price() -> unit ! { Test } = {
-  insts = [cur_par_swap(cast(1.0, f32), cast(0.05, f32))]
+  insts = [cur_par_swap(cast(1.0, f32), cast(0.05, f32), cast(1, int64))]
   out = bootstrap_multi(insts)
   rates = out.1
   z0 = index(rates, cast(0, int64))
@@ -51,7 +51,7 @@ def test_bootstrap_two_pillar_consistency() -> unit ! { Test } = {
   assert_close(z2, exp_z2, cast(1e-6, f32), "2y zero rate independent")
 }
 def test_bootstrap_mixed_deposit_swap() -> unit ! { Test } = {
-  insts = [deposit(cast(1.0, f32), cast(0.04, f32)), cur_par_swap(cast(2.0, f32), cast(0.045, f32))]
+  insts = [deposit(cast(1.0, f32), cast(0.04, f32)), cur_par_swap(cast(2.0, f32), cast(0.045, f32), cast(1, int64))]
   out = bootstrap_multi(insts)
   times = out.0
   rates = out.1

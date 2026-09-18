@@ -4,6 +4,74 @@ All notable changes to this project are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **`Shoals.Curves.bootstrap_multi` valued every par swap as one coupon per
+  earlier pillar with accrual 1.0** (shoals#75). Deposits counted as coupon
+  dates, and intermediate annual dates were skipped. The result was correct only
+  when the pillars were consecutive whole years starting at 1y. A 0.5y/1y
+  deposit and 2y/5y/10y annual swap strip bootstrapped a 2y zero rate of
+  0.065363 (reference 0.0426118) and a 10y of 0.023317 (reference 0.0460236),
+  an inverted curve from upward-sloping quotes. The fixed leg is now valued over
+  the swap's own coupon schedule. Discount factors at intermediate coupon dates
+  come from the curve being built under the `rate_at` convention, so the
+  returned curve reprices every input swap through `discount_factor`.
+  `bootstrap_grad_at_solution`, `bootstrap_grad_full_jacobian`, and
+  `bootstrap_grad_diagonal` shared the same rule and now differentiate the
+  corrected valuation.
+
+### Changed (breaking)
+
+- `ParSwap` gains `payments_per_year: int64`, and
+  `cur_par_swap(tenor, par_rate, payments_per_year)` takes it explicitly.
+  There is no default frequency. Existing annual callers pass `cast(1, int64)`.
+- `bootstrap_grad_diagonal(inst, times_so_far, rates_so_far, solved_rate)`
+  replaces `bootstrap_grad_diagonal(inst, solved_rate, cum_pv_before)`: a
+  cumulative discount sum cannot express an interpolated coupon schedule.
+- `instrument_validate` rejects a par swap with non-positive
+  `payments_per_year` or a tenor that is not a whole number of periods.
+  `bootstrap_multi`, `bootstrap_grad_at_solution`, and `fd_bump_pillar_rate`
+  now raise a runtime `fail` on any invalid instrument, and on any
+  instrument whose tenor does not exceed every earlier pillar, since the
+  returned curve is read through `rate_at` over strictly increasing times.
+  Previously they returned a value, or NaN, silently. Duplicate tenors are
+  rejected too. `bootstrap_grad_full_jacobian` keeps its up-front validation
+  and sentinel-NaN Jacobian for invalid instruments, but fails loudly on
+  out-of-order or duplicate tenors. `instrument_validate` also rejects a
+  non-finite par-swap tenor instead of trapping in `cast_trunc`. A quote the
+  root finder cannot bracket, or a `NaN` quote, still yields `NaN`.
+
+### Tests
+
+- `tests/curves_bootstrap_schedule.ch`: gapped-annual and semiannual reference
+  zero rates from an independent float64 model, par repricing through
+  `discount_factor`, monotonicity, frequency sensitivity, the unchanged
+  consecutive-annual layout, and swap validity (including non-finite tenors). `tests_neg/curves/` pins the
+  loud failures by message: an invalid swap schedule, a swap after a longer
+  swap, a deposit after a longer swap, and a duplicate tenor. Reintroducing the
+  old accrual rule fails six of the nine tests. Removing the whole-period
+  check fails the validity test and the invalid-schedule negative test.
+- `tests/curves_bootstrap_ift.ch`: the pathological-pillar test used two
+  zero-coupons at the same tenor, which are now rejected; it now covers extreme
+  but valid spacing (0.01y then 50y).
+- `tests/curves_bootstrap_ift_full.ch`: the FD Jacobian oracle uses central
+  differences at step 1e-2, with the tolerance unchanged. In a float64 model
+  the old forward difference at 1e-3 passes on all 25 entries. Under f32 and
+  brent 1e-7 it fails on exactly one off-diagonal entry, dz(3y)/d(1y deposit
+  quote), whose reference is -0.01627. That rules out FD truncation; the exact
+  f32 mechanism is not established. New tests pin all 25 entries of that
+  Jacobian, and all 16 entries of a semiannual/quarterly Jacobian, to float64
+  references.
+
+### Docs
+
+- `docs/src/curves.md` and `docs/src/scope.md` said the multi-instrument
+  bootstrap "is not part of this surface" while the module exported it; they
+  now document `Instrument`, the swap valuation convention, validation, and
+  the loud failures.
+
 ## [0.24.12] - 2026-09-15
 
 Compiler-pin and migration release for Chelis v0.18.10, on Nautilus 0.7.45 and

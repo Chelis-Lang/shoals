@@ -149,7 +149,15 @@ single-curve par-bond bootstrap. Extensions:
 - **Multi-instrument bootstrap:** given a set of market instruments
   (deposits, FRAs, swaps, futures) with prices, solve for the implied
   curve. Nonlinear root-find; gradient through the solve via implicit
-  differentiation.
+  differentiation. A par swap carries its payment frequency explicitly; its
+  fixed leg is valued over that coupon schedule, with discount factors at
+  intermediate coupon dates read from the curve being built under the same
+  interpolation the curve exposes, so the result reprices every input
+  instrument. The gradient differentiates that same valuation. An instrument
+  the valuation cannot represent (a tenor that is not a whole number of
+  periods, or instrument tenors that are not strictly increasing) is rejected
+  loudly rather than
+  approximated.
 - **Curve-derivative type:** the gradient of a price with respect to
   a `Curve` is a `Curve`-shaped object (per-pillar sensitivities), not
   an ad-hoc tensor. The type system carries this shape so downstream

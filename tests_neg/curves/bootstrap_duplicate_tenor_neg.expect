@@ -1,0 +1,5 @@
+Shoals.Curves.bootstrap_multi: instrument tenors must be strictly increasing
+
+Two instruments at one tenor with different quotes imply two discount factors
+at the same date, which no curve can reprice. The bootstrap rejects the
+duplicate instead of silently keeping either pillar.

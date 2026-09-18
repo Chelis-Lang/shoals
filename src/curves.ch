@@ -144,46 +144,107 @@ def butterfly[n](curve: YieldCurve[n], wing_delta: f32, body_delta: f32) -> Yiel
 type Instrument =
   | Deposit { tenor: f32, rate: f32 }
   | ZeroCoupon { tenor: f32, price: f32 }
-  | ParSwap { tenor: f32, par_rate: f32 }
+  | ParSwap { tenor: f32, par_rate: f32, payments_per_year: int64 }
 def deposit(tenor: f32, rate: f32) -> Instrument = Deposit { tenor, rate }
 def zero_coupon(tenor: f32, price: f32) -> Instrument = ZeroCoupon { tenor, price }
-def cur_par_swap(tenor: f32, par_rate: f32) -> Instrument = ParSwap { tenor, par_rate }
+def cur_par_swap(tenor: f32, par_rate: f32, payments_per_year: int64) -> Instrument = ParSwap { tenor, par_rate, payments_per_year }
 def instrument_tenor(inst: Instrument) -> f32 =
   match inst with {
     | Deposit { tenor: t, rate: _ } => t
     | ZeroCoupon { tenor: t, price: _ } => t
-    | ParSwap { tenor: t, par_rate: _ } => t
+    | ParSwap { tenor: t, par_rate: _, payments_per_year: _ } => t
   }
 def instrument_market_price_or_rate(inst: Instrument) -> f32 =
   match inst with {
     | Deposit { tenor: _, rate: r } => r
     | ZeroCoupon { tenor: _, price: p } => p
-    | ParSwap { tenor: _, par_rate: r } => r
+    | ParSwap { tenor: _, par_rate: r, payments_per_year: _ } => r
   }
 def deposit_implied_zero(t: f32, simple_rate: f32) -> f32 = {
   df = div(cast(1.0, f32), add(cast(1.0, f32), mul(simple_rate, t)))
   div(neg(log(df)), t)
 }
 def zero_coupon_implied_zero(t: f32, price: f32) -> f32 = div(neg(log(price)), t)
-def cum_pv_at(times_so_far: List[f32], rates_so_far: List[f32]) -> f32 = {
-  pairs = zip(times_so_far, rates_so_far)
-  fold(fn (acc: f32, e: (f32, f32)) -> add(acc, exp(neg(mul(e.1, e.0)))), cast(0.0, f32), pairs)
+def cur_nan_f32() -> f32 = div(cast(0.0, f32), cast(0.0, f32))
+def cur_period_count(tenor: f32, payments_per_year: int64) -> int64 = cast_trunc(add(mul(tenor, cast(payments_per_year, f32)), cast(0.5, f32)), int64)
+-- Coupon dates k / payments_per_year for k = 1..N; the final date is the
+-- quoted tenor itself so the fixed leg and the maturity discount agree.
+def cur_coupon_dates(tenor: f32, payments_per_year: int64) -> List[f32] = {
+  n_periods = cur_period_count(tenor, payments_per_year)
+  freq_f = cast(payments_per_year, f32)
+  ks = range(cast(1, int64), add(n_periods, cast(1, int64)))
+  map(fn (k: int64) -> if eq(k, n_periods) then tenor else div(cast(k, f32), freq_f), ks)
 }
-def cur_par_swap_residual(t_i: f32, par_rate: f32, cum_pv: f32, zero_rate_candidate: f32) -> f32 = {
-  df_i = exp(neg(mul(zero_rate_candidate, t_i)))
-  full_pv = add(mul(par_rate, add(cum_pv, df_i)), df_i)
-  sub(full_pv, cast(1.0, f32))
+-- Weight of pillar j in the zero rate at u under the `rate_at` convention:
+-- linear between neighbouring pillars, flat before the first and after the
+-- last. Pillar times must be strictly increasing.
+def cur_pillar_weight(times: List[f32], j: int64, u: f32) -> f32 = {
+  last = sub(len(times), cast(1, int64))
+  t_j = index(times, j)
+  if lte(u, index(times, cast(0, int64))) then if eq(j, cast(0, int64)) then cast(1.0, f32) else cast(0.0, f32) else if gte(u, index(times, last)) then if eq(j, last) then cast(1.0, f32) else cast(0.0, f32) else {
+    left = if gt(j, cast(0, int64)) then {
+      t_prev = index(times, sub(j, cast(1, int64)))
+      if and(gte(u, t_prev), lt(u, t_j)) then div(sub(u, t_prev), sub(t_j, t_prev)) else cast(0.0, f32)
+    } else cast(0.0, f32)
+    right = if lt(j, last) then {
+      t_next = index(times, add(j, cast(1, int64)))
+      if and(gte(u, t_j), lt(u, t_next)) then div(sub(t_next, u), sub(t_next, t_j)) else cast(0.0, f32)
+    } else cast(0.0, f32)
+    add(left, right)
+  }
+}
+def cur_discount_at(times: List[f32], rates: List[f32], u: f32) -> f32 = {
+  idxs = range(cast(0, int64), len(times))
+  z_u = fold(fn (acc: f32, j: int64) -> add(acc, mul(cur_pillar_weight(times, j, u), index(rates, j))), cast(0.0, f32), idxs)
+  exp(neg(mul(z_u, u)))
+}
+def cur_par_swap_annuity(times: List[f32], rates: List[f32], tenor: f32, payments_per_year: int64) -> f32 = {
+  accrual = div(cast(1.0, f32), cast(payments_per_year, f32))
+  mul(accrual, fold(fn (acc: f32, u: f32) -> add(acc, cur_discount_at(times, rates, u)), cast(0.0, f32), cur_coupon_dates(tenor, payments_per_year)))
+}
+-- Par-swap residual over the curve extended with the candidate pillar:
+-- par_rate * annuity + DF(tenor) - 1.
+def cur_par_swap_residual(t_i: f32, par_rate: f32, payments_per_year: int64, times_so_far: List[f32], rates_so_far: List[f32], zero_rate_candidate: f32) -> f32 = {
+  times = append(times_so_far, t_i)
+  rates = append(rates_so_far, zero_rate_candidate)
+  annuity = cur_par_swap_annuity(times, rates, t_i, payments_per_year)
+  sub(add(mul(par_rate, annuity), exp(neg(mul(zero_rate_candidate, t_i)))), cast(1.0, f32))
+}
+-- d(residual)/d(z_j) for pillar j of the extended curve (the candidate is
+-- the last pillar and also carries the maturity discount term).
+def cur_par_swap_residual_dz(times: List[f32], rates: List[f32], par_rate: f32, payments_per_year: int64, j: int64) -> f32 = {
+  last = sub(len(times), cast(1, int64))
+  t_i = index(times, last)
+  accrual = div(cast(1.0, f32), cast(payments_per_year, f32))
+  coupon_part = fold(fn (acc: f32, u: f32) -> {
+    w = cur_pillar_weight(times, j, u)
+    if eq(w, cast(0.0, f32)) then acc else add(acc, mul(neg(mul(u, w)), cur_discount_at(times, rates, u)))
+  }, cast(0.0, f32), cur_coupon_dates(t_i, payments_per_year))
+  maturity_part = if eq(j, last) then neg(mul(t_i, exp(neg(mul(index(rates, last), t_i))))) else cast(0.0, f32)
+  add(mul(mul(par_rate, accrual), coupon_part), maturity_part)
 }
 def bootstrap_residual_at_pillar(inst: Instrument, times_so_far: List[f32], rates_so_far: List[f32], zero_rate_candidate: f32) -> f32 =
   match inst with {
     | Deposit { tenor: t, rate: r } => sub(zero_rate_candidate, deposit_implied_zero(t, r))
     | ZeroCoupon { tenor: t, price: p } => sub(zero_rate_candidate, zero_coupon_implied_zero(t, p))
-    | ParSwap { tenor: t, par_rate: r } => cur_par_swap_residual(t, r, cum_pv_at(times_so_far, rates_so_far), zero_rate_candidate)
+    | ParSwap { tenor: t, par_rate: r, payments_per_year: f } => cur_par_swap_residual(t, r, f, times_so_far, rates_so_far, zero_rate_candidate)
   }
-def solve_pillar_rate(inst: Instrument, times_so_far: List[f32], rates_so_far: List[f32]) -> f32 = {
-  f_at = fn (z: f32) -> bootstrap_residual_at_pillar(inst, times_so_far, rates_so_far, z)
-  brent(f_at, cast(-0.5, f32), cast(2.0, f32), cast(1e-7, f32), cast(100, int64))
+-- The returned curve is read through `rate_at`, which is only defined over
+-- strictly increasing pillar times, and a par swap interpolates over every
+-- earlier pillar. Each instrument's tenor must therefore exceed all earlier
+-- pillars, whatever its kind; a duplicate or shorter tenor cannot reprice.
+def cur_increasing_pillars_below(times_so_far: List[f32], tenor: f32) -> bool = {
+  bound = fold(fn (acc: (bool, f32), t: f32) -> (if acc.0 then gt(t, acc.1) else false, t), (true, neg(cast(1.0, f32))), times_so_far)
+  if bound.0 then gt(tenor, bound.1) else false
 }
+-- A malformed instrument, or a tenor that does not extend the pillars already
+-- solved, is a structural error with no meaningful rate to propagate: fail
+-- loudly rather than guess a schedule, bracket, or ordering.
+def solve_pillar_rate(inst: Instrument, times_so_far: List[f32], rates_so_far: List[f32]) -> f32 =
+  if instrument_validate(inst) then if cur_increasing_pillars_below(times_so_far, instrument_tenor(inst)) then {
+    f_at = fn (z: f32) -> bootstrap_residual_at_pillar(inst, times_so_far, rates_so_far, z)
+    brent(f_at, cast(-0.5, f32), cast(2.0, f32), cast(1e-7, f32), cast(100, int64))
+  } else fail("Shoals.Curves.bootstrap_multi: instrument tenors must be strictly increasing") else fail("Shoals.Curves.bootstrap_multi: invalid instrument (see instrument_validate)")
 def bootstrap_multi(instruments: List[Instrument]) -> (List[f32], List[f32]) = {
   init = ([], [])
   fold(fn (state: (List[f32], List[f32]), inst: Instrument) -> {
@@ -200,14 +261,15 @@ def bootstrap_multi_curve[n](instruments: List[Instrument], times_template: tens
   rates_t = to_tensor(out.1)
   YieldCurve { kind: Custom { label: "bootstrap-multi" }, times: times_t, rates: rates_t }
 }
-def bootstrap_grad_diagonal(inst: Instrument, solved_rate: f32, cum_pv_before: f32) -> f32 =
+def bootstrap_grad_diagonal(inst: Instrument, times_so_far: List[f32], rates_so_far: List[f32], solved_rate: f32) -> f32 =
   match inst with {
     | Deposit { tenor: t, rate: r } => div(cast(1.0, f32), add(cast(1.0, f32), mul(r, t)))
     | ZeroCoupon { tenor: t, price: p } => neg(div(cast(1.0, f32), mul(t, p)))
-    | ParSwap { tenor: t, par_rate: r } => {
-    e_neg_zt = exp(neg(mul(solved_rate, t)))
-    partial_z = neg(mul(t, mul(add(r, cast(1.0, f32)), e_neg_zt)))
-    partial_r = add(cum_pv_before, e_neg_zt)
+    | ParSwap { tenor: t, par_rate: r, payments_per_year: f } => {
+    times = append(times_so_far, t)
+    rates = append(rates_so_far, solved_rate)
+    partial_z = cur_par_swap_residual_dz(times, rates, r, f, len(times_so_far))
+    partial_r = cur_par_swap_annuity(times, rates, t, f)
     neg(div(partial_r, partial_z))
   }
   }
@@ -215,48 +277,48 @@ def fd_bump_pillar_rate(inst: Instrument, times_so_far: List[f32], rates_so_far:
   bumped = match inst with {
     | Deposit { tenor: t, rate: r } => deposit(t, add(r, step))
     | ZeroCoupon { tenor: t, price: p } => zero_coupon(t, add(p, step))
-    | ParSwap { tenor: t, par_rate: r } => cur_par_swap(t, add(r, step))
+    | ParSwap { tenor: t, par_rate: r, payments_per_year: f } => cur_par_swap(t, add(r, step), f)
   }
   z_up = solve_pillar_rate(bumped, times_so_far, rates_so_far)
   z_base = solve_pillar_rate(inst, times_so_far, rates_so_far)
   div(sub(z_up, z_base), step)
 }
 def bootstrap_grad_at_solution(instruments: List[Instrument]) -> List[f32] = {
-  init = ([], [], [], cast(0.0, f32))
-  out = fold(fn (state: (List[f32], List[f32], List[f32], f32), inst: Instrument) -> {
+  init = ([], [], [])
+  out = fold(fn (state: (List[f32], List[f32], List[f32]), inst: Instrument) -> {
     ts_so_far = state.0
     rs_so_far = state.1
     grads_so_far = state.2
-    cum_pv_so_far = state.3
     r_new = solve_pillar_rate(inst, ts_so_far, rs_so_far)
     t_new = instrument_tenor(inst)
-    g_raw = bootstrap_grad_diagonal(inst, r_new, cum_pv_so_far)
-    g_new = if eq(r_new, r_new) then g_raw else div(cast(0.0, f32), cast(0.0, f32))
-    df_new = exp(neg(mul(r_new, t_new)))
-    (append(ts_so_far, t_new), append(rs_so_far, r_new), append(grads_so_far, g_new), add(cum_pv_so_far, df_new))
+    g_new = if eq(r_new, r_new) then bootstrap_grad_diagonal(inst, ts_so_far, rs_so_far, r_new) else cur_nan_f32()
+    (append(ts_so_far, t_new), append(rs_so_far, r_new), append(grads_so_far, g_new))
   }, init, instruments)
   out.2
+}
+def cur_whole_periods(tenor: f32, payments_per_year: int64) -> bool = {
+  n_periods = cur_period_count(tenor, payments_per_year)
+  schedule_end = div(cast(n_periods, f32), cast(payments_per_year, f32))
+  diff = sub(schedule_end, tenor)
+  within = if lt(diff, cast(0.0, f32)) then lte(neg(diff), cast(0.0001, f32)) else lte(diff, cast(0.0001, f32))
+  if gte(n_periods, cast(1, int64)) then within else false
 }
 def instrument_validate(inst: Instrument) -> bool =
   match inst with {
     | Deposit { tenor: t, rate: r } => if lte(t, cast(0.0, f32)) then false else if lte(r, cast(-1.0, f32)) then false else true
     | ZeroCoupon { tenor: t, price: p } => if lte(t, cast(0.0, f32)) then false else if lte(p, cast(0.0, f32)) then false else if gt(p, cast(1.0, f32)) then false else true
-    | ParSwap { tenor: t, par_rate: _ } => if lte(t, cast(0.0, f32)) then false else true
+    | ParSwap { tenor: t, par_rate: _, payments_per_year: f } => if neq(sub(t, t), cast(0.0, f32)) then false else if lte(t, cast(0.0, f32)) then false else if lte(f, cast(0, int64)) then false else cur_whole_periods(t, f)
   }
 def cur_all_instruments_valid(instruments: List[Instrument]) -> bool = fold(fn (acc: bool, inst: Instrument) -> if acc then instrument_validate(inst) else false, true, instruments)
 def cur_l_row_for_pillar(inst: Instrument, t_i: f32, z_i: f32, times_so_far: List[f32], rates_so_far: List[f32]) -> List[f32] =
   match inst with {
     | Deposit { tenor: _, rate: _ } => map(fn (t_k: f32) -> cast(0.0, f32), times_so_far)
     | ZeroCoupon { tenor: _, price: _ } => map(fn (t_k: f32) -> cast(0.0, f32), times_so_far)
-    | ParSwap { tenor: _, par_rate: r } => {
-    denom = neg(mul(t_i, mul(add(cast(1.0, f32), r), exp(neg(mul(z_i, t_i))))))
-    pairs = zip(times_so_far, rates_so_far)
-    map(fn (e: (f32, f32)) -> {
-      t_k = e.0
-      z_k = e.1
-      numer = mul(r, neg(mul(t_k, exp(neg(mul(z_k, t_k))))))
-      div(numer, denom)
-    }, pairs)
+    | ParSwap { tenor: _, par_rate: r, payments_per_year: f } => {
+    times = append(times_so_far, t_i)
+    rates = append(rates_so_far, z_i)
+    denom = cur_par_swap_residual_dz(times, rates, r, f, len(times_so_far))
+    map(fn (j: int64) -> div(cur_par_swap_residual_dz(times, rates, r, f, j), denom), range(cast(0, int64), len(times_so_far)))
   }
   }
 def cur_dot_l_j(l_row: List[f32], j_prev_col: List[f32]) -> f32 = {
@@ -281,23 +343,20 @@ def cur_nan_jacobian[m](paths_template: &tensor[m, f32]) -> tensor[m, m, f32] = 
   reshape(to_tensor(flat), [m_len, m_len])
 }
 def cur_full_jacobian_rows(instruments: List[Instrument], m_len: int64) -> List[List[f32]] = {
-  init = ([], [], cast(0.0, f32), [], cast(0, int64))
-  out = fold(fn (state: (List[f32], List[f32], f32, List[List[f32]], int64), inst: Instrument) -> {
+  init = ([], [], [], cast(0, int64))
+  out = fold(fn (state: (List[f32], List[f32], List[List[f32]], int64), inst: Instrument) -> {
     ts_so_far = state.0
     rs_so_far = state.1
-    cum_pv_so_far = state.2
-    rows_so_far = state.3
-    i_pos = state.4
+    rows_so_far = state.2
+    i_pos = state.3
     r_new = solve_pillar_rate(inst, ts_so_far, rs_so_far)
     t_new = instrument_tenor(inst)
-    diag_raw = bootstrap_grad_diagonal(inst, r_new, cum_pv_so_far)
-    diag_i = if eq(r_new, r_new) then diag_raw else div(cast(0.0, f32), cast(0.0, f32))
+    diag_i = if eq(r_new, r_new) then bootstrap_grad_diagonal(inst, ts_so_far, rs_so_far, r_new) else cur_nan_f32()
     l_row = cur_l_row_for_pillar(inst, t_new, r_new, ts_so_far, rs_so_far)
     row_i = cur_jacobian_row(diag_i, l_row, rows_so_far, m_len, i_pos)
-    df_new = exp(neg(mul(r_new, t_new)))
-    (append(ts_so_far, t_new), append(rs_so_far, r_new), add(cum_pv_so_far, df_new), append(rows_so_far, row_i), add(i_pos, cast(1, int64)))
+    (append(ts_so_far, t_new), append(rs_so_far, r_new), append(rows_so_far, row_i), add(i_pos, cast(1, int64)))
   }, init, instruments)
-  out.3
+  out.2
 }
 def bootstrap_grad_full_jacobian[m](paths_template: &tensor[m, f32], instruments: List[Instrument]) -> tensor[m, m, f32] = {
   m_len = len(to_list(paths_template))
