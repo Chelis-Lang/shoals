@@ -43,10 +43,10 @@ def fi_bond2_nodisc(c: f32, y: f32) -> f32 = (c + (1.0 + c))
 -- -- that capability does not exist at chelis 0.14.0.
 -- v^i computed via exp(i * log(v)); for the canon this is equivalent to
 -- repeated multiplication, but avoids a nested fold for the power.
-def fi_bond_general(c: f32, y: f32, n: int64) -> f32 = {
-  periods = range(cast(1, int64), add(n, cast(1, int64)))
+def fi_bond_general(c: f32, y: f32, n: i64) -> f32 = {
+  periods = range(cast(1, i64), add(n, cast(1, i64)))
   v = (1.0 / (1.0 + y))
-  fold(fn (acc: f32, i: int64) -> {
+  fold(fn (acc: f32, i: i64) -> {
     i_f = cast(i, f32)
     disc_i = exp(mul(i_f, log(v)))
     cf = if eq(i, n) then (1.0 + c) else c

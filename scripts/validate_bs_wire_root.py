@@ -18,8 +18,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENTRY = "bs_call_wire_f64"
-EXPECTED_ENTRY_ROOT = 773
-EXPECTED_NODE_COUNT = 1494
+EXPECTED_ENTRY_ROOT = 787
+EXPECTED_NODE_COUNT = 1522
 # Schema-13 migration (Chelis 0.18.10). The 0.18.9 pin captured schema 11 with
 # entry root 770 and 1488 nodes (raw hash 955c1df6...). Under the published
 # 0.18.10 binary the same src/pricing.ch lowers to schema 13, entry root 773
@@ -40,7 +40,13 @@ EXPECTED_NODE_COUNT = 1494
 # re-observed against the published Chelis 0.18.10 darwin binary at release
 # prep and re-validated at the release gate; the gate fails closed on any
 # mismatch of hash, root, node count, or schema.
-EXPECTED_RAW_SHA256 = "6ecfa7b7621d6490244083fdde6c1de5222b3548fbe93194fb21cddd4e3a0418"
+# Schema-15 migration (published Chelis 0.18.11): +14 Copy and +14 Drop
+# nodes; cmp_lt becomes compare with comparison=lt. All other op counts and
+# the 15 reachable loads are unchanged. Copy-elided dataflow, op parameters,
+# and precisions match 0.18.10 after that comparison rename. Internal symbolic
+# dimension names changed, so this does not certify shape equivalence. Two
+# independent cold lowerings reproduce the exact response below.
+EXPECTED_RAW_SHA256 = "3be34d901db81b1a0b250d6cb6e8b8b934f11c13323206fb1894b50e9fcfab02"
 FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
 EXPECTED_LOADS = {
     "a1",
@@ -60,11 +66,11 @@ EXPECTED_LOADS = {
     "two_over_sqrt_pi",
 }
 # Exact version, checked against each published compiler during a pin bump.
-WIRE_DAG_SCHEMA_VERSION = 13
+WIRE_DAG_SCHEMA_VERSION = 15
 WIRE_OPS = {
     "add",
     "cast",
-    "cmp_lt",
+    "compare",
     "const",
     "copy",
     "div",
@@ -214,6 +220,10 @@ def validate_response(
             raise ValidationError(
                 f"{ENTRY} reaches unsupported/host-only op {kind!r} at node {node_id}"
             )
+        if kind == "compare" and op.get("comparison") != "lt":
+            raise ValidationError(
+                f"{ENTRY} comparison drifted at node {node_id}: {op!r}"
+            )
         if kind == "load":
             name = op.get("name")
             if not isinstance(name, str):
@@ -321,6 +331,30 @@ def validate_corruption_controls() -> None:
         except ValidationError:
             continue
         raise ValidationError(f"validator accepted its {label} corruption control")
+
+    comparison = json.loads(json.dumps(valid))
+    dag = comparison["result"]["dag"]
+    tensor_type = dag["nodes"][0]["output_type"]
+    dag["nodes"].extend([
+        {"id": 8, "op": {"kind": "compare", "comparison": "lt"},
+         "inputs": [7, 7], "output_type": {**tensor_type, "precision": "bool"}},
+        {"id": 9, "op": {"kind": "cast", "precision": "f64"},
+         "inputs": [8], "output_type": tensor_type},
+    ])
+    dag["roots"] = [9]
+    comparison["result"]["named_roots"][ENTRY] = 9
+    options = dict(expected_loads={"spot"}, expected_root_op="cast",
+                   expected_entry_root=9, expected_node_count=3)
+    validate_response(comparison, **options)
+    for op in ({"kind": "compare", "comparison": "ge"},
+               {"kind": "compare"}, {"kind": "cmp_lt"}):
+        candidate = json.loads(json.dumps(comparison))
+        candidate["result"]["dag"]["nodes"][1]["op"] = op
+        try:
+            validate_response(candidate, **options)
+        except ValidationError:
+            continue
+        raise ValidationError(f"validator accepted comparison corruption {op!r}")
 
 
 def fail(message: str, server_log: str = "") -> int:

@@ -29,16 +29,16 @@ def sabr_qe_step(f: f32, alpha: f32, beta: f32, rho: f32, nu: f32, dt: f32, z_f:
   alpha_next = sabr_clamp_pos(mul(alpha_pos, exp(add(alpha_drift, alpha_diff))))
   (f_next, alpha_next)
 }
-def sabr_path_terminal(f0: f32, alpha0: f32, beta: f32, rho: f32, nu: f32, t: f32, n_steps: int64) -> (f32, f32) ! { Random } = {
-  template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), n_steps)))
+def sabr_path_terminal(f0: f32, alpha0: f32, beta: f32, rho: f32, nu: f32, t: f32, n_steps: i64) -> (f32, f32) ! { Random } = {
+  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), n_steps)))
   z_f_t = normal_sample(copy(template), cast(0.0, f32), cast(1.0, f32))
   z_alpha_t = normal_sample(template, cast(0.0, f32), cast(1.0, f32))
   z_f_l = to_list(z_f_t)
   z_alpha_l = to_list(z_alpha_t)
   dt = div(t, cast(n_steps, f32))
   init_state = (f0, alpha0)
-  idxs = range(cast(0, int64), n_steps)
-  final_state = fold(fn (state: (f32, f32), i: int64) -> {
+  idxs = range(cast(0, i64), n_steps)
+  final_state = fold(fn (state: (f32, f32), i: i64) -> {
     f = state.0
     alpha = state.1
     z_f = index(z_f_l, i)
@@ -47,21 +47,21 @@ def sabr_path_terminal(f0: f32, alpha0: f32, beta: f32, rho: f32, nu: f32, t: f3
   }, init_state, idxs)
   (final_state.0, final_state.1)
 }
-def sabr_paths_terminal[n](paths_template: tensor[n, f32], f0: f32, alpha0: f32, beta: f32, rho: f32, nu: f32, t: f32, n_steps: int64) -> (tensor[n, f32], tensor[n, f32]) ! { Random } = {
+def sabr_paths_terminal[n](paths_template: tensor[n, f32], f0: f32, alpha0: f32, beta: f32, rho: f32, nu: f32, t: f32, n_steps: i64) -> (tensor[n, f32], tensor[n, f32]) ! { Random } = {
   n_paths = numel(copy(paths_template))
   total = mul(n_paths, n_steps)
-  big_template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), total)))
+  big_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), total)))
   z_f_t = normal_sample(copy(big_template), cast(0.0, f32), cast(1.0, f32))
   z_alpha_t = normal_sample(big_template, cast(0.0, f32), cast(1.0, f32))
   z_f_l = to_list(z_f_t)
   z_alpha_l = to_list(z_alpha_t)
   dt = div(t, cast(n_steps, f32))
-  path_idxs = range(cast(0, int64), n_paths)
-  results = map(fn (p: int64) -> {
+  path_idxs = range(cast(0, i64), n_paths)
+  results = map(fn (p: i64) -> {
     base = mul(p, n_steps)
     init_state = (f0, alpha0)
-    step_idxs = range(cast(0, int64), n_steps)
-    final = fold(fn (state: (f32, f32), i: int64) -> {
+    step_idxs = range(cast(0, i64), n_steps)
+    final = fold(fn (state: (f32, f32), i: i64) -> {
       f = state.0
       alpha = state.1
       k = add(base, i)

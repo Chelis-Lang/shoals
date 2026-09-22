@@ -80,7 +80,7 @@ def test_vega_nonneg_atm() -> unit ! { Test } = {
   assert_close(to01(ok), cast(1.0, f32), cast(0.001, f32), "FD call vega is non-negative at ATM")
 }
 def test_mc_matches_textbook_mc_reference() -> unit ! { Test } = {
-  template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(2000, int64))))
+  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(2000, i64))))
   ok = mc_matches_textbook_mc_reference(template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
   assert_close(to01(ok), cast(1.0, f32), cast(0.001, f32), "optimized MC agrees with scalar textbook MC reference within 5%")
 }

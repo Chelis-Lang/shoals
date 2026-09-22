@@ -74,7 +74,7 @@ shifted = parallel_shift_atm_iv(p, cast(0.01, f32), cast(1.0, f32))
 
 ```chelis
 def implied_vol_from_call(spot: f32, strike: f32, r: f32, t: f32, target_price: f32) -> f32
-def implied_vol_bisect(spot: f32, strike: f32, r: f32, t: f32, target: f32, vol_lo: f32, vol_hi: f32, max_iters: int64, tol: f32) -> f32
+def implied_vol_bisect(spot: f32, strike: f32, r: f32, t: f32, target: f32, vol_lo: f32, vol_hi: f32, max_iters: i64, tol: f32) -> f32
 def bracket_brackets_root(spot: f32, strike: f32, r: f32, t: f32, target: f32, vol_lo: f32, vol_hi: f32) -> bool
 def is_iv_solver_failed(iv: f32) -> bool
 ```
@@ -99,6 +99,6 @@ the target, and `is_iv_solver_failed` tests the returned value for the NaN
 sentinel:
 
 ```chelis
-iv = implied_vol_bisect(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(1.0, f32), cast(200.0, f32), cast(0.0001, f32), cast(5.0, f32), cast(60, int64), cast(0.000001, f32))
+iv = implied_vol_bisect(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(1.0, f32), cast(200.0, f32), cast(0.0001, f32), cast(5.0, f32), cast(60, i64), cast(0.000001, f32))
 failed = is_iv_solver_failed(iv)  // true: 200.0 is not a reachable call price here
 ```

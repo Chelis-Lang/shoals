@@ -35,18 +35,18 @@ def hw1f_step(r: f32, a: f32, theta_bar: f32, sigma: f32, dt: f32, z: f32) -> f3
   diffusion = mul(sigma, mul(sqrt(dt), z))
   add(r, add(drift, diffusion))
 }
-def hw1f_path[n](paths_template: tensor[n, f32], r0: f32, a: f32, theta_bar: f32, sigma: f32, t: f32, n_steps: int64) -> tensor[n, f32] ! { Random } = {
+def hw1f_path[n](paths_template: tensor[n, f32], r0: f32, a: f32, theta_bar: f32, sigma: f32, t: f32, n_steps: i64) -> tensor[n, f32] ! { Random } = {
   n_paths = numel(copy(paths_template))
   total = mul(n_paths, n_steps)
-  big_template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), total)))
+  big_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), total)))
   z_t = normal_sample(big_template, cast(0.0, f32), cast(1.0, f32))
   z_l = to_list(z_t)
   dt = div(t, cast(n_steps, f32))
-  path_idxs = range(cast(0, int64), n_paths)
-  terminal = to_tensor(map(fn (p: int64) -> {
+  path_idxs = range(cast(0, i64), n_paths)
+  terminal = to_tensor(map(fn (p: i64) -> {
     base = mul(p, n_steps)
-    step_idxs = range(cast(0, int64), n_steps)
-    fold(fn (r: f32, i: int64) -> {
+    step_idxs = range(cast(0, i64), n_steps)
+    fold(fn (r: f32, i: i64) -> {
       k = add(base, i)
       z = index(z_l, k)
       hw1f_step(r, a, theta_bar, sigma, dt, z)
@@ -76,20 +76,20 @@ def hw2f_step(x: f32, y: f32, a: f32, b: f32, sigma1: f32, sigma2: f32, rho: f32
   diff_y = mul(sigma2, mul(sqrt_dt, w2))
   (add(x, add(drift_x, diff_x)), add(y, add(drift_y, diff_y)))
 }
-def hw2f_path[n](paths_template: tensor[n, f32], x0: f32, y0: f32, a: f32, b: f32, sigma1: f32, sigma2: f32, rho: f32, t: f32, n_steps: int64) -> (tensor[n, f32], tensor[n, f32]) ! { Random } = {
+def hw2f_path[n](paths_template: tensor[n, f32], x0: f32, y0: f32, a: f32, b: f32, sigma1: f32, sigma2: f32, rho: f32, t: f32, n_steps: i64) -> (tensor[n, f32], tensor[n, f32]) ! { Random } = {
   n_paths = numel(copy(paths_template))
   total = mul(n_paths, n_steps)
-  big_template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), total)))
+  big_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), total)))
   z1_t = normal_sample(copy(big_template), cast(0.0, f32), cast(1.0, f32))
   z2_t = normal_sample(big_template, cast(0.0, f32), cast(1.0, f32))
   z1_l = to_list(z1_t)
   z2_l = to_list(z2_t)
   dt = div(t, cast(n_steps, f32))
-  path_idxs = range(cast(0, int64), n_paths)
-  results = map(fn (p: int64) -> {
+  path_idxs = range(cast(0, i64), n_paths)
+  results = map(fn (p: i64) -> {
     base = mul(p, n_steps)
-    step_idxs = range(cast(0, int64), n_steps)
-    fold(fn (state: (f32, f32), i: int64) -> {
+    step_idxs = range(cast(0, i64), n_steps)
+    fold(fn (state: (f32, f32), i: i64) -> {
       x = state.0
       y = state.1
       k = add(base, i)

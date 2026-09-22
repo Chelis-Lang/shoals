@@ -84,7 +84,7 @@ functions match.
 Module: `Shoals.References.Date`.
 
 ```chelis
-def naive_days_between(start: Date, end: Date) -> int64
+def naive_days_between(start: Date, end: Date) -> i64
 def year_fraction_act_360_textbook(start: Date, end: Date) -> f32
 def year_fraction_act_365_textbook(start: Date, end: Date) -> f32
 def year_fraction_thirty_360_textbook(start: Date, end: Date) -> f32

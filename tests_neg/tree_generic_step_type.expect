@@ -1,4 +1,4 @@
-precision mismatch: expected int64, got f32
+precision mismatch: expected i64, got f32
 
-Assumption: the generic tree depth is an int64 count. A floating-point depth
+Assumption: the generic tree depth is an i64 count. A floating-point depth
 must be rejected rather than rounded into a different lattice.

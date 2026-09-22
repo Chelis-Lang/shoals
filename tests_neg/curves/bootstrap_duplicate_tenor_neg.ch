@@ -6,6 +6,6 @@ import Shoals.Curves (zero_coupon, bootstrap_multi)
 -- no curve reprices both. The bootstrap must fail loudly rather than keep one.
 def test_neg_bootstrap_rejects_duplicate_tenor() -> unit ! { Test } = {
   rates = bootstrap_multi([zero_coupon(cast(1.0, f32), cast(0.95, f32)), zero_coupon(cast(1.0, f32), cast(0.96, f32))]).1
-  z = index(rates, cast(1, int64))
+  z = index(rates, cast(1, i64))
   assert_true(eq(z, z), "should not reach here")
 }

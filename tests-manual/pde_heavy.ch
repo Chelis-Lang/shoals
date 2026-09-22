@@ -9,7 +9,7 @@ def test_pde_european_call_cn_converges_to_bs() -> unit ! { Test } = {
   q = cast(0.0, f32)
   sigma = cast(0.2, f32)
   t = cast(1.0, f32)
-  px_pde = pde_european_call_cn(s0, k, r, q, sigma, t, cast(200, int64), cast(50, int64), cast(4.0, f32))
+  px_pde = pde_european_call_cn(s0, k, r, q, sigma, t, cast(200, i64), cast(50, i64), cast(4.0, f32))
   px_bs = bs_call_scalar(s0, k, r, sigma, t)
   assert_close(px_pde, px_bs, cast(0.01, f32), "PDE European call within 0.01 of Black-Scholes")
 }
@@ -20,7 +20,7 @@ def test_pde_european_put_cn_converges_to_bs() -> unit ! { Test } = {
   q = cast(0.0, f32)
   sigma = cast(0.2, f32)
   t = cast(1.0, f32)
-  px_pde = pde_european_put_cn(s0, k, r, q, sigma, t, cast(200, int64), cast(50, int64), cast(4.0, f32))
+  px_pde = pde_european_put_cn(s0, k, r, q, sigma, t, cast(200, i64), cast(50, i64), cast(4.0, f32))
   px_bs = bs_put_scalar(s0, k, r, sigma, t)
   assert_close(px_pde, px_bs, cast(0.01, f32), "PDE European put within 0.01 of Black-Scholes")
 }
@@ -31,8 +31,8 @@ def test_pde_american_put_ge_european() -> unit ! { Test } = {
   q = cast(0.0, f32)
   sigma = cast(0.3, f32)
   t = cast(1.0, f32)
-  px_amer = pde_american_put_cn(s0, k, r, q, sigma, t, cast(200, int64), cast(50, int64), cast(4.0, f32))
-  px_eur = pde_european_put_cn(s0, k, r, q, sigma, t, cast(200, int64), cast(50, int64), cast(4.0, f32))
+  px_amer = pde_american_put_cn(s0, k, r, q, sigma, t, cast(200, i64), cast(50, i64), cast(4.0, f32))
+  px_eur = pde_european_put_cn(s0, k, r, q, sigma, t, cast(200, i64), cast(50, i64), cast(4.0, f32))
   assert_true(gte(px_amer, sub(px_eur, cast(0.001, f32))), "American put >= European put (ITM)")
 }
 def test_pde_european_put_call_parity() -> unit ! { Test } = {
@@ -42,8 +42,8 @@ def test_pde_european_put_call_parity() -> unit ! { Test } = {
   q = cast(0.0, f32)
   sigma = cast(0.2, f32)
   t = cast(1.0, f32)
-  px_call = pde_european_call_cn(s0, k, r, q, sigma, t, cast(200, int64), cast(50, int64), cast(4.0, f32))
-  px_put = pde_european_put_cn(s0, k, r, q, sigma, t, cast(200, int64), cast(50, int64), cast(4.0, f32))
+  px_call = pde_european_call_cn(s0, k, r, q, sigma, t, cast(200, i64), cast(50, i64), cast(4.0, f32))
+  px_put = pde_european_put_cn(s0, k, r, q, sigma, t, cast(200, i64), cast(50, i64), cast(4.0, f32))
   lhs = sub(px_call, px_put)
   rhs = sub(s0, mul(k, exp(neg(mul(r, t)))))
   assert_close(lhs, rhs, cast(0.02, f32), "Put-call parity: C - P = S - K*exp(-rT)")
@@ -59,7 +59,7 @@ def test_pde_spread_option_atm_zero_correl() -> unit ! { Test } = {
   sigma2 = cast(0.2, f32)
   rho = cast(0.0, f32)
   t = cast(1.0, f32)
-  px = pde_spread_option_adi(s1, s2, k, r, q1, q2, sigma1, sigma2, rho, t, cast(30, int64), cast(30, int64), cast(20, int64))
+  px = pde_spread_option_adi(s1, s2, k, r, q1, q2, sigma1, sigma2, rho, t, cast(30, i64), cast(30, i64), cast(20, i64))
   px_margrabe = cast(11.246, f32)
   diff_raw = sub(px, px_margrabe)
   diff_abs = if lt(diff_raw, cast(0.0, f32)) then neg(diff_raw) else diff_raw

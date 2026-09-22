@@ -6,6 +6,10 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Migrate Shoals 0.24.13 to Chelis 0.18.11, Nautilus 0.7.46, and Coral 0.7.43,
+  including canonical Surf vocabulary, refreshed conformance artifacts, and
+  the schema-15 WireDag receipt. See `docs/chelis_0_18_11_migration.md`.
+
 ### Fixed
 
 - **`Shoals.Curves.bootstrap_multi` valued every par swap as one coupon per
@@ -24,9 +28,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed (breaking)
 
-- `ParSwap` gains `payments_per_year: int64`, and
+- `ParSwap` gains `payments_per_year: i64`, and
   `cur_par_swap(tenor, par_rate, payments_per_year)` takes it explicitly.
-  There is no default frequency. Existing annual callers pass `cast(1, int64)`.
+  There is no default frequency. Existing annual callers pass `cast(1, i64)`.
 - `bootstrap_grad_diagonal(inst, times_so_far, rates_so_far, solved_rate)`
   replaces `bootstrap_grad_diagonal(inst, solved_rate, cum_pv_before)`: a
   cumulative discount sum cannot express an interpolated coupon schedule.

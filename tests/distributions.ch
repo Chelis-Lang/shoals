@@ -70,10 +70,10 @@ def test_beta_pdf_uniform_when_a_b_1() -> unit ! { Test } = {
 }
 def test_mvn_factor_2x2_identity() -> unit ! { Test } = {
   sigma = to_tensor([cast(1.0, f32), cast(0.0, f32), cast(0.0, f32), cast(1.0, f32)])
-  s2 = reshape(sigma, [cast(2, int64), cast(2, int64)])
+  s2 = reshape(sigma, [cast(2, i64), cast(2, i64)])
   lower = dist_mvn_factor(s2)
-  diag00 = index(to_list(reshape(copy(lower), [cast(4, int64)])), cast(0, int64))
-  diag11 = index(to_list(reshape(copy(lower), [cast(4, int64)])), cast(3, int64))
+  diag00 = index(to_list(reshape(copy(lower), [cast(4, i64)])), cast(0, i64))
+  diag11 = index(to_list(reshape(copy(lower), [cast(4, i64)])), cast(3, i64))
   _ = assert_close(diag00, cast(1.0, f32), cast(0.0001, f32), "I cholesky [0,0] = 1")
   assert_close(diag11, cast(1.0, f32), cast(0.0001, f32), "I cholesky [1,1] = 1")
 }

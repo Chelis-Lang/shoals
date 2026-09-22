@@ -91,11 +91,11 @@ def test_parallel_shift_atm_iv_on_flat_surface() -> unit ! { Test } = {
   assert_close(sub(iv_after, iv_before), cast(0.02, f32), cast(0.0001, f32), "parallel_shift_atm_iv on flat surface lifts IV by delta")
 }
 def test_iv_solver_failure_on_unbracketed_target() -> unit ! { Test } = {
-  iv = implied_vol_bisect(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(1.0, f32), cast(200.0, f32), cast(0.0001, f32), cast(5.0, f32), cast(60, int64), cast(1e-6, f32))
+  iv = implied_vol_bisect(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(1.0, f32), cast(200.0, f32), cast(0.0001, f32), cast(5.0, f32), cast(60, i64), cast(1e-6, f32))
   assert_true(is_iv_solver_failed(iv), "out-of-range target returns NaN sentinel rather than silently pinning at vol_hi")
 }
 def test_iv_solver_failure_on_negative_target() -> unit ! { Test } = {
-  iv = implied_vol_bisect(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(1.0, f32), cast(-1.0, f32), cast(0.0001, f32), cast(5.0, f32), cast(60, int64), cast(1e-6, f32))
+  iv = implied_vol_bisect(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(1.0, f32), cast(-1.0, f32), cast(0.0001, f32), cast(5.0, f32), cast(60, i64), cast(1e-6, f32))
   assert_true(is_iv_solver_failed(iv), "negative target returns NaN sentinel")
 }
 def test_bracket_brackets_root_valid() -> unit ! { Test } = {

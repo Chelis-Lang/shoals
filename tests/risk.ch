@@ -12,17 +12,17 @@ def test_parametric_cvar_exceeds_var() -> unit ! { Test } = {
   assert_close(cvar, cast(3.2613, f32), cast(0.01, f32), "parametric CVaR ~ 3.26")
 }
 def test_historical_var_quantile() -> unit ! { Test } = {
-  losses = to_tensor(map(fn (i: int64) -> cast(cast(i, int32), f32), range(cast(0, int64), cast(101, int64))))
+  losses = to_tensor(map(fn (i: i64) -> cast(cast(i, i32), f32), range(cast(0, i64), cast(101, i64))))
   v = historical_var(losses, cast(0.95, f32))
   assert_close(v, cast(95.0, f32), cast(0.001, f32), "hist VaR == 95.0")
 }
 def test_historical_cvar_tail_mean() -> unit ! { Test } = {
-  losses = to_tensor(map(fn (i: int64) -> cast(cast(i, int32), f32), range(cast(0, int64), cast(101, int64))))
+  losses = to_tensor(map(fn (i: i64) -> cast(cast(i, i32), f32), range(cast(0, i64), cast(101, i64))))
   cvar = historical_cvar(losses, cast(0.95, f32))
   assert_close(cvar, cast(97.5, f32), cast(0.001, f32), "hist CVaR == 97.5")
 }
 def test_empirical_quantile_median() -> unit ! { Test } = {
-  losses = to_tensor(map(fn (i: int64) -> cast(cast(i, int32), f32), range(cast(0, int64), cast(101, int64))))
+  losses = to_tensor(map(fn (i: i64) -> cast(cast(i, i32), f32), range(cast(0, i64), cast(101, i64))))
   q = empirical_loss_quantile(losses, cast(0.5, f32))
   assert_close(q, cast(50.0, f32), cast(0.001, f32), "median == 50.0")
 }

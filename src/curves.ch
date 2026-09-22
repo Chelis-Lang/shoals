@@ -90,13 +90,13 @@ def parallel_shift[n](curve: YieldCurve[n], delta: f32) -> YieldCurve[n] =
     YieldCurve { kind: k, times: ts, rates: new_rates }
   }
   }
-def key_rate_shift[n](curve: YieldCurve[n], pillar_index: int64, delta: f32) -> YieldCurve[n] =
+def key_rate_shift[n](curve: YieldCurve[n], pillar_index: i64, delta: f32) -> YieldCurve[n] =
   match curve with {
     | YieldCurve { kind: k, times: ts, rates: rs } => {
     rs_l = to_list(copy(rs))
-    idxs = range(cast(0, int64), cast(len(rs_l), int64))
+    idxs = range(cast(0, i64), cast(len(rs_l), i64))
     pairs = zip(idxs, rs_l)
-    new_rates_l = map(fn (entry: (int64, f32)) -> if eq(entry.0, pillar_index) then add(entry.1, delta) else entry.1, pairs)
+    new_rates_l = map(fn (entry: (i64, f32)) -> if eq(entry.0, pillar_index) then add(entry.1, delta) else entry.1, pairs)
     YieldCurve { kind: k, times: ts, rates: to_tensor(new_rates_l) }
   }
   }
@@ -144,10 +144,10 @@ def butterfly[n](curve: YieldCurve[n], wing_delta: f32, body_delta: f32) -> Yiel
 type Instrument =
   | Deposit { tenor: f32, rate: f32 }
   | ZeroCoupon { tenor: f32, price: f32 }
-  | ParSwap { tenor: f32, par_rate: f32, payments_per_year: int64 }
+  | ParSwap { tenor: f32, par_rate: f32, payments_per_year: i64 }
 def deposit(tenor: f32, rate: f32) -> Instrument = Deposit { tenor, rate }
 def zero_coupon(tenor: f32, price: f32) -> Instrument = ZeroCoupon { tenor, price }
-def cur_par_swap(tenor: f32, par_rate: f32, payments_per_year: int64) -> Instrument = ParSwap { tenor, par_rate, payments_per_year }
+def cur_par_swap(tenor: f32, par_rate: f32, payments_per_year: i64) -> Instrument = ParSwap { tenor, par_rate, payments_per_year }
 def instrument_tenor(inst: Instrument) -> f32 =
   match inst with {
     | Deposit { tenor: t, rate: _ } => t
@@ -166,45 +166,45 @@ def deposit_implied_zero(t: f32, simple_rate: f32) -> f32 = {
 }
 def zero_coupon_implied_zero(t: f32, price: f32) -> f32 = div(neg(log(price)), t)
 def cur_nan_f32() -> f32 = div(cast(0.0, f32), cast(0.0, f32))
-def cur_period_count(tenor: f32, payments_per_year: int64) -> int64 = cast_trunc(add(mul(tenor, cast(payments_per_year, f32)), cast(0.5, f32)), int64)
+def cur_period_count(tenor: f32, payments_per_year: i64) -> i64 = cast_trunc(add(mul(tenor, cast(payments_per_year, f32)), cast(0.5, f32)), i64)
 -- Coupon dates k / payments_per_year for k = 1..N; the final date is the
 -- quoted tenor itself so the fixed leg and the maturity discount agree.
-def cur_coupon_dates(tenor: f32, payments_per_year: int64) -> List[f32] = {
+def cur_coupon_dates(tenor: f32, payments_per_year: i64) -> List[f32] = {
   n_periods = cur_period_count(tenor, payments_per_year)
   freq_f = cast(payments_per_year, f32)
-  ks = range(cast(1, int64), add(n_periods, cast(1, int64)))
-  map(fn (k: int64) -> if eq(k, n_periods) then tenor else div(cast(k, f32), freq_f), ks)
+  ks = range(cast(1, i64), add(n_periods, cast(1, i64)))
+  map(fn (k: i64) -> if eq(k, n_periods) then tenor else div(cast(k, f32), freq_f), ks)
 }
 -- Weight of pillar j in the zero rate at u under the `rate_at` convention:
 -- linear between neighbouring pillars, flat before the first and after the
 -- last. Pillar times must be strictly increasing.
-def cur_pillar_weight(times: List[f32], j: int64, u: f32) -> f32 = {
-  last = sub(len(times), cast(1, int64))
+def cur_pillar_weight(times: List[f32], j: i64, u: f32) -> f32 = {
+  last = sub(len(times), cast(1, i64))
   t_j = index(times, j)
-  if lte(u, index(times, cast(0, int64))) then if eq(j, cast(0, int64)) then cast(1.0, f32) else cast(0.0, f32) else if gte(u, index(times, last)) then if eq(j, last) then cast(1.0, f32) else cast(0.0, f32) else {
-    left = if gt(j, cast(0, int64)) then {
-      t_prev = index(times, sub(j, cast(1, int64)))
+  if lte(u, index(times, cast(0, i64))) then if eq(j, cast(0, i64)) then cast(1.0, f32) else cast(0.0, f32) else if gte(u, index(times, last)) then if eq(j, last) then cast(1.0, f32) else cast(0.0, f32) else {
+    left = if gt(j, cast(0, i64)) then {
+      t_prev = index(times, sub(j, cast(1, i64)))
       if and(gte(u, t_prev), lt(u, t_j)) then div(sub(u, t_prev), sub(t_j, t_prev)) else cast(0.0, f32)
     } else cast(0.0, f32)
     right = if lt(j, last) then {
-      t_next = index(times, add(j, cast(1, int64)))
+      t_next = index(times, add(j, cast(1, i64)))
       if and(gte(u, t_j), lt(u, t_next)) then div(sub(t_next, u), sub(t_next, t_j)) else cast(0.0, f32)
     } else cast(0.0, f32)
     add(left, right)
   }
 }
 def cur_discount_at(times: List[f32], rates: List[f32], u: f32) -> f32 = {
-  idxs = range(cast(0, int64), len(times))
-  z_u = fold(fn (acc: f32, j: int64) -> add(acc, mul(cur_pillar_weight(times, j, u), index(rates, j))), cast(0.0, f32), idxs)
+  idxs = range(cast(0, i64), len(times))
+  z_u = fold(fn (acc: f32, j: i64) -> add(acc, mul(cur_pillar_weight(times, j, u), index(rates, j))), cast(0.0, f32), idxs)
   exp(neg(mul(z_u, u)))
 }
-def cur_par_swap_annuity(times: List[f32], rates: List[f32], tenor: f32, payments_per_year: int64) -> f32 = {
+def cur_par_swap_annuity(times: List[f32], rates: List[f32], tenor: f32, payments_per_year: i64) -> f32 = {
   accrual = div(cast(1.0, f32), cast(payments_per_year, f32))
   mul(accrual, fold(fn (acc: f32, u: f32) -> add(acc, cur_discount_at(times, rates, u)), cast(0.0, f32), cur_coupon_dates(tenor, payments_per_year)))
 }
 -- Par-swap residual over the curve extended with the candidate pillar:
 -- par_rate * annuity + DF(tenor) - 1.
-def cur_par_swap_residual(t_i: f32, par_rate: f32, payments_per_year: int64, times_so_far: List[f32], rates_so_far: List[f32], zero_rate_candidate: f32) -> f32 = {
+def cur_par_swap_residual(t_i: f32, par_rate: f32, payments_per_year: i64, times_so_far: List[f32], rates_so_far: List[f32], zero_rate_candidate: f32) -> f32 = {
   times = append(times_so_far, t_i)
   rates = append(rates_so_far, zero_rate_candidate)
   annuity = cur_par_swap_annuity(times, rates, t_i, payments_per_year)
@@ -212,8 +212,8 @@ def cur_par_swap_residual(t_i: f32, par_rate: f32, payments_per_year: int64, tim
 }
 -- d(residual)/d(z_j) for pillar j of the extended curve (the candidate is
 -- the last pillar and also carries the maturity discount term).
-def cur_par_swap_residual_dz(times: List[f32], rates: List[f32], par_rate: f32, payments_per_year: int64, j: int64) -> f32 = {
-  last = sub(len(times), cast(1, int64))
+def cur_par_swap_residual_dz(times: List[f32], rates: List[f32], par_rate: f32, payments_per_year: i64, j: i64) -> f32 = {
+  last = sub(len(times), cast(1, i64))
   t_i = index(times, last)
   accrual = div(cast(1.0, f32), cast(payments_per_year, f32))
   coupon_part = fold(fn (acc: f32, u: f32) -> {
@@ -243,7 +243,7 @@ def cur_increasing_pillars_below(times_so_far: List[f32], tenor: f32) -> bool = 
 def solve_pillar_rate(inst: Instrument, times_so_far: List[f32], rates_so_far: List[f32]) -> f32 =
   if instrument_validate(inst) then if cur_increasing_pillars_below(times_so_far, instrument_tenor(inst)) then {
     f_at = fn (z: f32) -> bootstrap_residual_at_pillar(inst, times_so_far, rates_so_far, z)
-    brent(f_at, cast(-0.5, f32), cast(2.0, f32), cast(1e-7, f32), cast(100, int64))
+    brent(f_at, cast(-0.5, f32), cast(2.0, f32), cast(1e-7, f32), cast(100, i64))
   } else fail("Shoals.Curves.bootstrap_multi: instrument tenors must be strictly increasing") else fail("Shoals.Curves.bootstrap_multi: invalid instrument (see instrument_validate)")
 def bootstrap_multi(instruments: List[Instrument]) -> (List[f32], List[f32]) = {
   init = ([], [])
@@ -296,18 +296,18 @@ def bootstrap_grad_at_solution(instruments: List[Instrument]) -> List[f32] = {
   }, init, instruments)
   out.2
 }
-def cur_whole_periods(tenor: f32, payments_per_year: int64) -> bool = {
+def cur_whole_periods(tenor: f32, payments_per_year: i64) -> bool = {
   n_periods = cur_period_count(tenor, payments_per_year)
   schedule_end = div(cast(n_periods, f32), cast(payments_per_year, f32))
   diff = sub(schedule_end, tenor)
   within = if lt(diff, cast(0.0, f32)) then lte(neg(diff), cast(0.0001, f32)) else lte(diff, cast(0.0001, f32))
-  if gte(n_periods, cast(1, int64)) then within else false
+  if gte(n_periods, cast(1, i64)) then within else false
 }
 def instrument_validate(inst: Instrument) -> bool =
   match inst with {
     | Deposit { tenor: t, rate: r } => if lte(t, cast(0.0, f32)) then false else if lte(r, cast(-1.0, f32)) then false else true
     | ZeroCoupon { tenor: t, price: p } => if lte(t, cast(0.0, f32)) then false else if lte(p, cast(0.0, f32)) then false else if gt(p, cast(1.0, f32)) then false else true
-    | ParSwap { tenor: t, par_rate: _, payments_per_year: f } => if neq(sub(t, t), cast(0.0, f32)) then false else if lte(t, cast(0.0, f32)) then false else if lte(f, cast(0, int64)) then false else cur_whole_periods(t, f)
+    | ParSwap { tenor: t, par_rate: _, payments_per_year: f } => if neq(sub(t, t), cast(0.0, f32)) then false else if lte(t, cast(0.0, f32)) then false else if lte(f, cast(0, i64)) then false else cur_whole_periods(t, f)
   }
 def cur_all_instruments_valid(instruments: List[Instrument]) -> bool = fold(fn (acc: bool, inst: Instrument) -> if acc then instrument_validate(inst) else false, true, instruments)
 def cur_l_row_for_pillar(inst: Instrument, t_i: f32, z_i: f32, times_so_far: List[f32], rates_so_far: List[f32]) -> List[f32] =
@@ -318,16 +318,16 @@ def cur_l_row_for_pillar(inst: Instrument, t_i: f32, z_i: f32, times_so_far: Lis
     times = append(times_so_far, t_i)
     rates = append(rates_so_far, z_i)
     denom = cur_par_swap_residual_dz(times, rates, r, f, len(times_so_far))
-    map(fn (j: int64) -> div(cur_par_swap_residual_dz(times, rates, r, f, j), denom), range(cast(0, int64), len(times_so_far)))
+    map(fn (j: i64) -> div(cur_par_swap_residual_dz(times, rates, r, f, j), denom), range(cast(0, i64), len(times_so_far)))
   }
   }
 def cur_dot_l_j(l_row: List[f32], j_prev_col: List[f32]) -> f32 = {
   pairs = zip(l_row, j_prev_col)
   fold(fn (acc: f32, e: (f32, f32)) -> add(acc, mul(e.0, e.1)), cast(0.0, f32), pairs)
 }
-def cur_jacobian_row(diag_i: f32, l_row: List[f32], j_prev_rows: List[List[f32]], m_len: int64, i_pos: int64) -> List[f32] = {
-  col_idxs = range(cast(0, int64), m_len)
-  map(fn (j: int64) -> {
+def cur_jacobian_row(diag_i: f32, l_row: List[f32], j_prev_rows: List[List[f32]], m_len: i64, i_pos: i64) -> List[f32] = {
+  col_idxs = range(cast(0, i64), m_len)
+  map(fn (j: i64) -> {
     j_prev_col = map(fn (row: List[f32]) -> index(row, j), j_prev_rows)
     correction = cur_dot_l_j(l_row, j_prev_col)
     d_ij = if eq(j, i_pos) then diag_i else cast(0.0, f32)
@@ -338,13 +338,13 @@ def cur_nan_jacobian[m](paths_template: &tensor[m, f32]) -> tensor[m, m, f32] = 
   m_len = len(to_list(paths_template))
   nan_val = div(cast(0.0, f32), cast(0.0, f32))
   total = mul(m_len, m_len)
-  idxs = range(cast(0, int64), total)
-  flat = map(fn (k: int64) -> nan_val, idxs)
+  idxs = range(cast(0, i64), total)
+  flat = map(fn (k: i64) -> nan_val, idxs)
   reshape(to_tensor(flat), [m_len, m_len])
 }
-def cur_full_jacobian_rows(instruments: List[Instrument], m_len: int64) -> List[List[f32]] = {
-  init = ([], [], [], cast(0, int64))
-  out = fold(fn (state: (List[f32], List[f32], List[List[f32]], int64), inst: Instrument) -> {
+def cur_full_jacobian_rows(instruments: List[Instrument], m_len: i64) -> List[List[f32]] = {
+  init = ([], [], [], cast(0, i64))
+  out = fold(fn (state: (List[f32], List[f32], List[List[f32]], i64), inst: Instrument) -> {
     ts_so_far = state.0
     rs_so_far = state.1
     rows_so_far = state.2
@@ -354,7 +354,7 @@ def cur_full_jacobian_rows(instruments: List[Instrument], m_len: int64) -> List[
     diag_i = if eq(r_new, r_new) then bootstrap_grad_diagonal(inst, ts_so_far, rs_so_far, r_new) else cur_nan_f32()
     l_row = cur_l_row_for_pillar(inst, t_new, r_new, ts_so_far, rs_so_far)
     row_i = cur_jacobian_row(diag_i, l_row, rows_so_far, m_len, i_pos)
-    (append(ts_so_far, t_new), append(rs_so_far, r_new), append(rows_so_far, row_i), add(i_pos, cast(1, int64)))
+    (append(ts_so_far, t_new), append(rs_so_far, r_new), append(rows_so_far, row_i), add(i_pos, cast(1, i64)))
   }, init, instruments)
   out.2
 }

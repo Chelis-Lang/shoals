@@ -13,8 +13,8 @@ import Std.Test (assert_eq)
 -- may discard its intermediate assertions with `_ =` again instead of holding
 -- them in unused `asserted_N` bindings.
 type DiscardBox =
-  | DiscardBox { data: tensor[2, f32], tag: int64 }
-def discard_tag_of(b: DiscardBox) -> int64 =
+  | DiscardBox { data: tensor[2, f32], tag: i64 }
+def discard_tag_of(b: DiscardBox) -> i64 =
   match b with {
     | DiscardBox { data, tag } => tag
   }

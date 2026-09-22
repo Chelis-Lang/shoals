@@ -21,7 +21,7 @@ def twist_at_midpoint_is_average(c: YieldCurve[3], short_d: f32, long_d: f32, t_
   expected_delta = mul(cast(0.5, f32), add(short_d, long_d))
   lt(abs_f32(sub(observed_delta, expected_delta)), cast(0.00001, f32))
 }
-def key_rate_shift_localized_at_unmoved_pillar(c: YieldCurve[3], pillar_idx: int64, delta: f32, far_t: f32) -> bool = {
+def key_rate_shift_localized_at_unmoved_pillar(c: YieldCurve[3], pillar_idx: i64, delta: f32, far_t: f32) -> bool = {
   shifted = key_rate_shift(c, pillar_idx, delta)
   r_before = rate_at(c, far_t)
   r_after = rate_at(shifted, far_t)

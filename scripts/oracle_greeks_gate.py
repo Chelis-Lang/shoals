@@ -123,12 +123,10 @@ def erf_pkg(x: float) -> float:
     >= 3.3675e-16, so `math.erf` is a faithful mirror: the two differ by
     ~1e-16, ten orders below this gate's tightest tolerance (3e-6).
 
-    `_erf_as_f32` below is NOT updated with this. It models
-    `Nautilus.Special.erf`, which carries A&S at the PINNED nautilus 0.7.43 --
-    not on nautilus main, where nautilus#57 switched it to a 4-term series
-    below 0.25 with no tag yet carrying it. A pin bump invalidates this leg and
-    it must be re-measured; `docs/UPSTREAM_BUGS.md` holds that trigger. Do not
-    rely on an issue transition instead -- #57 can ship without closing one.
+    `_erf_as_f32` models the separate f32 Nautilus.Special.erf path: the
+    pinned 0.7.46 uses a four-term Taylor series below |x|=0.25 and A&S
+    elsewhere. The generated kernel-mirror test checks both arms and their
+    boundary against the installed package at every oracle run.
     """
     return math.erf(x)
 
@@ -156,15 +154,19 @@ def call_price(s, k, r, sg, t, ncdf):
 
 
 def _erf_as_f32(x: float) -> float:
-    """A&S 7.1.26 erf in f32 arithmetic -- models the OLD Nautilus.Special.erfc
-    path (Nautilus erf is the SAME A&S 7.1.26 coefficients, evaluated in f32)."""
+    """Pinned Nautilus erf: f32 Taylor near zero, A&S 7.1.26 elsewhere."""
+    x = f32(x)
     a1, a2, a3, a4, a5, p = (
         f32(0.254829592), f32(-0.284496736), f32(1.421413741),
         f32(-1.453152027), f32(1.061405429), f32(0.3275911),
     )
     ax = f32(abs(x))
-    if ax < f32(1e-5):
-        return f32(x * f32(1.1283791670955126))
+    if ax < f32(0.25):
+        x2 = f32(x * x)
+        poly = f32(1.0 - f32(x2 * f32(f32(1.0 / 3.0) - f32(
+            x2 * f32(f32(0.1) - f32(x2 * f32(1.0 / 42.0)))
+        ))))
+        return f32(f32(x * poly) * f32(1.1283791670955126))
     t = f32(1.0 / f32(1.0 + f32(p * ax)))
     poly = f32(t * f32(a1 + f32(t * f32(a2 + f32(t * f32(a3 + f32(t * f32(a4 + f32(t * a5)))))))))
     y = f32(1.0 - f32(poly * f32(math.exp(-f32(ax * ax)))))
@@ -520,6 +522,7 @@ def build_test_source(grid, refs):
         "import Shoals.Pricing (call_prices, deltas_call, vegas_call, rhos_call, thetas_call, gammas_call, volgas_call, vannas_call)",
         "import Shoals.References.BlackScholes (call_textbook)",
         "import Shoals.Greeks (fd_delta_call, fd_vega_call, fd_rho_call, fd_theta_call)",
+        "import Nautilus.Special (erf)",
     ]
     # Group cells by (k,r,sg,t) so we issue one vector call per group.
     groups: dict = {}
@@ -527,7 +530,20 @@ def build_test_source(grid, refs):
         key = (cell["k"], cell["r"], cell["sigma"], cell["t"])
         groups.setdefault(key, []).append((cell, ref))
 
-    test_names = []
+    test_names = ["test_nautilus_erf_mirror"]
+    lines.append("def test_nautilus_erf_mirror() -> unit ! { Test } = {")
+    # Both signs, the former cutover, the changed Taylor interval, adjacent
+    # f32 values around the new cutover, and the unchanged rational arm.
+    mirror_points = [0.0, 1e-6, 1e-5, 0.03796697407960892, 0.1,
+                     0.2499999850988388, 0.25, 0.2500000298023224, 1.0, 3.0]
+    mirror_points += [-x for x in mirror_points[1:]]
+    for i, x in enumerate(mirror_points):
+        expected = _erf_as_f32(x)
+        tolerance = 2.0 ** (math.frexp(abs(expected))[1] - 23) if expected else 0.0
+        prefix = "  _ = " if i + 1 < len(mirror_points) else "  "
+        lines.append(prefix + f'assert_close(erf({lit32(x)}), {lit32(expected)}, '
+                     f'{lit32(tolerance)}, "nautilus erf mirror {i}")')
+    lines.append("}")
     for gi, (key, members) in enumerate(groups.items()):
         k, r, sg, t = key
         spots = [m[0]["s"] for m in members]
@@ -548,7 +564,7 @@ def build_test_source(grid, refs):
         asserts = []
         for j, (cell, ref) in enumerate(members):
             s = cell["s"]
-            idx = f"cast({j}, int64)"
+            idx = f"cast({j}, i64)"
             # BINDING cross-check: displayed price (f64-downcast) == erfc reference.
             asserts.append(
                 f'assert_close(index(cp, {idx}), call_textbook({lit32(s)}, {common}), '

@@ -40,8 +40,8 @@ def test_cholesky_round_trip_recovers_covariance() -> unit ! { Test } = {
   assert_close(recon_yy, sigma_yy, cast(1e-6, f32), "L L^T [1,1] = Sigma_yy")
 }
 def test_merton_terminal_positive_paths() -> unit ! { Test } = {
-  template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(2000, int64))))
-  jumps_template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(2000, int64))))
+  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(2000, i64))))
+  jumps_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(2000, i64))))
   paths = with seed(11i64) { merton_jump_terminal(template, jumps_template, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(0.3, f32), cast(-0.1, f32), cast(0.15, f32), cast(1.0, f32)) }
   paths_l = to_list(paths)
   init = true
@@ -49,8 +49,8 @@ def test_merton_terminal_positive_paths() -> unit ! { Test } = {
   assert_true(all_pos, "all Merton-jump terminal values are positive")
 }
 def test_merton_terminal_mean_near_s0_exp_mu_t() -> unit ! { Test } = {
-  template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(5000, int64))))
-  jumps_template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(5000, int64))))
+  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
+  jumps_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
   paths = with seed(7i64) { merton_jump_terminal(template, jumps_template, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(0.3, f32), cast(-0.1, f32), cast(0.15, f32), cast(1.0, f32)) }
   m = mean_vec(paths)
   expected = mul(cast(100.0, f32), exp(cast(0.05, f32)))
@@ -59,8 +59,8 @@ def test_merton_terminal_mean_near_s0_exp_mu_t() -> unit ! { Test } = {
   assert_true(lt(abs_err, cast(0.05, f32)), "Merton terminal mean within 5% of S0*exp(mu*t) for compensated drift")
 }
 def test_correlated_gbm_2d_marginals() -> unit ! { Test } = {
-  template_x = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(5000, int64))))
-  template_y = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(5000, int64))))
+  template_x = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
+  template_y = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
   out = with seed(13i64) { correlated_gbm_terminal_2d(template_x, template_y, cast(100.0, f32), cast(50.0, f32), cast(0.04, f32), cast(0.06, f32), cast(0.2, f32), cast(0.3, f32), cast(0.5, f32), cast(1.0, f32)) }
   m_x = mean_vec(out.0)
   m_y = mean_vec(out.1)
@@ -74,9 +74,9 @@ def test_correlated_gbm_2d_marginals() -> unit ! { Test } = {
   assert_true(lt(abs_y, cast(0.05, f32)), "Y marginal mean within 5%")
 }
 def test_correlated_gbm_2d_rho_zero_positive_dispersion() -> unit ! { Test } = {
-  template_x = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(100, int64))))
-  template_y = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(100, int64))))
+  template_x = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(100, i64))))
+  template_y = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(100, i64))))
   out = with seed(17i64) { correlated_gbm_terminal_2d(template_x, template_y, cast(100.0, f32), cast(100.0, f32), cast(0.0, f32), cast(0.0, f32), cast(0.2, f32), cast(0.2, f32), cast(0.0, f32), cast(1.0, f32)) }
-  s_x = std_vec(out.0, cast(1, int64))
+  s_x = std_vec(out.0, cast(1, i64))
   assert_true(gt(s_x, cast(0.0, f32)), "X has positive dispersion under rho=0")
 }

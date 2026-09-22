@@ -9,7 +9,7 @@ def scenario_pnl_grid[m](base_value: f32, scenario_shifts: tensor[m, f32], pnl_p
   shifts_l = to_list(copy(scenario_shifts))
   to_tensor(map(fn (shift: f32) -> add(base_value, mul(pnl_per_unit_shift, shift)), shifts_l))
 }
-def kupiec_pof_statistic_simple(num_violations: int64, total_observations: int64, expected_rate: f32) -> f32 = {
+def kupiec_pof_statistic_simple(num_violations: i64, total_observations: i64, expected_rate: f32) -> f32 = {
   n_v = cast(num_violations, f32)
   n_t = cast(total_observations, f32)
   observed_rate = if eq(n_t, cast(0.0, f32)) then cast(0.0, f32) else div(n_v, n_t)
@@ -19,23 +19,23 @@ def kupiec_pof_statistic_simple(num_violations: int64, total_observations: int64
   log_lik_h1_b = if eq(observed_rate, cast(1.0, f32)) then cast(0.0, f32) else mul(sub(n_t, n_v), log(sub(cast(1.0, f32), observed_rate)))
   mul(cast(-2.0, f32), sub(add(log_lik_h0, log_lik_h0_b), add(log_lik_h1, log_lik_h1_b)))
 }
-def re_frtb_ima_zone_at_day(n_exceptions_window: int64) -> int64 = if lte(n_exceptions_window, cast(4, int64)) then cast(0, int64) else if lte(n_exceptions_window, cast(9, int64)) then cast(1, int64) else cast(2, int64)
-def re_frtb_ima_window_count(indicators_l: List[f32], t_end: int64) -> int64 = {
-  start_idx = sub(t_end, cast(249, int64))
-  offsets = range(cast(0, int64), cast(250, int64))
-  s = fold(fn (acc: f32, k: int64) -> add(acc, index(indicators_l, add(start_idx, k))), cast(0.0, f32), offsets)
-  cast_trunc(s, int64)
+def re_frtb_ima_zone_at_day(n_exceptions_window: i64) -> i64 = if lte(n_exceptions_window, cast(4, i64)) then cast(0, i64) else if lte(n_exceptions_window, cast(9, i64)) then cast(1, i64) else cast(2, i64)
+def re_frtb_ima_window_count(indicators_l: List[f32], t_end: i64) -> i64 = {
+  start_idx = sub(t_end, cast(249, i64))
+  offsets = range(cast(0, i64), cast(250, i64))
+  s = fold(fn (acc: f32, k: i64) -> add(acc, index(indicators_l, add(start_idx, k))), cast(0.0, f32), offsets)
+  cast_trunc(s, i64)
 }
-def re_frtb_ima_zone_rolling[n, m](loss_series: tensor[n, f32], var_forecasts: tensor[n, f32]) -> tensor[m, int64] = {
+def re_frtb_ima_zone_rolling[n, m](loss_series: tensor[n, f32], var_forecasts: tensor[n, f32]) -> tensor[m, i64] = {
   losses_l = to_list(copy(loss_series))
   vars_l = to_list(copy(var_forecasts))
   pairs = zip(losses_l, vars_l)
   indicators_l = map(fn (p: (f32, f32)) -> if gt(p.0, p.1) then cast(1.0, f32) else cast(0.0, f32), pairs)
   n_total = numel(copy(loss_series))
-  m_out = if lt(n_total, cast(250, int64)) then cast(0, int64) else sub(n_total, cast(249, int64))
-  out_idxs = range(cast(0, int64), m_out)
-  to_tensor(map(fn (j: int64) -> {
-    t_end = add(j, cast(249, int64))
+  m_out = if lt(n_total, cast(250, i64)) then cast(0, i64) else sub(n_total, cast(249, i64))
+  out_idxs = range(cast(0, i64), m_out)
+  to_tensor(map(fn (j: i64) -> {
+    t_end = add(j, cast(249, i64))
     re_frtb_ima_zone_at_day(re_frtb_ima_window_count(indicators_l, t_end))
   }, out_idxs))
 }
@@ -48,14 +48,14 @@ def re_christoffersen_exception_indicators[n](losses: tensor[n, f32], var_foreca
 def re_christoffersen_transition_counts(indicators_l: List[f32]) -> (f32, f32, f32, f32) = {
   n_total = len(indicators_l)
   init = (cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(0.0, f32))
-  if lt(n_total, cast(2, int64)) then init else {
-    idxs = range(cast(1, int64), n_total)
-    fold(fn (state: (f32, f32, f32, f32), t: int64) -> {
+  if lt(n_total, cast(2, i64)) then init else {
+    idxs = range(cast(1, i64), n_total)
+    fold(fn (state: (f32, f32, f32, f32), t: i64) -> {
       t00 = state.0
       t01 = state.1
       t10 = state.2
       t11 = state.3
-      prev = index(indicators_l, sub(t, cast(1, int64)))
+      prev = index(indicators_l, sub(t, cast(1, i64)))
       curr = index(indicators_l, t)
       is_prev_one = eq(prev, cast(1.0, f32))
       is_curr_one = eq(curr, cast(1.0, f32))
@@ -86,7 +86,7 @@ def re_christoffersen_cc[n](losses: tensor[n, f32], var_forecasts: tensor[n, f32
   n_total = numel(copy(losses))
   indicators_l = re_christoffersen_exception_indicators(losses, var_forecasts)
   exception_count = fold(fn (acc: f32, e: f32) -> add(acc, e), cast(0.0, f32), indicators_l)
-  lr_uc = kupiec_pof_statistic_simple(cast_trunc(exception_count, int64), n_total, alpha)
+  lr_uc = kupiec_pof_statistic_simple(cast_trunc(exception_count, i64), n_total, alpha)
   counts = re_christoffersen_transition_counts(indicators_l)
   lr_ind = re_christoffersen_lr_ind(counts.0, counts.1, counts.2, counts.3)
   lr_cc = add(lr_uc, lr_ind)

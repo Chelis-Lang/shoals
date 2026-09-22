@@ -115,7 +115,7 @@ block.
 From `tests/pricing.ch`, a twenty-thousand-path estimate of the ATM call:
 
 ```chelis
-template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(20000, int64))))
+template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
 mc_px = with seed(42) {
   mc_call_price(template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
 }

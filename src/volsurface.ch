@@ -34,11 +34,11 @@ def bracket_brackets_root(spot: f32, strike: f32, r: f32, t: f32, target: f32, v
   lt(mul(flo, fhi), cast(0.0, f32))
 }
 def is_iv_solver_failed(iv: f32) -> bool = neq(iv, iv)
-def implied_vol_bisect(spot: f32, strike: f32, r: f32, t: f32, target: f32, vol_lo: f32, vol_hi: f32, max_iters: int64, tol: f32) -> f32 =
+def implied_vol_bisect(spot: f32, strike: f32, r: f32, t: f32, target: f32, vol_lo: f32, vol_hi: f32, max_iters: i64, tol: f32) -> f32 =
   if not(bracket_brackets_root(spot, strike, r, t, target, vol_lo, vol_hi)) then div(cast(0.0, f32), cast(0.0, f32)) else {
-    iters = range(cast(0, int64), max_iters)
+    iters = range(cast(0, i64), max_iters)
     init = (vol_lo, vol_hi, cast(0.5, f32))
-    out = fold(fn (state: (f32, f32, f32), unused: int64) -> {
+    out = fold(fn (state: (f32, f32, f32), unused: i64) -> {
       lo = state.0
       hi = state.1
       mid = mul(cast(0.5, f32), add(lo, hi))
@@ -48,7 +48,7 @@ def implied_vol_bisect(spot: f32, strike: f32, r: f32, t: f32, target: f32, vol_
     }, init, iters)
     out.2
   }
-def implied_vol_from_call(spot: f32, strike: f32, r: f32, t: f32, target_price: f32) -> f32 = implied_vol_bisect(spot, strike, r, t, target_price, cast(0.0001, f32), cast(5.0, f32), cast(60, int64), cast(1e-6, f32))
+def implied_vol_from_call(spot: f32, strike: f32, r: f32, t: f32, target_price: f32) -> f32 = implied_vol_bisect(spot, strike, r, t, target_price, cast(0.0001, f32), cast(5.0, f32), cast(60, i64), cast(1e-6, f32))
 def pow_f32(base: f32, expn: f32) -> f32 = exp(mul(expn, log(base)))
 def vs_sabr_atm_implied_vol(p: SABR, f: f32, t: f32) -> f32 = {
   one_minus_beta = sub(cast(1.0, f32), p.beta)

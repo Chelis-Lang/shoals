@@ -4,14 +4,14 @@ import Nautilus.Stats (mean_vec, correlation_scalar)
 import Shoals.SabrPaths (sabr_paths_terminal)
 def abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 def test_sabr_zero_volvol_deterministic() -> unit ! { Test } = {
-  template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(64, int64))))
+  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(64, i64))))
   f0 = cast(100.0, f32)
   alpha0 = cast(0.2, f32)
   beta = cast(0.5, f32)
   rho = cast(-0.3, f32)
   nu = cast(0.0, f32)
   big_t = cast(0.1, f32)
-  n_steps = cast(50, int64)
+  n_steps = cast(50, i64)
   out = with seed(7i64) { sabr_paths_terminal(template, f0, alpha0, beta, rho, nu, big_t, n_steps) }
   mean_f = mean_vec(out.0)
   diff = abs_f32(sub(mean_f, f0))
@@ -26,14 +26,14 @@ def test_sabr_zero_volvol_deterministic() -> unit ! { Test } = {
   assert_true(lt(rel, tol), "with nu=0, F follows CEV with constant alpha; martingale E[F_T] approx F_0 at 64 paths within 3*SE_mc")
 }
 def test_sabr_alpha_lognormal_marginal() -> unit ! { Test } = {
-  template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(100, int64))))
+  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(100, i64))))
   f0 = cast(100.0, f32)
   alpha0 = cast(0.2, f32)
   beta = cast(0.5, f32)
   rho = cast(-0.3, f32)
   nu = cast(0.5, f32)
   big_t = cast(1.0, f32)
-  n_steps = cast(100, int64)
+  n_steps = cast(100, i64)
   out = with seed(11i64) { sabr_paths_terminal(template, f0, alpha0, beta, rho, nu, big_t, n_steps) }
   mean_alpha = mean_vec(out.1)
   diff = abs_f32(sub(mean_alpha, alpha0))
@@ -44,14 +44,14 @@ def test_sabr_alpha_lognormal_marginal() -> unit ! { Test } = {
   assert_true(lt(diff, tol), "alpha is exact log-Euler martingale: E[alpha_T] approx alpha_0 at 100 paths within 3*SE_mc")
 }
 def test_sabr_f_nonneg() -> unit ! { Test } = {
-  template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(64, int64))))
+  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(64, i64))))
   f0 = cast(100.0, f32)
   alpha0 = cast(0.2, f32)
   beta = cast(0.3, f32)
   rho = cast(-0.95, f32)
   nu = cast(2.0, f32)
   big_t = cast(2.0, f32)
-  n_steps = cast(100, int64)
+  n_steps = cast(100, i64)
   out = with seed(13i64) { sabr_paths_terminal(template, f0, alpha0, beta, rho, nu, big_t, n_steps) }
   f_l = to_list(out.0)
   init = true
@@ -59,14 +59,14 @@ def test_sabr_f_nonneg() -> unit ! { Test } = {
   assert_true(all_nonneg, "under extreme SABR params (beta=0.3, rho=-0.95, nu=2.0, T=2y), all 64 terminal F values stay non-negative thanks to clamp")
 }
 def test_sabr_zero_correlation_independence() -> unit ! { Test } = {
-  template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(256, int64))))
+  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(256, i64))))
   f0 = cast(100.0, f32)
   alpha0 = cast(0.2, f32)
   beta = cast(0.5, f32)
   rho = cast(0.0, f32)
   nu = cast(0.5, f32)
   big_t = cast(1.0, f32)
-  n_steps = cast(50, int64)
+  n_steps = cast(50, i64)
   out = with seed(17i64) { sabr_paths_terminal(template, f0, alpha0, beta, rho, nu, big_t, n_steps) }
   f_l = to_list(out.0)
   alpha_l = to_list(out.1)

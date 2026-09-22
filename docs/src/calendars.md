@@ -39,8 +39,8 @@ From `tests/holidaycal.ch`:
 
 ```chelis
 cal = nyc_calendar()
-ny = is_holiday(cal, date(cast(2025, int64), cast(1, int64), cast(1, int64)))   // true
-wed = is_business_day(cal, date(cast(2025, int64), cast(8, int64), cast(13, int64)))  // true
+ny = is_holiday(cal, date(cast(2025, i64), cast(1, i64), cast(1, i64)))   // true
+wed = is_business_day(cal, date(cast(2025, i64), cast(8, i64), cast(13, i64)))  // true
 ```
 
 A joint New York and London calendar treats both US Independence Day and UK
@@ -48,15 +48,15 @@ Boxing Day as holidays:
 
 ```chelis
 joint = joint_calendar(nyc_calendar(), ldn_calendar())
-july4 = is_holiday(joint, date(cast(2025, int64), cast(7, int64), cast(4, int64)))   // true
-boxing = is_holiday(joint, date(cast(2025, int64), cast(12, int64), cast(26, int64))) // true
+july4 = is_holiday(joint, date(cast(2025, i64), cast(7, i64), cast(4, i64)))   // true
+boxing = is_holiday(joint, date(cast(2025, i64), cast(12, i64), cast(26, i64))) // true
 ```
 
 
 ## International holiday predicates
 
 `hc_tyo_is_holiday`, `hc_syd_is_holiday`, `hc_fra_is_holiday` and
-`hc_hkg_is_holiday` accept year, month and day as `int64` values. Each checks
+`hc_hkg_is_holiday` accept year, month and day as `i64` values. Each checks
 membership in the corresponding generated annual holiday list. These are
 holiday predicates, not business-day predicates; weekend exclusion is a
 separate operation. They are explicitly exported for the international
