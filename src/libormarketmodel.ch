@@ -2,12 +2,12 @@ module Shoals.LiborMarketModel
 import Nautilus.Distributions (normal_sample)
 import Nautilus.LinAlg (cholesky_n, matvec, scale_vec)
 export (lmm_step, lmm_path, hjm_no_arb_drift, step_hjm)
-def lmm_terminal_drift_one(f_l: List[f32], tau_l: List[f32], sig_l: List[f32], corr_flat_l: List[f32], i: int64, k_dim: int64) -> f32 = {
+def lmm_terminal_drift_one(f_l: List[f32], tau_l: List[f32], sig_l: List[f32], corr_flat_l: List[f32], i: i64, k_dim: i64) -> f32 = {
   sigma_i = index(sig_l, i)
-  start = add(i, cast(1, int64))
+  start = add(i, cast(1, i64))
   if gte(start, k_dim) then cast(0.0, f32) else {
     j_idxs = range(start, k_dim)
-    inner_sum = fold(fn (acc: f32, j: int64) -> {
+    inner_sum = fold(fn (acc: f32, j: i64) -> {
       tau_j = index(tau_l, j)
       l_j = index(f_l, j)
       sigma_j = index(sig_l, j)
@@ -19,12 +19,12 @@ def lmm_terminal_drift_one(f_l: List[f32], tau_l: List[f32], sig_l: List[f32], c
     neg(mul(sigma_i, inner_sum))
   }
 }
-def lmm_step_with_chol[k](forwards: tensor[k, f32], tau_l: List[f32], sig_l: List[f32], corr_flat_l: List[f32], chol: &tensor[k, k, f32], dt: f32, normals: tensor[k, f32], k_dim: int64, sqrt_dt: f32) -> tensor[k, f32] = {
+def lmm_step_with_chol[k](forwards: tensor[k, f32], tau_l: List[f32], sig_l: List[f32], corr_flat_l: List[f32], chol: &tensor[k, k, f32], dt: f32, normals: tensor[k, f32], k_dim: i64, sqrt_dt: f32) -> tensor[k, f32] = {
   z_corr = matvec(copy(chol), copy(normals))
   z_corr_l = to_list(z_corr)
   f_l = to_list(copy(forwards))
-  idxs = range(cast(0, int64), k_dim)
-  new_l = map(fn (i: int64) -> {
+  idxs = range(cast(0, i64), k_dim)
+  new_l = map(fn (i: i64) -> {
     l_i = index(f_l, i)
     sigma_i = index(sig_l, i)
     z_i = index(z_corr_l, i)
@@ -44,15 +44,15 @@ def lmm_step[k](forwards: tensor[k, f32], taus: tensor[k, f32], sigmas: tensor[k
   sqrt_dt = sqrt(dt)
   lmm_step_with_chol(forwards, tau_l, sig_l, corr_flat_l, copy(chol), dt, normals, k_dim, sqrt_dt)
 }
-def lmm_evolve[k](forwards: tensor[k, f32], tau_l: List[f32], sig_l: List[f32], corr_flat_l: List[f32], chol: &tensor[k, k, f32], dt: f32, n_steps: int64, k_dim: int64, sqrt_dt: f32) -> tensor[k, f32] ! { Random } = {
-  step_idxs = range(cast(0, int64), n_steps)
-  fold(fn (state: tensor[k, f32], s: int64) -> {
+def lmm_evolve[k](forwards: tensor[k, f32], tau_l: List[f32], sig_l: List[f32], corr_flat_l: List[f32], chol: &tensor[k, k, f32], dt: f32, n_steps: i64, k_dim: i64, sqrt_dt: f32) -> tensor[k, f32] ! { Random } = {
+  step_idxs = range(cast(0, i64), n_steps)
+  fold(fn (state: tensor[k, f32], s: i64) -> {
     template = scale_vec(copy(state), cast(0.0, f32))
     normals = normal_sample(template, cast(0.0, f32), cast(1.0, f32))
     lmm_step_with_chol(state, tau_l, sig_l, corr_flat_l, copy(chol), dt, normals, k_dim, sqrt_dt)
   }, forwards, step_idxs)
 }
-def lmm_path[k, n](paths_template: tensor[n, f32], forwards0: tensor[k, f32], taus: tensor[k, f32], sigmas: tensor[k, f32], corr: tensor[k, k, f32], t: f32, n_steps: int64, forward_idx: int64) -> tensor[n, f32] ! { Random } = {
+def lmm_path[k, n](paths_template: tensor[n, f32], forwards0: tensor[k, f32], taus: tensor[k, f32], sigmas: tensor[k, f32], corr: tensor[k, k, f32], t: f32, n_steps: i64, forward_idx: i64) -> tensor[n, f32] ! { Random } = {
   k_dim = len(to_list(copy(forwards0)))
   dt = div(t, cast(n_steps, f32))
   sqrt_dt = sqrt(dt)
@@ -73,12 +73,12 @@ def hjm_no_arb_drift[k](sigmas: tensor[k, f32], taus: tensor[k, f32]) -> tensor[
   k_dim = len(to_list(copy(sigmas)))
   sig_l = to_list(copy(sigmas))
   tau_l = to_list(copy(taus))
-  idxs = range(cast(0, int64), k_dim)
-  to_tensor(map(fn (i: int64) -> {
+  idxs = range(cast(0, i64), k_dim)
+  to_tensor(map(fn (i: i64) -> {
     sigma_i = index(sig_l, i)
-    upper = add(i, cast(1, int64))
-    j_idxs = range(cast(0, int64), upper)
-    cumulative = fold(fn (acc: f32, j: int64) -> {
+    upper = add(i, cast(1, i64))
+    j_idxs = range(cast(0, i64), upper)
+    cumulative = fold(fn (acc: f32, j: i64) -> {
       tau_j = index(tau_l, j)
       sigma_j = index(sig_l, j)
       add(acc, mul(tau_j, sigma_j))
@@ -93,8 +93,8 @@ def step_hjm[k](forwards: tensor[k, f32], drifts: tensor[k, f32], sigmas: tensor
   s_l = to_list(copy(sigmas))
   z_l = to_list(copy(normals))
   k_dim = len(f_l)
-  idxs = range(cast(0, int64), k_dim)
-  to_tensor(map(fn (i: int64) -> {
+  idxs = range(cast(0, i64), k_dim)
+  to_tensor(map(fn (i: i64) -> {
     f_i = index(f_l, i)
     d_i = index(d_l, i)
     s_i = index(s_l, i)

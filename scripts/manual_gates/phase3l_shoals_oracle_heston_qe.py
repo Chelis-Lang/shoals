@@ -77,18 +77,18 @@ SPEC_CONFIG_NOTE = (
 )
 
 QE_SETUP = (
-    "  template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(N_PATHS, int64))))\n"
+    "  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(N_PATHS, i64))))\n"
     "  out = with seed(SEED) { heston_qe_paths_terminal(template, "
     "cast(S0, f32), cast(V0, f32), cast(R, f32), "
     "cast(KAPPA, f32), cast(THETA, f32), cast(SIGMA, f32), cast(RHO, f32), "
-    "cast(T_YEARS, f32), cast(N_STEPS, int64)) }\n"
+    "cast(T_YEARS, f32), cast(N_STEPS, i64)) }\n"
     "  s_t_list = to_list(out.0)\n"
     "  min_v_list = to_list(out.2)\n"
     "  payoffs = map(fn (s: f32) -> if gt(s, cast(K, f32)) then sub(s, cast(K, f32)) else cast(0.0, f32), s_t_list)\n"
     "  total_payoff = fold(fn (a: f32, p: f32) -> add(a, p), cast(0.0, f32), payoffs)\n"
     "  total_payoff_sq = fold(fn (a: f32, p: f32) -> add(a, mul(p, p)), cast(0.0, f32), payoffs)\n"
     "  global_min_v = fold(fn (a: f32, mv: f32) -> if lt(mv, a) then mv else a, cast(1.0, f32), min_v_list)\n"
-    "  total_nonneg_int = fold(fn (a: int64, mv: f32) -> if gte(mv, cast(0.0, f32)) then add(a, cast(1, int64)) else a, cast(0, int64), min_v_list)\n"
+    "  total_nonneg_int = fold(fn (a: i64, mv: f32) -> if gte(mv, cast(0.0, f32)) then add(a, cast(1, i64)) else a, cast(0, i64), min_v_list)\n"
     "  total_nonneg = cast(total_nonneg_int, f32)\n"
     "  n_f = cast(N_PATHS, f32)\n"
     "  mc_mean_payoff = div(total_payoff, n_f)\n"
@@ -188,7 +188,7 @@ def probe_truncation_sweep() -> dict:
             tag = f"truncation_{m_tag}_u{int(u)}"
             body_parts.append(
                 f"def test_{tag}() -> unit ! {{ Test }} = {{\n"
-                f"  p = heston_call_carr_madan_panels(cast(S0, f32), cast({k_val}, f32), cast(T_YEARS, f32), cast(R, f32), cast(V0, f32), cast(KAPPA, f32), cast(THETA, f32), cast(SIGMA, f32), cast(RHO, f32), cast(ALPHA, f32), cast({u}, f32), cast(N_PANELS_BASE, int64))\n"
+                f"  p = heston_call_carr_madan_panels(cast(S0, f32), cast({k_val}, f32), cast(T_YEARS, f32), cast(R, f32), cast(V0, f32), cast(KAPPA, f32), cast(THETA, f32), cast(SIGMA, f32), cast(RHO, f32), cast(ALPHA, f32), cast({u}, f32), cast(N_PANELS_BASE, i64))\n"
                 f"  assert_close(p, cast(-12345.0, f32), cast(0.001, f32), \"capture_{tag}\")\n"
                 f"}}"
             )
@@ -268,14 +268,14 @@ def probe_mc_and_charfn(u_max: float) -> dict:
         )
     body_parts.append(
         "def test_extract_p_charfn() -> unit ! { Test } = {\n"
-        f"  p = heston_call_carr_madan_panels(cast(S0, f32), cast(K, f32), cast(T_YEARS, f32), cast(R, f32), cast(V0, f32), cast(KAPPA, f32), cast(THETA, f32), cast(SIGMA, f32), cast(RHO, f32), cast(ALPHA, f32), cast({u_max}, f32), cast(N_PANELS_BASE, int64))\n"
+        f"  p = heston_call_carr_madan_panels(cast(S0, f32), cast(K, f32), cast(T_YEARS, f32), cast(R, f32), cast(V0, f32), cast(KAPPA, f32), cast(THETA, f32), cast(SIGMA, f32), cast(RHO, f32), cast(ALPHA, f32), cast({u_max}, f32), cast(N_PANELS_BASE, i64))\n"
         "  assert_close(p, cast(-12345.0, f32), cast(0.001, f32), \"capture_p_charfn\")\n"
         "}"
     )
     body_parts.append(
         "def test_acceptance_3sigma() -> unit ! { Test } = {\n"
         f"{QE_SETUP}"
-        f"  p_charfn = heston_call_carr_madan_panels(cast(S0, f32), cast(K, f32), cast(T_YEARS, f32), cast(R, f32), cast(V0, f32), cast(KAPPA, f32), cast(THETA, f32), cast(SIGMA, f32), cast(RHO, f32), cast(ALPHA, f32), cast({u_max}, f32), cast(N_PANELS_BASE, int64))\n"
+        f"  p_charfn = heston_call_carr_madan_panels(cast(S0, f32), cast(K, f32), cast(T_YEARS, f32), cast(R, f32), cast(V0, f32), cast(KAPPA, f32), cast(THETA, f32), cast(SIGMA, f32), cast(RHO, f32), cast(ALPHA, f32), cast({u_max}, f32), cast(N_PANELS_BASE, i64))\n"
         "  abs_diff = if lt(sub(mc_price, p_charfn), cast(0.0, f32)) then neg(sub(mc_price, p_charfn)) else sub(mc_price, p_charfn)\n"
         "  three_se = mul(cast(3.0, f32), se_mc)\n"
         "  pass_bit = if lt(abs_diff, three_se) then cast(1.0, f32) else cast(0.0, f32)\n"

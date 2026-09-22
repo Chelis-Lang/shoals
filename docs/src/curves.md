@@ -113,11 +113,11 @@ curve = bootstrap_zero_from_par(times, pars)
 type Instrument =
   | Deposit { tenor: f32, rate: f32 }
   | ZeroCoupon { tenor: f32, price: f32 }
-  | ParSwap { tenor: f32, par_rate: f32, payments_per_year: int64 }
+  | ParSwap { tenor: f32, par_rate: f32, payments_per_year: i64 }
 
 def deposit(tenor: f32, rate: f32) -> Instrument
 def zero_coupon(tenor: f32, price: f32) -> Instrument
-def cur_par_swap(tenor: f32, par_rate: f32, payments_per_year: int64) -> Instrument
+def cur_par_swap(tenor: f32, par_rate: f32, payments_per_year: i64) -> Instrument
 def instrument_validate(inst: Instrument) -> bool
 def bootstrap_multi(instruments: List[Instrument]) -> (List[f32], List[f32])
 def bootstrap_multi_curve[n](instruments: List[Instrument], times_template: tensor[n, f32]) -> YieldCurve[n]
@@ -152,9 +152,9 @@ From `tests/curves_bootstrap_schedule.ch`, a gapped annual strip:
 insts = [
   deposit(cast(0.5, f32), cast(0.041, f32)),
   deposit(cast(1.0, f32), cast(0.042, f32)),
-  cur_par_swap(cast(2.0, f32), cast(0.0435, f32), cast(1, int64)),
-  cur_par_swap(cast(5.0, f32), cast(0.0452, f32), cast(1, int64)),
-  cur_par_swap(cast(10.0, f32), cast(0.0468, f32), cast(1, int64))
+  cur_par_swap(cast(2.0, f32), cast(0.0435, f32), cast(1, i64)),
+  cur_par_swap(cast(5.0, f32), cast(0.0452, f32), cast(1, i64)),
+  cur_par_swap(cast(10.0, f32), cast(0.0468, f32), cast(1, i64))
 ]
 rates = bootstrap_multi(insts).1
 // 10y zero rate ~0.0460236
@@ -170,7 +170,7 @@ joint; see [Scope and limitations](scope.md).
 
 ```chelis
 def parallel_shift[n](curve: YieldCurve[n], delta: f32) -> YieldCurve[n]
-def key_rate_shift[n](curve: YieldCurve[n], pillar_index: int64, delta: f32) -> YieldCurve[n]
+def key_rate_shift[n](curve: YieldCurve[n], pillar_index: i64, delta: f32) -> YieldCurve[n]
 def twist[n](curve: YieldCurve[n], short_delta: f32, long_delta: f32) -> YieldCurve[n]
 def butterfly[n](curve: YieldCurve[n], wing_delta: f32, body_delta: f32) -> YieldCurve[n]
 def scale_rates[n](curve: YieldCurve[n], factor: f32) -> YieldCurve[n]
@@ -189,5 +189,5 @@ amount and a key-rate shift moves only the chosen pillar:
 
 ```chelis
 shifted = parallel_shift(curve, cast(0.001, f32))      // every rate +10bp
-kr = key_rate_shift(curve, cast(1, int64), cast(0.005, f32))  // only the 2y pillar +50bp
+kr = key_rate_shift(curve, cast(1, i64), cast(0.005, f32))  // only the 2y pillar +50bp
 ```

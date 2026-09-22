@@ -38,16 +38,16 @@ def test_dupire_at_zero_volvol_equals_input_iv() -> unit ! { Test } = {
   assert_close(sig_loc, cast(0.2, f32), cast(0.015, f32), "strictly-flat IV surface: Dupire sigma_loc(K,T) equals input IV (consistency check) at OTM (K=95, T=0.75, q=2%)")
 }
 def test_cubic_log_moneyness_monotonic_input_preserves_monotonicity() -> unit ! { Test } = {
-  strikes = to_tensor(map(fn (i: int64) -> add(cast(80.0, f32), mul(cast(i, f32), cast(10.0, f32))), range(cast(0, int64), cast(5, int64))))
-  times = to_tensor(map(fn (i: int64) -> add(cast(0.25, f32), mul(cast(i, f32), cast(0.25, f32))), range(cast(0, int64), cast(3, int64))))
+  strikes = to_tensor(map(fn (i: i64) -> add(cast(80.0, f32), mul(cast(i, f32), cast(10.0, f32))), range(cast(0, i64), cast(5, i64))))
+  times = to_tensor(map(fn (i: i64) -> add(cast(0.25, f32), mul(cast(i, f32), cast(0.25, f32))), range(cast(0, i64), cast(3, i64))))
   iv_per_strike = fn (k: f32) -> sub(cast(0.35, f32), mul(cast(0.001, f32), sub(k, cast(80.0, f32))))
-  flat_idx = range(cast(0, int64), cast(15, int64))
-  iv_flat = to_tensor(map(fn (idx: int64) -> {
-    i_col = mod(idx, cast(5, int64))
+  flat_idx = range(cast(0, i64), cast(15, i64))
+  iv_flat = to_tensor(map(fn (idx: i64) -> {
+    i_col = mod(idx, cast(5, i64))
     k_at_i = add(cast(80.0, f32), mul(cast(i_col, f32), cast(10.0, f32)))
     iv_per_strike(k_at_i)
   }, flat_idx))
-  iv_grid_2d = reshape(iv_flat, [cast(3, int64), cast(5, int64)])
+  iv_grid_2d = reshape(iv_flat, [cast(3, i64), cast(5, i64)])
   forward = cast(100.0, f32)
   k_q1 = cast(85.0, f32)
   k_q2 = cast(105.0, f32)

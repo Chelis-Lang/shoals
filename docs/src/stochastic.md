@@ -28,7 +28,7 @@ From `tests/stochastic.ch`, a fifty-step path is strictly positive and
 bit-exactly reproducible under a fixed seed:
 
 ```chelis
-template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(50, int64))))
+template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(50, i64))))
 path = with seed(7) { gbm_path(template, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32)) }
 ```
 
@@ -61,8 +61,8 @@ prices are positive and their mean stays near `s0 * exp(mu * t)` because of
 the compensated drift:
 
 ```chelis
-template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(5000, int64))))
-jumps_template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(5000, int64))))
+template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
+jumps_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
 paths = with seed(7) {
   merton_jump_terminal(template, jumps_template, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(0.3, f32), cast(-0.1, f32), cast(0.15, f32), cast(1.0, f32))
 }
@@ -90,8 +90,8 @@ with correlation `rho`, returning a tuple of two terminal tensors. Each
 marginal mean stays near `s0 * exp(mu * t)`:
 
 ```chelis
-template_x = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(5000, int64))))
-template_y = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(5000, int64))))
+template_x = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
+template_y = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
 out = with seed(13) {
   correlated_gbm_terminal_2d(template_x, template_y, cast(100.0, f32), cast(50.0, f32), cast(0.04, f32), cast(0.06, f32), cast(0.2, f32), cast(0.3, f32), cast(0.5, f32), cast(1.0, f32))
 }

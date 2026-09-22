@@ -3,7 +3,7 @@ import Std.Test (assert_true)
 import Shoals.Lsm (lsm_polynomial_regression)
 def lsm_t_abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 def test_lsm_polynomial_regression_recovers_quadratic() -> unit ! { Test } = {
-  xs = to_tensor(map(fn (i: int64) -> add(cast(-1.0, f32), cast(i, f32)), range(cast(0, int64), cast(5, int64))))
+  xs = to_tensor(map(fn (i: i64) -> add(cast(-1.0, f32), cast(i, f32)), range(cast(0, i64), cast(5, i64))))
   xs_l = to_list(copy(xs))
   ys = to_tensor(map(fn (x: f32) -> add(cast(2.0, f32), add(mul(cast(3.0, f32), x), mul(cast(4.0, f32), mul(x, x)))), xs_l))
   coeffs = lsm_polynomial_regression(xs, ys)

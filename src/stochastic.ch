@@ -136,8 +136,8 @@ def heston_qe_step(log_s: f32, v: f32, min_v: f32, mu: f32, kappa: f32, theta: f
   new_min = if lt(v_next_pos, min_v) then v_next_pos else min_v
   (log_s_next, v_next_pos, new_min)
 }
-def heston_qe_terminal(s0: f32, v0: f32, mu: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, t: f32, n_steps: int64) -> (f32, f32, f32) ! { Random } = {
-  template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), n_steps)))
+def heston_qe_terminal(s0: f32, v0: f32, mu: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, t: f32, n_steps: i64) -> (f32, f32, f32) ! { Random } = {
+  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), n_steps)))
   z_v_t = normal_sample(copy(template), cast(0.0, f32), cast(1.0, f32))
   z_ind_t = normal_sample(copy(template), cast(0.0, f32), cast(1.0, f32))
   u_t = uniform_sample(template, cast(0.0, f32), cast(1.0, f32))
@@ -147,8 +147,8 @@ def heston_qe_terminal(s0: f32, v0: f32, mu: f32, kappa: f32, theta: f32, sigma:
   dt = div(t, cast(n_steps, f32))
   log_s0 = log(s0)
   init_state = (log_s0, v0, v0)
-  idxs = range(cast(0, int64), n_steps)
-  final_state = fold(fn (state: (f32, f32, f32), i: int64) -> {
+  idxs = range(cast(0, i64), n_steps)
+  final_state = fold(fn (state: (f32, f32, f32), i: i64) -> {
     log_s = state.0
     v = state.1
     min_v = state.2
@@ -159,10 +159,10 @@ def heston_qe_terminal(s0: f32, v0: f32, mu: f32, kappa: f32, theta: f32, sigma:
   }, init_state, idxs)
   (exp(final_state.0), final_state.1, final_state.2)
 }
-def heston_qe_paths_terminal[n](paths_template: tensor[n, f32], s0: f32, v0: f32, mu: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, t: f32, n_steps: int64) -> (tensor[n, f32], tensor[n, f32], tensor[n, f32]) ! { Random } = {
+def heston_qe_paths_terminal[n](paths_template: tensor[n, f32], s0: f32, v0: f32, mu: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, t: f32, n_steps: i64) -> (tensor[n, f32], tensor[n, f32], tensor[n, f32]) ! { Random } = {
   n_paths = numel(copy(paths_template))
   total = mul(n_paths, n_steps)
-  big_template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), total)))
+  big_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), total)))
   z_v_t = normal_sample(copy(big_template), cast(0.0, f32), cast(1.0, f32))
   z_ind_t = normal_sample(copy(big_template), cast(0.0, f32), cast(1.0, f32))
   u_t = uniform_sample(big_template, cast(0.0, f32), cast(1.0, f32))
@@ -171,12 +171,12 @@ def heston_qe_paths_terminal[n](paths_template: tensor[n, f32], s0: f32, v0: f32
   u_l = to_list(u_t)
   dt = div(t, cast(n_steps, f32))
   log_s0 = log(s0)
-  path_idxs = range(cast(0, int64), n_paths)
-  results = map(fn (p: int64) -> {
+  path_idxs = range(cast(0, i64), n_paths)
+  results = map(fn (p: i64) -> {
     base = mul(p, n_steps)
     init_state = (log_s0, v0, v0)
-    step_idxs = range(cast(0, int64), n_steps)
-    final = fold(fn (state: (f32, f32, f32), i: int64) -> {
+    step_idxs = range(cast(0, i64), n_steps)
+    final = fold(fn (state: (f32, f32, f32), i: i64) -> {
       log_s = state.0
       v = state.1
       min_v = state.2
@@ -206,10 +206,10 @@ def sto_kou_jump_terminal[n](paths_template: tensor[n, f32], jumps_template: ten
   _ = jumps_template
   n_paths = numel(copy(paths_template))
   expected_jumps_f = mul(lambda_jump, t)
-  n_max_raw = cast_trunc(add(mul(expected_jumps_f, cast(5.0, f32)), cast(1.0, f32)), int64)
-  n_max = if lt(n_max_raw, cast(1, int64)) then cast(1, int64) else n_max_raw
+  n_max_raw = cast_trunc(add(mul(expected_jumps_f, cast(5.0, f32)), cast(1.0, f32)), i64)
+  n_max = if lt(n_max_raw, cast(1, i64)) then cast(1, i64) else n_max_raw
   total = mul(n_paths, n_max)
-  big_template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), total)))
+  big_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), total)))
   z_diff = normal_sample(copy(paths_template), cast(0.0, f32), cast(1.0, f32))
   u_branch_t = uniform_sample(copy(big_template), cast(0.0, f32), cast(1.0, f32))
   u_thin_t = uniform_sample(copy(big_template), cast(0.0, f32), cast(1.0, f32))
@@ -225,11 +225,11 @@ def sto_kou_jump_terminal[n](paths_template: tensor[n, f32], jumps_template: ten
   drift = mul(sub(sub(mu, half_sigma_sq), mul(lambda_jump, zeta)), t)
   vol_sqrt_t = mul(sigma, sqrt(t))
   log_s0 = log(s0)
-  path_idxs = range(cast(0, int64), n_paths)
-  to_tensor(map(fn (path_i: int64) -> {
+  path_idxs = range(cast(0, i64), n_paths)
+  to_tensor(map(fn (path_i: i64) -> {
     base = mul(path_i, n_max)
-    slot_idxs = range(cast(0, int64), n_max)
-    jump_sum = fold(fn (acc: f32, j: int64) -> {
+    slot_idxs = range(cast(0, i64), n_max)
+    jump_sum = fold(fn (acc: f32, j: i64) -> {
       k = add(base, j)
       u_b = index(u_branch_l, k)
       u_t = index(u_thin_l, k)

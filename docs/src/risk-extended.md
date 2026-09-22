@@ -24,7 +24,7 @@ the FRTB-IMA expected shortfall fixed at the 97.5% level.
 From `tests/riskext.ch`, on the integer losses `0..100`:
 
 ```chelis
-losses = to_tensor(map(fn (i: int64) -> cast(cast(i, int32), f32), range(cast(0, int64), cast(101, int64))))
+losses = to_tensor(map(fn (i: i64) -> cast(cast(i, i32), f32), range(cast(0, i64), cast(101, i64))))
 v = mc_var(losses, cast(0.95, f32))                  // v == 95.0
 es = mc_expected_shortfall(losses, cast(0.95, f32))  // es == 97.5 (mean of 95..100)
 ```
@@ -51,7 +51,7 @@ pnls = scenario_pnl_grid(cast(100.0, f32), shifts, cast(50.0, f32))
 ## Kupiec backtest
 
 ```chelis
-def kupiec_pof_statistic_simple(num_violations: int64, total_observations: int64, expected_rate: f32) -> f32
+def kupiec_pof_statistic_simple(num_violations: i64, total_observations: i64, expected_rate: f32) -> f32
 ```
 
 `kupiec_pof_statistic_simple` is the Kupiec proportion-of-failures
@@ -61,6 +61,6 @@ When the observed rate equals the expected rate the statistic is zero; when
 it is far from expected the statistic grows. From `tests/riskext.ch`:
 
 ```chelis
-stat = kupiec_pof_statistic_simple(cast(5, int64), cast(100, int64), cast(0.05, f32))
+stat = kupiec_pof_statistic_simple(cast(5, i64), cast(100, i64), cast(0.05, f32))
 // stat == 0.0 at observed == expected
 ```

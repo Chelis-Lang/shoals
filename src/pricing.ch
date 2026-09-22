@@ -165,16 +165,16 @@ def bs_put_scalar(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = cast(bs_p
 -- free var crosses the vmap/grad boundary. const_col builds non-differentiated
 -- inputs, so the host-lane map in its fill never has grad flow through it.
 def const_col[n](spots: tensor[n, f32], v: f64) -> tensor[n, 1, f64] = {
-  nn = cast(shape(copy(spots), cast(0, int32)), int64)
-  reshape(to_tensor(map(fn (i: int64) -> v, range(cast(0, int64), nn))), [nn, cast(1, int64)])
+  nn = cast(shape(copy(spots), cast(0, i32)), i64)
+  reshape(to_tensor(map(fn (i: i64) -> v, range(cast(0, i64), nn))), [nn, cast(1, i64)])
 }
 def spot_col[n](spots: tensor[n, f32]) -> tensor[n, 1, f64] = {
-  nn = cast(shape(copy(spots), cast(0, int32)), int64)
-  reshape(cast(spots, f64), [nn, cast(1, int64)])
+  nn = cast(shape(copy(spots), cast(0, i32)), i64)
+  reshape(cast(spots, f64), [nn, cast(1, i64)])
 }
 def f64_col[n](xs: tensor[n, f64]) -> tensor[n, 1, f64] = {
-  nn = cast(shape(copy(xs), cast(0, int32)), int64)
-  reshape(xs, [nn, cast(1, int64)])
+  nn = cast(shape(copy(xs), cast(0, i32)), i64)
+  reshape(xs, [nn, cast(1, i64)])
 }
 -- Pure tensor-DAG Black-Scholes helpers for the Beacon seam (shoals issue 19).
 -- Constants are point-valued tensor inputs because introducing them through

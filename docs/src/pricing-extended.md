@@ -101,7 +101,7 @@ px = margrabe_exchange_call(cast(100.0, f32), cast(100.0, f32), cast(0.2, f32), 
 ## Shared lattice and tridiagonal helpers
 
 `Shoals.Trees.tr_binom_european_call_generic` accepts spot, strike, the up/down
-log increments, up probability, per-step discount and an `int64` step count.
+log increments, up probability, per-step discount and an `i64` step count.
 It builds terminal call payoffs and discounts backward through that lattice.
 Supply a nonnegative count, finite inputs and a probability in [0, 1]. The
 helper does not validate these model constraints. At zero steps it returns

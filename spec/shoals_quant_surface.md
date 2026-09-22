@@ -376,7 +376,7 @@ verified claim available to consumers.
 Each Shoals function annotates the differentiability of each parameter:
 
 - `Differentiable[f64]` — gradient flows through this parameter.
-- `Discrete[T]` (or just `Date`, `int64`, `String`, etc.) — gradient
+- `Discrete[T]` (or just `Date`, `i64`, `String`, etc.) — gradient
   does not flow.
 - `Curve[Differentiable[f64]]` — gradient returns a curve-shaped
   per-pillar sensitivity object.

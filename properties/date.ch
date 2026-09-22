@@ -22,27 +22,27 @@ def year_fraction_matches_textbook(start: Date, end: Date, convention: DayCount)
   }
   lt(abs_f32(diff), tol)
 }
-def schedule_monotone_increasing(start: Date, end: Date, step_months: int64) -> bool = {
+def schedule_monotone_increasing(start: Date, end: Date, step_months: i64) -> bool = {
   dates = schedule_from_tenor(start, end, step_months)
   n = len(dates)
-  if lte(n, cast(1, int64)) then true else {
-    idxs = range(cast(1, int64), n)
-    fold(fn (acc: bool, i: int64) -> {
-      prev = index(dates, sub(i, cast(1, int64)))
+  if lte(n, cast(1, i64)) then true else {
+    idxs = range(cast(1, i64), n)
+    fold(fn (acc: bool, i: i64) -> {
+      prev = index(dates, sub(i, cast(1, i64)))
       curr = index(dates, i)
       and(acc, date_lt(prev, curr))
     }, true, idxs)
   }
 }
 def date_roll_following_idempotent_on_weekday(d: Date) -> bool = if is_weekend(d) then true else date_eq(date_roll_following(d, true), d)
-def add_months_then_neg_is_identity(d: Date, n: int64) -> bool = if gt(d.day, cast(28, int64)) then true else date_eq(add_months(add_months(d, n), neg(n)), d)
-def schedule_calendar_monotone_increasing(start: Date, end: Date, step_months: int64) -> bool = {
+def add_months_then_neg_is_identity(d: Date, n: i64) -> bool = if gt(d.day, cast(28, i64)) then true else date_eq(add_months(add_months(d, n), neg(n)), d)
+def schedule_calendar_monotone_increasing(start: Date, end: Date, step_months: i64) -> bool = {
   dates = schedule_from_tenor_calendar(start, end, step_months)
   n = len(dates)
-  if lte(n, cast(1, int64)) then true else {
-    idxs = range(cast(1, int64), n)
-    fold(fn (acc: bool, i: int64) -> {
-      prev = index(dates, sub(i, cast(1, int64)))
+  if lte(n, cast(1, i64)) then true else {
+    idxs = range(cast(1, i64), n)
+    fold(fn (acc: bool, i: i64) -> {
+      prev = index(dates, sub(i, cast(1, i64)))
       curr = index(dates, i)
       and(acc, date_lt(prev, curr))
     }, true, idxs)

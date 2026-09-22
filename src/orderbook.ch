@@ -37,11 +37,11 @@ def add_ask(book: OrderBook, price: f32, qty: f32) -> OrderBook =
   }
 def best_bid(book: OrderBook) -> Order =
   match book with {
-    | OrderBook { bids: bs, asks: _ } => if bs |> len |> eq(cast(0, int64)) then Order { price: nan_f32(), qty: cast(0.0, f32) } else index(bs, cast(0, int64))
+    | OrderBook { bids: bs, asks: _ } => if bs |> len |> eq(cast(0, i64)) then Order { price: nan_f32(), qty: cast(0.0, f32) } else index(bs, cast(0, i64))
   }
 def best_ask(book: OrderBook) -> Order =
   match book with {
-    | OrderBook { bids: _, asks: as_ } => if as_ |> len |> eq(cast(0, int64)) then Order { price: nan_f32(), qty: cast(0.0, f32) } else index(as_, cast(0, int64))
+    | OrderBook { bids: _, asks: as_ } => if as_ |> len |> eq(cast(0, i64)) then Order { price: nan_f32(), qty: cast(0.0, f32) } else index(as_, cast(0, i64))
   }
 def bid_ask_spread(book: OrderBook) -> f32 = {
   ba = best_ask(book)

@@ -149,7 +149,7 @@ def build_program(case_tag: str, true_alpha: float, true_beta: float,
         f"  weights = {_tensor_lit([1.0] * len(STRIKES))}",
         (f"  fit = lm_bounded_nparam(sabr_model_{case_tag}, strikes, "
          f"observed, weights, theta0, lo, hi, {_f32_lit(LAMBDA0)}, "
-         f"{_f32_lit(TOL)}, cast({MAX_ITERS}, int64), {_f32_lit(FD_EPS)})"),
+         f"{_f32_lit(TOL)}, cast({MAX_ITERS}, i64), {_f32_lit(FD_EPS)})"),
         "  theta_fit = fit.0",
         "  sse_final = fit.1",
         "  iters_used = fit.2",
@@ -185,7 +185,7 @@ def build_program(case_tag: str, true_alpha: float, true_beta: float,
     )
     extractions.append(("max_rel_iv_err", "max_rel"))
     for i, name in enumerate(PARAM_NAMES):
-        setup_lines.append(f"  {name}_fit = index(theta_l, cast({i}, int64))")
+        setup_lines.append(f"  {name}_fit = index(theta_l, cast({i}, i64))")
         extractions.append((f"{name}_fit", f"{name}_fit"))
     setup = "\n".join(setup_lines) + "\n"
 
@@ -206,10 +206,10 @@ def build_program(case_tag: str, true_alpha: float, true_beta: float,
     model_def = (
         f"def sabr_model_{case_tag}(theta: &tensor[4, f32], strikes: &tensor[5, f32]) -> tensor[5, f32] = {{\n"
         f"  th_l = to_list(theta)\n"
-        f"  a = index(th_l, cast(0, int64))\n"
-        f"  b = index(th_l, cast(1, int64))\n"
-        f"  r = index(th_l, cast(2, int64))\n"
-        f"  v = index(th_l, cast(3, int64))\n"
+        f"  a = index(th_l, cast(0, i64))\n"
+        f"  b = index(th_l, cast(1, i64))\n"
+        f"  r = index(th_l, cast(2, i64))\n"
+        f"  v = index(th_l, cast(3, i64))\n"
         f"  s = SABR {{ alpha: a, beta: b, rho: r, nu: v }}\n"
         f"  to_tensor(map(fn (k: f32) -> vs_sabr_implied_vol(s, {_f32_lit(F_FWD)}, k, {_f32_lit(T_YR)}), to_list(strikes)))\n"
         f"}}"

@@ -3,23 +3,23 @@ import Std.Test (assert_close, assert_true)
 import Shoals.ModelFit (sequential_pipeline_2stage, sequential_pipeline_2stage_gradient, lm_bounded_nparam)
 def mph_linear_model[n, m](theta: &tensor[n, f32], x: &tensor[m, f32]) -> tensor[m, f32] = {
   th_l = to_list(theta)
-  a = index(th_l, cast(0, int64))
-  b = index(th_l, cast(1, int64))
+  a = index(th_l, cast(0, i64))
+  b = index(th_l, cast(1, i64))
   to_tensor(map(fn (xi: f32) -> add(mul(a, xi), b), to_list(x)))
 }
 def mph_stage1_to_stage2_passthrough[n](theta1: &tensor[n, f32]) -> tensor[2, f32] = {
   th_l = to_list(theta1)
-  a = index(th_l, cast(0, int64))
-  b = index(th_l, cast(1, int64))
+  a = index(th_l, cast(0, i64))
+  b = index(th_l, cast(1, i64))
   to_tensor([a, b])
 }
 def mph_stage2_model[n, m](theta: &tensor[n, f32], features: &tensor[m, f32]) -> tensor[m, f32] = {
   th_l = to_list(theta)
-  c = index(th_l, cast(0, int64))
-  d = index(th_l, cast(1, int64))
+  c = index(th_l, cast(0, i64))
+  d = index(th_l, cast(1, i64))
   f_l = to_list(features)
-  a = index(f_l, cast(0, int64))
-  b = index(f_l, cast(1, int64))
+  a = index(f_l, cast(0, i64))
+  b = index(f_l, cast(1, i64))
   to_tensor([mul(c, a), mul(d, b)])
 }
 def test_pipeline_2stage_each_stage_converged() -> unit ! { Test } = {
@@ -34,7 +34,7 @@ def test_pipeline_2stage_each_stage_converged() -> unit ! { Test } = {
   theta2_0 = to_tensor([cast(1.9, f32), cast(1.9, f32)])
   lo2 = to_tensor([cast(-10.0, f32), cast(-10.0, f32)])
   hi2 = to_tensor([cast(10.0, f32), cast(10.0, f32)])
-  max_it = cast(200, int64)
+  max_it = cast(200, i64)
   out = sequential_pipeline_2stage(mph_linear_model, copy(xs), copy(ys), copy(weights1), theta1_0, copy(lo1), copy(hi1), mph_stage1_to_stage2_passthrough, mph_stage2_model, copy(observed2), copy(weights2), theta2_0, copy(lo2), copy(hi2), cast(0.01, f32), cast(0.0001, f32), max_it, cast(0.0001, f32))
   sse1 = out.2
   sse2 = out.3
@@ -58,15 +58,15 @@ def mph_pipeline_at_observed1(observed1: tensor[5, f32]) -> tensor[2, f32] = {
   theta2_0 = to_tensor([cast(1.0, f32), cast(1.0, f32)])
   lo2 = to_tensor([cast(-10.0, f32), cast(-10.0, f32)])
   hi2 = to_tensor([cast(10.0, f32), cast(10.0, f32)])
-  out = sequential_pipeline_2stage(mph_linear_model, copy(xs), copy(observed1), copy(weights1), theta1_0, copy(lo1), copy(hi1), mph_stage1_to_stage2_passthrough, mph_stage2_model, copy(observed2), copy(weights2), theta2_0, copy(lo2), copy(hi2), cast(0.01, f32), cast(1e-6, f32), cast(200, int64), cast(0.0001, f32))
+  out = sequential_pipeline_2stage(mph_linear_model, copy(xs), copy(observed1), copy(weights1), theta1_0, copy(lo1), copy(hi1), mph_stage1_to_stage2_passthrough, mph_stage2_model, copy(observed2), copy(weights2), theta2_0, copy(lo2), copy(hi2), cast(0.01, f32), cast(1e-6, f32), cast(200, i64), cast(0.0001, f32))
   out.1
 }
-def mph_bumph_jth(observed1: &tensor[5, f32], j: int64, eps: f32) -> tensor[5, f32] = {
+def mph_bumph_jth(observed1: &tensor[5, f32], j: i64, eps: f32) -> tensor[5, f32] = {
   obs_l = to_list(observed1)
   n = len(obs_l)
-  idxs = range(cast(0, int64), n)
+  idxs = range(cast(0, i64), n)
   pairs = zip(idxs, obs_l)
-  to_tensor(map(fn (e: (int64, f32)) -> if eq(e.0, j) then add(e.1, eps) else e.1, pairs))
+  to_tensor(map(fn (e: (i64, f32)) -> if eq(e.0, j) then add(e.1, eps) else e.1, pairs))
 }
 def mph_rel_err(a: f32, b: f32) -> f32 = {
   diff = sub(a, b)
@@ -88,18 +88,18 @@ def test_pipeline_2stage_gradient_vs_full_fd_bump() -> unit ! { Test } = {
   lo2 = to_tensor([cast(-10.0, f32), cast(-10.0, f32)])
   hi2 = to_tensor([cast(10.0, f32), cast(10.0, f32)])
   bumph_eps = cast(0.001, f32)
-  jac = sequential_pipeline_2stage_gradient(mph_linear_model, copy(xs), copy(ys), copy(weights1), copy(theta1_0), copy(lo1), copy(hi1), mph_stage1_to_stage2_passthrough, mph_stage2_model, copy(observed2), copy(weights2), copy(theta2_0), copy(lo2), copy(hi2), cast(0.01, f32), cast(1e-6, f32), cast(200, int64), cast(0.0001, f32), bumph_eps)
+  jac = sequential_pipeline_2stage_gradient(mph_linear_model, copy(xs), copy(ys), copy(weights1), copy(theta1_0), copy(lo1), copy(hi1), mph_stage1_to_stage2_passthrough, mph_stage2_model, copy(observed2), copy(weights2), copy(theta2_0), copy(lo2), copy(hi2), cast(0.01, f32), cast(1e-6, f32), cast(200, i64), cast(0.0001, f32), bumph_eps)
   theta2_base = mph_pipeline_at_observed1(copy(ys))
   theta2_base_l = to_list(theta2_base)
-  jac_flat = to_list(reshape(jac, [cast(10, int64)]))
-  m1_len = cast(5, int64)
-  idxs_j = range(cast(0, int64), m1_len)
-  per_col_ok = map(fn (j: int64) -> {
+  jac_flat = to_list(reshape(jac, [cast(10, i64)]))
+  m1_len = cast(5, i64)
+  idxs_j = range(cast(0, i64), m1_len)
+  per_col_ok = map(fn (j: i64) -> {
     ys_bumped = mph_bumph_jth(copy(ys), j, bumph_eps)
     theta2_bumped = mph_pipeline_at_observed1(ys_bumped)
     theta2_bumped_l = to_list(theta2_bumped)
-    g0_ref = div(sub(index(theta2_bumped_l, cast(0, int64)), index(theta2_base_l, cast(0, int64))), bumph_eps)
-    g1_ref = div(sub(index(theta2_bumped_l, cast(1, int64)), index(theta2_base_l, cast(1, int64))), bumph_eps)
+    g0_ref = div(sub(index(theta2_bumped_l, cast(0, i64)), index(theta2_base_l, cast(0, i64))), bumph_eps)
+    g1_ref = div(sub(index(theta2_bumped_l, cast(1, i64)), index(theta2_base_l, cast(1, i64))), bumph_eps)
     g0_api = index(jac_flat, j)
     g1_api = index(jac_flat, add(m1_len, j))
     rel0 = mph_rel_err(g0_api, g0_ref)

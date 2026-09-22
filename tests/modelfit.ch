@@ -27,8 +27,8 @@ def test_vega_weighted_higher_at_low_vega() -> unit ! { Test } = {
   vegas = to_tensor([cast(0.5, f32), cast(2.0, f32)])
   res = vega_weighted_squared_residuals(observed, predicted, vegas)
   res_l = to_list(res)
-  r0 = index(res_l, cast(0, int64))
-  r1 = index(res_l, cast(1, int64))
+  r0 = index(res_l, cast(0, i64))
+  r1 = index(res_l, cast(1, i64))
   assert_true(gt(r0, r1), "lower-vega point gets higher weight when residuals equal magnitude")
 }
 def test_weighted_absolute_zero_residuals() -> unit ! { Test } = {

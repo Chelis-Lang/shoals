@@ -26,13 +26,13 @@ convention. `Act360` divides actual days by 360, `Act365` divides by 365,
 actual days by 365.25. From `tests/date.ch`:
 
 ```chelis
-start = date(cast(2025, int64), cast(1, int64), cast(1, int64))
-end = date(cast(2026, int64), cast(1, int64), cast(1, int64))
+start = date(cast(2025, i64), cast(1, i64), cast(1, i64))
+end = date(cast(2026, i64), cast(1, i64), cast(1, i64))
 yf = year_fraction(start, end, Act365)  // yf == 1.0
 
 half = year_fraction(
-  date(cast(2025, int64), cast(1, int64), cast(15, int64)),
-  date(cast(2025, int64), cast(7, int64), cast(15, int64)),
+  date(cast(2025, i64), cast(1, i64), cast(15, i64)),
+  date(cast(2025, i64), cast(7, i64), cast(15, i64)),
   ThirtyThreeSixty
 )  // half == 0.5
 ```
@@ -44,7 +44,7 @@ def is_weekend(d: Date) -> bool
 def date_roll_following(d: Date, weekend_only: bool) -> Date
 def date_roll_modified_following(d: Date, weekend_only: bool) -> Date
 def date_roll_preceding(d: Date, weekend_only: bool) -> Date
-def add_business_days(d: Date, n: int64, weekend_only: bool) -> Date
+def add_business_days(d: Date, n: i64, weekend_only: bool) -> Date
 ```
 
 `is_weekend` reports whether a date falls on Saturday or Sunday.
@@ -56,7 +56,7 @@ next month, in which case it rolls back. `add_business_days` steps forward
 following Monday:
 
 ```chelis
-sat = date(cast(2025, int64), cast(1, int64), cast(4, int64))
+sat = date(cast(2025, i64), cast(1, i64), cast(4, i64))
 rolled = date_roll_following(sat, true)
 // rolled is Monday 2025-01-06
 ```
@@ -68,7 +68,7 @@ combine it with the [holiday calendars](calendars.md).
 ## Schedule generation
 
 ```chelis
-def schedule_from_tenor(start: Date, end: Date, step_months: int64) -> List[Date]
+def schedule_from_tenor(start: Date, end: Date, step_months: i64) -> List[Date]
 ```
 
 `schedule_from_tenor` returns a list of dates from `start`, stepped by
@@ -78,9 +78,9 @@ From `tests/date.ch`, a quarterly schedule across 2025 has five stops:
 
 ```chelis
 dates = schedule_from_tenor(
-  date(cast(2025, int64), cast(1, int64), cast(1, int64)),
-  date(cast(2025, int64), cast(12, int64), cast(31, int64)),
-  cast(3, int64)
+  date(cast(2025, i64), cast(1, i64), cast(1, i64)),
+  date(cast(2025, i64), cast(12, i64), cast(31, i64)),
+  cast(3, i64)
 )
 // len(dates) == 5
 ```

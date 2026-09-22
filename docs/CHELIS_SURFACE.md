@@ -1,4 +1,4 @@
-<!-- BEGIN CHELIS MANAGED BLOCK: chelis-surface-header chelis@0.18.10 (sha256:28011bed9ccb5778) -->
+<!-- BEGIN CHELIS MANAGED BLOCK: chelis-surface-header chelis@0.18.11 (sha256:28011bed9ccb5778) -->
 This file is a domain-scoped view of the canonical Chelis capability surface,
 generated for the pinned toolchain. Each capability row is marked `@pin` (usable
 at the current pin) or `@upstream` (lands at the next bump). **Read it before
@@ -10,13 +10,28 @@ in `Chelis-Lang/chelis`.
 
 # Chelis Capability Surface for Shoals
 
+**Current manifest:** Shoals 0.24.13 / Chelis 0.18.11 / chelis-std 0.4.0 /
+Nautilus 0.7.46 / Coral 0.7.43. Migration evidence is recorded in
+[`chelis_0_18_11_migration.md`](chelis_0_18_11_migration.md).
+Capability markers below are refreshed for the current pin. Numerical
+measurements remain tied to the release named beside each measurement and are
+not silently promoted. The current WireDag is schema 15 (1522 nodes, root 787),
+and Nautilus's f32 `erf` uses a four-term Taylor branch below `|x|=0.25`.
+
 What the Chelis language and the bundled chelis-std actually provide to the
 quantitative-finance domain this shell touches — numerical methods, pricing,
 Greeks, and the proof surface over them. **Read this before designing around a
 suspected language gap.**
 
-> **Pinned manifest:** Shoals 0.24.10; chelis 0.18.6 (chelis-std 0.4.0,
-> bundled), Nautilus 0.7.43, Coral 0.7.40 · **Last refreshed:** 2026-08-29
+> **Pinned manifest:** Shoals 0.24.13; Chelis 0.18.11 (chelis-std 0.4.0,
+> bundled), Nautilus 0.7.46, Coral 0.7.43 · **Last refreshed:** 2026-09-21
+
+The exact current release receipts and migration evidence are in
+[`chelis_0_18_11_migration.md`](chelis_0_18_11_migration.md) and the frozen
+CNote manifest. The release-specific narrative below is retained as historical
+de-narrowing evidence.
+
+## Historical 0.18.6 de-narrowing record
 
 The published Chelis `v0.18.6` tag resolves to commit
 `cf49f85bf0d1bca2c87c88a3e459c446912189c0`. Release workflow `33232762790`
@@ -187,9 +202,10 @@ tiers: **A** (type/dimension/linearity), **B** (SMT via cvc5 over the reals),
 | `if/then/else` | `@pin` | Lowers as ITE in `QF_NRA`. |
 | `Option[T]`, `Some`/`None`, `match`; `@opaque` + `@invariant` | `@pin` | Opaque-invariant abstraction is the path from synthetic green to a green a quant recognizes (report §1, §3); producer obligations discharge at SMT. |
 | `Std.Test` (`assert_close`, `assert_eq`) | `@pin` | The executable numeric suites under `tests/` and `tests-manual/`. **Changed at 0.18.6:** `assert_eq_int` / `assert_eq_bool` / `assert_eq_string` / `assert_eq_tensor_int64` are gone with no alias; use the polymorphic `assert_eq[q](actual, expected, label)`. `assert_close` widened from `f32` to `[p_float]` — a loosening, and its tolerance must now share the tensors' dtype in `assert_close_tensor` (unused here). |
-| WireDag lowering (`chelis tide serve` `/lower`) | `@pin` | Schema **6** at this pin (was 5), exact-only with no legacy aliases (chelis#1287/chelis#1306). Shoals pins the lowered `bs_call_wire_f64` DAG byte-exactly in `scripts/validate_bs_wire_root.py`; the 0.18.6 direct-`sub` identity moved it to 972 nodes / entry root 512 / raw sha256 `0c85b5c0…fabe`. Re-audit that constant by op-kind histogram at every pin bump, never by accepting the new hash. |
-| Front-end check throughput | `@pin` | Substantially faster at 0.18.6 (chelis#1316/chelis#1207/chelis#1205): on this corpus `chelis check src/modelfit.ch` 67.6s → 31.6s and the 3-line `src/core.ch` dependency-load floor 31.2s → 17.0s. **But `chelis test --batch-mode auto` regressed 2.6x on `tests/`** (3m01s → 7m54s); see `docs/UPSTREAM_BUGS.md` §Actively blocking. |
-| `count` ([05-OP-29]), direct `sub` / `min_elem` ([05-OP-40]/[05-OP-41]), `stop_gradient` ([05-OP-42]) | `@upstream` | New at 0.18.6 but unused by this shell today. `stop_gradient` and relu's own adjoint are specified with `Unimplemented` backend cells (chelis#1312/chelis#1313) and are not usable at this pin. |
+| WireDag lowering (`chelis tide serve` `/lower`) | `@pin` | Schema **15**, exact-only. Shoals pins `bs_call_wire_f64` byte-exactly in `scripts/validate_bs_wire_root.py`: 1522 nodes, entry root 787, raw SHA-256 `3be34d901db81b1a0b250d6cb6e8b8b934f11c13323206fb1894b50e9fcfab02`. Relative to 0.18.10, 14 `Copy` and 14 `Drop` nodes are added and `cmp_lt` becomes `compare(comparison=lt)`; copy-elided dataflow, op parameters, precisions, and 15 named loads agree. Symbolic dimension names differ, so no shape-equivalence claim is made. |
+| Front-end check throughput | `@pin` | The compiler surface is available. The 0.18.6 measurements (31.6s for `src/modelfit.ch`, 17.0s dependency-load floor, and a 7m54s batched-suite observation) remain historical measurements, not 0.18.11 performance claims. The pin-bump full gate owns current acceptance. |
+| `count` ([05-OP-29]), direct `sub` / `min_elem` ([05-OP-40]/[05-OP-41]) | `@pin` | Shipped before this pin and available, though Shoals does not currently depend on them. |
+| `stop_gradient` ([05-OP-42]) | `@upstream` | The contract exists, but implementation remains open in chelis#1312; Shoals does not claim it at this pin. Relu's dedicated adjoint is a separate closed issue (chelis#1313). |
 | chelis-std / nautilus / coral module surface | `@pin` | Pricing, distributions, RNG, curves, dates, vol surfaces per `src/` + `references/`. |
 
 ## Numerical accuracy of shell-authored kernels
@@ -294,7 +310,7 @@ all in this repository -- plus TWO Python mirrors,
 `research/proof-infra/ad/harness.py` and
 `scripts/oracle_greeks_gate.py::_erf_as_f32`. The second is the one with a live
 maintenance trigger: it models `Nautilus.Special.erf` and must be re-measured at
-the next nautilus pin bump past 0.7.43 (see `docs/UPSTREAM_BUGS.md`).
+the next nautilus pin bump past 0.7.46 (see `docs/UPSTREAM_BUGS.md`).
 Add `Nautilus.Special.erf`/`erf_t`
 upstream. Since `erf64` moved to Cody's these are no longer copies of one
 algorithm but two different ones, so it is drift rather than redundancy, and

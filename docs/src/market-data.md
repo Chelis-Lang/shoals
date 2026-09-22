@@ -28,7 +28,7 @@ date. `quote` constructs one; `quote_side` and `quote_value` read the side
 and value back. From `tests/marketdata.ch`:
 
 ```chelis
-d = date(cast(2025, int64), cast(6, int64), cast(15, int64))
+d = date(cast(2025, i64), cast(6, i64), cast(15, i64))
 q = make_quote(Bid, cast(100.5, f32), d)
 v = quote_value(q)  // v == 100.5
 ```

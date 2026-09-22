@@ -68,8 +68,8 @@ def xva_trapezoidal_df_weighted[n](time_grid: tensor[n, f32], weight: tensor[n, 
   ts_l = to_list(time_grid)
   w_l = to_list(weight)
   pairs = zip(ts_l, w_l)
-  init = (cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(0, int64))
-  out = fold(fn (state: (f32, f32, f32, int64), entry: (f32, f32)) -> {
+  init = (cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(0, i64))
+  out = fold(fn (state: (f32, f32, f32, i64), entry: (f32, f32)) -> {
     prev_t = state.0
     prev_dfw = state.1
     accum = state.2
@@ -80,18 +80,18 @@ def xva_trapezoidal_df_weighted[n](time_grid: tensor[n, f32], weight: tensor[n, 
     dfw_i = mul(df_i, w_i)
     dt_i = sub(t_i, prev_t)
     avg_dfw = add(prev_dfw, dfw_i) |> mul(cast(0.5, f32))
-    contribution = if eq(idx, cast(0, int64)) then cast(0.0, f32) else avg_dfw |> mul(dt_i)
-    (t_i, dfw_i, add(accum, contribution), add(idx, cast(1, int64)))
+    contribution = if eq(idx, cast(0, i64)) then cast(0.0, f32) else avg_dfw |> mul(dt_i)
+    (t_i, dfw_i, add(accum, contribution), add(idx, cast(1, i64)))
   }, init, pairs)
   out.2
 }
 def fva[n](time_grid: tensor[n, f32], epe: tensor[n, f32], funding_spread: f32, discount_rate: f32) -> f32 = mul(funding_spread, xva_trapezoidal_df_weighted(time_grid, epe, discount_rate))
 def kva[n](time_grid: tensor[n, f32], ead: tensor[n, f32], cost_of_capital: f32, regulatory_capital_weight: f32, discount_rate: f32) -> f32 = mul(cost_of_capital, mul(regulatory_capital_weight, xva_trapezoidal_df_weighted(time_grid, ead, discount_rate)))
-def xva_cva_stochastic_recovery[n](time_grid: tensor[n, f32], epe: tensor[n, f32], hazard: f32, recovery_alpha: f32, recovery_beta: f32, discount_rate: f32, n_paths: int64) -> f32 ! { Random } = {
+def xva_cva_stochastic_recovery[n](time_grid: tensor[n, f32], epe: tensor[n, f32], hazard: f32, recovery_alpha: f32, recovery_beta: f32, discount_rate: f32, n_paths: i64) -> f32 ! { Random } = {
   zero_f = cast(0.0, f32)
   one_f = cast(1.0, f32)
   bare = cva_constant_hazard(time_grid, epe, hazard, zero_f, discount_rate)
-  template = to_tensor(map(fn (i: int64) -> zero_f, range(cast(0, int64), n_paths)))
+  template = to_tensor(map(fn (i: i64) -> zero_f, range(cast(0, i64), n_paths)))
   xs = gamma_sample(copy(template), recovery_alpha, one_f)
   ys = gamma_sample(template, recovery_beta, one_f)
   xs_l = to_list(xs)
@@ -143,17 +143,17 @@ def xva_cva_stochastic_hazard[n, m](time_grid: tensor[m, f32], epe: tensor[m, f3
   }
   }
 }
-def xva_cva_wwr_constant_hazard[n](time_grid: tensor[n, f32], epe: tensor[n, f32], hazard: f32, recovery: f32, discount_rate: f32, rho: f32, n_paths: int64) -> f32 ! { Random } = {
+def xva_cva_wwr_constant_hazard[n](time_grid: tensor[n, f32], epe: tensor[n, f32], hazard: f32, recovery: f32, discount_rate: f32, rho: f32, n_paths: i64) -> f32 ! { Random } = {
   zero_f = cast(0.0, f32)
   one_f = cast(1.0, f32)
   eta_e = cast(0.5, f32)
   lgd = sub(one_f, recovery)
-  template = to_tensor(map(fn (i: int64) -> zero_f, range(cast(0, int64), n_paths)))
+  template = to_tensor(map(fn (i: i64) -> zero_f, range(cast(0, i64), n_paths)))
   z_e_t = normal_sample(copy(template), zero_f, one_f)
   z_d_t = normal_sample(template, zero_f, one_f)
   ts_l = to_list(copy(time_grid))
   n_grid = numel(copy(time_grid))
-  t_max = index(ts_l, sub(cast(n_grid, int64), cast(1, int64)))
+  t_max = index(ts_l, sub(cast(n_grid, i64), cast(1, i64)))
   z_e_l = to_list(z_e_t)
   z_d_l = to_list(z_d_t)
   pairs = zip(z_e_l, z_d_l)

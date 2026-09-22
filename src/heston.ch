@@ -83,17 +83,17 @@ def heston_call_carr_madan(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32,
   raw_price = div(mul(exp_neg_alpha_lnk, integral_value), heston_pi_const())
   if gt(raw_price, cast(0.0, f32)) then raw_price else cast(0.0, f32)
 }
-def gauss_legendre_panels(f: f32 -> f32, a: f32, b: f32, n_panels: int64) -> f32 = {
+def gauss_legendre_panels(f: f32 -> f32, a: f32, b: f32, n_panels: i64) -> f32 = {
   panel_width = div(sub(b, a), cast(n_panels, f32))
-  idxs = range(cast(0, int64), n_panels)
-  parts = map(fn (i: int64) -> {
+  idxs = range(cast(0, i64), n_panels)
+  parts = map(fn (i: i64) -> {
     sub_a = add(a, mul(cast(i, f32), panel_width))
     sub_b = add(sub_a, panel_width)
     gauss_legendre_10(f, sub_a, sub_b)
   }, idxs)
   fold(fn (acc: f32, x: f32) -> add(acc, x), cast(0.0, f32), parts)
 }
-def heston_call_carr_madan_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, alpha: f32, u_max: f32, n_panels: int64) -> f32 = {
+def heston_call_carr_madan_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, alpha: f32, u_max: f32, n_panels: i64) -> f32 = {
   log_k = log(k)
   alpha_plus_one = add(alpha, cast(1.0, f32))
   two_alpha_plus_one = add(mul(cast(2.0, f32), alpha), cast(1.0, f32))
@@ -114,13 +114,13 @@ def heston_call_carr_madan_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kapp
   raw_price = div(mul(exp_neg_alpha_lnk, integral_value), heston_pi_const())
   if gt(raw_price, cast(0.0, f32)) then raw_price else cast(0.0, f32)
 }
-def heston_put_carr_madan_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, alpha: f32, u_max: f32, n_panels: int64) -> f32 = {
+def heston_put_carr_madan_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, alpha: f32, u_max: f32, n_panels: i64) -> f32 = {
   call_price = heston_call_carr_madan_panels(s0, k, t, r, v0, kappa, theta, sigma, rho, alpha, u_max, n_panels)
   exp_neg_rt = exp(neg(mul(r, t)))
   raw_put = sub(add(call_price, mul(k, exp_neg_rt)), s0)
   if gt(raw_put, cast(0.0, f32)) then raw_put else cast(0.0, f32)
 }
-def heston_call_lewis_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, u_max: f32, n_panels: int64) -> f32 = {
+def heston_call_lewis_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, u_max: f32, n_panels: i64) -> f32 = {
   exp_neg_rt = exp(neg(mul(r, t)))
   forward = div(s0, exp_neg_rt)
   log_k = log(k)
@@ -140,20 +140,20 @@ def heston_call_lewis_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f3
   raw_price = sub(s0, correction)
   if gt(raw_price, cast(0.0, f32)) then raw_price else cast(0.0, f32)
 }
-def heston_put_lewis_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, u_max: f32, n_panels: int64) -> f32 = {
+def heston_put_lewis_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, u_max: f32, n_panels: i64) -> f32 = {
   call_price = heston_call_lewis_panels(s0, k, t, r, v0, kappa, theta, sigma, rho, u_max, n_panels)
   exp_neg_rt = exp(neg(mul(r, t)))
   raw_put = sub(add(call_price, mul(k, exp_neg_rt)), s0)
   if gt(raw_put, cast(0.0, f32)) then raw_put else cast(0.0, f32)
 }
-def heston_lipton_pj(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, u_max: f32, n_panels: int64, j: int64) -> f32 = {
+def heston_lipton_pj(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, u_max: f32, n_panels: i64, j: i64) -> f32 = {
   log_k = log(k)
   exp_neg_rt = exp(neg(mul(r, t)))
   forward = div(s0, exp_neg_rt)
   integrand = fn (u: f32) -> {
     u_complex = (u, cast(0.0, f32))
     phi_val = heston_charfn(u_complex, s0, r, v0, kappa, theta, sigma, rho, t)
-    f_val = if eq(j, cast(1, int64)) then {
+    f_val = if eq(j, cast(1, i64)) then {
       u_shifted = (u, cast(-1.0, f32))
       phi_shifted = heston_charfn(u_shifted, s0, r, v0, kappa, theta, sigma, rho, t)
       cscale(phi_shifted, div(cast(1.0, f32), forward))
@@ -166,14 +166,14 @@ def heston_lipton_pj(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32, theta
   integral_value = gauss_legendre_panels(integrand, cast(0.0, f32), u_max, n_panels)
   add(cast(0.5, f32), div(integral_value, heston_pi_const()))
 }
-def heston_call_lipton_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, u_max: f32, n_panels: int64) -> f32 = {
+def heston_call_lipton_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, u_max: f32, n_panels: i64) -> f32 = {
   exp_neg_rt = exp(neg(mul(r, t)))
-  p1 = heston_lipton_pj(s0, k, t, r, v0, kappa, theta, sigma, rho, u_max, n_panels, cast(1, int64))
-  p2 = heston_lipton_pj(s0, k, t, r, v0, kappa, theta, sigma, rho, u_max, n_panels, cast(2, int64))
+  p1 = heston_lipton_pj(s0, k, t, r, v0, kappa, theta, sigma, rho, u_max, n_panels, cast(1, i64))
+  p2 = heston_lipton_pj(s0, k, t, r, v0, kappa, theta, sigma, rho, u_max, n_panels, cast(2, i64))
   raw_price = sub(mul(s0, p1), mul(mul(k, exp_neg_rt), p2))
   if gt(raw_price, cast(0.0, f32)) then raw_price else cast(0.0, f32)
 }
-def heston_put_lipton_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, u_max: f32, n_panels: int64) -> f32 = {
+def heston_put_lipton_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, u_max: f32, n_panels: i64) -> f32 = {
   call_price = heston_call_lipton_panels(s0, k, t, r, v0, kappa, theta, sigma, rho, u_max, n_panels)
   exp_neg_rt = exp(neg(mul(r, t)))
   raw_put = sub(add(call_price, mul(k, exp_neg_rt)), s0)

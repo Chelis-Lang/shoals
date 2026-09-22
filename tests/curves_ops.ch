@@ -15,7 +15,7 @@ def test_parallel_shift_negative() -> unit ! { Test } = {
   assert_close(r2, cast(0.035, f32), cast(0.00001, f32), "-50bp at 2y")
 }
 def test_key_rate_shift_affects_only_chosen_pillar() -> unit ! { Test } = {
-  shifted = key_rate_shift(base_curve(), cast(1, int64), cast(0.005, f32))
+  shifted = key_rate_shift(base_curve(), cast(1, i64), cast(0.005, f32))
   r1 = rate_at(shifted, cast(1.0, f32))
   r2 = rate_at(shifted, cast(2.0, f32))
   r3 = rate_at(shifted, cast(3.0, f32))

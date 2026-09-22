@@ -93,7 +93,7 @@ the length of a template tensor you pass in. This example, from
 import Shoals.Pricing (mc_call_price)
 
 def example() -> f32 ! { Random } = {
-  template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(20000, int64))))
+  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
   with seed(42) {
     mc_call_price(template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
   }

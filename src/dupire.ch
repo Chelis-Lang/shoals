@@ -47,7 +47,7 @@ def du_local_vol_from_iv_surface(iv_surface_fn: f32 -> f32 -> f32, s0: f32, r: f
   call_fn = fn (k: f32, t: f32) -> du_call_from_iv(iv_surface_fn, s0, r, q, k, t)
   du_local_vol_from_call_closure(call_fn, r, q, k_query, t_query, fd_eps_k, fd_eps_t)
 }
-def du_extract_row[n_k, n_t](iv_grid: &tensor[n_t, n_k, f32], j: int64, tpl_t: &tensor[n_t, f32]) -> tensor[n_k, f32] = {
+def du_extract_row[n_k, n_t](iv_grid: &tensor[n_t, n_k, f32], j: i64, tpl_t: &tensor[n_t, f32]) -> tensor[n_k, f32] = {
   e_j = la_basis_n_f32(j, du_one_f(), tpl_t)
   einsum("ij,i->j", iv_grid, e_j)
 }
@@ -56,9 +56,9 @@ def du_cubic_log_moneyness_interp[n_k, n_t](strikes: &tensor[n_k, f32], times: &
   xs = to_tensor(map(fn (kk: f32) -> log(div(kk, forward)), to_list(strikes)))
   n_t_len = len(to_list(times))
   tpl_t = to_tensor(map(fn (v: f32) -> du_zero_f(), to_list(times)))
-  iv_at_query_per_t = to_tensor(map(fn (j: int64) -> {
+  iv_at_query_per_t = to_tensor(map(fn (j: i64) -> {
     row = du_extract_row(iv_grid, j, copy(tpl_t))
     spline_eval(copy(xs), row, x_query)
-  }, range(cast(0, int64), n_t_len)))
+  }, range(cast(0, i64), n_t_len)))
   linear_interp_sorted(times, iv_at_query_per_t, t_query)
 }

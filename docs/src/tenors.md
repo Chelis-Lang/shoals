@@ -19,7 +19,7 @@ type TenorUnit =
   | SpotNext
 
 type Tenor =
-  | Tenor { count: int64, unit: TenorUnit }
+  | Tenor { count: i64, unit: TenorUnit }
 ```
 
 A `Tenor` is a `count` and a `TenorUnit`. The units include calendar steps
@@ -29,11 +29,11 @@ tomorrow-next, and spot-next.
 ## Constructors
 
 ```chelis
-def tenor(count: int64, unit: TenorUnit) -> Tenor
-def days_n(n: int64) -> Tenor
-def weeks_n(n: int64) -> Tenor
-def months_n(n: int64) -> Tenor
-def years_n(n: int64) -> Tenor
+def tenor(count: i64, unit: TenorUnit) -> Tenor
+def days_n(n: i64) -> Tenor
+def weeks_n(n: i64) -> Tenor
+def months_n(n: i64) -> Tenor
+def years_n(n: i64) -> Tenor
 def overnight() -> Tenor
 def tomorrow_next() -> Tenor
 def spot_next() -> Tenor
@@ -47,8 +47,8 @@ negative count expresses a step into the past.
 ## Conversion and application
 
 ```chelis
-def days_per_unit(unit: TenorUnit) -> int64
-def tenor_to_days(t: Tenor) -> int64
+def days_per_unit(unit: TenorUnit) -> i64
+def tenor_to_days(t: Tenor) -> i64
 def tenor_apply(t: Tenor, reference: Date) -> Date
 ```
 
@@ -62,10 +62,10 @@ From `tests/tenor.ch`, three months is ninety days and advances a reference
 date by ninety days:
 
 ```chelis
-d = tenor_to_days(months_n(cast(3, int64)))  // d == 90
+d = tenor_to_days(months_n(cast(3, i64)))  // d == 90
 
-ref = date(cast(2025, int64), cast(6, int64), cast(15, int64))
-shifted = tenor_apply(months_n(cast(3, int64)), ref)
+ref = date(cast(2025, i64), cast(6, i64), cast(15, i64))
+shifted = tenor_apply(months_n(cast(3, i64)), ref)
 // days_between(ref, shifted) == 90
 ```
 

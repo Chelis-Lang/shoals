@@ -7,9 +7,9 @@ finance.
 ## Scalars are explicitly typed
 
 Numeric literals are cast to their element type. A 32-bit float literal is
-written `cast(100.0, f32)`, and an integer is written `cast(3, int64)`.
+written `cast(100.0, f32)`, and an integer is written `cast(3, i64)`.
 Every Shoals price, rate, and volatility argument is `f32`. Indices and
-counts are `int64`.
+counts are `i64`.
 
 ## Building tensors
 
@@ -23,7 +23,7 @@ To build a tensor of a fixed length programmatically, map over a range. A
 template of twenty thousand zeros, used to size a Monte Carlo run, is:
 
 ```chelis
-template = to_tensor(map(fn (i: int64) -> cast(0.0, f32), range(cast(0, int64), cast(20000, int64))))
+template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
 ```
 
 A tensor is turned back into a list with `to_list`, and an element is read
@@ -31,7 +31,7 @@ with `index`:
 
 ```chelis
 prices = to_list(call_prices(spots, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32)))
-first = index(prices, cast(0, int64))
+first = index(prices, cast(0, i64))
 ```
 
 Tensors that are consumed more than once are duplicated with `copy`, so a

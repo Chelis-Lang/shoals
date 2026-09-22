@@ -258,12 +258,17 @@ in code that is CLOSED upstream but not sitting in §Archived.
       signature barrier and does not cover `Nautilus.Special`; citing it would
       make the de-narrowing branch unexecutable, since closing it would not
       yield an f64 `erf`.
+    - **0.18.11 / Nautilus 0.7.46 refresh:** the f64 blocked probe still
+      rejects. The published f32 kernel now uses the four-term Taylor series
+      below `|x|=0.25`; `scripts/oracle_greeks_gate.py` mirrors that branch.
+      Its generated mirror test covers both signs, both arms, and adjacent
+      f32 values at the cutoff (19 points, two-ulp budget). These checks pass
+      against the installed published package; this is not an accuracy bound.
     - **Re-probe trigger:** the blocked probe passing, either issue closing, or
-      **any nautilus pin bump past 0.7.43**. The pin clause is the load-bearing
-      one: nautilus#57 already switched `Special.erf` to a 4-term series below
-      0.25 on main with no tag yet carrying it, so the kernel this shell mirrors
-      in `scripts/oracle_greeks_gate.py::_erf_as_f32` changes at the next
-      release, not at any issue transition.
+      **any nautilus pin bump past 0.7.46**. Kernel changes invalidate the
+      mirror in `scripts/oracle_greeks_gate.py::_erf_as_f32` even without an
+      issue transition; re-run its generated mirror checks and inspect the
+      published kernel before accepting a new pin.
       Follow that probe's sidecar; which repair landed decides whether this
       kernel is deleted in favour of a callable one or merely re-pointed.
 
