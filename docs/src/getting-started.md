@@ -84,20 +84,19 @@ The three prices are approximately `1.8594`, `10.4506`, and `26.169`.
 
 ## A Monte Carlo price
 
-This keyed example requires Chelis 0.18.12 and matching published Nautilus
-and Coral packages. The current `reef.toml` pin still selects 0.18.11, so it
-is not an executable release example yet.
-
-The Monte Carlo engine consumes an explicit key made from a seed. The number of paths is
+The Monte Carlo engine carries the `Random` effect, so it runs inside a
+`with seed(...)` block that fixes the random stream. The number of paths is
 the length of a template tensor you pass in. This example, from
 `tests/pricing.ch`, prices the same call with twenty thousand paths:
 
 ```chelis
 import Shoals.Pricing (mc_call_price)
 
-def example() -> f32 = {
+def example() -> f32 ! { Random } = {
   template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
-  mc_call_price(key_from_seed(42i64), template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
+  with seed(42) {
+    mc_call_price(template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
+  }
 }
 ```
 

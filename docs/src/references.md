@@ -59,7 +59,7 @@ historical measures reproduce.
 Module: `Shoals.References.MonteCarlo`.
 
 ```chelis
-def vanilla_call_textbook[n](rng_key: key, template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32
+def vanilla_call_textbook[n](template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 ! { Random }
 ```
 
 A straightforward scalar-fold Monte Carlo call pricer, the reference that

@@ -59,13 +59,3 @@ p = bvn_pdf(cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast
 
 Each of these agrees with its textbook reference under the
 [property checks](properties.md).
-
-## Sampling
-
-The exported `gamma_sample_s`, `chi_squared_sample_s`,
-`exponential_sample_s`, and `uniform_sample_s` wrappers take an affine
-`key` as their first argument, followed by a template tensor and the
-distribution parameters. `dist_mvn_sample_one` likewise takes a key
-before the template, mean, and Cholesky factor. Reconstruct a key from
-the same seed to replay a draw; derive distinct child keys for separate
-samples.

@@ -108,7 +108,7 @@ is gated on which upstream item:
 | Control-flow AD (chelis D1, tracks chelis#199) | chelis monorepo | M5 (trees with early exercise), M7 (XVA exposure exercise decisions), M8 (sequential calibration if it includes regime switches) |
 | AdjointTyping theorem | LaCaDiLE | M1 (foundations), M2 (curves) — first-order verified status |
 | Higher-order AD theorem | LaCaDiLE | M3.4 (Dupire local vol), M6.2 (gamma/volga/vanna) |
-| AD through keyed stochastic draws (chelis D3) | chelis monorepo + LaCaDiLE | M5 (MC pricers), M7 (XVA paths), M9 (MC VaR) — any export consuming a random key |
+| Effect-AD interaction (chelis D3) | chelis monorepo + LaCaDiLE | M5 (MC pricers), M7 (XVA paths), M9 (MC VaR) — any export over the `Random` effect |
 | Linearity-AD interaction | chelis monorepo + LaCaDiLE | M6.3 (bucket sensitivities returning curve / surface tensors) |
 | Differentiability typing (chelis D5) | chelis monorepo | M10 (type-system migration) |
 
@@ -218,7 +218,7 @@ breakdowns.
 | # | Packet | Agent | Output |
 |---|---|---|---|
 | M1.1 | `src/distributions.ch`: lognormal, Student-t, gamma, beta, chi-squared, exponential, Poisson, uniform — `pdf`, `cdf`, `inv_cdf`, `sample`. Extend `Nautilus.Distributions` where the upstream is missing; multivariate normal (Cholesky) and multivariate t live here. AD must flow through pdf and cdf wrt parameters. | general-purpose | references + properties + tests |
-| M1.2 | `src/rng.ch`: Sobol with Joe-Kuo direction numbers, 1024-D minimum (table extends to 21201-D per spec §2.2); Halton, 50-D minimum. Pseudorandom draws consume explicit keys — no new generators added. Add control-variate, stratified-sampling, importance-sampling combinators alongside the existing antithetic. | general-purpose | references + properties + tests |
+| M1.2 | `src/rng.ch`: Sobol with Joe-Kuo direction numbers, 1024-D minimum (table extends to 21201-D per spec §2.2); Halton, 50-D minimum. Mersenne / PCG go through the existing `Random` effect — no new generators added. Add control-variate, stratified-sampling, importance-sampling combinators alongside the existing antithetic. | general-purpose | references + properties + tests |
 | M1.3 | `src/date.ch`: day-count conventions (ACT/360, ACT/365, 30/360 variants, ACT/ACT-ISDA, ACT/ACT-ISMA, Business/252), business-day rolling, schedule generation, year-fraction. `Date` is `Discrete` — type-system rejection of `grad(..., wrt=date)` lands via doc-string + lint convention pre-D5. | general-purpose | references + properties + tests |
 | M1.4 | `src/calendar.ch`: built-in calendars (NYC, LDN, TYO, SYD, FRA, HKG) with named-holiday tables; joint-calendar combinator; user-registry hook. | general-purpose | references + properties + tests |
 | M1.5 | `src/tenor.ch`: tenor parser ("3M", "1Y", "30Y", "ON", "TN", "SN") → integer-day shift relative to a reference. Overnight specials documented and tested. | general-purpose | references + properties + tests |
@@ -374,7 +374,7 @@ resolution.
 **Acceptance:**
 - Each process matches its closed-form or characteristic-function reference for pricing instruments where one exists.
 - Heston QE preserves variance positivity over 100k paths on the pinned stress configuration.
-- **AD verification status table:** every process's path-generation function lands as `unsupported` until AD through keyed draws is verified. Closed-form references without random draws land as `composed`. The matrix in §3.3 is the source of truth for what each process pairs with on the pricing side.
+- **AD verification status table:** every process's path-generation function lands as `unsupported` until effect-AD upstream lands (each process runs over the `Random` effect). Closed-form references that don't touch `Random` land as `composed`. The matrix in §3.3 is the source of truth for what each process pairs with on the pricing side.
 
 **Red team:** `/red-team` probes Feller-condition violation in Heston (does QE actually keep variance non-negative under the pinned stress config?), Kou tail behavior, Hull-White negative-rate handling, LMM drift in long-dated tenors, and audits that every process's AD profile annotation matches the matrix in §3.3.
 
@@ -622,7 +622,7 @@ blocked on M6.3 bucket sensitivities (linearity-AD theorem).
 | M10.1 | When AdjointTyping closes: audit every Shoals export with `AD: unproven-primitive` on a first-order AD path. Promote to `composed` where the proof composes; document any leaves that still need targeted proof effort. | Explore + general-purpose | report + SKILL.md updates |
 | M10.2 | When chelis D5 (Differentiability typing) closes: migrate signatures from doc-string convention to the upstream `Differentiable` / `Discrete` type annotations. Mechanical refactor; no semantic change. Lint script from M2.5 can be retired (subsumed by the type checker). | general-purpose | code change |
 | M10.3 | When chelis D1 (control-flow AD) closes: promote tree pricers (M5.2), LSM policy-boundary path (M5.4), and XVA exposure-with-exercise paths (M7) from `unsupported` to `composed` (or `unproven-primitive` if any leaves remain). | general-purpose | SKILL.md updates + tests |
-| M10.4 | When chelis D3 covers AD through keyed draws: promote MC pricers, MC VaR, and XVA paths whose verified AD oracles pass. | general-purpose | SKILL.md updates + tests |
+| M10.4 | When chelis D3 (effect-AD) closes: promote all `Random`-effect MC pricers, MC VaR, and XVA paths. | general-purpose | SKILL.md updates + tests |
 | M10.5 | When higher-order AD theorem closes: promote second-order Greeks (M6.2) and Dupire local vol (M3.4). | general-purpose | SKILL.md updates + tests |
 | M10.6 | When linearity-AD theorem closes: promote bucket sensitivities (M6.3). | general-purpose | SKILL.md updates + tests |
 | M10.7 | Refresh SKILL.md's verified-AD subset table — the running list of exports with `AD: composed`. This is the verifiable claim Shoals makes to the C Proof pitch: this list, not "Shoals supports AD." Flip stability label to `stable` for any export now fully `composed` AND green on its acceptance oracle. | direct | doc + SKILL.md |

@@ -20,7 +20,7 @@ The functional surface is organized into modules, each documented in its
 own chapter:
 
 - **Pricing.** Black-Scholes call and put, vectorized price tensors, and a
-  Monte Carlo engine driven by explicit affine keys.
+  Monte Carlo engine driven by the `Random` effect.
 - **Greeks.** Finite-difference first- and second-order Greeks, analytic
   Greek references for cross-checking, and pathwise / likelihood-ratio
   estimators for the digital payoff family.

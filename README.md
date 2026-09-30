@@ -6,10 +6,6 @@ Ships as a reef package under the `Shoals` module prefix.
 
 ## Status
 
-**Draft keyed API:** The source migration requires Chelis 0.18.12 and
-compatible published Nautilus and Coral packages. `reef.toml` still pins the
-0.18.11 chain; this branch has no official-chain build or conformance result.
-
 v0.24.5 release candidate targeting Chelis 0.18.1. The M0-M9
 quantitative surface is implemented across pricing, curves, volatility,
 stochastic models, Greeks, XVA, calibration, and risk. The candidate carries a first-class
@@ -31,7 +27,7 @@ one installable, sidecar-verified dependency chain used by the release gate.
 
 | Module | Contents | Status |
 |---|---|---|
-| `Shoals.Pricing` | Black-Scholes call/put (closed form), call/put price tensors, MC engine with explicit keys, finite-difference Greek checks; grad-derived Greeks are an alpha runtime path | alpha |
+| `Shoals.Pricing` | Black-Scholes call/put (closed form), call/put price tensors, MC engine with `Random` effect, finite-difference Greek checks; grad-derived Greeks are an alpha runtime path | alpha |
 | `Shoals.Risk` | Parametric VaR + CVaR (Gaussian), historical VaR + CVaR (empirical-quantile + tail-mean), empirical loss quantiles | alpha |
 | `Shoals.Curves` | Linear / cubic-spline / log-linear / Nelson-Siegel-Svensson yield-curve interpolation; discount factors; single-curve par-bond bootstrap; curve-kind metadata (OIS/IBOR/SOFR/SONIA/ESTR/Custom); sensitivity ops (parallel/key-rate/twist/butterfly shifts, scale) | alpha |
 | `Shoals.Stochastic` | GBM path generation (log-Euler), terminal draws, antithetic-variates terminal-mean estimator; Merton lognormal jump-diffusion (compensated drift, aggregate-jump Gaussian approximation); 2-asset correlated GBM via 2x2 Cholesky | alpha |
@@ -263,8 +259,8 @@ monorepo oracle remains a separate manual gate.
    `chelis manifest` CLI product.** Shoals publishes
    `shoals-0.24.5.invariants.json` byte-for-byte from
    `docs/cnote-import-surface.json`; CI validates its schema, pins, tiers, and
-   model bindings. MC reproducibility is separately enforced by explicit
-   affine keys, which the type checker prevents a draw from reusing.
+   model bindings. MC reproducibility is separately enforced by the `Random`
+   effect, which rejects unseeded random operations at type-check time.
 3. **MC convergence rigor is split by tier.** The default 20 000-path
    test uses 2 % tolerance and runs in CI through
    `chelis test tests/ --timeout 1200 --suite-timeout 1500 --jobs auto`.

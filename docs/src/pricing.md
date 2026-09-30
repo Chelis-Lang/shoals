@@ -4,7 +4,7 @@ Module: `Shoals.Pricing`.
 
 This module provides the Black-Scholes call and put in closed form,
 vectorized price tensors over a set of spots, gradient-derived sensitivity
-vectors, and a Monte Carlo call pricer that consumes an explicit key.
+vectors, and a Monte Carlo call pricer that carries the `Random` effect.
 The standard normal cumulative distribution is computed by this module's own
 `n_cdf64`, because `Nautilus.Special` is f32-only and an f64 grad path cannot
 reach its `erfc`. `docs/CHELIS_SURFACE.md` states which approximation `erf64`
@@ -103,20 +103,22 @@ finite-difference and analytic Greeks that the test suite uses directly.
 ## Monte Carlo call price
 
 ```chelis
-def mc_call_price[n](rng_key: key, template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32
+def mc_call_price[n](template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 ! { Random }
 ```
 
 `mc_call_price` simulates terminal prices under geometric Brownian motion,
 takes the discounted mean of the call payoff, and returns the Monte Carlo
 estimate. The number of paths is the length of the `template` tensor. The
-function consumes a key. Reconstruct the key from the same seed to replay
-the draw, or split a key to make distinct draws.
+function carries the `Random` effect and must run inside a `with seed(...)`
+block.
 
 From `tests/pricing.ch`, a twenty-thousand-path estimate of the ATM call:
 
 ```chelis
 template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
-mc_px = mc_call_price(key_from_seed(42i64), template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
+mc_px = with seed(42) {
+  mc_call_price(template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
+}
 ```
 
 The estimate lands within two percent of `bs_call_scalar` at this path
