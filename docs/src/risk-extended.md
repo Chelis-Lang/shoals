@@ -29,8 +29,10 @@ v = mc_var(losses, cast(0.95, f32))                  // v == 95.0
 es = mc_expected_shortfall(losses, cast(0.95, f32))  // es == 97.5 (mean of 95..100)
 ```
 
-Expected shortfall dominates VaR at the same confidence, and a stricter
-confidence selects a deeper quantile.
+For the sample above, expected shortfall exceeds VaR and higher confidence
+selects a deeper quantile. These functions summarize supplied simulated
+losses; they do not generate paths. Use a nonempty tensor and confidence
+strictly between zero and one.
 
 ## Scenario PnL grid
 

@@ -23,9 +23,9 @@ def theta_call_textbook(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32
 def rho_call_textbook(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32
 ```
 
-The textbook call and put and the five first-order Greeks, written straight
-from the `d1` / `d2` definitions. `Shoals.Pricing` and `Shoals.Greeks` are
-required to agree with these.
+The textbook call and put, first-order sensitivities, and gamma, written
+from the `d1` / `d2` definitions. Shoals tests compare selected inputs
+with these formulas.
 
 ## Vasicek
 

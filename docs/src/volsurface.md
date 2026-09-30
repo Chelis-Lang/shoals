@@ -3,9 +3,9 @@
 Module: `Shoals.VolSurface`.
 
 This module parameterizes a volatility smile with the five-parameter SVI
-total-variance form, converts total variance to implied volatility, applies
-structured shifts to a surface, and solves for an implied volatility from a
-call price by bisection over Black-Scholes.
+total-variance form and a four-parameter SABR approximation. It converts
+total variance to implied volatility, applies parameter shifts, and solves
+for an implied volatility from a call price by bisection.
 
 ## The SVI type
 
@@ -33,7 +33,8 @@ def vs_implied_vol(p: SVI, k: f32, t: f32) -> f32
 
 `vs_total_variance` evaluates the SVI total variance `w(k)` at log-moneyness
 `k`. `vs_implied_vol` converts total variance to an implied volatility by
-`sqrt(max(w, 0) / t)`, clamping negative variance to zero.
+`sqrt(max(w, 0) / t)`, clamping negative variance to zero. Supply `t > 0`;
+the function does not validate its input.
 
 From `tests/volsurface.ch`, a flat surface has total variance equal to `a`
 at the money and constant across strikes, and its implied vol at one year
@@ -45,7 +46,8 @@ w = vs_total_variance(p, cast(0.0, f32))      // w == 0.04
 iv = vs_implied_vol(p, cast(0.0, f32), cast(1.0, f32))  // iv == 0.2
 ```
 
-A smile has higher total variance out of the money than at the money.
+The example's left wing has higher total variance than its at-the-money
+value; the skew can make the two wings behave differently.
 
 ## Surface shifts
 
@@ -92,8 +94,9 @@ iv = implied_vol_from_call(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), 
 ```
 
 `implied_vol_bisect` exposes the full bisection with an explicit bracket,
-iteration cap, and tolerance. If the bracket does not contain a sign change,
-it returns a NaN sentinel rather than pinning silently at the bracket edge.
+iteration cap, and tolerance. It requires a strict sign change across the
+bracket; even an exact target at an endpoint fails that test. On failure it
+returns a NaN sentinel.
 `bracket_brackets_root` reports whether a `[vol_lo, vol_hi]` pair brackets
 the target, and `is_iv_solver_failed` tests the returned value for the NaN
 sentinel:
@@ -102,3 +105,21 @@ sentinel:
 iv = implied_vol_bisect(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(1.0, f32), cast(200.0, f32), cast(0.0001, f32), cast(5.0, f32), cast(60, i64), cast(0.000001, f32))
 failed = is_iv_solver_failed(iv)  // true: 200.0 is not a reachable call price here
 ```
+
+## SABR approximation
+
+```chelis
+type SABR =
+  | SABR { alpha: f32, beta: f32, rho: f32, nu: f32 }
+
+def vs_sabr_implied_vol(p: SABR, f: f32, k: f32, t: f32) -> f32
+def vs_sabr_atm_implied_vol(p: SABR, f: f32, t: f32) -> f32
+def vs_sabr_shift_alpha(p: SABR, d: f32) -> SABR
+def vs_sabr_shift_rho(p: SABR, d: f32) -> SABR
+def vs_sabr_shift_nu(p: SABR, d: f32) -> SABR
+```
+
+The two implied-vol functions evaluate a Hagan-style SABR expansion for
+an off-ATM strike or at the money. They do not calibrate parameters or
+enforce `f > 0`, `k > 0`, `alpha > 0`, or `|rho| < 1`; supply admissible
+values. The shift functions change one parameter at a time.

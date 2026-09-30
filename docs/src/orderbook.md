@@ -57,7 +57,9 @@ def total_ask_qty(book: OrderBook) -> f32
 empty side they return an order with a NaN price and zero quantity, so a
 caller can test for an empty book by checking whether the best price equals
 itself. `bid_ask_spread` is the best ask price minus the best bid price.
-`vwap` is the volume-weighted average price across all orders on both sides.
+`vwap` is the volume-weighted average price across all orders on both sides;
+it returns NaN when the total quantity is zero. The module sorts supplied
+orders but does not match them or validate price and quantity.
 `total_bid_qty` and `total_ask_qty` sum the quantities on each side.
 
 From `tests/orderbook.ch`, the best bid of the three-order book above is

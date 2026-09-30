@@ -16,8 +16,7 @@ surfaces, sensitivity operators on curves, XVA aggregators, and so on.
 
 ## What is in the box
 
-The functional surface is organized into modules, each documented in its
-own chapter:
+The chapters introduce the main modules and point to their source tests:
 
 - **Pricing.** Black-Scholes call and put, vectorized price tensors, and a
   Monte Carlo engine driven by the `Random` effect.
@@ -27,7 +26,7 @@ own chapter:
 - **Extended pricers.** Bachelier (normal underlying), Black (forward), 
   Garman-Kohlhagen (FX), and Margrabe (exchange).
 - **Volatility surface.** SVI total-variance parameterization, implied
-  vol, surface shifts, and a bisection implied-vol solver.
+  vol, surface shifts, a SABR approximation, and a bisection implied-vol solver.
 - **Stochastic processes.** Geometric Brownian motion paths and terminals,
   antithetic variates, Merton jump-diffusion, and correlated two-asset GBM.
 - **Risk.** Parametric and historical value-at-risk and conditional VaR.
@@ -46,24 +45,27 @@ own chapter:
 - **Distributions.** Lognormal, Student-t, and bivariate-normal densities.
 - **Calibration.** Weighted residuals, sum-of-squared-errors loss, and a
   bound-clamped Levenberg-Marquardt step.
-- **XVA.** Constant-hazard survival, exposure aggregation, netting, and CVA
-  and DVA over a time grid.
+- **XVA.** Exposure aggregation, netting, CVA and DVA, plus funding and
+  capital adjustment helpers.
 - **Currency-tagged money.** Runtime-tagged `Money` with same-currency
   arithmetic.
 
+Additional modules under `src/` cover lattice and PDE pricing,
+fixed-income models, collateral agreements, credit curves, local
+volatility, Longstaff–Schwartz exercise, and specialized stochastic
+processes. Their exported definitions and `tests/` or `tests-manual/`
+files give their exact signatures and numerical domains.
+
 ## Verification
 
-Shoals carries two extra top-level directories of code that exist to keep
-the library honest:
+Shoals carries two top-level directories of comparison code:
 
-- `references/` holds textbook-formula implementations of the same
-  quantities the optimized library computes (Black-Scholes, its Greeks,
-  Vasicek, historical VaR, vanilla Monte Carlo, the distributions, and the
-  day-count conventions). These are the oracles.
-- `properties/` holds the finance invariants the library is expected to
-  satisfy (put-call parity, a call bounded by spot, finite-difference Greek
-  agreement, Monte Carlo reproducibility, no-arbitrage spread checks, and
-  the textbook-agreement checks).
+- `references/` holds textbook-formula implementations for selected
+  quantities (Black-Scholes, its Greeks, Vasicek, historical VaR, vanilla
+  Monte Carlo, distributions, and day-count conventions).
+- `properties/` holds checks for finance relationships such as put-call
+  parity, finite-difference Greek agreement, Monte Carlo reproducibility,
+  and comparisons with textbook formulas. Tests exercise selected inputs.
 
 The [Reference oracles](references.md) and
 [Property specifications](properties.md) chapters describe both. The

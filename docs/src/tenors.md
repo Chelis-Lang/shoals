@@ -50,6 +50,7 @@ negative count expresses a step into the past.
 def days_per_unit(unit: TenorUnit) -> i64
 def tenor_to_days(t: Tenor) -> i64
 def tenor_apply(t: Tenor, reference: Date) -> Date
+def parse_tenor(text: string) -> Tenor
 ```
 
 `days_per_unit` returns the day count of a single unit: a day is one, a week
@@ -71,5 +72,7 @@ shifted = tenor_apply(months_n(cast(3, i64)), ref)
 
 Months and years use the fixed thirty-day and three-hundred-sixty-five-day
 approximations, so tenor arithmetic is calendar-day arithmetic, not
-calendar-aware month stepping. Parsing a tenor from a string is not part of
-this surface; see [Scope and limitations](scope.md).
+calendar-aware month stepping. `parse_tenor` accepts `ON`, `TN`, `SN`, or
+an integer followed by uppercase `D`, `W`, `M`, or `Y`, such as `3M` or
+`1Y`. It fails on an unknown suffix or a noninteger count. For calendar
+months, use `Shoals.Date.add_months`; see [Scope and limitations](scope.md).

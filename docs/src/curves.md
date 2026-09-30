@@ -166,6 +166,14 @@ instrument quotes, over the same coupon schedule and interpolation. FRAs and
 futures are not instruments here, and the solve is sequential rather than
 joint; see [Scope and limitations](scope.md).
 
+### Basis spreads
+
+`CurveBasis`, `curve_basis_from_pillars`, and `basis_spread_at` represent
+and interpolate a spread curve. `discount_factor_with_basis` applies
+that spread to a supplied domestic zero curve. Despite its name,
+`bootstrap_basis_curve` wraps the supplied basis quote times and
+spreads; it does not solve a joint multi-curve calibration.
+
 ## Sensitivity shifts
 
 ```chelis

@@ -3,9 +3,8 @@
 Module: `Shoals.HolidayCal`.
 
 This module represents a named calendar as a list of holiday dates, ships
-the 2025 New York and London tables, combines two calendars into a joint
-calendar, and reports whether a date is a holiday or a business day. Dates
-come from `Std.Time`.
+2025 New York and London lists, combines calendars, and reports whether a
+date is a holiday or a business day. Dates come from `Std.Time`.
 
 ## The Calendar type
 
@@ -15,14 +14,20 @@ type Calendar =
 
 def empty_calendar(name: string) -> Calendar
 def weekend_only_calendar() -> Calendar
-def nyc_calendar() -> Calendar
-def ldn_calendar() -> Calendar
+def hc_nyc_calendar() -> Calendar
+def hc_ldn_calendar() -> Calendar
+def hc_nyc_calendar_year(year: i64) -> Calendar
+def hc_ldn_calendar_year(year: i64) -> Calendar
+def hc_nyc_calendar_multi(years: List[i64]) -> Calendar
+def hc_ldn_calendar_multi(years: List[i64]) -> Calendar
 def joint_calendar(left: Calendar, right: Calendar) -> Calendar
 ```
 
 `empty_calendar` and `weekend_only_calendar` carry no holiday dates, so
-under them only weekends are non-business. `nyc_calendar` and `ldn_calendar`
-carry the 2025 New York and London bank holiday tables. `joint_calendar`
+under them only weekends are non-business. `hc_nyc_calendar` and `hc_ldn_calendar`
+carry 2025 New York and London holiday lists. The year and multi-year
+constructors generate smaller lists from fixed rules; they are not complete
+bank-holiday calendars. `joint_calendar`
 merges the holiday lists of two calendars, keeping the left calendar's name,
 so a date that is a holiday in either is a holiday in the joint calendar.
 
@@ -38,7 +43,7 @@ def is_business_day(cal: Calendar, d: Date) -> bool
 From `tests/holidaycal.ch`:
 
 ```chelis
-cal = nyc_calendar()
+cal = hc_nyc_calendar()
 ny = is_holiday(cal, date(cast(2025, i64), cast(1, i64), cast(1, i64)))   // true
 wed = is_business_day(cal, date(cast(2025, i64), cast(8, i64), cast(13, i64)))  // true
 ```
@@ -47,7 +52,7 @@ A joint New York and London calendar treats both US Independence Day and UK
 Boxing Day as holidays:
 
 ```chelis
-joint = joint_calendar(nyc_calendar(), ldn_calendar())
+joint = joint_calendar(hc_nyc_calendar(), hc_ldn_calendar())
 july4 = is_holiday(joint, date(cast(2025, i64), cast(7, i64), cast(4, i64)))   // true
 boxing = is_holiday(joint, date(cast(2025, i64), cast(12, i64), cast(26, i64))) // true
 ```
@@ -55,9 +60,9 @@ boxing = is_holiday(joint, date(cast(2025, i64), cast(12, i64), cast(26, i64))) 
 
 ## International holiday predicates
 
-`hc_tyo_is_holiday`, `hc_syd_is_holiday`, `hc_fra_is_holiday` and
-`hc_hkg_is_holiday` accept year, month and day as `i64` values. Each checks
-membership in the corresponding generated annual holiday list. These are
-holiday predicates, not business-day predicates; weekend exclusion is a
-separate operation. They are explicitly exported for the international
-calendar tests and callers using the annual rules.
+`hc_tyo_is_holiday`, `hc_syd_is_holiday`, `hc_fra_is_holiday`, and
+`hc_hkg_is_holiday` accept year, month, and day as `i64` values. Each checks
+membership in its annual holiday list. They do not exclude weekends.
+Hong Kong's lookup supports 2025–2030 and returns false for other years.
+The regional rules are limited; check [Scope and limitations](scope.md)
+before using them for settlement.

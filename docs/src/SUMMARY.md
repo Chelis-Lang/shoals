@@ -29,9 +29,9 @@
 
 - [Reference oracles](references.md)
 - [Property specifications](properties.md)
-- [Business-wrong demos](demos.md)
+- [Counterexample demos](demos.md)
 
 # Reference material
 
 - [Scope and limitations](scope.md)
-- [C Note import surface](import-surface.md)
+- [Package verification manifest](import-surface.md)

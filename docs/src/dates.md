@@ -61,14 +61,17 @@ rolled = date_roll_following(sat, true)
 // rolled is Monday 2025-01-06
 ```
 
-The `weekend_only` flag indicates that only weekends are skipped; this
-module does not consult a holiday list. To roll against holidays as well,
-combine it with the [holiday calendars](calendars.md).
+Both values of `weekend_only` currently give weekend-only behavior; this
+module does not consult a holiday list. Check holidays separately with
+`Shoals.HolidayCal.is_business_day`.
 
 ## Schedule generation
 
 ```chelis
 def schedule_from_tenor(start: Date, end: Date, step_months: i64) -> List[Date]
+def days_in_month(year: i64, month: i64) -> i64
+def add_months(d: Date, n: i64) -> Date
+def schedule_from_tenor_calendar(start: Date, end: Date, step_months: i64) -> List[Date]
 ```
 
 `schedule_from_tenor` returns a list of dates from `start`, stepped by
@@ -85,4 +88,7 @@ dates = schedule_from_tenor(
 // len(dates) == 5
 ```
 
-Months are treated as a fixed thirty-day step in this schedule generator.
+`schedule_from_tenor` treats a month as 30 days. For month-of-year
+stepping, `add_months` caps the day at the destination month's end, and
+`schedule_from_tenor_calendar` builds a schedule using that operation.
+Neither generator rolls dates against a holiday calendar.

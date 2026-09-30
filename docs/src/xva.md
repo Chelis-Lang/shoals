@@ -2,11 +2,10 @@
 
 Module: `Shoals.Xva`.
 
-This module computes the building blocks of valuation adjustments under a
-constant-hazard credit model: survival and default probabilities, a
-constant-rate discount factor, expected positive and negative exposure,
-pointwise two-deal netting, and the credit and debit valuation adjustments
-aggregated over a discrete time grid.
+This module computes valuation-adjustment building blocks: survival and
+default probabilities, expected positive and negative exposure, two-deal
+netting, CVA and DVA on a time grid, and funding and capital adjustments.
+It also has a hazard-curve CVA and a sampled wrong-way-risk estimator.
 
 ## Survival and default
 
@@ -76,3 +75,25 @@ cva = cva_constant_hazard(time_grid, epe, cast(0.05, f32), cast(0.4, f32), cast(
 
 A negative expected negative exposure yields a positive DVA, since the
 institution gains on its own default.
+
+## Funding, capital, and varying hazard
+
+```chelis
+def fva[n](time_grid: tensor[n, f32], epe: tensor[n, f32], funding_spread: f32, discount_rate: f32) -> f32
+def kva[n](time_grid: tensor[n, f32], ead: tensor[n, f32], cost_of_capital: f32, regulatory_capital_weight: f32, discount_rate: f32) -> f32
+def xva_cva_stochastic_hazard[n, m](time_grid: tensor[m, f32], epe: tensor[m, f32], hazards: HazardCurve[n], recovery: f32, discount_rate: f32) -> f32
+def xva_cva_wwr_constant_hazard[n](time_grid: tensor[n, f32], epe: tensor[n, f32], hazard: f32, recovery: f32, discount_rate: f32, rho: f32, n_paths: i64) -> f32 ! { Random }
+```
+
+`fva` multiplies the trapezoidal integral of discounted positive exposure
+by a supplied funding spread. `kva` multiplies the discounted exposure at
+default integral by supplied capital weight and cost. Both integrate
+between supplied grid points, without a contribution before the first
+point. `xva_cva_stochastic_hazard` uses a `Shoals.Cds.HazardCurve` to
+compute interval survival changes; despite its name, it does not draw
+random paths. `xva_cva_wwr_constant_hazard` samples correlated exposure
+and default shocks; it carries `Random` and requires a seed.
+
+Supply increasing times, matching tensor lengths, valid recoveries, and
+positive path counts where used. These functions do not model collateral
+or a general portfolio netting agreement.

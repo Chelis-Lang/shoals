@@ -1,13 +1,12 @@
 # Property specifications
 
-The `properties/` directory holds the finance invariants the library is
-expected to satisfy, written as ordinary Chelis functions that return a
-`bool` for a given set of inputs. They live under the `Shoals.Properties`
-module prefix. Each property states a relationship that should hold for any
-admissible input, and the runtime test suite exercises them on concrete grids
-of inputs. They are the executable specification of correct behavior: read
-them to learn what each part of the library guarantees, and run them through
-`tests/` to confirm those guarantees hold on this checkout.
+The `properties/` directory holds finance checks. Many are ordinary
+Chelis functions that return a `bool` for one set of inputs under the
+`Shoals.Properties` module prefix. The runtime suite calls them on
+selected inputs. A passing test establishes that result for those inputs;
+read a property's formula and assumptions before applying it elsewhere.
+Other files contain `@property` declarations run through a separate
+prover.
 
 ## Pricing properties
 
@@ -15,9 +14,9 @@ Module: `Shoals.Properties.Pricing`.
 
 - `put_call_parity_holds(s, k, r, sigma, t)`: the call minus the put equals
   `s - k * exp(-r * t)`.
-- `call_price_nonneg` and `put_price_nonneg`: prices are non-negative.
-- `call_bounded_by_spot(s, k, r, sigma, t)`: the call price never exceeds
-  the spot.
+- `call_price_nonneg` and `put_price_nonneg`: check non-negative prices.
+- `call_bounded_by_spot(s, k, r, sigma, t)`: checks that the call price
+  does not exceed spot at the supplied point.
 - `matches_textbook_reference` and `matches_textbook_reference_put`: the
   optimized scalars agree with the `Shoals.References.BlackScholes` oracles.
 - `mc_matches_textbook_mc_reference(template, s0, k, r, sigma, t)`: under a
@@ -28,11 +27,10 @@ Module: `Shoals.Properties.Pricing`.
 
 Module: `Shoals.Properties.NoArbitrage`.
 
-- `bull_spread_nonneg(s, k_low, k_high, r, sigma, t)`: a call struck lower is
-  worth at least as much as one struck higher, so the bull spread is
-  non-negative.
-- `butterfly_nonneg(s, k, h, r, sigma, t)`: the long-butterfly payoff
-  `c(k - h) - 2 c(k) + c(k + h)` is non-negative (within a small tolerance).
+- `bull_spread_nonneg(s, k_low, k_high, r, sigma, t)`: checks that a
+  lower-strike call costs at least as much as a higher-strike call.
+- `butterfly_nonneg(s, k, h, r, sigma, t)`: checks that
+  `c(k - h) - 2 c(k) + c(k + h)` is non-negative within a small tolerance.
 
 ## Greek properties
 
@@ -117,7 +115,8 @@ Module: `Shoals.Properties.MarketData`.
 - `quote_round_trip(side, value, d)`: a constructed quote reads back its
   value.
 - `md_bar_high_gte_low`, `md_bar_close_in_high_low_range`,
-  `md_bar_open_in_high_low_range`: bar fields satisfy the OHLC ordering.
+  `md_bar_open_in_high_low_range`: check a supplied bar's OHLC ordering.
+  `make_bar` does not enforce that ordering.
 - `snapshot_empty_has_no_quote(d, key)`: an empty snapshot returns no quote.
 
 ## How the properties run
@@ -131,11 +130,10 @@ The properties are written as plain boolean functions, which is the form the
 test suite consumes. See [Scope and limitations](scope.md) for what this
 form does and does not cover.
 
-The canonical `@property` corpus has a separate release proof gate. Shoals#37
-adds exactly six VaR/ES entries: confidence monotonicity, ES dominance, and
-positivity for each of the parametric inverse-CDF and historical
-empirical-quantile families. They are observed at `fuzz_validated`, with 25
-accepted constraint-directed samples at seeds 0, 1, and 2, corrupt controls,
-and compiler-owned dependency attribution. ES dominance additionally requires
-the exact second edge to `parametric_cvar` or `historical_cvar`. The release
-gate reproduces this evidence on the official 0.18.1 dependency chain.
+The `@property` corpus has a separate release gate. Its VaR/expected-
+shortfall entries cover confidence monotonicity, shortfall dominance, and
+positive-loss behavior for both Gaussian parametric and empirical measures.
+The manifest reports `fuzz_validated` for these entries, with 25 accepted
+samples at each of seeds 0, 1, and 2, plus controls that detect wrong
+results. This is sampled evidence. The method and pinned release identity
+are in the [verification manifest](import-surface.md).
