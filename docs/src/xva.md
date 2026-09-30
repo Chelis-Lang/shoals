@@ -76,3 +76,8 @@ cva = cva_constant_hazard(time_grid, epe, cast(0.05, f32), cast(0.4, f32), cast(
 
 A negative expected negative exposure yields a positive DVA, since the
 institution gains on its own default.
+
+`xva_cva_wwr_constant_hazard` also samples correlated exposure and default
+shocks. Its first argument is an affine `key`, followed by the time grid,
+expected positive exposure, hazard, recovery, discount rate, correlation,
+and path count. Reconstruct the key from the same seed to replay the draw.

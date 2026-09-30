@@ -1,4 +1,4 @@
-# Working with tensors and effects
+# Working with tensors and keys
 
 The Shoals examples in this book lean on a small number of Chelis idioms.
 This chapter collects them so the module chapters can stay focused on
@@ -39,22 +39,19 @@ value can be passed to one call and reused afterward. Several Shoals
 signatures are generic over a tensor length, written `[n]`, which the
 caller fixes by the tensor it passes.
 
-## The Random effect
+## Explicit random keys
 
-Functions that draw random numbers carry the `Random` effect in their
-signature, written `! { Random }`. The compiler refuses to run such a
-function outside a seeded context, which is what makes Monte Carlo results
-reproducible. You supply the seed with a `with seed(...)` block:
+Functions that draw random numbers take an explicit affine `key` as their
+first argument. Construct one from an integer seed for repeatable Monte
+Carlo results, and split it before making two distinct draws:
 
 ```chelis
-px = with seed(42) {
-  mc_call_price(template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
-}
+px = mc_call_price(key_from_seed(42i64), template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
 ```
 
-Two runs under the same literal seed produce bit-identical results. This is
-the reproducibility contract the Monte Carlo and stochastic-process
-chapters rely on.
+Two calls with separately constructed keys from the same seed produce
+bit-identical results. A key is consumed by a draw; `split_key` creates
+distinct child keys for multiple draws.
 
 ## Records and pattern matching
 
@@ -72,14 +69,14 @@ match book with {
 The module chapters show the accessor functions each type ships, so you
 rarely need to match by hand.
 
-## Effect and result types in signatures
+## Keys and result types in signatures
 
 Throughout this book a signature like
 
 ```chelis
-def mc_call_price[n](template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 ! { Random }
+def mc_call_price[n](rng_key: key, template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32
 ```
 
-reads as: generic over length `n`, takes a length-`n` template tensor and
-five `f32` arguments, returns an `f32`, and carries the `Random` effect.
-Functions without an effect clause are pure.
+reads as: generic over length `n`, consumes a key, takes a length-`n`
+template tensor and five `f32` arguments, and returns an `f32`. A caller
+must supply a fresh key or an unused child from `split_key`.

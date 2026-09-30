@@ -341,8 +341,8 @@ def vannas_call[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) ->
   g64 = vmap(fn (sa: tensor[1, f64], ka: tensor[1, f64], ra: tensor[1, f64], va: tensor[1, f64], ta: tensor[1, f64]) -> grad(fn (ss: f64, kk: f64, rr: f64, x: f64, tt: f64) -> grad(fn (y: f64, k2: f64, r2: f64, s2: f64, t2: f64) -> bs_call_f64(y, k2, r2, s2, t2), wrt=y)(ss, kk, rr, x, tt), wrt=x)(tensor_to_scalar(sum(sa, 0)), tensor_to_scalar(sum(ka, 0)), tensor_to_scalar(sum(ra, 0)), tensor_to_scalar(sum(va, 0)), tensor_to_scalar(sum(ta, 0))))(sc, kc, rc, vc, tc)
   cast(g64, f32)
 }
-def mc_call_price[n](template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 ! { Random } = {
-  z = normal_sample(template, cast(0.0, f32), cast(1.0, f32))
+def mc_call_price[n](rng_key: key, template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = {
+  z = normal_sample(rng_key, template, cast(0.0, f32), cast(1.0, f32))
   half_sigma_sq = mul(cast(0.5, f32), mul(sigma, sigma))
   drift = mul(sub(r, half_sigma_sq), t)
   vol_sqrt_t = mul(sigma, sqrt(t))

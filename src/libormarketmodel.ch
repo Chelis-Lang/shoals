@@ -44,15 +44,18 @@ def lmm_step[k](forwards: tensor[k, f32], taus: tensor[k, f32], sigmas: tensor[k
   sqrt_dt = sqrt(dt)
   lmm_step_with_chol(forwards, tau_l, sig_l, corr_flat_l, copy(chol), dt, normals, k_dim, sqrt_dt)
 }
-def lmm_evolve[k](forwards: tensor[k, f32], tau_l: List[f32], sig_l: List[f32], corr_flat_l: List[f32], chol: &tensor[k, k, f32], dt: f32, n_steps: i64, k_dim: i64, sqrt_dt: f32) -> tensor[k, f32] ! { Random } = {
+def lmm_evolve[k](rng_key: key, forwards: tensor[k, f32], tau_l: List[f32], sig_l: List[f32], corr_flat_l: List[f32], chol: &tensor[k, k, f32], dt: f32, n_steps: i64, k_dim: i64, sqrt_dt: f32) -> tensor[k, f32] = {
   step_idxs = range(cast(0, i64), n_steps)
-  fold(fn (state: tensor[k, f32], s: i64) -> {
-    template = scale_vec(copy(state), cast(0.0, f32))
-    normals = normal_sample(template, cast(0.0, f32), cast(1.0, f32))
-    lmm_step_with_chol(state, tau_l, sig_l, corr_flat_l, copy(chol), dt, normals, k_dim, sqrt_dt)
-  }, forwards, step_idxs)
+  out = fold(fn (state: (key, tensor[k, f32]), s: i64) -> {
+    (draw_key, next_key) = split_key(state.0)
+    template = scale_vec(copy(state.1), cast(0.0, f32))
+    normals = normal_sample(draw_key, template, cast(0.0, f32), cast(1.0, f32))
+    next_forwards = lmm_step_with_chol(state.1, tau_l, sig_l, corr_flat_l, copy(chol), dt, normals, k_dim, sqrt_dt)
+    (next_key, next_forwards)
+  }, (rng_key, forwards), step_idxs)
+  out.1
 }
-def lmm_path[k, n](paths_template: tensor[n, f32], forwards0: tensor[k, f32], taus: tensor[k, f32], sigmas: tensor[k, f32], corr: tensor[k, k, f32], t: f32, n_steps: i64, forward_idx: i64) -> tensor[n, f32] ! { Random } = {
+def lmm_path[k, n](rng_key: key, paths_template: tensor[n, f32], forwards0: tensor[k, f32], taus: tensor[k, f32], sigmas: tensor[k, f32], corr: tensor[k, k, f32], t: f32, n_steps: i64, forward_idx: i64) -> tensor[n, f32] = {
   k_dim = len(to_list(copy(forwards0)))
   dt = div(t, cast(n_steps, f32))
   sqrt_dt = sqrt(dt)
@@ -62,12 +65,13 @@ def lmm_path[k, n](paths_template: tensor[n, f32], forwards0: tensor[k, f32], ta
   corr_flat_l = to_list(reshape(corr, [mul(k_dim, k_dim)]))
   zero_path = scale_vec(copy(paths_template), cast(0.0, f32))
   pl = to_list(zero_path)
-  result = map(fn (placeholder: f32) -> {
+  result = fold(fn (state: (key, List[f32]), placeholder: f32) -> {
+    (path_key, next_key) = split_key(state.0)
     f0 = copy(forwards0)
-    terminal = lmm_evolve(f0, tau_l, sig_l, corr_flat_l, copy(chol), dt, n_steps, k_dim, sqrt_dt)
-    index(to_list(terminal), forward_idx)
-  }, pl)
-  to_tensor(result)
+    terminal = lmm_evolve(path_key, f0, tau_l, sig_l, corr_flat_l, copy(chol), dt, n_steps, k_dim, sqrt_dt)
+    (next_key, append(state.1, index(to_list(terminal), forward_idx)))
+  }, (rng_key, []), pl)
+  to_tensor(result.1)
 }
 def hjm_no_arb_drift[k](sigmas: tensor[k, f32], taus: tensor[k, f32]) -> tensor[k, f32] = {
   k_dim = len(to_list(copy(sigmas)))

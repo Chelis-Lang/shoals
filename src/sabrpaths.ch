@@ -29,10 +29,11 @@ def sabr_qe_step(f: f32, alpha: f32, beta: f32, rho: f32, nu: f32, dt: f32, z_f:
   alpha_next = sabr_clamp_pos(mul(alpha_pos, exp(add(alpha_drift, alpha_diff))))
   (f_next, alpha_next)
 }
-def sabr_path_terminal(f0: f32, alpha0: f32, beta: f32, rho: f32, nu: f32, t: f32, n_steps: i64) -> (f32, f32) ! { Random } = {
+def sabr_path_terminal(rng_key: key, f0: f32, alpha0: f32, beta: f32, rho: f32, nu: f32, t: f32, n_steps: i64) -> (f32, f32) = {
+  (rng_draw_0, rng_draw_1) = split_key(rng_key)
   template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), n_steps)))
-  z_f_t = normal_sample(copy(template), cast(0.0, f32), cast(1.0, f32))
-  z_alpha_t = normal_sample(template, cast(0.0, f32), cast(1.0, f32))
+  z_f_t = normal_sample(rng_draw_0, copy(template), cast(0.0, f32), cast(1.0, f32))
+  z_alpha_t = normal_sample(rng_draw_1, template, cast(0.0, f32), cast(1.0, f32))
   z_f_l = to_list(z_f_t)
   z_alpha_l = to_list(z_alpha_t)
   dt = div(t, cast(n_steps, f32))
@@ -47,12 +48,13 @@ def sabr_path_terminal(f0: f32, alpha0: f32, beta: f32, rho: f32, nu: f32, t: f3
   }, init_state, idxs)
   (final_state.0, final_state.1)
 }
-def sabr_paths_terminal[n](paths_template: tensor[n, f32], f0: f32, alpha0: f32, beta: f32, rho: f32, nu: f32, t: f32, n_steps: i64) -> (tensor[n, f32], tensor[n, f32]) ! { Random } = {
+def sabr_paths_terminal[n](rng_key: key, paths_template: tensor[n, f32], f0: f32, alpha0: f32, beta: f32, rho: f32, nu: f32, t: f32, n_steps: i64) -> (tensor[n, f32], tensor[n, f32]) = {
+  (rng_draw_0, rng_draw_1) = split_key(rng_key)
   n_paths = numel(copy(paths_template))
   total = mul(n_paths, n_steps)
   big_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), total)))
-  z_f_t = normal_sample(copy(big_template), cast(0.0, f32), cast(1.0, f32))
-  z_alpha_t = normal_sample(big_template, cast(0.0, f32), cast(1.0, f32))
+  z_f_t = normal_sample(rng_draw_0, copy(big_template), cast(0.0, f32), cast(1.0, f32))
+  z_alpha_t = normal_sample(rng_draw_1, big_template, cast(0.0, f32), cast(1.0, f32))
   z_f_l = to_list(z_f_t)
   z_alpha_l = to_list(z_alpha_t)
   dt = div(t, cast(n_steps, f32))

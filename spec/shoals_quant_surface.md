@@ -70,8 +70,10 @@ extensions migrate back to Nautilus when stable.
 
 ### 2.2 `Shoals.Rng` (new module)
 
-- **Pseudo-random generators:** Mersenne Twister, PCG64, accessed
-  through the `Random` effect with `withSeed` handlers.
+- **Pseudo-random draws:** Consume explicit affine keys through the compiler's
+  random primitives. Reconstruct keys from seeds for replay and derive child
+  keys for separate draws. The compiler key contract owns the generator;
+  Shoals does not expose or mutate a separate hidden generator state.
 - **Low-discrepancy sequences:** Sobol with Joe-Kuo direction numbers
   (committed dimension floor: 1024-D; the Joe-Kuo `new-joe-kuo-6.21201`
   table extends to 21201-D and the implementation should not impose a
@@ -473,7 +475,7 @@ Each cell of the matrix is one of:
 Cells marked `—` aren't shipped in Shoals v0.x; they're noted so a
 later milestone can extend deliberately rather than backfill
 ad hoc. Cells that depend on upstream theorems (any `P/L` involving
-`Random` effect composition, any IFT involving control-flow AD)
+keyed stochastic differentiation, any IFT involving control-flow AD)
 carry the `AD: unsupported` annotation per §3.2 until the upstream
 work closes.
 
@@ -490,13 +492,13 @@ Until that theorem closes, Shoals's second-order Greek functions are
 alpha and gated behind finite-difference cross-checks in the property
 suite.
 
-### 3.5 AD through Chelis effects
+### 3.5 AD through keyed draws and Chelis effects
 
-Quant finance code uses effects:
+Quant finance code uses explicit random inputs and effects:
 
-- **`Random`** for Monte Carlo paths. Pathwise differentiation must
-  compose with the seed-tracking effect handler so that gradient
-  estimates inherit reproducibility.
+- **Explicit keys** for Monte Carlo paths. Pathwise differentiation holds
+  the forward key fixed when replaying draws in a backward pass. Keys are
+  nondifferentiable inputs; randomness introduces no effect or handler.
 - **`Raises`** for numerical failures (square root of negative
   variance, divergent root-find). AD must thread through error
   paths without losing the gradient when the function falls back to
@@ -540,7 +542,7 @@ theorems close.
 | Control-flow AD (chelis D1) | chelis monorepo | American exercise, path triggers, regression-based Bermudans become verifiably differentiable |
 | AdjointTyping theorem | LaCaDiLE | First-order AD becomes a verified language property |
 | Higher-order AD theorem | LaCaDiLE | Second-order Greeks become verifiably correct |
-| Effect-AD theorem (chelis D3) | chelis monorepo + LaCaDiLE | AD through `Random` / `Raises` / `State` becomes verified |
+| Effect-AD theorem (chelis D3) | chelis monorepo + LaCaDiLE | AD through `Raises` / `State` becomes verified |
 | Linearity-AD theorem | chelis monorepo + LaCaDiLE | AD through linear tensors becomes verified |
 
 Until each closes, the corresponding Shoals modules ship at alpha

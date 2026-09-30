@@ -113,13 +113,13 @@ def test_fd_delta_matches_analytic() -> unit ! { Test } = {
 }
 def test_mc_reproducible() -> unit ! { Test } = {
   template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
-  px1 = with seed(42i64) { mc_call_price(copy(template), cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32)) }
-  px2 = with seed(42i64) { mc_call_price(template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32)) }
+  px1 = mc_call_price(key_from_seed(42i64), copy(template), cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
+  px2 = mc_call_price(key_from_seed(42i64), template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
   assert_close(px1, px2, cast(0.0, f32), "same seed, same price")
 }
 def test_mc_converges_to_bs() -> unit ! { Test } = {
   template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
-  mc_px = with seed(42i64) { mc_call_price(template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32)) }
+  mc_px = mc_call_price(key_from_seed(42i64), template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
   bs_px = bs_call_scalar(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
   diff = sub(mc_px, bs_px)
   abs_diff = if lt(diff, cast(0.0, f32)) then neg(diff) else diff

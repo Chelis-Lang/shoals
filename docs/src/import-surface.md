@@ -34,7 +34,7 @@ number.
 - First-order Greeks (AD): `deltas_call`, `deltas_put`, `vegas_call`, `rhos_call`,
   `thetas_call` (`theta = -dC/dt`).
 - Second-order Greeks (AD via nested grad): `gammas_call`, `volgas_call`, `vannas_call`.
-- `mc_call_price`: Monte Carlo call, carries `Random`.
+- `mc_call_price`: Monte Carlo call, consumes an explicit key.
 
 The Greeks are oracle-validated (analytic closed form, tuned finite differences of the
 displayed price, the `d1 = 0` sign fold, and an accuracy-monotone guard) by
