@@ -25,7 +25,7 @@ export (erf64, n_cdf64, bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_
 -- differentiate through this path and each branch is separately checkable.
 -- `abs` is the intrinsic, not a hand-rolled `if`: that would have the operand
 -- as its untaken arm, which under vmap's masked select returns NaN at +inf
--- (chelis#1464).
+-- (chelis#2103).
 def abs_f64(x: f64) -> f64 = abs(x)
 -- Cody region 1 (|x| <= 0.5): erf(x) = x * P(x^2)/Q(x^2), odd by construction.
 def erf64_core_small(x: f64) -> f64 = {
@@ -94,7 +94,7 @@ def erf64_core_erfc_tail(axr: f64) -> f64 = {
   div(mul(exp(neg(mul(ax, ax))), sub(cast(0.5641895835477563, f64), r)), guarded)
 }
 -- EVERY core clamps its argument into its own region at entry: load-bearing,
--- not defensive. Narrowing for chelis#1464 (`vmap` lowers `if` to a masked
+-- not defensive. Narrowing for chelis#2103 (`vmap` lowers `if` to a masked
 -- select which evaluates BOTH arms, against `spec/06-transformations.md`
 -- §2.10.1), so every core runs on every operand the dispatcher sees, and a core
 -- returning a non-finite value outside its own region poisons the arm that WAS
@@ -106,8 +106,9 @@ def erf64_core_erfc_tail(axr: f64) -> f64 = {
 --
 -- This makes each core total over the FINITE f64 domain, not over all of f64:
 -- the clamps and dispatcher are themselves `if`s, so +/-inf still poisons a
--- sibling arm wherever an untaken arm is unbounded. `min`/`max` would remove
--- the rest but fail at eval under vmap at this pin (chelis#1582).
+-- sibling arm wherever an untaken arm is unbounded. Imported Std.Scalar
+-- `min`/`max` now work in a standalone 0.18.12 Eval/C vmap probe
+-- (chelis#1582 closed); changing this kernel awaits the package-chain gate.
 def erf64_erfc_abs(ax: f64) -> f64 = if lt(ax, cast(4.0, f64)) then erf64_core_erfc_mid(ax) else if lt(ax, cast(6.0, f64)) then erf64_core_erfc_tail(ax) else cast(0.0, f64)
 def erf64(x: f64) -> f64 = {
   ax = abs_f64(x)

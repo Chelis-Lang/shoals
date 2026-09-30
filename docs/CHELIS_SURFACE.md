@@ -1,4 +1,4 @@
-<!-- BEGIN CHELIS MANAGED BLOCK: chelis-surface-header chelis@0.18.11 (sha256:28011bed9ccb5778) -->
+<!-- BEGIN CHELIS MANAGED BLOCK: chelis-surface-header chelis@0.18.12 (sha256:28011bed9ccb5778) -->
 This file is a domain-scoped view of the canonical Chelis capability surface,
 generated for the pinned toolchain. Each capability row is marked `@pin` (usable
 at the current pin) or `@upstream` (lands at the next bump). **Read it before
@@ -10,25 +10,27 @@ in `Chelis-Lang/chelis`.
 
 # Chelis Capability Surface for Shoals
 
-**Current manifest:** Shoals 0.24.13 / Chelis 0.18.11 / chelis-std 0.4.0 /
-Nautilus 0.7.46 / Coral 0.7.43. Migration evidence is recorded in
-[`chelis_0_18_11_migration.md`](chelis_0_18_11_migration.md).
-Capability markers below are refreshed for the current pin. Numerical
-measurements remain tied to the release named beside each measurement and are
-not silently promoted. The current WireDag is schema 15 (1522 nodes, root 787),
-and Nautilus's f32 `erf` uses a four-term Taylor branch below `|x|=0.25`.
+**Draft manifest:** Shoals 0.24.13 / Chelis 0.18.12 / chelis-std 0.4.0 /
+Nautilus 0.7.46 / Coral 0.7.43. The sibling packages still require Chelis
+0.18.11, so this manifest is not a buildable official chain. Compiler-only
+evidence is in [`chelis_0_18_12_migration.md`](chelis_0_18_12_migration.md).
+Capability markers and numerical measurements below retain their prior
+0.18.11-chain evidence until the package and full gates run. The last measured
+Black-Scholes WireDag was schema 15 (1522 nodes, root 787), and Nautilus
+0.7.46's f32 `erf` uses a four-term Taylor branch below `|x|=0.25`.
 
 What the Chelis language and the bundled chelis-std actually provide to the
 quantitative-finance domain this shell touches — numerical methods, pricing,
 Greeks, and the proof surface over them. **Read this before designing around a
 suspected language gap.**
 
-> **Pinned manifest:** Shoals 0.24.13; Chelis 0.18.11 (chelis-std 0.4.0,
-> bundled), Nautilus 0.7.46, Coral 0.7.43 · **Last refreshed:** 2026-09-21
+> **Draft pin:** Shoals 0.24.13; Chelis 0.18.12 (chelis-std 0.4.0,
+> bundled), Nautilus 0.7.46, Coral 0.7.43 (both compiler-incompatible)
+> · **Compiler-only refresh:** 2026-09-30
 
-The exact current release receipts and migration evidence are in
+The last accepted package-chain receipts are in
 [`chelis_0_18_11_migration.md`](chelis_0_18_11_migration.md) and the frozen
-CNote manifest. The release-specific narrative below is retained as historical
+CNote manifest. The release-specific narrative below is historical
 de-narrowing evidence.
 
 ## Historical 0.18.6 de-narrowing record

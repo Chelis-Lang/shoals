@@ -127,7 +127,7 @@ def test_mc_converges_to_bs() -> unit ! { Test } = {
   ok = lt(rel, cast(0.02, f32))
   assert_close(if ok then cast(1.0, f32) else cast(0.0, f32), cast(1.0, f32), cast(0.001, f32), "MC within 2% of BS at 20K paths")
 }
--- chelis#1464-adjacent hazard: `vmap` lowers `if` to a masked select that
+-- chelis#2103 hazard: `vmap` lowers `if` to a masked select that
 -- evaluates BOTH arms, so a core returning a non-finite value outside its own
 -- Cody region poisons the arm that WAS selected. Two distinct mechanisms, both
 -- pinned below:

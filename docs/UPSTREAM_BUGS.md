@@ -21,6 +21,14 @@ mechanical staleness audit (`scripts/audit_workarounds.py`) can find them.
 `scripts/audit_workarounds.py` (full mode) flags any `chelis#NNN` cited here or
 in code that is CLOSED upstream but not sitting in §Archived.
 
+> **0.18.12 pre-pin status (2026-09-30):** the published compiler is installed,
+> the Shoals compiler/workflow pin and managed agent content are synchronized,
+> and the offline conformance audit passes. Nautilus 0.7.46 and Coral 0.7.43
+> still declare the older compiler pin, so package build, in-package blocked
+> probes, proof tiers, and the full gate have not been accepted on 0.18.12.
+> Standalone results and limits are in
+> [`chelis_0_18_12_migration.md`](chelis_0_18_12_migration.md).
+
 > **0.18.6 release status (2026-08-29):** the published Chelis tag points
 > to `cf49f85bf0d1bca2c87c88a3e459c446912189c0`; its authenticated Darwin arm64
 > archive is `08580435570c6fd44716f4d5c64117e973e379808cefeaaa97c8faefa2588f6c`
@@ -113,6 +121,9 @@ in code that is CLOSED upstream but not sitting in §Archived.
       `src/` citations still present, row 12 reads `NA` if fixed and `FAIL` if
       not. Restore the directory afterwards. Then replace this draft path with
       the issue number everywhere it is cited.
+    - **0.18.12 standalone re-probe:** an isolated copy with only a
+      `shoals#19` source citation and no `tests_blocked/` produces row 12
+      `FAIL` again. This does not change the real tree's PASS verdict.
 
 - **chelis#1391 --
   `chelis test --batch-mode auto` regressed 2.6x on this suite.** On one quiet
@@ -156,12 +167,12 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 ## Tracking
 
-- **chelis#1464 — `vmap`/`grad` evaluate untaken `if` branches, so every
+- **chelis#2103 — untaken arithmetic under `vmap`/`grad` can poison a
+  selected result, so every
   `erf64` core must be total.** `spec/06-transformations.md` §2.10.1 states that
-  untaken branches contribute nothing and are not evaluated. The implementation
-  lowers a scalar `if` under `vmap`/`grad` to a masked select that evaluates
-  BOTH arms, so a core that returns a non-finite value outside its own region
-  poisons the arm that was actually selected (`0 * NaN = NaN`).
+  untaken branches contribute nothing and are not evaluated. On the prior
+  package chain, masked lowering of scalar `if` under `vmap`/`grad` let a
+  non-finite untaken core poison the selected result (`0 * NaN = NaN`).
     - **Affected surface / narrowing:** `erf64_core_small` and
       `erf64_core_erfc_mid` clamp their argument at entry, and
       `erf64_core_erfc_tail` clamps its LOWER end. `abs_f64` uses the `abs`
@@ -188,13 +199,11 @@ in code that is CLOSED upstream but not sitting in §Archived.
       claims nothing at +inf.
     - **Scope of the guarantee:** total over the FINITE f64 domain, not over
       all of f64. `+/-inf` still poisons a sibling arm wherever an untaken arm
-      is unbounded. `min`/`max` would close that but are unavailable at this
-      pin: they type-check under vmap and then fail at eval with `missing
-      required input min`, measured at 0.18.6. Filed as
-      [`chelis#1582`](https://github.com/Chelis-Lang/chelis/issues/1582). Not
-      chelis#377 (that one needs a top-level-binding capture; this reproducer
-      captures nothing), so the residual is upstream-blocked rather than
-      unfixed.
+      is unbounded. Imported `Std.Scalar.min/max` were unavailable under
+      `vmap` at 0.18.6 (chelis#1582). That issue is now closed: a standalone
+      0.18.12 package using bundled chelis-std passes both Eval and compiled C
+      for imported `min/max`. Whether changing Shoals' clamps is safe remains
+      untested against the compatible Nautilus/Coral chain.
     - **Why the clamp is at every core, not at the observed failure:** an
       earlier revision guarded only the two divisions in region 3. Regions 1
       and 2 do not divide -- both are `P(y)/Q(y)` Horner chains with positive
@@ -210,6 +219,12 @@ in code that is CLOSED upstream but not sitting in §Archived.
       the non-finite-input cases: removing it fails
       `test_non_finite_input_propagates_rather_than_saturating` on the
       negative-spot assertion.
+    - **0.18.12 standalone re-probe:** a corrected `vmap`/`if` example
+      returns a finite selected value in Eval and C even though its discarded
+      series evaluates to `-inf` directly. This one shape does not reproduce
+      poisoning; chelis#2103 remains open, and Shoals pricing and `grad` paths
+      cannot be cleared before a compatible package-chain gate. chelis#1464
+      closed for the distinct taken-`fail` case.
     - **The `abs` intrinsic is NOT pinned, and cannot be.** An earlier revision
       of this entry claimed it was. Swapping `abs(x)` for a hand-rolled
       `if lt(x, 0) then neg(x) else x` changes no observable output: measured
