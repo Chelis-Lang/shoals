@@ -12,11 +12,12 @@ gh release download --repo Chelis-Lang/chelis --pattern chelisup.sh --output - |
 export PATH="$HOME/.chelis/bin:$PATH"
 gh repo clone Chelis-Lang/shoals
 cd shoals
+chelisup install 0.18.11
 chelis reef setup
 chelis reef build
 ```
 
-`chelis reef setup` installs the compiler selected by `reef.toml` and the locked dependencies. `chelis reef build` checks the package and produces its Reef artifacts. If you already have `chelisup`, begin with the clone. Run the remaining commands from the checkout root.
+`chelisup install 0.18.11` installs the compiler pinned by `reef.toml`. `chelis reef setup` installs the locked dependencies after the compiler is available, and `chelis reef build` checks the package and produces its Reef artifacts. If you already have `chelisup`, begin with the clone and keep the pinned compiler installation step. Run the remaining commands from the checkout root.
 
 ## Price a call
 
