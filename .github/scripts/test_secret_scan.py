@@ -27,6 +27,13 @@ class SecretScanTests(unittest.TestCase):
     def git(self,*args):
         return subprocess.check_output(['git','-C',str(self.repo),*args],stderr=subprocess.DEVNULL,text=True)
 
+    def test_each_push_keeps_its_scan(self):
+        workflow=(Path(__file__).parent.parent/'workflows'/'secret-scan.yml').read_text()
+        # GitHub concurrency can cancel running or replace pending push scans.
+        # Every push must retain the scan of its own introduced commit range.
+        self.assertNotRegex(workflow,r'(?m)^[ \t]*concurrency:')
+        self.assertNotIn('cancel-in-progress:',workflow)
+
     def test_push_scans_introduced_commits(self):
         selected=scan.select_range('push',{'before':self.before,'after':self.after},self.repo)
         self.assertEqual(selected,self.before+'..'+self.after)
