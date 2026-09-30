@@ -210,6 +210,10 @@ def main() -> int:
             "release workflow integrity tests",
             ["python3", "scripts/test_release_workflow.py"],
         ),
+        (
+            "secret scan contract tests",
+            ["python3", "-m", "unittest", "discover", "-v", "-s", ".github/scripts", "-p", "test_secret_scan.py"],
+        ),
     ]
     nightly_stages: list[tuple[str, list[str]]] = [
         (

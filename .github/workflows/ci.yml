@@ -95,6 +95,9 @@ jobs:
             chelis fmt --check "$f"
           done
 
+      - name: Test secret scan contract
+        run: python3 -m unittest discover -v -s .github/scripts -p test_secret_scan.py
+
       - name: chelis lint --check
         run: chelis lint --check src/ properties/ references/ demos/ tests/ tests-manual/ manual-gates/ tests_neg/ tests_blocked/
 

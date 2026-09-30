@@ -6,6 +6,8 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Add a pinned, redacted secret scan for pull requests and branch pushes, with a manual full-history scan.
+
 - Migrate Shoals 0.24.13 to Chelis 0.18.11, Nautilus 0.7.46, and Coral 0.7.43,
   including canonical Surf vocabulary, refreshed conformance artifacts, and
   the schema-15 WireDag receipt. See `docs/chelis_0_18_11_migration.md`.
