@@ -1,9 +1,9 @@
 # Chelis 0.18.12 draft pin: compiler-only evidence
 
-Shoals PR #95 remains a draft. Its compiler pin is `=0.18.12`; its Nautilus
-0.7.46 and Coral 0.7.43 dependencies still declare `=0.18.11`. No Shoals
-package build, source test suite, blocked probe suite, proof-tier receipt, or
-full local gate on the official chain is claimed here.
+Shoals 0.24.14 candidate PR #95 remains a draft. Its compiler pin is
+`=0.18.12`; its Nautilus 0.7.46 and Coral 0.7.43 dependencies still declare
+`=0.18.11`. No Shoals package build, source test suite, blocked probe suite,
+proof-tier receipt, or full local gate on the official chain is claimed here.
 
 The official Chelis tag resolves to
 `c81d8188de6ebad032c1bb1c0a427eb0408feee3`; release workflow
@@ -44,9 +44,10 @@ Standalone compiler probes with the released binary:
   has a blocked probe; chelis#1387 is not cleared by that PASS.
 
 `docs/cnote-import-surface.json` retains the prior `chelis_pin`, 37 tier
-expectations, and official 0.18.11-chain receipts. Updating that manifest or
-the exact Black-Scholes WireDag receipt requires observed results from
-compatible published Nautilus and Coral packages. At that point rerun
+expectations, and official 0.18.11-chain receipts while its `pkg_version` names
+the distinct 0.24.14 candidate. Updating those tier records or the exact
+Black-Scholes WireDag receipt requires observed results from compatible
+published Nautilus and Coral packages. At that point rerun
 in-package blocked and negative tests, the full local gate, proof and numeric
 oracles, and the official-chain release checks before considering merge.
 

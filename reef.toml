@@ -1,6 +1,6 @@
 [package]
 name = "shoals"
-version = "0.24.13"
+version = "0.24.14"
 compiler = "=0.18.12"
 module_prefix = "Shoals"
 additional_sources = ["properties", "references", "demos"]

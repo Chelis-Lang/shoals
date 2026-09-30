@@ -10,7 +10,7 @@ in `Chelis-Lang/chelis`.
 
 # Chelis Capability Surface for Shoals
 
-**Draft manifest:** Shoals 0.24.13 / Chelis 0.18.12 / chelis-std 0.4.0 /
+**Draft manifest:** Shoals 0.24.14 / Chelis 0.18.12 / chelis-std 0.4.0 /
 Nautilus 0.7.46 / Coral 0.7.43. The sibling packages still require Chelis
 0.18.11, so this manifest is not a buildable official chain. Compiler-only
 evidence is in [`chelis_0_18_12_migration.md`](chelis_0_18_12_migration.md).
@@ -24,7 +24,7 @@ quantitative-finance domain this shell touches — numerical methods, pricing,
 Greeks, and the proof surface over them. **Read this before designing around a
 suspected language gap.**
 
-> **Draft pin:** Shoals 0.24.13; Chelis 0.18.12 (chelis-std 0.4.0,
+> **Draft pin:** Shoals 0.24.14; Chelis 0.18.12 (chelis-std 0.4.0,
 > bundled), Nautilus 0.7.46, Coral 0.7.43 (both compiler-incompatible)
 > · **Compiler-only refresh:** 2026-09-30
 
