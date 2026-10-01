@@ -1,0 +1,5 @@
+Shoals.Indicators: volume must be >= 0
+
+Assumption: a negative weight is not a weighting. Admitting it would let a
+VWAP fall outside the range of its own prices, which no caller could detect
+from the result.

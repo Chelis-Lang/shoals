@@ -1,0 +1,5 @@
+Shoals.Indicators: input series must have equal length
+
+Assumption: a bar series is one object split across three lists, so a length
+disagreement is malformed input. `zip` would stop at the shorter list and
+return a silently shortened result instead.

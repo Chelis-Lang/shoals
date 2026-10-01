@@ -6,6 +6,83 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`Shoals.Indicators`: a technical-indicator module with no default
+  conventions** (shoals#83). EMA, Wilder's RMA, SMA, true range, ATR, RSI,
+  MACD, Bollinger bands, the stochastic oscillator, ADX, Donchian channels,
+  VWAP and crossovers, in f64 over `List[f64]`. See
+  [`docs/src/indicators.md`](docs/src/indicators.md) and
+  `spec/shoals_quant_surface.md` §2.15.
+
+  The point is not the functions; it is that these definitions disagree
+  silently. Measured across 431 agent-written Chelis programs: 100 of 115
+  hand-written EMAs seeded at the first price (pandas `adjust=False`) where
+  TA-Lib seeds at the first window's SMA, and about 105 programs called their
+  smoothing "Wilder" while using `alpha = 2/(n+1)` instead of Wilder's
+  `1/n`. Neither disagreement errors. So `EmaSeed`, `Alpha`, `Smoothing` and
+  `Ddof` are closed ADT arguments, **none of them has a default**, and an
+  unhandled convention is a type error. `rma(xs, n)` is named separately
+  because that is what "Wilder" means.
+
+  Warm-up is represented rather than filled: every series-valued export
+  returns `List[Option[f64]]` of exactly the input length, so output index
+  `i` is input index `i` and a warm-up entry cannot be read as a number. A
+  `valid_from` count was rejected as ignorable and a shortened list as moving
+  the index arithmetic to the caller. `None` means warm-up only — degenerate
+  cases take a defined value instead: a dead-flat RSI window reads **0**,
+  guarding the sum of smoothed gain and loss exactly as TA-Lib's `ta_RSI.c`
+  does, while a monotone rise still reads 100. The stochastic and ADX
+  degenerate cases are documented at their sites together with the three
+  places the module and current TA-Lib differ: the stochastic range test is
+  exact where TA-Lib scales it, ADX emits 0 where TA-Lib skips and holds the
+  previous value, and the ADX DI-sum test is exact where TA-Lib uses an
+  epsilon band. `rsi` additionally accepts `n = 1`, where TA-Lib returns
+  `TA_BAD_PARAM`; no document claims parity there.
+
+  A period below 1, a negative `ind_shift`, unequal input lengths and
+  negative volume all `fail(...)`; `tests_neg/indicators/` covers each, and
+  all four are non-vacuous — removing any one guard makes `--expect neg`
+  flag the file. Two do so by the intended mechanism (the probe asserts the
+  length an *unguarded* implementation would return, so it goes green); the
+  other two trip a `WRONG-DIAGNOSTIC` instead, because removing the guard
+  changes the failure rather than removing it.
+
+  The properties' own comparison is structural: `masked_series_agrees` takes
+  the expected warm-up as an integer and asserts it on both sides, so a value
+  comparison cannot be written without an absolute shape check. Three
+  red-team rounds found four properties satisfiable by absence before that
+  landed. The primitive's contract is itself pinned by
+  `test_primitive_rejects_every_vacuous_comparison`, with positive and
+  negative controls — which is how a laziness bug in it was found: `both` is
+  an ordinary function and evaluates both arguments, so its length guard did
+  not protect the indexing that followed and a mismatched comparison trapped
+  instead of returning false. Unreachable from any call site, and fixed.
+
+  Verification is analytic first: `properties/indicators.ch` checks
+  identities that hold by derivation (a constant series' EMA is that
+  constant, a strictly rising close gives RSI exactly 100, an SMA over an
+  arithmetic ramp is the window midpoint, band width is exactly
+  `2*k*sigma`, the two `Ddof` deviations differ by exactly
+  `sqrt(n/(n-1))`), two properties assert no look-ahead by perturbing only
+  the last input, and one negative property requires the two conflated
+  alphas to be distinguishable. `references/indicators.ch` recomputes the
+  exponential average from its closed form rather than its recursion, and
+  `scripts/oracle_indicators.py` re-derives every series in Python from the
+  cited definitions with no shared code.
+
+  `ind_rolling_sum`/`mean`/`std`/`min`/`max`, `ind_shift` and `ind_diff` are
+  generic time-series primitives that belong in Nautilus (`nautilus#85`).
+  They carry the `ind_` prefix to mark them as borrowed and ship here only
+  because the rolling family exists in exactly one other place in the
+  ecosystem and that copy does not serve `List[f64]`: `Coral.Window` has the
+  five rolling reductions but only on `tensor[n, f32]`, and Coral is not a
+  compiled lane (`coral#26`). `Nautilus.TimeSeries` is not a second copy — it
+  has no rolling family at any width, only exponential smoothing and AR/ARMA
+  prediction (`nautilus#70`, `shoals#72`). So `ind_rolling_*` is the second
+  implementation of the reductions, and `ind_shift` / `ind_diff` duplicate
+  nothing at all. Delete this layer and re-export when `nautilus#85` lands.
+
 - Add a pinned, redacted secret scan for pull requests and branch pushes, with a manual full-history scan.
 
 - Migrate Shoals 0.24.13 to Chelis 0.18.11, Nautilus 0.7.46, and Coral 0.7.43,

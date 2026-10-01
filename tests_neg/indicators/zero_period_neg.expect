@@ -1,0 +1,5 @@
+Shoals.Indicators: period must be >= 1
+
+Assumption: a window or period below 1 is a domain error, not a degenerate
+case with a defined result. Returning an all-`None` series would report
+"no data" for what is a caller bug (spec/shoals_quant_surface.md §2.15.5).

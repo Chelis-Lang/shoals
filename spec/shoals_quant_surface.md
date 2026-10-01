@@ -365,6 +365,158 @@ Baseline ships parametric/historical VaR and CVaR. Extensions:
   sensitivities from `Shoals.Greeks`. Used when full revaluation is
   too expensive.
 
+### 2.15 `Shoals.Indicators` (new module)
+
+Technical indicators over `List[f64]` price and volume series. The module
+exists because the indicator families below were absent from the whole
+ecosystem (shoals#83) while being the most frequently hand-written
+components measured in the Chelis-Lang/Voyage benchmark captures: true
+range / ATR 179 programs, EMA recursion 125, RSI 111, "Wilder" smoothing
+105, Bollinger 97, MACD 45, crossovers 30.
+
+**The point of this module is not saved effort; it is that the
+conventions disagree silently.** The same measurements found 100 of 115
+hand-written EMAs seeding at the first price where TA-Lib seeds at the
+SMA of the first window, about 105 programs calling their smoothing
+"Wilder" while using `alpha = 2/(n+1)` rather than Wilder's `1/n`, and
+ATR appearing in at least three variants. None of those disagreements
+raises an error. They just produce different numbers. Every function in
+this module therefore names its convention in its signature, and no
+convention has a default.
+
+#### 2.15.1 Convention types
+
+Conventions are closed ADTs, not strings or integers, so an unhandled
+convention is a type error rather than a silent fallback:
+
+- `EmaSeed`: `SeedFirstValue` seeds the recursion at the first valid
+  input and reports no warm-up beyond its input's own
+  (pandas `ewm(..., adjust=False)`). `SeedSma` seeds at the arithmetic
+  mean of the first `n` valid inputs and reports `n - 1` further
+  warm-up entries (TA-Lib `EMA`).
+- `Alpha`: `AlphaSpan` is `2 / (n + 1)` (pandas `span=n`).
+  `AlphaWilder` is `1 / n` (Wilder 1978; TA-Lib `RMA`).
+- `Smoothing` selects the averaging kernel for the derived indicators
+  that admit more than one in the wild: `SmoothWilder` is
+  `SeedSma` + `AlphaWilder`, `SmoothEma` is `SeedFirstValue` +
+  `AlphaSpan`, and `SmoothSimple` is the rolling arithmetic mean over
+  `n`. These are exactly the three ATR variants the measurements found.
+- `Ddof`: `DdofPopulation` divides the rolling variance by `n`
+  (TA-Lib `STDDEV`, and what Bollinger bands are defined against).
+  `DdofSample` divides by `n - 1` (pandas `.std()` default). This pair
+  is a distinct silent-drift axis from the smoothing ones: a Bollinger
+  band computed with `DdofSample` is wider than the published
+  definition at every point, and nothing reports it.
+
+#### 2.15.2 Warm-up is represented, not filled
+
+Every series-valued export returns `List[Option[f64]]` of exactly the
+input length. Entries that no valid computation covers are `None`;
+valid entries are `Some(v)`. Index `i` of the output corresponds to
+index `i` of the input with no offset.
+
+This is the structural form of the requirement, chosen over a flat
+`List[f64]` plus a `valid_from` count and over a shortened list. A
+`valid_from` field is ignorable, so a caller that drops it reads
+warm-up filler as real data; a shortened list moves the alignment
+burden to the caller, which is exactly where the measured off-by-one
+and look-ahead defects appear (nautilus#85). `Option[T]` is `@pin` in
+`docs/CHELIS_SURFACE.md`.
+
+Warm-up lengths are part of the contract and are stated per function in
+`src/indicators.ch`. No export reads any input index greater than its
+own output index -- for the whole surface, not only where it is pinned.
+Two properties check it executably rather than by inspection, by perturbing
+only the last input and requiring every earlier output to be unchanged;
+they cover `ema` and `rsi`. The committed suite does not pin the rest.
+Review evidence for the unpinned exports belongs in the pull request record,
+not here.
+
+#### 2.15.3 Rolling layer (on loan from Nautilus)
+
+`ind_rolling_sum`, `ind_rolling_mean`, `ind_rolling_std`,
+`ind_rolling_min`, `ind_rolling_max`, `ind_shift` and `ind_diff` are
+generic time-series primitives, not finance. They belong in Nautilus and
+are requested there as nautilus#85. They live here, under an `ind_`
+prefix that marks them as the borrowed layer, because the rolling family exists in exactly one place in the ecosystem and that copy does not serve `List[f64]`:
+`Coral.Window` has `rolling_sum`, `rolling_mean`, `rolling_std`,
+`rolling_min` and `rolling_max`, but only on `tensor[n, f32]`, and Coral is
+not a compiled lane (coral#26). `Nautilus.TimeSeries` is not a second copy —
+it has no rolling family at any width, only exponential smoothing and
+AR/ARMA prediction (nautilus#70, shoals#72). `ind_shift` and `ind_diff`
+duplicate nothing: neither package has a shift, lag or diff. Delete this
+layer and re-export from Nautilus when nautilus#85 lands.
+
+The rolling reductions re-sum each window rather than carrying a running
+total. That is `O(n * w)` where a running total is `O(n)`, and it is the
+deliberate choice: a running total accumulates cancellation error across
+the whole series, and an indicator library whose whole purpose is that
+the numbers agree with a named reference should not trade that away for
+a constant factor at the window sizes these indicators use (`n` is 9, 12,
+14, 20 or 26 in every convention cited here).
+
+#### 2.15.4 Indicator surface
+
+Each entry names the reference definition it matches. Where a reference
+is ambiguous, the ambiguity is a convention argument rather than a
+choice made inside the function.
+
+- **`sma(xs, n)`** — rolling arithmetic mean. Warm-up `n - 1`.
+- **`ema(xs, n, seed, alpha)`** — the exponential recursion
+  `out[i] = a * xs[i] + (1 - a) * out[i-1]`, with `a` from `alpha` and
+  the recursion's start from `seed`. Both pandas and TA-Lib are
+  reachable; neither is the default.
+- **`rma(xs, n)`** — Wilder's smoothing, defined as
+  `ema(xs, n, SeedSma, AlphaWilder)`. Named separately because it is
+  what "Wilder" means, and because naming it removes the most common
+  measured error.
+- **`true_range(high, low, close)`** — `max(h - l, |h - prev_c|,
+  |l - prev_c|)` (Wilder 1978). Warm-up 1: the first bar has no
+  previous close, and that is a `None`, not `h - l`.
+- **`atr(high, low, close, n, smoothing)`** — `smoothing` applied to
+  `true_range`. All three measured variants are reachable and named.
+- **`rsi(close, n, smoothing)`** — `100 * g / (g + l)` for smoothed gain
+  `g` and smoothed loss `l`, which is Wilder 1978's `100 - 100/(1 + RS)`
+  rearranged. `SmoothWilder` is the published definition. **No movement at
+  all reads 0**, guarding the sum exactly as TA-Lib's `ta_RSI.c` does; a
+  monotone rise still reads 100, because there the sum is positive.
+- **`macd(close, fast, slow, signal, seed, alpha)`** — returns
+  `(line, signal_line, histogram)` in one pass so the three cannot
+  drift apart. `line = ema(fast) - ema(slow)`,
+  `signal_line = ema(line, signal)`, `histogram = line - signal_line`.
+  Appel's original uses 12/26/9 with `AlphaSpan`.
+- **`bollinger(close, n, k, ddof)`** — returns `(lower, mid, upper)`
+  with `mid = sma(close, n)` and the bands at `mid -/+ k * sigma`
+  (Bollinger 1980s; `n = 20`, `k = 2`, `DdofPopulation`).
+- **`stochastic(high, low, close, k_n, d_n, smoothing)`** — returns
+  `(k, d)`. `k = 100 * (c - min(low, k_n)) / (max(high, k_n) -
+  min(low, k_n))`; `d` is `k` smoothed over `d_n` (Lane). A zero range
+  is a defined case and is specified in the module, not left to
+  division by zero. The module tests the range for exact zero; TA-Lib
+  tests a scaled epsilon, so the two disagree on a sub-epsilon residue.
+  See the note at the site.
+- **`adx(high, low, close, n)`** — returns `(plus_di, minus_di, adx)`.
+  Directional movement, Wilder-smoothed, then `DX` and `ADX = rma(DX)`
+  (Wilder 1978). Wilder's smoothing is not a convention argument here
+  because ADX is defined with it.
+- **`donchian(high, low, n)`** — returns `(lower, mid, upper)`, the
+  rolling low, midpoint and high over `n`.
+- **`cumulative_vwap(price, volume)`** and
+  **`rolling_vwap(price, volume, n)`** — volume-weighted average price,
+  from the start of the series and over a rolling window.
+- **`crossover(a, b)`** / **`crossunder(a, b)`** — `List[Option[bool]]`,
+  true at `i` when `a` crosses `b` between `i-1` and `i`. `None`
+  wherever either input is `None` at `i` or `i-1`, so a crossing is
+  never reported out of a warm-up.
+
+#### 2.15.5 Out-of-domain inputs trap
+
+A window or period below 1, and a multi-series call whose inputs have
+unequal lengths, are domain errors and `fail(...)`. They are not
+narrowings and carry no issue citation: there is no correct number to
+return, and returning an all-`None` series would report "no data" for
+what is a caller bug. `tests_neg/` covers each trap.
+
 ## 3. AD as a property — structural commitments
 
 The functional surface is only half the verified-AD-for-quant-finance
