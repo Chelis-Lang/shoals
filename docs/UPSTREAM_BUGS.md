@@ -156,71 +156,6 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 ## Tracking
 
-- **chelis#1464 — `vmap`/`grad` evaluate untaken `if` branches, so every
-  `erf64` core must be total.** `spec/06-transformations.md` §2.10.1 states that
-  untaken branches contribute nothing and are not evaluated. The implementation
-  lowers a scalar `if` under `vmap`/`grad` to a masked select that evaluates
-  BOTH arms, so a core that returns a non-finite value outside its own region
-  poisons the arm that was actually selected (`0 * NaN = NaN`).
-    - **Affected surface / narrowing:** `erf64_core_small` and
-      `erf64_core_erfc_mid` clamp their argument at entry, and
-      `erf64_core_erfc_tail` clamps its LOWER end. `abs_f64` uses the `abs`
-      intrinsic rather than a hand-rolled `if`, and `erf64` guards NaN with
-      `eq(x, x)`. The clamps never bind on the region the dispatcher routes to
-      each core, so no returned value changes.
-    - **The rule, since two revisions got it wrong:** a clamp is an `if`, so
-      under masked select it is safe only when its UNTAKEN arm has a finite
-      VALUE **and** a finite DERIVATIVE over the domain totality is claimed
-      for. The derivative half was missing from an earlier revision:
-      `if c then k else sqrt(x)` has a finite untaken value at x = 0 and an
-      infinite derivative, satisfies the weaker rule, and still NaNs under
-      `grad` because the adjoint multiplies that derivative by the 0 mask.
-      Measured at this pin; the shipped kernel is safe under the stronger
-      rule, since every untaken arm is a constant or the bare operand. A bounded constant is sufficient but
-      NOT necessary -- an earlier revision of this line said "bounded
-      constant", which would condemn regions 1 and 2, whose clamps take the
-      operand itself as an untaken arm and are demonstrably safe over the
-      finite domain. The tail's lower clamp has the constant `1.0`; an upper
-      clamp would take the operand, which is +inf at ax = +inf, so one added
-      "for uniformity" REMOVED that branch's totality at the single point
-      where it had more than regions 1 and 2. It is deleted, and its absence
-      is unpinned: re-adding it leaves every test green, because the suite
-      claims nothing at +inf.
-    - **Scope of the guarantee:** total over the FINITE f64 domain, not over
-      all of f64. `+/-inf` still poisons a sibling arm wherever an untaken arm
-      is unbounded. `min`/`max` would close that but are unavailable at this
-      pin: they type-check under vmap and then fail at eval with `missing
-      required input min`, measured at 0.18.6. Filed as
-      [`chelis#1582`](https://github.com/Chelis-Lang/chelis/issues/1582). Not
-      chelis#377 (that one needs a top-level-binding capture; this reproducer
-      captures nothing), so the residual is upstream-blocked rather than
-      unfixed.
-    - **Why the clamp is at every core, not at the observed failure:** an
-      earlier revision guarded only the two divisions in region 3. Regions 1
-      and 2 do not divide -- both are `P(y)/Q(y)` Horner chains with positive
-      coefficients, so numerator and denominator both overflow to `+inf` and
-      `inf/inf = NaN`. Guarding the sites a review named, rather than the
-      class, let the same defect survive two repairs: measured, the f64 vector
-      price returned NaN at sigma = 1e-60 and the AD gamma at sigma = 1e-40, a
-      representable f32 subnormal.
-    - **State at pin 0.18.6 (2026-09-07):** OPEN upstream. Pinning is
-      per-clamp and was previously misstated as uniform: reverting the region-1
-      or region-2 clamp fails the subnormal-sigma cases; reverting the tail's
-      LOWER clamp fails the zero-`d` cases instead. The NaN guard is pinned by
-      the non-finite-input cases: removing it fails
-      `test_non_finite_input_propagates_rather_than_saturating` on the
-      negative-spot assertion.
-    - **The `abs` intrinsic is NOT pinned, and cannot be.** An earlier revision
-      of this entry claimed it was. Swapping `abs(x)` for a hand-rolled
-      `if lt(x, 0) then neg(x) else x` changes no observable output: measured
-      through `bs_call_f64_vector` (the vmap lane) at an infinite sigma and at
-      a negative spot, and through scalar `bs_call_f64`, both spellings return
-      NaN in every cell, and the full suite is unchanged. The two differ only
-      at a non-finite argument, and every path that reaches `abs_f64` with one
-      ends in NaN regardless. The intrinsic is kept because it is the
-      structurally simpler form -- one fewer `if` for the masked select to
-      duplicate -- not because a test defends it.
-
 - **nautilus#56 / chelis#902 — no f64-callable `erf`, so this shell carries its
   own kernel.** `Nautilus.Special` is f32-only, so a Shoals f64 grad path
   cannot call its `erf`; `Shoals.Pricing` therefore hand-rolls one. The
@@ -474,6 +409,98 @@ No parked entries.
 
 ## Archived
 
+- **chelis#2640 — `grad` through a scalar `if` returns NaN when the untaken
+  branch has a non-finite DERIVATIVE, so every `erf64` core must be total.**
+  `spec/06-transformations.md` §2.10.1 states that untaken branches contribute
+  nothing and are not evaluated. The adjoint multiplies the untaken arm's
+  derivative by the zero mask, so an arm with an unbounded derivative poisons the
+  result even though it was not selected.
+    - **Resolution:** CLOSED upstream 2026-09-27, resolved by chelis#2586
+      (`e65735e8c`), whose witness returns a finite gradient and whose eval/C
+      untaken-arm gradient oracle passes. **This shell is pinned at 0.18.11,
+      which does not contain that fix**, so every narrowing below still binds.
+      Re-probe at the pin bump to 0.18.12 or later and simplify whatever the fix
+      makes unnecessary; needing the pin to catch up is the only reason this
+      entry is archived rather than active.
+    - **This entry previously cited chelis#1464, which was wrong twice over.**
+      That issue is "Transforms mask a taken scalar-if `fail` branch as zero" --
+      a *taken* `fail` arm lowering to a zero `Const` -- a different mechanism,
+      and it is CLOSED. The value-level story that citation carried
+      (`0 * NaN = NaN` poisoning the selected arm) does not reproduce at 0.18.11:
+      measured, `vmap(if eq(x,0) then 7.0 else div(x,x))` over `[0.0, 2.0]` is
+      `[7.0, 1.0]`, and a hand-rolled `if` absolute value returns `inf` at `+inf`
+      exactly as the `abs` intrinsic does. It may have reproduced at an older
+      pin; it does not now. The DERIVATIVE rule below is what binds, and that one
+      is measured at this pin.
+    - **Affected surface / narrowing:** `erf64_core_small` and
+      `erf64_core_erfc_mid` clamp their argument at entry, and
+      `erf64_core_erfc_tail` clamps its LOWER end. `erf64` guards NaN with
+      `eq(x, x)`. The clamps never bind on the region the dispatcher routes to
+      each core, so no returned value changes. They are retained on the
+      derivative rule below and on in-region numerical correctness: a core
+      evaluated outside its own Cody region returns a wrong number, which is a
+      reason to clamp independent of any transform. `abs_f64` uses the `abs`
+      intrinsic, which is the better spelling on its own merits; the claim that a
+      hand-rolled `if` would return NaN at `+inf` is withdrawn as unmeasured --
+      it returns `inf`, exactly as the intrinsic does.
+    - **The rule, since two revisions got it wrong:** a clamp is an `if`, so
+      under masked select it is safe when its UNTAKEN arm has a finite
+      DERIVATIVE over the domain totality is claimed for. This entry asks for a
+      finite VALUE as well, and that half is conservative margin rather than a
+      measured requirement at this pin: an untaken arm with an infinite or NaN
+      value but a finite derivative differentiates cleanly (measured). Keeping
+      the stronger form can only retain a clamp that is not needed; it cannot
+      license removing one that is. The derivative half was missing from an earlier revision:
+      `if c then k else sqrt(x)` has a finite untaken value at x = 0 and an
+      infinite derivative, satisfies the weaker rule, and still NaNs under
+      `grad` because the adjoint multiplies that derivative by the 0 mask.
+      Measured at this pin; the shipped kernel is safe under the stronger
+      rule, since every untaken arm is a constant or the bare operand. A bounded constant is sufficient but
+      NOT necessary -- an earlier revision of this line said "bounded
+      constant", which would condemn regions 1 and 2, whose clamps take the
+      operand itself as an untaken arm and are demonstrably safe over the
+      finite domain. The tail's lower clamp has the constant `1.0`; an upper
+      clamp would take the operand, which is +inf at ax = +inf, so one added
+      "for uniformity" REMOVED that branch's totality at the single point
+      where it had more than regions 1 and 2. It is deleted, and its absence
+      is unpinned: re-adding it leaves every test green, because the suite
+      claims nothing at +inf.
+    - **Scope of the guarantee:** total over the FINITE f64 domain, not over
+      all of f64. An unbounded untaken arm does not poison the selected arm's
+      VALUE at this pin (measured); the exposure is its derivative, per the rule
+      above. `min`/`max` would close that but are unavailable at this
+      pin: they type-check under vmap and then fail at eval with `missing
+      required input min`, measured at 0.18.6. Filed as
+      [`chelis#1582`](https://github.com/Chelis-Lang/chelis/issues/1582). Not
+      chelis#377 (that one needs a top-level-binding capture; this reproducer
+      captures nothing), so the residual is upstream-blocked rather than
+      unfixed.
+    - **Why the clamp is at every core, not at the observed failure:** an
+      earlier revision guarded only the two divisions in region 3. Regions 1
+      and 2 do not divide -- both are `P(y)/Q(y)` Horner chains with positive
+      coefficients, so numerator and denominator both overflow to `+inf` and
+      `inf/inf = NaN`. Guarding the sites a review named, rather than the
+      class, let the same defect survive two repairs: measured, the f64 vector
+      price returned NaN at sigma = 1e-60 and the AD gamma at sigma = 1e-40, a
+      representable f32 subnormal.
+    - **State at pin 0.18.6 (2026-09-07):** OPEN upstream. Pinning is
+      per-clamp and was previously misstated as uniform: reverting the region-1
+      or region-2 clamp fails the subnormal-sigma cases; reverting the tail's
+      LOWER clamp fails the zero-`d` cases instead. The NaN guard is pinned by
+      the non-finite-input cases: removing it fails
+      `test_non_finite_input_propagates_rather_than_saturating` on the
+      negative-spot assertion.
+    - **The `abs` intrinsic is NOT pinned, and cannot be.** An earlier revision
+      of this entry claimed it was. Swapping `abs(x)` for a hand-rolled
+      `if lt(x, 0) then neg(x) else x` changes no observable output: measured
+      through `bs_call_f64_vector` (the vmap lane) at an infinite sigma and at
+      a negative spot, and through scalar `bs_call_f64`, both spellings return
+      NaN in every cell, and the full suite is unchanged. The two differ only
+      at a non-finite argument, and every path that reaches `abs_f64` with one
+      ends in NaN regardless. The intrinsic is kept because it is the
+      structurally simpler form -- one fewer `if` for the masked select to
+      duplicate -- not because a test defends it.
+
 - **shoals#88 — Black-Scholes returned NaN with no remaining uncertainty, in
   both the scalar and the WireDag lane.** Resolved in this shell by flooring
   `sigma*sqrt(t)` in `d1_64` and `pricing_wire_d1_f64`; `tests/pricing_expiry.ch`
@@ -481,16 +508,19 @@ No parked entries.
   `shoals#88` citations in `src/pricing.ch`, and those comments explain a
   deliberate narrowing that outlives the fix: the guard **must** stay a clamp on
   the denominator and may not become a branch on the price. The binding reason is
-  the **derivative** rule in the chelis#1464 entry above, not the value rule --
+  the **derivative** rule in the chelis#2640 entry above, not the value rule --
   measured at this pin the rejected branch returns the correct price at every
   lane, and only its delta is NaN, because the adjoint multiplies the untaken
   arm's infinite derivative by the zero mask. Anyone who checks only the price
   will conclude the clamp is unnecessary. The hazard does not need `vmap` either:
   it reproduces under plain `grad`. The wire lane additionally cannot use a branch at all: its
   selectors are arithmetic, so it hand-rolls `abs` out of a select and the first
-  `+/-inf` reaching it computes `0 * neg(inf)`. If chelis#1464 is ever fixed and
-  a non-arithmetic select becomes available, both floors may be revisited --
-  until then they are load-bearing. The re-pinned WireDag receipt
+  `+/-inf` reaching it computes `0 * neg(inf)` -- IEEE arithmetic in this shell's
+  own select, not an upstream defect. The scalar floor may be revisited when the
+  pin reaches 0.18.12 and chelis#2640's fix lands here; the wire floor is
+  independent of any upstream state, because that lane must stay producer-clean
+  for the WireDag seam and so has no `if` available to it. Until then both are
+  load-bearing. The re-pinned WireDag receipt
   (`scripts/validate_bs_wire_root.py`, root 859 / 1665 nodes) reflects the
   floor and involved no compiler change.
 

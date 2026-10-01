@@ -41,8 +41,9 @@ def test_f32_entry_points_at_expiry() -> unit ! { Test } = {
   _ = assert_close(bs_call_scalar(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(0.0, f32)), cast(0.0, f32), cast(0.0001, f32), "bs_call_scalar t=0 ATM == 0 (the issue's named entry point)")
   assert_close(bs_put_scalar(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(0.0, f32)), cast(0.0, f32), cast(0.0001, f32), "bs_put_scalar t=0 ATM == 0")
 }
--- The vmap lane runs the same body under a masked select, which is why the fix
--- is a denominator clamp and not a branch on the price (chelis#1464).
+-- The vmap lane runs the same body under a masked select. The fix is a
+-- denominator clamp and not a branch on the price because of the adjoint, not
+-- the value: a branch returns the right price and a NaN delta (chelis#2640).
 def test_vmap_lane_at_expiry() -> unit ! { Test } = {
   out = bs_call_f64_vector(to_tensor([cast(100.0, f64), cast(110.0, f64)]), to_tensor([k100(), k100()]), to_tensor([r5(), r5()]), to_tensor([v20(), v20()]), to_tensor([z(), z()]))
   vals = to_list(out)

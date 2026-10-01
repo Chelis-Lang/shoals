@@ -25,7 +25,8 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   returned NaN at *every* moneyness on expiry, because nothing in that lane
   saturates. Its selectors are arithmetic, so the first `+/-inf` to reach the
   hand-rolled `pricing_wire_abs_f64` evaluates `0 * neg(inf)` and poisons the
-  result whichever branch the mask selects (chelis#1464).
+  result whichever branch the mask selects. That is IEEE arithmetic in this
+  shell's own select, not an upstream defect, so it carries no citation.
 
   Both are fixed by flooring the denominator rather than by branching on the
   price, and the reason is the adjoint rather than the value: measured at this
