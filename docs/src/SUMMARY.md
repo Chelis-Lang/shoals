@@ -20,6 +20,7 @@
 - [Tenors](tenors.md)
 - [Market data](market-data.md)
 - [Order book](orderbook.md)
+- [Technical indicators](indicators.md)
 - [Distributions](distributions.md)
 - [Calibration](modelfit.md)
 - [XVA](xva.md)

@@ -1,0 +1,40 @@
+tensor precision mismatch: f32 vs f64
+
+Blocker: `Nautilus.TimeSeries` is f32-and-tensor-only, so no f64 `List[f64]`
+indicator path can reuse it. Tracked upstream as nautilus#70 (the f32-only
+public surface) with nautilus#85 the specific request for rolling-window and
+lag primitives on `List[f64]`. The owning entry is in
+docs/UPSTREAM_BUGS.md §Tracking, which carries the measured declaration and
+the re-probe trigger. `Shoals.Indicators` therefore ships its own
+`ind_rolling_sum` / `ind_rolling_mean` / `ind_rolling_std` /
+`ind_rolling_min` / `ind_rolling_max` / `ind_shift` / `ind_diff`, marked with
+the `ind_` prefix as a borrowed layer (shoals#83,
+spec/shoals_quant_surface.md §2.15.3, docs/src/indicators.md §Rolling layer).
+
+DE-NARROWING, and the branch matters because the two upstream fixes are not
+interchangeable:
+
+1. If this probe PASSES because `Nautilus.TimeSeries` gained an f64
+   signature (nautilus#70), that alone does NOT let the borrowed layer go.
+   The Nautilus surface is tensor-shaped and exponential; `ind_rolling_min`,
+   `ind_rolling_max`, `ind_shift` and `ind_diff` have no counterpart there at
+   any width. Promote this probe to `tests/` as a real cross-width test,
+   re-key it on whatever f64 rolling reduction Nautilus then exposes, and
+   leave the layer in place with its citation narrowed to nautilus#85 only.
+
+2. If nautilus#85 lands with rolling and lag primitives on `List[f64]`, this
+   probe may still FAIL (the tensor surface can stay f32) -- so it is NOT the
+   trigger for that half. The trigger is a Nautilus release whose changelog
+   closes nautilus#85. At that bump: delete `ind_rolling_*`, `ind_shift` and
+   `ind_diff` from `src/indicators.ch`, re-export or import the Nautilus
+   equivalents, keep the `Option`-masked public signatures unchanged, and
+   re-run `tests/indicators.ch` -- the oracle decimals in
+   `test_oracle_rolling_layer` and `test_oracle_shift_and_diff` are the
+   equivalence check, and `scripts/oracle_indicators.py` regenerates them.
+   Confirm the warm-up semantics match before deleting anything: Nautilus may
+   choose a `min_periods` convention rather than `n - 1`, in which case the
+   Shoals wrapper keeps the mapping and only the arithmetic moves.
+
+Do not cite coral#26 here. `Coral.Window` does have the rolling reductions,
+but it is f32-only AND build-lane-blocked, so it is not a de-narrowing path
+for either branch; citing it would make the steps above unexecutable.

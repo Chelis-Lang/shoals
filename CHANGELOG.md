@@ -6,6 +6,58 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`Shoals.Indicators`: a technical-indicator module with no default
+  conventions** (shoals#83). EMA, Wilder's RMA, SMA, true range, ATR, RSI,
+  MACD, Bollinger bands, the stochastic oscillator, ADX, Donchian channels,
+  VWAP and crossovers, in f64 over `List[f64]`. See
+  [`docs/src/indicators.md`](docs/src/indicators.md) and
+  `spec/shoals_quant_surface.md` §2.15.
+
+  The point is not the functions; it is that these definitions disagree
+  silently. Measured across 431 agent-written Chelis programs: 100 of 115
+  hand-written EMAs seeded at the first price (pandas `adjust=False`) where
+  TA-Lib seeds at the first window's SMA, and about 105 programs called their
+  smoothing "Wilder" while using `alpha = 2/(n+1)` instead of Wilder's
+  `1/n`. Neither disagreement errors. So `EmaSeed`, `Alpha`, `Smoothing` and
+  `Ddof` are closed ADT arguments, **none of them has a default**, and an
+  unhandled convention is a type error. `rma(xs, n)` is named separately
+  because that is what "Wilder" means.
+
+  Warm-up is represented rather than filled: every series-valued export
+  returns `List[Option[f64]]` of exactly the input length, so output index
+  `i` is input index `i` and a warm-up entry cannot be read as a number. A
+  `valid_from` count was rejected as ignorable and a shortened list as moving
+  the index arithmetic to the caller. `None` means warm-up only — degenerate
+  cases follow their cited reference instead (a flat RSI window reads 100 per
+  TA-Lib's zero-average-loss guard, a zero-range stochastic window reads 0).
+
+  A period below 1, a negative `ind_shift`, unequal input lengths and
+  negative volume all `fail(...)`; `tests_neg/indicators/` covers each, and
+  each probe asserts the length an *unguarded* implementation would return so
+  removing a guard turns the probe green and `--expect neg` flags it.
+
+  Verification is analytic first: `properties/indicators.ch` checks
+  identities that hold by derivation (a constant series' EMA is that
+  constant, a strictly rising close gives RSI exactly 100, an SMA over an
+  arithmetic ramp is the window midpoint, band width is exactly
+  `2*k*sigma`, the two `Ddof` deviations differ by exactly
+  `sqrt(n/(n-1))`), two properties assert no look-ahead by perturbing only
+  the last input, and one negative property requires the two conflated
+  alphas to be distinguishable. `references/indicators.ch` recomputes the
+  exponential average from its closed form rather than its recursion, and
+  `scripts/oracle_indicators.py` re-derives every series in Python from the
+  cited definitions with no shared code.
+
+  `ind_rolling_sum`/`mean`/`std`/`min`/`max`, `ind_shift` and `ind_diff` are
+  generic time-series primitives that belong in Nautilus (`nautilus#85`).
+  They carry the `ind_` prefix to mark them as borrowed and ship here only
+  because neither existing implementation serves `List[f64]`:
+  `Nautilus.TimeSeries` is an f32-tensor EWMA (`nautilus#70`, `shoals#72`)
+  and `Coral.Window` is f32-only and not a compiled lane (`coral#26`).
+  Delete this layer and re-export when `nautilus#85` lands.
+
 - Add a pinned, redacted secret scan for pull requests and branch pushes, with a manual full-history scan.
 
 - Migrate Shoals 0.24.13 to Chelis 0.18.11, Nautilus 0.7.46, and Coral 0.7.43,

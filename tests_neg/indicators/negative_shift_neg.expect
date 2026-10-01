@@ -1,0 +1,5 @@
+Shoals.Indicators: shift must be >= 0 (a negative shift reads the future)
+
+Assumption: `ind_shift` lags a series. A negative count reads an input index
+greater than the output index, which is the look-ahead the module exists to
+make impossible; it is rejected rather than served.
