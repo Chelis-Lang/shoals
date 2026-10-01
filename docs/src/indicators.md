@@ -191,9 +191,10 @@ No tensor form returns a tensor; the results are lists on both surfaces.
 
 The scalar and convention arguments follow the list form's, in the same order
 and with the same meaning, so `Ddof`, `Smoothing`, `EmaSeed` and `Alpha`
-selections carry across. One spelling differs: the five rolling reductions call
-their width `window` where the list forms call it `n`, because `n` is the
-dimension variable in the tensor signature. `ind_shift` and `ind_diff` keep `k`.
+selections carry across. One spelling differs: wherever a list form calls its
+width `n`, the tensor form calls it `window`, because `n` is the dimension
+variable in the tensor signature. Widths with another name are unchanged, so
+`ind_shift` and `ind_diff` keep `k`.
 
 Length agreement is stronger here than on the list surface. One `[n]` covers
 every series a call takes, so a multi-series call such as `tensor_atr` cannot be

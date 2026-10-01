@@ -525,7 +525,7 @@ same tuple of the same arity. Masked-series length equals the input length per
 
 **No tensor form returns a tensor.** §2.15.2 requires a representation a caller
 cannot misread. Each tensor-return shape that has been proposed fails one of
-§2.15.2's grounds, and they are different grounds:
+§2.15.2's terms, and each for a different reason:
 
 - A *sibling* channel — a scalar count, a parallel validity tensor, a record
   field, a tuple component — is **droppable**: a caller reads one component and

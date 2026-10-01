@@ -443,7 +443,7 @@ def crossunder(a: List[Option[f64]], b: List[Option[f64]]) -> List[Option[bool]]
 --     indistinguishable from a computed value and propagates silently --
 --     "represented, not filled", above.
 --   * A MARKER-FREE return (hand the tensor back and document that the first
---     n-1 entries are unspecified) or a SHORTENED one fails on the third
+--     n-1 entries are unspecified) or a SHORTENED one fails on a
 --     ground §2.15.2 already states: it moves the alignment burden onto the
 --     caller, which is where the measured off-by-one and look-ahead defects
 --     appear (nautilus#85).

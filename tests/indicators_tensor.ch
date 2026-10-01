@@ -3,7 +3,7 @@ import Std.Test (assert_close, assert_eq)
 import Shoals.Indicators (sma, ema, rma, true_range, atr, rsi, macd, bollinger, stochastic, adx, donchian, cumulative_vwap, rolling_vwap, crossover, crossunder, ind_rolling_sum, ind_rolling_mean, ind_rolling_std, ind_rolling_min, ind_rolling_max, ind_shift, ind_diff, tensor_sma, tensor_ema, tensor_rma, tensor_true_range, tensor_atr, tensor_rsi, tensor_macd, tensor_bollinger, tensor_stochastic, tensor_adx, tensor_donchian, tensor_cumulative_vwap, tensor_rolling_vwap, tensor_crossover, tensor_crossunder, tensor_ind_rolling_sum, tensor_ind_rolling_mean, tensor_ind_rolling_std, tensor_ind_rolling_min, tensor_ind_rolling_max, tensor_ind_shift, tensor_ind_diff, SeedFirstValue, SeedSma, AlphaSpan, AlphaWilder, SmoothWilder, SmoothSimple, DdofPopulation, DdofSample)
 import Shoals.Properties.Indicators (expect_from)
 -- Every tensor-accepting variant must be IDENTICAL to its list counterpart,
--- not merely close: it delegates to the same kernel after one `to_list`, so
+-- not merely close: it delegates to the same kernel after `to_list`, so
 -- any difference at all means the delegation is wrong. Exact equality is the
 -- assertion that catches a mis-wired variant -- `tensor_rsi` calling `atr`
 -- would still produce plausible numbers, and a tolerance would hide it.
