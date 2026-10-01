@@ -108,5 +108,5 @@ Separate modules provide lattice and PDE helpers. `Shoals.Trees` includes
 `tr_binom_european_call_generic`, which accepts a nonnegative step count,
 finite inputs, and an up probability in `[0, 1]`. `Shoals.Pde.pde_thomas_solve`
 solves a supplied tridiagonal system without pivoting. It substitutes one
-for a pivot smaller than `1e-10` without a diagnostic, so near-singular
-systems are outside its accuracy contract.
+when a pivot's absolute magnitude is below `1e-10`, without a diagnostic.
+Near-singular systems are outside its accuracy contract.
