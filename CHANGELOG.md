@@ -48,6 +48,17 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   other two trip a `WRONG-DIAGNOSTIC` instead, because removing the guard
   changes the failure rather than removing it.
 
+  The properties' own comparison is structural: `masked_series_agrees` takes
+  the expected warm-up as an integer and asserts it on both sides, so a value
+  comparison cannot be written without an absolute shape check. Three
+  red-team rounds found four properties satisfiable by absence before that
+  landed. The primitive's contract is itself pinned by
+  `test_primitive_rejects_every_vacuous_comparison`, with positive and
+  negative controls — which is how a laziness bug in it was found: `both` is
+  an ordinary function and evaluates both arguments, so its length guard did
+  not protect the indexing that followed and a mismatched comparison trapped
+  instead of returning false. Unreachable from any call site, and fixed.
+
   Verification is analytic first: `properties/indicators.ch` checks
   identities that hold by derivation (a constant series' EMA is that
   constant, a strictly rising close gives RSI exactly 100, an SMA over an

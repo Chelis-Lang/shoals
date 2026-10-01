@@ -417,7 +417,8 @@ in code that is CLOSED upstream but not sitting in §Archived.
       width or shape. Measured 2026-10-01: zero defs matching
       rolling|window|shift|lag|diff among nautilus 0.7.46's `src/` DEFINITIONS
       and exports (a bare substring sweep also hits `gauss_laguerre_10` and
-      `smoke_sde_diff`, which are neither), and
+      `smoke_sde_diff`, which ARE definitions but are not members of the
+      rolling/shift/lag/diff family), and
       `Coral.Window` exporting exactly `rolling_sum`, `rolling_mean`,
       `rolling_std`, `rolling_min`, `rolling_max`, `ewm`.
     - **Why the one existing copy does not serve, and why Nautilus is not a

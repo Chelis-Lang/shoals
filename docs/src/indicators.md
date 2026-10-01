@@ -203,9 +203,8 @@ covers each one.
   sides.
 - Two properties assert **no look-ahead** by perturbing only the last input
   and requiring every earlier output to be unchanged — a check on behaviour,
-  not on source reading. They cover `ema` and `rsi`. A red-team pass extended
-  the same technique to all 22 exported functions with injected-look-ahead detectors
-  and found none, but only those two are pinned in the committed suite.
+  not on source reading. They cover `ema` and `rsi`; the requirement holds
+  for every export, but only those two are pinned in the committed suite.
 - One property is negative: `wilder_rma_differs_from_span_ema` requires the
   two conflated alphas to be *distinguishable*. Without it, every positive
   test would still pass if `rma` quietly used the span alpha — the exact

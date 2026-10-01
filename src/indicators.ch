@@ -42,9 +42,9 @@ export (EmaSeed, SeedFirstValue, SeedSma, Alpha, AlphaSpan, AlphaWilder, Smoothi
 -- NO LOOK-AHEAD. No export reads an input index greater than its own
 -- output index. `properties/indicators.ch` checks that for `ema` and `rsi`
 -- directly, by perturbing the tail of an input and asserting the earlier
--- outputs do not move rather than by inspection; two red-team passes
--- extended the same technique to all 22 exported functions with injected
--- look-ahead detectors and found none, but only those two are pinned here.
+-- outputs do not move rather than by inspection. The requirement holds for
+-- the whole surface; only those two are pinned executably. Review evidence
+-- for the rest belongs in the pull request record, not in this file.
 -- Internal dense series: `values` always has the input's length, and the
 -- first `warmup` entries are filler that no exported path can observe.
 -- Every combinator below propagates `warmup` so that filler never reaches

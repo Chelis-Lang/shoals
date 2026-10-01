@@ -1,7 +1,7 @@
 module Shoals.Tests.Indicators
 import Std.Test (assert_close, assert_eq)
 import Shoals.Indicators (sma, ema, rma, atr, rsi, macd, bollinger, stochastic, adx, donchian, cumulative_vwap, rolling_vwap, true_range, crossover, crossunder, ind_rolling_sum, ind_rolling_mean, ind_rolling_std, ind_rolling_min, ind_rolling_max, ind_shift, ind_diff, SeedFirstValue, SeedSma, AlphaSpan, AlphaWilder, SmoothWilder, SmoothEma, SmoothSimple, DdofPopulation, DdofSample)
-import Shoals.Properties.Indicators (opt_value_or, none_count, algebra_agrees_at_both_rsi_guard_branches, true_range_agrees_with_textbook, reference_alpha_definitions_have_not_drifted, closed_form_ema_agrees, constant_series_ema_is_constant, monotone_up_rsi_is_hundred, monotone_down_rsi_is_zero, wilder_rma_differs_from_span_ema, ramp_sma_is_window_midpoint, bollinger_mid_equals_sma, bollinger_width_is_two_k_sigma, ddof_ratio_is_exact, atr_constant_range_recovers_range, ema_look_ahead_absent, rsi_look_ahead_absent, warmup_lengths_match_spec, crossover_silent_during_warmup, output_length_equals_input_length)
+import Shoals.Properties.Indicators (opt_value_or, none_count, masked_series_agrees, expect_from, algebra_agrees_at_both_rsi_guard_branches, true_range_agrees_with_textbook, reference_alpha_definitions_have_not_drifted, closed_form_ema_agrees, constant_series_ema_is_constant, monotone_up_rsi_is_hundred, monotone_down_rsi_is_zero, wilder_rma_differs_from_span_ema, ramp_sma_is_window_midpoint, bollinger_mid_equals_sma, bollinger_width_is_two_k_sigma, ddof_ratio_is_exact, atr_constant_range_recovers_range, ema_look_ahead_absent, rsi_look_ahead_absent, warmup_lengths_match_spec, crossover_silent_during_warmup, output_length_equals_input_length)
 -- Executable suite for `Shoals.Indicators` (shoals#83).
 --
 -- TWO TIERS, and the second is the one that carries the weight.
@@ -43,7 +43,7 @@ def test_property_rsi_look_ahead_absent() -> unit ! { Test } = assert_close(to01
 def test_property_warmup_lengths_match_spec() -> unit ! { Test } = assert_close(to01(warmup_lengths_match_spec(close_series(), cast(4, i64))), cast(1.0, f64), tight(), "documented warm-up lengths hold (§2.15.4)")
 def test_property_output_length_equals_input_length() -> unit ! { Test } = assert_close(to01(output_length_equals_input_length(close_series(), cast(4, i64))), cast(1.0, f64), tight(), "every series export returns the input length")
 def test_property_crossover_silent_during_warmup() -> unit ! { Test } = assert_close(to01(crossover_silent_during_warmup(close_series(), cast(2, i64), cast(5, i64))), cast(1.0, f64), tight(), "no crossing is reported out of a warm-up")
-def test_property_rsi_algebra_agrees_at_both_guard_branches() -> unit ! { Test } = assert_close(to01(algebra_agrees_at_both_rsi_guard_branches(tight())), cast(1.0, f64), tight(), "shipped 100*(g/(g+l)) == Wilder's 100-100/(1+g/l) across both guard branches")
+def test_property_rsi_algebra_agrees_at_both_guard_branches() -> unit ! { Test } = assert_close(to01(algebra_agrees_at_both_rsi_guard_branches(tight())), cast(1.0, f64), tight(), "the two RSI algebraic forms agree at both guard branches (an ALGEBRA check -- it does not call rsi; the edge tests pin the kernel)")
 def test_property_true_range_agrees_with_textbook() -> unit ! { Test } = assert_close(to01(true_range_agrees_with_textbook(high_series(), low_series(), close_series(), tight())), cast(1.0, f64), tight(), "shipped true_range == the pointwise textbook max")
 def test_property_reference_alpha_definitions_have_not_drifted() -> unit ! { Test } = assert_close(to01(reference_alpha_definitions_have_not_drifted(tight())), cast(1.0, f64), tight(), "reference alpha definitions have not drifted (NOT a shipped-alpha check -- wilder_rma_differs_from_span_ema is that)")
 -- Tier 2: negative parity. The conflated conventions must be distinguishable.
@@ -217,4 +217,25 @@ def test_edge_warmup_generalises_beyond_one_period() -> unit ! { Test } = {
   _ = assert_close(to01(warmup_lengths_match_spec(close_series(), cast(6, i64))), cast(1.0, f64), tight(), "warm-up lengths hold at n = 6")
   _ = assert_eq(none_count(adx(high_series(), low_series(), close_series(), cast(2, i64)).2), cast(3, i64), "ADX(2) warm-up is 2n-1 == 3")
   assert_eq(none_count(adx(high_series(), low_series(), close_series(), cast(5, i64)).2), cast(9, i64), "ADX(5) warm-up is 2n-1 == 9")
+}
+-- Tier 5: the comparison primitive's own contract. `masked_series_agrees`
+-- is load-bearing for ten properties, and its doc comment makes claims --
+-- that it rejects a series returning nothing, and that a length mismatch
+-- returns false rather than trapping -- which nothing else checks. Three
+-- red-team rounds found four properties vacuous because the comparison
+-- helper could be satisfied by absence; a helper whose job is to prevent
+-- that has to be pinned itself.
+--
+-- The positive and negative controls are not decoration: without them the
+-- four rejections below would be satisfied by a primitive that rejects
+-- everything.
+def nones(k: i64) -> List[Option[f64]] = map(fn (_i: i64) -> None, range(cast(0, i64), k))
+def three_from_one() -> List[Option[f64]] = expect_from([cast(1.0, f64), cast(2.0, f64), cast(3.0, f64)], cast(1, i64))
+def test_primitive_rejects_every_vacuous_comparison() -> unit ! { Test } = {
+  _ = assert_close(to01(masked_series_agrees(nones(cast(3, i64)), nones(cast(3, i64)), cast(3, i64), tight())), cast(0.0, f64), tight(), "warmup == len, every entry absent on both sides: REJECTED (this was the hole)")
+  _ = assert_close(to01(masked_series_agrees([], [], cast(0, i64), tight())), cast(0.0, f64), tight(), "an empty series is not a passing comparison: REJECTED")
+  _ = assert_close(to01(masked_series_agrees(three_from_one(), nones(cast(2, i64)), cast(1, i64), tight())), cast(0.0, f64), tight(), "length mismatch: REJECTED, and must not trap -- `both` evaluates both arguments, so the guard has to be an `if`")
+  _ = assert_close(to01(masked_series_agrees(three_from_one(), three_from_one(), cast(5, i64), tight())), cast(0.0, f64), tight(), "warmup > len: REJECTED")
+  _ = assert_close(to01(masked_series_agrees(three_from_one(), three_from_one(), cast(1, i64), tight())), cast(1.0, f64), tight(), "POSITIVE CONTROL: genuine agreement is ACCEPTED")
+  assert_close(to01(masked_series_agrees(three_from_one(), expect_from([cast(1.0, f64), cast(2.0, f64), cast(9.0, f64)], cast(1, i64)), cast(1, i64), tight())), cast(0.0, f64), tight(), "NEGATIVE CONTROL: a wrong value past the warm-up is REJECTED")
 }

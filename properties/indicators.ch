@@ -49,7 +49,7 @@ def both(a: bool, b: bool) -> bool = if a then b else false
 -- `monotone_down_rsi_is_zero` passed for exactly that reason, over a
 -- region where the indicator returns nothing at all. Prefer
 -- `masked_series_agrees` below, which takes the expected warm-up as an
--- integer and so cannot be satisfied by a series that returns nothing. The
+-- integer and rejects a series that returns nothing. The
 -- two look-ahead properties still use this helper directly, because they
 -- compare a PREFIX of two runs rather than a series against an expectation;
 -- they carry their own `none_count` assertion instead.
@@ -75,10 +75,41 @@ def gap_from_index(a: List[Option[f64]], b: List[Option[f64]], lo_index: i64, up
 -- relative check compares the subject against itself; an absolute one
 -- cannot. Asserting it on BOTH sides means a caller has to know the answer
 -- rather than derive it from the thing under test.
+--
+-- WHAT IS ABSOLUTE HERE IS THE COUNT, NOT THE BOUNDARY'S PLACEMENT.
+-- `option_shape_gap` pins placement only when `b` is an independent
+-- expectation (built with `expect_from`); where `b` is derived from the
+-- same subject as `a` -- `bollinger_mid_equals_sma` is the one such case --
+-- a regression that moves the `None`s while preserving their number
+-- satisfies this helper. A red-team round confirmed that by emitting the
+-- warm-up `None`s at the END of the series: the suite still caught it, via
+-- the properties that compare against `expect_from`, but not via that one
+-- property. If you add another subject-vs-subject comparison, build one
+-- side with `expect_from` instead.
 def masked_series_agrees(a: List[Option[f64]], b: List[Option[f64]], warmup: i64, tol: f64) -> bool = {
   m = len(a)
-  shape_ok = both(eq(none_count(a), warmup), both(eq(none_count(b), warmup), eq(option_shape_gap(a, b, m), cast(0, i64))))
-  both(eq(len(b), m), both(shape_ok, lt(gap_from_index(a, b, warmup, m), tol)))
+  -- `lt(warmup, m)` is what makes "cannot be satisfied by a series that
+  -- returns nothing" TRUE rather than merely intended. Without it,
+  -- `warmup == m` -- every entry absent on both sides -- satisfies both
+  -- count equalities, leaves the shape gap at 0 and leaves an empty value
+  -- range, so the whole thing passes while comparing nothing. An empty
+  -- series is rejected for the same reason. A red-team round found that
+  -- hole by probing the helper directly rather than its call sites.
+  -- The guards must gate the comparisons LAZILY. `both` is an ordinary
+  -- function, so it evaluates both arguments: written as
+  -- `both(eq(len(b), m), <compare>)` the length check does not protect the
+  -- comparison, and a shorter `b` TRAPS on an out-of-bounds index instead of
+  -- returning false. `if` is the only construct here that does not evaluate
+  -- the untaken side. Found by probing this helper with mismatched lengths
+  -- rather than through a call site -- every live call site compares
+  -- equal-length series, so the trap was unreachable from the suite.
+  --
+  -- `lt(warmup, m)` is what makes "rejects a series that returns nothing"
+  -- true rather than merely intended: without it, `warmup == m` satisfies
+  -- both count equalities, leaves the shape gap 0 and the value range empty,
+  -- so the whole thing passes while comparing nothing. An empty series is
+  -- rejected for the same reason.
+  if both(eq(len(b), m), lt(warmup, m)) then both(eq(none_count(a), warmup), both(eq(none_count(b), warmup), both(eq(option_shape_gap(a, b, m), cast(0, i64)), lt(gap_from_index(a, b, warmup, m), tol)))) else false
 }
 -- Lift a dense expectation to the masked shape, so a property can state its
 -- expected values and its expected warm-up in one place.
@@ -103,7 +134,6 @@ def flat_series(v: f64, m: i64) -> List[f64] = map(fn (_i: i64) -> v, range(cast
 -- geometric-weight sum. `SeedFirstValue` + `AlphaSpan` has no warm-up, so
 -- every index is compared.
 def closed_form_ema_agrees(xs: List[f64], n: i64, tol: f64) -> bool = {
-  m = len(xs)
   shipped = ema(xs, n, SeedFirstValue, AlphaSpan)
   reference = expect_from(ema_closed_form_textbook(xs, n), cast(0, i64))
   masked_series_agrees(shipped, reference, cast(0, i64), tol)
@@ -141,13 +171,10 @@ def ramp_sma_is_window_midpoint(start: f64, step: f64, n: i64, m: i64, tol: f64)
   masked_series_agrees(sma(linear_ramp(start, step, m), n), expect_from(map(fn (x: f64) -> sub(x, offset), linear_ramp(start, step, m)), sub(n, cast(1, i64))), sub(n, cast(1, i64)), tol)
 }
 -- ANALYTIC. Bollinger's middle band IS the simple moving average.
-def bollinger_mid_equals_sma(xs: List[f64], n: i64, k: f64, tol: f64) -> bool = {
-  m = len(xs)
-  -- Both sides come from the same `ind_roll`, so a RELATIVE shape check
-  -- agrees under an all-`None` regression (shape gap 0, value gap 0). Only
-  -- the absolute warm-up closes it; a red-team round found this one green.
-  masked_series_agrees(bollinger(xs, n, k, DdofPopulation).1, sma(xs, n), sub(n, cast(1, i64)), tol)
-}
+-- Both sides come from the same `ind_roll`, so a RELATIVE shape check
+-- agrees under an all-`None` regression (shape gap 0, value gap 0). Only
+-- the absolute warm-up closes it; a red-team round found this one green.
+def bollinger_mid_equals_sma(xs: List[f64], n: i64, k: f64, tol: f64) -> bool = masked_series_agrees(bollinger(xs, n, k, DdofPopulation).1, sma(xs, n), sub(n, cast(1, i64)), tol)
 -- ANALYTIC. upper - lower = 2*k*sigma exactly, whichever ddof is chosen, so
 -- this also pins that both bands read the SAME deviation.
 def bollinger_width_is_two_k_sigma(xs: List[f64], n: i64, k: f64, ddof_pop: bool, tol: f64) -> bool = {
@@ -270,18 +297,27 @@ def crossover_silent_during_warmup(xs: List[f64], fast: i64, slow: i64) -> bool 
 -- exist -- and its RSI entry encoded the same misreading of TA-Lib's guard
 -- that the shipped kernel had, so wiring it up unchanged would not have
 -- caught that either. Both are fixed, and both are exercised below.
--- The shipped kernel evaluates `100*(g/(g+l))`, TA-Lib's grouping. The
--- reference evaluates Wilder's `100 - 100/(1 + g/l)`. Equal whenever l > 0,
--- and the grid straddles BOTH guard branches: all-zero (reads 0) and
+-- ALGEBRA CHECK ONLY. This compares two algebraic FORMS -- TA-Lib's
+-- `100*(g/(g+l))` grouping against Wilder's `100 - 100/(1 + g/l)` -- over a
+-- grid straddling both guard branches: all-zero (reads 0) and
 -- zero-loss-with-positive-gain (reads 100).
+--
+-- It does NOT call `rsi`, so it does not pin the shipped kernel. The
+-- left-hand side is a TRANSCRIPTION of the kernel's expression, and a
+-- transcription goes stale silently. A red-team round restored the original
+-- loss-guard defect in `src/indicators.ch` and this property stayed green.
+-- The shipped guard is pinned by `test_edge_flat_series_rsi_is_zero` and
+-- `test_edge_monotone_rise_rsi_is_one_hundred` instead, which do call it.
+-- Same overclaim class as `reference_alpha_definitions_have_not_drifted`
+-- below, and narrowed the same way rather than given new scope.
 def algebra_agrees_at_both_rsi_guard_branches(tol: f64) -> bool = {
   gains = [cast(0.0, f64), cast(0.5, f64), cast(1.0, f64), cast(7.25, f64), cast(100.0, f64)]
   losses = [cast(0.0, f64), cast(0.25, f64), cast(1.0, f64), cast(3.5, f64), cast(99.0, f64)]
   fold(fn (acc: bool, pair: (f64, f64)) -> {
     g = pair.0
     l = pair.1
-    shipped = if lt(cast(0.0, f64), add(g, l)) then mul(cast(100.0, f64), div(g, add(g, l))) else cast(0.0, f64)
-    if acc then lt(abs(sub(shipped, rsi_from_smoothed_averages(g, l))), tol) else false
+    kernel_form = if lt(cast(0.0, f64), add(g, l)) then mul(cast(100.0, f64), div(g, add(g, l))) else cast(0.0, f64)
+    if acc then lt(abs(sub(kernel_form, rsi_from_smoothed_averages(g, l))), tol) else false
   }, true, flat_map(fn (g: f64) -> map(fn (l: f64) -> (g, l), losses), gains))
 }
 def ind_min_one(m: i64) -> i64 = if lt(m, cast(1, i64)) then m else cast(1, i64)
