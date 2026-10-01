@@ -21,11 +21,12 @@ mechanical staleness audit (`scripts/audit_workarounds.py`) can find them.
 `scripts/audit_workarounds.py` (full mode) flags any `chelis#NNN` cited here or
 in code that is CLOSED upstream but not sitting in §Archived.
 
-> **0.18.12 partial pin status (2026-10-01):** Chelis 0.18.12 and Nautilus
-> 0.7.47 are published and compiler-compatible; Coral 0.7.43 still declares
-> Chelis 0.18.11. The offline conformance audit and isolated Nautilus f64
-> signature probe pass. Shoals package build, in-package suites, proof tiers,
-> and the full gate have not been accepted on the 0.18.12 chain. Receipts are in
+> **0.18.12 pin status (2026-10-01):** The official Chelis 0.18.12 /
+> Nautilus 0.7.47 / Coral 0.7.44 package chain builds. An initial nested AD
+> compiler error (chelis#2825) is avoided by sequential scalar conditionals:
+> all four second-order Greek cases, all 37 raw proof controls, and the Greek
+> numeric oracle and the 4,451-point-per-function f64 accuracy sweep pass.
+> The full local gate is pending; the candidate is not yet an accepted release. Receipts are in
 > [`chelis_0_18_12_migration.md`](chelis_0_18_12_migration.md).
 
 > **0.18.6 release status (2026-08-29):** the published Chelis tag points
@@ -154,8 +155,8 @@ in code that is CLOSED upstream but not sitting in §Archived.
       require `auto` to beat `file` again before lowering the nightly budget
       back.
 
-- **Nothing blocks shipping the current proof surface.** The finance proof
-  surface ships as documented in `research/proof-infra/report.md`: the economic
+- **The last accepted proof surface remains the 0.18.11 chain.** The finance
+  surface there is documented in `research/proof-infra/report.md`: the economic
   / dynamic-programming properties reach the SMT tier with no transcendental
   contract; the derivatives structural properties
   (`properties/composites.ch`: upper bound, put–call parity with reflection,
@@ -166,6 +167,18 @@ in code that is CLOSED upstream but not sitting in §Archived.
   chelis#637 below). Both entries above are tooling defects, not semantic ones.
 
 ## Tracking
+
+- **chelis#2825 — nested gradients reject a compiler-generated logical
+  `not` in a nonlinear nested clamp.** A standalone copy of Shoals's scalar
+  Cody kernel reproduced the 0.18.12 `grad: not is non-differentiable` error.
+  A minimal nested two-branch clamp squared fails at an interior point, while
+  sequential selections evaluate its second derivative. Shoals now spells
+  the small-region clamp and erfc dispatcher sequentially. This preserves the
+  scalar price and exported nested-gradient path: all four second-order test
+  cases, their raw proof control pairs at seeds 0, 1, and 2, and the Greek
+  oracle pass. The upstream nested-clamp bug remains open; keep the source
+  spelling and re-probe the reproducer on a compiler release that changes AD
+  lowering. The reproducer and diagnostic are in chelis#2825.
 
 - **chelis#2103 — untaken arithmetic under `vmap`/`grad` can poison a
   selected result, so every
@@ -269,12 +282,14 @@ in code that is CLOSED upstream but not sitting in §Archived.
   bytes solely because the origin strings differed in case.
     - **Affected surface / narrowing:** every Shoals workflow and Python
       installer uses canonical lowercase `chelis-lang/...` coordinates.
-      `scripts/build_release_assets.py` deliberately reinstalls both
-      dependencies immediately before building and rejects a non-canonical
-      generated lock. `scripts/check_release_artifact_determinism.py` release-
-      gates two fresh isolated Reef homes: one adversarially preseeded through
-      mixed-case manual installs and one clean, requiring byte-identical lock,
-      CHB, and archive payloads. This does not claim the compiler is fixed.
+      `scripts/build_release_assets.py` resolves both dependencies in a
+      fresh registry using those coordinates, discards a stale generated lock
+      before the build, and rejects a non-canonical replacement. A lowercase
+      reinstall into a mixed-case preseeded registry did not rewrite its
+      origins on Chelis 0.18.12. `scripts/check_release_artifact_determinism.py`
+      compares two isolated Reef homes: one preseeded through mixed-case
+      manual installs and one clean, requiring byte-identical lock, CHB, and
+      archive payloads. This does not claim the compiler is fixed.
     - **State at pin 0.18.6 (2026-08-29):** still OPEN upstream and the 0.18.6
       changelog names no origin canonicalization, so the narrowing stays. The
       adversarial pair (`scripts/check_release_artifact_determinism.py`) could

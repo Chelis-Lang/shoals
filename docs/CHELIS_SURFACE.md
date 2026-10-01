@@ -10,14 +10,15 @@ in `Chelis-Lang/chelis`.
 
 # Chelis Capability Surface for Shoals
 
-**Draft manifest:** Shoals 0.24.14 / Chelis 0.18.12 / chelis-std 0.4.0 /
-Nautilus 0.7.47 / Coral 0.7.43. Nautilus 0.7.47 declares Chelis 0.18.12;
-Coral 0.7.43 still requires Chelis 0.18.11, so this is not a buildable
-official chain. Bounded evidence is in
+**Candidate chain:** Shoals 0.24.14 / Chelis 0.18.12 / chelis-std 0.4.0 /
+Nautilus 0.7.47 / Coral 0.7.44. The official release packages install and
+Shoals builds. A sequential conditional spelling in the scalar pricing kernel
+avoids Chelis 0.18.12's nested AD rejection (chelis#2825); the Greek and f64
+oracles and 37 raw proof controls pass. Full release acceptance is pending. Evidence is in
 [`chelis_0_18_12_migration.md`](chelis_0_18_12_migration.md).
-Capability markers and numerical measurements below retain their prior
-0.18.11-chain evidence until the package and full gates run. The last measured
-Black-Scholes WireDag was schema 15 (1522 nodes, root 787). Nautilus 0.7.47's
+The f64 kernel floors below were remeasured over 4,451 points per function
+on this chain. The 0.18.12 Black-Scholes WireDag lowers
+at schema 23 (1522 nodes, root 787). Nautilus 0.7.47's
 generic `erf` retains the four-term Taylor branch below `|x|=0.25`.
 
 What the Chelis language and the bundled chelis-std actually provide to the
@@ -25,24 +26,28 @@ quantitative-finance domain this shell touches — numerical methods, pricing,
 Greeks, and the proof surface over them. **Read this before designing around a
 suspected language gap.**
 
-> **Draft pin:** Shoals 0.24.14; Chelis 0.18.12 (chelis-std 0.4.0,
-> bundled), Nautilus 0.7.47 (compatible), Coral 0.7.43 (incompatible)
+> **Candidate pin:** Shoals 0.24.14; Chelis 0.18.12 (chelis-std 0.4.0,
+> bundled), Nautilus 0.7.47, Coral 0.7.44
 > · **Partial refresh:** 2026-10-01
 
 The last accepted package-chain receipts are in
-[`chelis_0_18_11_migration.md`](chelis_0_18_11_migration.md) and the frozen
-CNote manifest. The release-specific narrative below is historical
+[`chelis_0_18_11_migration.md`](chelis_0_18_11_migration.md) and the historical
+0.18.11 section of the CNote manifest. The release-specific narrative below is historical
 de-narrowing evidence.
 
-**Published Nautilus input for the draft bump.** Annotated tag `v0.7.47`
+**Published Nautilus input for the candidate bump.** Annotated tag `v0.7.47`
 dereferences to commit `76a66ae921cafeef538e1ff48ea53fdc253c1724`.
 The downloaded `nautilus-0.7.47.chb` is SHA-256
 `cd5c04ecfcd2445b7f7a7e0a997d721f20c85aac4524ae626571c3db96008603`;
 the archive is
 `dfe18e834c2d6e49282afd682e0452e51575c3d1dcefd4db3267098e98bba716`.
 Both match the release sidecar. The archive declares compiler `=0.18.12`;
-its 25 source modules retain the 0.7.46 exported-name sets. This establishes
-the Nautilus package pin, not a complete Shoals chain.
+its 25 source modules retain the 0.7.46 exported-name sets. Coral 0.7.44's
+published archive declares the same compiler pin and Nautilus 0.7.47;
+its CHB is `5e69584d3e967aef72c6ae18b0204b00b155804876ece8d7feda604c6c0263b3`
+and archive is
+`7cc0ed3ede5ab754615465704ec0f9bd01bb7ccabba10cb50770c6c78c3e3ba5`.
+These are the hashes in the generated Shoals lock.
 
 ## Historical 0.18.6 de-narrowing record
 
@@ -215,7 +220,7 @@ tiers: **A** (type/dimension/linearity), **B** (SMT via cvc5 over the reals),
 | `if/then/else` | `@pin` | Lowers as ITE in `QF_NRA`. |
 | `Option[T]`, `Some`/`None`, `match`; `@opaque` + `@invariant` | `@pin` | Opaque-invariant abstraction is the path from synthetic green to a green a quant recognizes (report §1, §3); producer obligations discharge at SMT. |
 | `Std.Test` (`assert_close`, `assert_eq`) | `@pin` | The executable numeric suites under `tests/` and `tests-manual/`. **Changed at 0.18.6:** `assert_eq_int` / `assert_eq_bool` / `assert_eq_string` / `assert_eq_tensor_int64` are gone with no alias; use the polymorphic `assert_eq[q](actual, expected, label)`. `assert_close` widened from `f32` to `[p_float]` — a loosening, and its tolerance must now share the tensors' dtype in `assert_close_tensor` (unused here). |
-| WireDag lowering (`chelis tide serve` `/lower`) | `@pin` | Schema **15**, exact-only. Shoals pins `bs_call_wire_f64` byte-exactly in `scripts/validate_bs_wire_root.py`: 1522 nodes, entry root 787, raw SHA-256 `3be34d901db81b1a0b250d6cb6e8b8b934f11c13323206fb1894b50e9fcfab02`. Relative to 0.18.10, 14 `Copy` and 14 `Drop` nodes are added and `cmp_lt` becomes `compare(comparison=lt)`; copy-elided dataflow, op parameters, precisions, and 15 named loads agree. Symbolic dimension names differ, so no shape-equivalence claim is made. |
+| WireDag lowering (`chelis tide serve` `/lower`) | `@pin` | Schema **23**, exact-only. Two cold 0.18.12 lowerings of `bs_call_wire_f64` agree byte-for-byte: 1522 nodes, entry root 787, raw SHA-256 `ffa30f7050681f8cc95a3d994a34d3eb481bbe56585b14d7de5972f282a357c0`. The root type and full op-kind histogram match the 0.18.11 capture; the validator confirms 15 reachable named loads, the copy-elided `sub` root, and no host-only op in the reachable graph. Only source spans changed after the scalar-kernel repair; the span-stripped responses are identical. No shape-equivalence claim beyond that validation is made. |
 | Front-end check throughput | `@pin` | The compiler surface is available. The 0.18.6 measurements (31.6s for `src/modelfit.ch`, 17.0s dependency-load floor, and a 7m54s batched-suite observation) remain historical measurements, not 0.18.11 performance claims. The pin-bump full gate owns current acceptance. |
 | `count` ([05-OP-29]), direct `sub` / `min_elem` ([05-OP-40]/[05-OP-41]) | `@pin` | Shipped before this pin and available, though Shoals does not currently depend on them. |
 | `stop_gradient` ([05-OP-42]) | `@upstream` | The contract exists, but implementation remains open in chelis#1312; Shoals does not claim it at this pin. Relu's dedicated adjoint is a separate closed issue (chelis#1313). |
@@ -240,7 +245,7 @@ job (shoals#64). Re-run it and compare after any kernel change.
 
 | Kernel | Approximation | Worst observed absolute error (a floor) | Method |
 |---|---|---|---|
-| `erf64` | W. J. Cody, Math. Comp. 23 (1969); three ranges split at 0.5 and 4, saturating at 6 | **>= 3.3675e-16** (~1.52 ulp of 1.0) | worst observed at x = 0.507001975, measured at 60 dps by `scripts/oracle_erf64_accuracy.py`; the error is jagged at ulp scale so any grid reports a floor |
+| `erf64` | W. J. Cody, Math. Comp. 23 (1969); three ranges split at 0.5 and 4, saturating at 6 | **>= 3.3675e-16** (~1.52 ulp of 1.0) | worst observed at x = -0.507001975, measured at 60 dps by `scripts/oracle_erf64_accuracy.py`; the error is jagged at ulp scale so any grid reports a floor |
 | `n_cdf64` | `0.5 * (1 - erf64(-x/√2))` | **>= 1.9495e-16** (~0.88 ulp of 1.0) | worst observed at x = -0.7170090691949448, measured at 60 dps by the same oracle. NOT `erf64`'s halved: the argument reduction `-x/√2` and the final `0.5 * (1 - e)` each round. **ABSOLUTE only — see the left-tail limitation below** |
 
 **`n_cdf64` has no useful RELATIVE accuracy in the left tail.** Both figures above
@@ -339,8 +344,8 @@ chelis#1563 proposes one.
 
 | Capability | Status | Notes |
 |---|---|---|
-| `grad` reverse-mode AD in `eval` / host runtime | `@pin` | Differentiates the full Greek set through a real Black–Scholes body — including the normal-CDF path, since `erf` is a library function of differentiable primitives (report §5). Reverse-mode; scalar floating result required. |
-| `grad(grad(...))` second order | `@pin*` | Gamma/volga/vanna via nested `grad`. *Host-lane caveats captured in report §5/§9: nested `grad(grad(named_fn))` is not host-lowered (use nested-lambda form); an f64-capture-across-grad-boundary bug (inline non-differentiated args as literals). |
+| `grad` reverse-mode AD in `eval` / host runtime | `@pin` | The four first-order call Greek outputs evaluate through the real Black–Scholes and normal-CDF body. The 0.18.12 Greek oracle passes 15 groups and 63 cells, including second-order outputs. Reverse-mode; scalar floating result required. |
+| `grad(grad(...))` second order | `@pin` | Gamma/volga/vanna exports use nested `grad` through the displayed Black–Scholes price body. The 0.18.12 raw sampled controls pass at seeds 0, 1, and 2, and all four `tests-manual/greeks_secondorder.ch` cases pass. Keep the scalar kernel's sequential conditional spelling while chelis#2825 remains open. |
 | `vmap(grad(...))` batched sensitivities | `@pin` | True batched grad over a spot×vol grid, validated vs analytic `N(d1)` (report §5). |
 | Host-lane list-combinator pricing body under `grad` | `@upstream` | The shipped per-spot `to_tensor(map(..., to_list(...)))` body does not lower under `grad` (rank-0 `sum`); identical pure-tensor-lane math differentiates fine. Graduation candidate: a tensor-lane grad-able BS body (ties to shoals#19). |
 

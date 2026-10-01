@@ -45,8 +45,13 @@ EXPECTED_NODE_COUNT = 1522
 # the 15 reachable loads are unchanged. Copy-elided dataflow, op parameters,
 # and precisions match 0.18.10 after that comparison rename. Internal symbolic
 # dimension names changed, so this does not certify shape equivalence. Two
-# independent cold lowerings reproduce the exact response below.
-EXPECTED_RAW_SHA256 = "3be34d901db81b1a0b250d6cb6e8b8b934f11c13323206fb1894b50e9fcfab02"
+# independent cold lowerings reproduced that 0.18.11 response.
+# Published Chelis 0.18.12: schema 23. Two cold lowerings agree byte-for-byte;
+# the node count (1522), named root (787), root type, and full op-kind histogram
+# match the 0.18.11 capture. Sequential scalar-kernel edits shifted source
+# spans; removing only span_id/merged_spans makes the complete pre/post-repair
+# responses equal. The exact digest below is from the repaired source.
+EXPECTED_RAW_SHA256 = "ffa30f7050681f8cc95a3d994a34d3eb481bbe56585b14d7de5972f282a357c0"
 FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
 EXPECTED_LOADS = {
     "a1",
@@ -66,7 +71,7 @@ EXPECTED_LOADS = {
     "two_over_sqrt_pi",
 }
 # Exact version, checked against each published compiler during a pin bump.
-WIRE_DAG_SCHEMA_VERSION = 15
+WIRE_DAG_SCHEMA_VERSION = 23
 WIRE_OPS = {
     "add",
     "cast",

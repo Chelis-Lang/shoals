@@ -30,7 +30,9 @@ def abs_f64(x: f64) -> f64 = abs(x)
 -- Cody region 1 (|x| <= 0.5): erf(x) = x * P(x^2)/Q(x^2), odd by construction.
 def erf64_core_small(x: f64) -> f64 = {
   -- Domain clamp. See the note above `erf64` for why every core clamps.
-  xc = if lt(x, cast(-0.5, f64)) then cast(-0.5, f64) else if lt(cast(0.5, f64), x) then cast(0.5, f64) else x
+  -- Sequential selects preserve nested AD lowering (chelis#2825).
+  lo = if lt(x, cast(-0.5, f64)) then cast(-0.5, f64) else x
+  xc = if lt(cast(0.5, f64), lo) then cast(0.5, f64) else lo
   y = mul(xc, xc)
   xnum0 = mul(cast(0.18577770618460315, f64), y)
   xden0 = y
@@ -109,7 +111,11 @@ def erf64_core_erfc_tail(axr: f64) -> f64 = {
 -- sibling arm wherever an untaken arm is unbounded. Imported Std.Scalar
 -- `min`/`max` now work in a standalone 0.18.12 Eval/C vmap probe
 -- (chelis#1582 closed); changing this kernel awaits the package-chain gate.
-def erf64_erfc_abs(ax: f64) -> f64 = if lt(ax, cast(4.0, f64)) then erf64_core_erfc_mid(ax) else if lt(ax, cast(6.0, f64)) then erf64_core_erfc_tail(ax) else cast(0.0, f64)
+-- Sequential dispatcher for the same nested-grad lowering gap (chelis#2825).
+def erf64_erfc_abs(ax: f64) -> f64 = {
+  tail = if lt(ax, cast(6.0, f64)) then erf64_core_erfc_tail(ax) else cast(0.0, f64)
+  if lt(ax, cast(4.0, f64)) then erf64_core_erfc_mid(ax) else tail
+}
 def erf64(x: f64) -> f64 = {
   ax = abs_f64(x)
   y = sub(cast(1.0, f64), erf64_erfc_abs(ax))

@@ -30,7 +30,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
+import re
+import struct
 import subprocess
 import sys
 from pathlib import Path
@@ -106,6 +109,50 @@ def evaluate(points: list[float], call: str) -> list[float]:
     return out
 
 
+def decode_f64(value: object) -> float:
+    """Decode the evaluator's exact f64 bits; reject non-finite probe output."""
+    if isinstance(value, dict):
+        bits = value.get("bits")
+        if (
+            set(value) != {"dtype", "bits"}
+            or value.get("dtype") != "f64"
+            or not isinstance(bits, str)
+            or re.fullmatch(r"[0-9a-fA-F]{16}", bits) is None
+        ):
+            raise ValueError(f"unexpected tagged f64 result: {value!r}")
+        number = struct.unpack(">d", bytes.fromhex(bits))[0]
+    elif isinstance(value, (int, float)) and not isinstance(value, bool):
+        number = float(value)
+    else:
+        raise ValueError(f"unexpected f64 result: {value!r}")
+    if not math.isfinite(number):
+        raise ValueError(f"non-finite f64 result for finite oracle input: {value!r}")
+    return number
+
+
+def decoder_self_test() -> None:
+    for bits, expected in (
+        ("3ff0000000000000", 1.0),
+        ("bff0000000000000", -1.0),
+        ("0000000000000001", math.ldexp(1.0, -1074)),
+    ):
+        got = decode_f64({"dtype": "f64", "bits": bits})
+        if got != expected:
+            raise ValueError(f"f64 decoder changed {bits}: {got!r}")
+    for bad in (
+        {"dtype": "f32", "bits": "3ff0000000000000"},
+        {"dtype": "f64", "bits": "3ff"},
+        {"dtype": "f64", "bits": "7ff0000000000000"},
+        {"dtype": "f64", "bits": "7ff8000000000000"},
+        None,
+    ):
+        try:
+            decode_f64(bad)
+        except ValueError:
+            continue
+        raise ValueError(f"f64 decoder accepted invalid value {bad!r}")
+
+
 def _evaluate_batch(points: list[float], call: str) -> list[float]:
     GEN.parent.mkdir(parents=True, exist_ok=True)
     lits = ", ".join(f"{call}(cast({x!r}, f64))" for x in points)
@@ -126,14 +173,12 @@ def _evaluate_batch(points: list[float], call: str) -> list[float]:
             f"stderr: {done.stderr[:700]}\nstdout: {done.stdout[:300]}"
         )
     doc = json.loads(done.stdout)
-    return [e["value"] for e in doc["roots"][0]["value"]["value"]]
+    return [decode_f64(e["value"]) for e in doc["roots"][0]["value"]["value"]]
 
 
 def worst(points: list[float], values: list[float], fn) -> tuple[mp.mpf, float]:
     top, at = mp.mpf(0), points[0]
     for x, got in zip(points, values):
-        if got is None:  # NaN on the wire
-            continue
         err = abs(mp.mpf(got) - fn(mp.mpf(x)))
         if err > top:
             top, at = err, x
@@ -144,6 +189,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
+    decoder_self_test()
     mp.mp.dps = 60
 
     points = probe_points()
