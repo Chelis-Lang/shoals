@@ -459,10 +459,13 @@ No parked entries.
   covers it. Recorded here because §4's narrowing-coverage scanner reads the
   `shoals#88` citations in `src/pricing.ch`, and those comments explain a
   deliberate narrowing that outlives the fix: the guard **must** stay a clamp on
-  the denominator and may not become a branch on the price. `bs_call_f64_vector`
-  runs that body under `vmap`, and an `if` there evaluates both arms
-  (chelis#1464, open, tracked above), so a branch would reinstate the NaN as its
-  untaken arm. The wire lane additionally cannot use a branch at all: its
+  the denominator and may not become a branch on the price. The binding reason is
+  the **derivative** rule in the chelis#1464 entry above, not the value rule --
+  measured at this pin the rejected branch returns the correct price at every
+  lane, and only its delta is NaN, because the adjoint multiplies the untaken
+  arm's infinite derivative by the zero mask. Anyone who checks only the price
+  will conclude the clamp is unnecessary. The hazard does not need `vmap` either:
+  it reproduces under plain `grad`. The wire lane additionally cannot use a branch at all: its
   selectors are arithmetic, so it hand-rolls `abs` out of a select and the first
   `+/-inf` reaching it computes `0 * neg(inf)`. If chelis#1464 is ever fixed and
   a non-arithmetic select becomes available, both floors may be revisited --

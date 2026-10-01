@@ -69,7 +69,17 @@ EXPECTED_NODE_COUNT = 1665
 # byte-deterministic. This comparison does not certify shape semantics. Former
 # raw hash at this schema:
 # 3be34d901db81b1a0b250d6cb6e8b8b934f11c13323206fb1894b50e9fcfab02.
-EXPECTED_RAW_SHA256 = "9709d1a41c246554dc65ac9eadbb9bd5abd2f6b11914a729d8156bd987dc9a42"
+#
+# NOTE for whoever drifts this next: the raw artifact embeds source spans, so
+# editing a COMMENT in src/pricing.ch moves this hash while leaving the graph
+# identical. That happened once inside shoals#88 itself (9709d1a41c246554...
+# -> the value below) when review corrections rewrote the comments above
+# `d1_64`. The signature of a non-semantic edit is therefore: this hash check
+# fails while the root, node count, 15 named loads and op kinds all still
+# match. Confirm that shape before assuming a regression -- and note the node
+# count is checked BEFORE the hash, so a hash-only failure already tells you
+# the count agreed.
+EXPECTED_RAW_SHA256 = "904bd65b1cf4e9afc9849b7ef5f27fd35358478766531d142d7bdf7bf84bef38"
 FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
 EXPECTED_LOADS = {
     "a1",

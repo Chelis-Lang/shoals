@@ -13,10 +13,11 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
   The issue called this an expiry bug in the scalar lane. It is wider in one
   direction and narrower in the other. Narrower: at `t = 0` the unguarded
-  division was already right at every moneyness except one, because the
-  resulting `+/-inf` saturates `erf64` and the formula collapses to
+  division already produced the right PRICE at every moneyness except one,
+  because the resulting `+/-inf` saturates `erf64` and the formula collapses to
   `max(s - k*exp(-rt), 0)`. Only the forward sitting exactly on the strike gave
-  `0/0`. Wider: `s = k` with `sigma = 0` and `r = 0` reaches the same `0/0` at
+  `0/0`. That narrowing is about the price alone -- every exported Greek was NaN
+  at every moneyness before this change. Wider: `s = k` with `sigma = 0` and `r = 0` reaches the same `0/0` at
   any `t > 0`, so this is a no-uncertainty bug rather than an expiry one, and a
   `t == 0` special case would have missed it.
 
@@ -27,10 +28,19 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   result whichever branch the mask selects (chelis#1464).
 
   Both are fixed by flooring the denominator rather than by branching on the
-  price: every Greek differentiates this body and `bs_call_f64_vector` runs it
-  under `vmap`, where an `if` evaluates both arms, so a branch would have kept
-  the NaN as its untaken arm. No value that works today moves, and the public
-  signature of neither entry point changes.
+  price, and the reason is the adjoint rather than the value: measured at this
+  pin, a masked select does not propagate the untaken arm's NaN value, and the
+  rejected branch returns the correct price -- but its delta is NaN, because the
+  adjoint multiplies the untaken arm's infinite derivative by the zero mask.
+  That hazard fires under plain `grad` with or without `vmap`. The clamp is safe
+  under the same rule: its arms are finite in value and in derivative.
+
+  No correct value moves. The floor is identity for any denominator at or above
+  it, so the only inputs whose result changes are the `0/0` the fix targets, a
+  denominator below the floor, and a negative `sigma` -- now folded onto the
+  floor, returning the zero-vol discounted intrinsic where it previously
+  returned a negative, arbitrage-violating call price. The public signature of
+  neither entry point changes.
 
   This re-pins the WireDag receipt in `scripts/validate_bs_wire_root.py` to root
   859 / 1665 nodes with no compiler change; `div`, `exp`, `log`, `neg` and

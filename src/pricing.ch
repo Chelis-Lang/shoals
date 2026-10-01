@@ -155,15 +155,24 @@ def n_cdf64(x: f64) -> f64 = {
 -- that saturates `erf64` identically to the +/-inf it replaces, so no
 -- currently-correct value moves.
 --
--- IT MUST BE A CLAMP ON THE DENOMINATOR, NOT A BRANCH ON THE PRICE. Every
--- Greek and both f32 entry points differentiate this body, and
--- `bs_call_f64_vector` runs it under `vmap`, where an `if` lowers to a masked
--- select that evaluates BOTH arms (chelis#1464). `if t = 0 then max(s-k,0)
--- else <formula>` has NaN as its untaken arm at exactly the broken point, so
--- the select would reintroduce the NaN it was added to remove. This clamp's
--- arms are `den` and a positive constant: both finite in value and in
--- derivative, which is the condition the note above `erf64` states for a
--- clamp to be safe under masked select.
+-- IT MUST BE A CLAMP ON THE DENOMINATOR, NOT A BRANCH ON THE PRICE -- and the
+-- reason is the ADJOINT, not the value. Measure before changing this: the
+-- untaken arm's NaN *value* does NOT propagate at this pin.
+-- `vmap(if eq(x,0) then 7.0 else div(x,x))` over `[0.0, 2.0]` evaluates to
+-- `[7.0, 1.0]`, and the rejected counterfactual
+-- `if t = 0 then max(s-k,0) else <formula>` with an unfloored `d1` returns the
+-- CORRECT PRICE at every lane. What it does not return is a usable delta: that
+-- comes back NaN, because the adjoint multiplies the untaken arm's derivative
+-- by the zero mask and the untaken arm's derivative is infinite. A test of the
+-- price alone will therefore say the branch is fine. It is not.
+--
+-- The hazard is not vmap-specific either: `grad(if lt(x,1) then 2.0 else
+-- sqrt(x))` at x = 0 is NaN with no `vmap` anywhere, the untaken arm's value
+-- being a finite 0.0 while its derivative is infinite. This is the derivative
+-- rule the chelis#1464 entry in `docs/UPSTREAM_BUGS.md` states; every Greek and
+-- both f32 entry points differentiate this body, so it binds here. This clamp
+-- is safe under the same rule because its arms are `den` and a positive
+-- constant: finite in value AND in derivative.
 def d1_64(s: f64, k: f64, r: f64, sigma: f64, t: f64) -> f64 = {
   num = add(log(div(s, k)), mul(add(r, mul(cast(0.5, f64), mul(sigma, sigma))), t))
   den = mul(sigma, sqrt(t))
@@ -259,7 +268,11 @@ def pricing_wire_normal_cdf_f64[n](x: &tensor[n, f64], half: &tensor[n, f64], in
 -- is 0, and all three selects behave. The floor is `small^8` (1e-40), built by
 -- squaring rather than taken as a new parameter: `small` is already one of the
 -- 15 named loads this entry is pinned against, so threading it here changes no
--- load and leaves `bs_call_wire_f64`'s public signature alone. 1e-40 is below
+-- load and leaves `bs_call_wire_f64`'s public signature alone. Note that
+-- `small` is a public parameter, so `small^8` is 1e-40 at the value every call
+-- site in this repo passes rather than as a property of this function; for any
+-- `small` small enough to be a correct erf linearisation threshold (<= 0.1) the
+-- floor is at most 1e-8, still far below any reachable denominator. 1e-40 is below
 -- any reachable `sigma*sqrt(t)` -- a 0.01 vol over one day is 5e-4 -- so no
 -- value that works today moves.
 def pricing_wire_d1_f64[n](s: &tensor[n, f64], k: &tensor[n, f64], r: &tensor[n, f64], sigma: &tensor[n, f64], t: &tensor[n, f64], half: &tensor[n, f64], small: &tensor[n, f64]) -> tensor[n, f64] = {

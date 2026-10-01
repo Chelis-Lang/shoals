@@ -49,19 +49,32 @@ def test_vmap_lane_at_expiry() -> unit ! { Test } = {
   _ = assert_close(index(vals, cast(0, i64)), z(), tol(), "vmap t=0 ATM == 0 (was NaN)")
   assert_close(index(vals, cast(1, i64)), cast(10.0, f64), tol(), "vmap t=0 ITM == 10, unchanged")
 }
--- The Greeks differentiate this body. They are discontinuous at expiry, so this
--- asserts only that they are FINITE -- a NaN here would mean the clamp
--- reintroduced the defect through the derivative rather than through the value,
--- which is the specific risk chelis#1464 creates for a branch under `vmap`.
+-- The Greeks differentiate this body, which is where a branch would have
+-- reintroduced the defect (see the adjoint note above `d1_64`). Read the scope
+-- of these two tests precisely, because it is narrower than the Greek class:
+--
+--   * They assert NAN-FREEDOM, not finiteness. `nan_free32` is `eq(x, x)`,
+--     which is TRUE for +/-inf -- measured -- so an infinite Greek passes here.
+--   * They cover DELTA and VEGA only. Measured post-fix at expiry, those two
+--     are clean (`[0,1,0]` and `[0,0,0]`) but gamma is `[inf,NaN,NaN]`, theta
+--     is `[NaN,NaN,NaN]` and vanna is `[0.0,NaN,NaN]`. That residue is not a
+--     regression -- pre-fix all seven exported Greeks were NaN at every
+--     moneyness -- so the fix is neutral-or-better everywhere, but it is not
+--     fixed, and this file does not claim it is.
+--
+-- Also unasserted, and worth knowing before trusting delta at expiry: the ATM
+-- value is 0.0 where the one-sided limits are 0 and 1, so the conventional 0.5
+-- midpoint is not what comes back.
+--
 -- The Greek vectors are the f32 surface and take scalar k/r/sigma/t.
-def test_greeks_are_finite_at_expiry() -> unit ! { Test } = {
+def test_greeks_are_nan_free_at_expiry() -> unit ! { Test } = {
   spots = to_tensor([cast(100.0, f32), cast(110.0, f32), cast(90.0, f32)])
   d = to_list(deltas_call(spots, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(0.0, f32)))
   _ = assert_true(nan_free32(index(d, cast(0, i64))), "delta at t=0 ATM is not NaN")
   _ = assert_true(nan_free32(index(d, cast(1, i64))), "delta at t=0 ITM is not NaN")
   assert_true(nan_free32(index(d, cast(2, i64))), "delta at t=0 OTM is not NaN")
 }
-def test_vegas_are_finite_at_expiry() -> unit ! { Test } = {
+def test_vegas_are_nan_free_at_expiry() -> unit ! { Test } = {
   spots = to_tensor([cast(100.0, f32), cast(110.0, f32), cast(90.0, f32)])
   v = to_list(vegas_call(spots, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(0.0, f32)))
   _ = assert_true(nan_free32(index(v, cast(0, i64))), "vega at t=0 ATM is not NaN")
