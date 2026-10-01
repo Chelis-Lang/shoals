@@ -80,9 +80,11 @@ update and holds the previous value.
 **Three cases reach a reported `Some` that is not an ordinary value**, and
 they are limitations rather than conventions:
 
-- `ind_rolling_std(xs, 1, DdofSample)` divides by `n - 1 = 0` and yields
-  `Some(NaN)`. pandas gives `NaN` here too, so it is reference-consistent,
-  but it is not guarded and `NaN` is not what "a defined value" promises.
+- `DdofSample` with `n = 1` divides by `n - 1 = 0` and yields `Some(NaN)`.
+  Reachable through two exports: `ind_rolling_std(xs, 1, DdofSample)` and
+  `bollinger(xs, 1, k, DdofSample)` (both bands NaN, mid ordinary). pandas
+  gives `NaN` here too, so it is reference-consistent, but it is not guarded
+  and `NaN` is not what "a defined value" promises.
 - `bollinger(..., k)` with `k < 0` swaps the bands, so `lower` exceeds
   `upper`. The module traps negative volume and negative shifts; it does not
   trap a negative `k`.
@@ -163,7 +165,10 @@ def ind_diff(xs: List[f64], k: i64) -> List[Option[f64]]
 
 These are generic time-series primitives, not finance, and they belong in
 Nautilus — they are requested there as `nautilus#85`. They carry the `ind_`
-prefix to mark them as the borrowed layer, and they live here only because the rolling family exists in exactly one place in the ecosystem and that copy does not serve `List[f64]`: `Coral.Window` has the five rolling reductions but only on
+prefix to mark them as the borrowed layer, and they live here only because the
+rolling family exists in exactly one place in the ecosystem and that copy does
+not serve `List[f64]`: `Coral.Window` has the five rolling reductions but only
+on
 `tensor[n, f32]`, and Coral is not a compiled lane (`coral#26`).
 `Nautilus.TimeSeries` is **not** a second copy — it has no rolling family at
 any width, only exponential smoothing and AR/ARMA prediction (`nautilus#70`,
@@ -199,7 +204,7 @@ covers each one.
 - Two properties assert **no look-ahead** by perturbing only the last input
   and requiring every earlier output to be unchanged — a check on behaviour,
   not on source reading. They cover `ema` and `rsi`. A red-team pass extended
-  the same technique to all ~16 exports with injected-look-ahead detectors
+  the same technique to all 22 exported functions with injected-look-ahead detectors
   and found none, but only those two are pinned in the committed suite.
 - One property is negative: `wilder_rma_differs_from_span_ema` requires the
   two conflated alphas to be *distinguishable*. Without it, every positive

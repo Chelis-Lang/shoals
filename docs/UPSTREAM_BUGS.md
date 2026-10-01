@@ -415,7 +415,9 @@ in code that is CLOSED upstream but not sitting in §Archived.
       `ind_rolling_*` is the SECOND implementation, and `ind_shift` / `ind_diff`
       duplicate nothing at all — no package has a shift, lag or diff at any
       width or shape. Measured 2026-10-01: zero defs matching
-      rolling|window|shift|lag|diff anywhere in nautilus 0.7.46 `src/`, and
+      rolling|window|shift|lag|diff among nautilus 0.7.46's `src/` DEFINITIONS
+      and exports (a bare substring sweep also hits `gauss_laguerre_10` and
+      `smoke_sde_diff`, which are neither), and
       `Coral.Window` exporting exactly `rolling_sum`, `rolling_mean`,
       `rolling_std`, `rolling_min`, `rolling_max`, `ewm`.
     - **Why the one existing copy does not serve, and why Nautilus is not a

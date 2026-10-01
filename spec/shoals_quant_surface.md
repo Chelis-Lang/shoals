@@ -425,12 +425,12 @@ and look-ahead defects appear (nautilus#85). `Option[T]` is `@pin` in
 
 Warm-up lengths are part of the contract and are stated per function in
 `src/indicators.ch`. No export reads any input index greater than its
-own output index. Two properties check that directly rather than by
-inspection, by perturbing only the last input and requiring every earlier
-output to be unchanged; they cover `ema` and `rsi`. The requirement is
-stated for the whole surface, and a red-team pass confirmed it for every
-export with validated detectors, but the committed suite does not pin all
-of them.
+own output index -- for the whole surface, not only where it is pinned.
+Two properties check it executably rather than by inspection, by perturbing
+only the last input and requiring every earlier output to be unchanged;
+they cover `ema` and `rsi`. The committed suite does not pin the rest.
+Review evidence for the unpinned exports belongs in the pull request record,
+not here.
 
 #### 2.15.3 Rolling layer (on loan from Nautilus)
 

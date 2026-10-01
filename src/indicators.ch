@@ -22,17 +22,29 @@ export (EmaSeed, SeedFirstValue, SeedSma, Alpha, AlphaSpan, AlphaWilder, Smoothi
 -- list would move the alignment burden onto the caller, which is where the
 -- measured off-by-one and look-ahead defects appear (nautilus#85).
 --
--- DEGENERATE CASES FOLLOW THE CITED REFERENCE, they do not become `None`.
--- `None` means warm-up and nothing else. A flat RSI window yields 100 and
--- a zero-range stochastic window yields 0 because that is what TA-Lib
--- does; each site says so. Keeping `None` to one meaning is what lets the
--- internal representation carry a leading warm-up count rather than
--- arbitrary holes.
+-- DEGENERATE CASES TAKE A DEFINED VALUE, they do not become `None`.
+-- `None` means warm-up and nothing else. A dead-flat RSI window yields 0 --
+-- TA-Lib guards the SUM of smoothed gain and loss, not the loss alone, so
+-- "no movement at all" reads 0 while a monotone rise still reads 100. A
+-- zero-range stochastic window yields 0. Each site says so, and each site
+-- also names where the module and current TA-Lib DIFFER rather than
+-- claiming a parity it does not have.
+--
+-- Three cases reach a reported `Some` that is not an ordinary value, and
+-- they are limitations rather than conventions: `DdofSample` with n = 1
+-- divides by zero, a negative Bollinger `k` swaps the bands, and a
+-- non-finite input is position-dependent in the rolling min/max fold.
+-- Inputs are assumed finite. See docs/src/indicators.md.
+--
+-- Keeping `None` to one meaning is what lets the internal representation
+-- carry a leading warm-up count rather than arbitrary holes.
 --
 -- NO LOOK-AHEAD. No export reads an input index greater than its own
--- output index. `properties/indicators.ch` checks that directly by
--- perturbing the tail of an input and asserting the earlier outputs do not
--- move, rather than by inspection.
+-- output index. `properties/indicators.ch` checks that for `ema` and `rsi`
+-- directly, by perturbing the tail of an input and asserting the earlier
+-- outputs do not move rather than by inspection; two red-team passes
+-- extended the same technique to all 22 exported functions with injected
+-- look-ahead detectors and found none, but only those two are pinned here.
 -- Internal dense series: `values` always has the input's length, and the
 -- first `warmup` entries are filler that no exported path can observe.
 -- Every combinator below propagates `warmup` so that filler never reaches
@@ -290,8 +302,11 @@ def bollinger(close: List[f64], n: i64, k: f64, ddof: Ddof) -> (List[Option[f64]
 -- its change history records the exact comparison used here AS the defect it
 -- fixed (fix #107, later scaled by #253). So a window that is flat to 15
 -- significant digits but carries a sub-epsilon rounding residue -- which
--- ordinary price arithmetic produces, e.g. 0.1 + 0.2 against 0.3 -- reads as
--- a FULL-RANGE window here and as a zero-range window in TA-Lib. Matching
+-- ordinary price arithmetic produces, e.g. 0.1 + 0.2 against 0.3 -- is
+-- treated as a REAL range here and as a zero range in TA-Lib. The reported
+-- k is then `100*(c - lowest)/epsilon`, i.e. wherever `close` happens to sit
+-- inside that sub-epsilon band, so it is an arbitrary point in [0, 100]
+-- rather than necessarily 100. Matching
 -- the scaled test is a dtype-aware epsilon decision, so it is tracked rather
 -- than guessed at: shoals#83 follow-up.
 def stochastic(high: List[f64], low: List[f64], close: List[f64], k_n: i64, d_n: i64, smoothing: Smoothing) -> (List[Option[f64]], List[Option[f64]]) = {

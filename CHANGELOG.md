@@ -33,8 +33,12 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   cases take a defined value instead: a dead-flat RSI window reads **0**,
   guarding the sum of smoothed gain and loss exactly as TA-Lib's `ta_RSI.c`
   does, while a monotone rise still reads 100. The stochastic and ADX
-  degenerate cases are documented at their sites together with the two places
-  the module and current TA-Lib differ.
+  degenerate cases are documented at their sites together with the three
+  places the module and current TA-Lib differ: the stochastic range test is
+  exact where TA-Lib scales it, ADX emits 0 where TA-Lib skips and holds the
+  previous value, and the ADX DI-sum test is exact where TA-Lib uses an
+  epsilon band. `rsi` additionally accepts `n = 1`, where TA-Lib returns
+  `TA_BAD_PARAM`; no document claims parity there.
 
   A period below 1, a negative `ind_shift`, unequal input lengths and
   negative volume all `fail(...)`; `tests_neg/indicators/` covers each, and
