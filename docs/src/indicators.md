@@ -157,6 +157,66 @@ Rolling reductions recompute each window, so a series of length `m` and
 window width `n` takes `O(m * n)` reduction work. `rolling_vwap` also
 recomputes each window. Factor that cost into long series or large windows.
 
+## Tensor inputs
+
+Every function above also accepts a `tensor[n, f64]` series. The tensor form's
+name is the list name with `tensor_` prepended, so you can derive it instead of
+looking it up: `sma` has `tensor_sma`, and `ind_rolling_mean` has
+`tensor_ind_rolling_mean`. Every list function on this page has one, the rolling
+and lag functions included.
+
+```text
+def tensor_sma[n](xs: tensor[n, f64], window: i64) -> List[Option[f64]]
+def tensor_ind_rolling_std[n](xs: tensor[n, f64], window: i64, ddof: Ddof) -> List[Option[f64]]
+def tensor_atr[n](high: tensor[n, f64], low: tensor[n, f64], close: tensor[n, f64],
+                  window: i64, smoothing: Smoothing) -> List[Option[f64]]
+def tensor_macd[n](close: tensor[n, f64], fast: i64, slow: i64, signal: i64,
+                   seed: EmaSeed, alpha: Alpha)
+    -> (List[Option[f64]], List[Option[f64]], List[Option[f64]])
+def tensor_crossover[n](fast: tensor[n, f64], fast_warmup: i64,
+                        slow: tensor[n, f64], slow_warmup: i64) -> List[Option[bool]]
+```
+
+A tensor form returns what its list counterpart returns, element type and
+structure included. Each numeric result series keeps its `Option[f64]` mask.
+`tensor_macd`, `tensor_bollinger`, `tensor_adx` and `tensor_donchian` return
+their three series as a tuple, and `tensor_stochastic` its two, exactly as the
+list forms do. `tensor_crossover` and `tensor_crossunder` return
+`List[Option[bool]]`. Read a result as you read the list form's: the alignment
+and leading-`None` counts in [Reading a result](#reading-a-result) apply
+unchanged, so a tensor input adds no warm-up rules of its own.
+
+No tensor form returns a tensor; the results are lists on both surfaces.
+`spec/shoals_quant_surface.md` §2.15.5 records why.
+
+The scalar and convention arguments follow the list form's, in the same order
+and with the same meaning, so `Ddof`, `Smoothing`, `EmaSeed` and `Alpha`
+selections carry across. One spelling differs: wherever a list form calls its
+width `n`, the tensor form calls it `window`, because `n` is the dimension
+variable in the tensor signature. Widths with another name are unchanged, so
+`ind_shift` and `ind_diff` keep `k`.
+
+Length agreement is stronger here than on the list surface. One `[n]` covers
+every series a call takes, so a multi-series call such as `tensor_atr` cannot be
+given mismatched lengths in the first place -- on the list surface that is a trap
+checked at run time.
+
+### Crossings need an explicit warm-up
+
+`crossover` and `crossunder` read masked series, and a `tensor[n, f64]` cannot
+carry a mask. Their tensor forms therefore take each side's warm-up as a
+required `i64`: the number of leading entries the producing indicator left
+without a valid value.
+
+```text
+tensor_crossover(fast_tensor, 9, slow_tensor, 25)
+```
+
+Pass the warm-up the producing indicator actually has. A warm-up of `0` declares
+every entry valid; a warm-up equal to the series length declares none valid,
+which is legal and reports no crossings. A negative warm-up and a warm-up
+greater than the series length are both caller errors and trap.
+
 ## Defined cases and input limits
 
 An available result can be zero even when no movement occurs. A flat RSI
@@ -185,7 +245,9 @@ depending on its position in the window. Two other cases need care:
 
 These are reported values or ordering effects, not `None` warm-up entries.
 The module traps a period below 1, unequal lengths in multi-series calls,
-negative volume, a negative `ind_shift` lag, and an `ind_diff` lag below 1.
+negative volume, a negative `ind_shift` lag, and an `ind_diff` lag below 1. On
+the tensor crossing forms it also traps a negative warm-up and a warm-up greater
+than the series length; a warm-up equal to the length is legal.
 
 ## Source and checks
 
@@ -198,6 +260,12 @@ Bollinger width, and the population-to-sample deviation ratio. It checks
 absence of look-ahead by perturbing the last input for `ema` and `rsi`;
 that executable check covers those two functions. The implementation uses
 current and earlier input indices for the other operations.
+
+[`tests/indicators_tensor.ch`](../../tests/indicators_tensor.ch) checks each
+tensor form against its list counterpart for exact equality, and
+`scripts/check_tensor_surface_parity.py` reports on the correspondence between
+the two surfaces; it reads the module's export list, so it proves that every
+list function has a tensor counterpart and no counterpart is unexported.
 
 [`references/indicators.ch`](../../references/indicators.ch) computes a
 first-value-seeded EMA by a geometric-weight sum for comparison with the

@@ -509,7 +509,49 @@ choice made inside the function.
   wherever either input is `None` at `i` or `i-1`, so a crossing is
   never reported out of a warm-up.
 
-#### 2.15.5 Out-of-domain inputs trap
+#### 2.15.5 Tensor-accepting forms
+
+Every function in §2.15.3 and §2.15.4 has a tensor-accepting form, named by
+prepending `tensor_` to the list name with no exceptions, so the name is
+derivable by rule. They take `tensor[n, f64]` and return exactly what their
+list counterparts return.
+
+A tensor form's result preserves its list counterpart's type in full,
+structure and element type included. Each numeric result series keeps its
+`Option[f64]` mask; `crossover` and `crossunder` keep `List[Option[bool]]`; and
+a list form that returns a tuple of series has a tensor form that returns the
+same tuple of the same arity. Masked-series length equals the input length per
+§2.15.2.
+
+**No tensor form returns a tensor.** §2.15.2 requires a representation a caller
+cannot misread. Each tensor-return shape that has been proposed fails one of
+§2.15.2's terms, and each for a different reason:
+
+- A *sibling* channel — a scalar count, a parallel validity tensor, a record
+  field, a tuple component — is **droppable**: a caller reads one component and
+  the marker is gone. `(tensor[n, f64], tensor[n, bool])` is admissible to the
+  type system and falls here.
+- An *in-element sentinel* such as a NaN fill has no sibling to drop, so
+  droppability does not reach it. It is **indistinguishable from a computed
+  value** and propagates silently.
+- A *marker-free* return (the tensor unchanged, with the warm-up documented) or
+  a *shortened* one **moves the alignment burden onto the caller**, which
+  §2.15.2 already rejects.
+
+`tensor[n, Option[f64]]` is separately not expressible, since a tensor element
+must be a precision type. This section states grounds for the shapes that have
+been proposed; it does not claim to enumerate every possible tensor return, and
+a new shape should be judged against §2.15.2 directly.
+
+`crossover` and `crossunder` consume masked series, so their tensor forms take
+each side's warm-up as a required parameter, which cannot be dropped. That
+closes the drop hazard and not the wrong-value one: an out-of-range warm-up is
+an out-of-domain input and traps under §2.15.6.
+
+The 1:1 correspondence between the two surfaces is a contract invariant and is
+enforced mechanically, not by inspection.
+
+#### 2.15.6 Out-of-domain inputs trap
 
 A window or period below 1, and a multi-series call whose inputs have
 unequal lengths, are domain errors and `fail(...)`. They are not

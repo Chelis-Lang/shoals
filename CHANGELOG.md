@@ -111,6 +111,31 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   `scripts/oracle_indicators.py` re-derives every series in Python from the
   cited definitions with no shared code.
 
+  **Every function also has a tensor-accepting form**, named by prepending
+  `tensor_` to the list name with no exceptions so the name is derivable by
+  rule (shoals#83's "accept `List[f64]` or `tensor[n, f64]`" bullet). Each one
+  returns its list counterpart's type in full: a numeric result series keeps its
+  `Option[f64]` mask, the crossing forms keep `List[Option[bool]]`, and a list
+  form returning a tuple of series has a tensor form returning the same tuple.
+  None of them returns a tensor. Each proposed tensor-return shape
+  fails a different one of §2.15.2's grounds: a sibling channel (count,
+  validity tensor, record field, tuple component — including
+  `(tensor[n,f64], tensor[n,bool])`, which does type-check) is *droppable*; an
+  in-element NaN sentinel is *indistinguishable* from a real value; a
+  marker-free or shortened return *moves the alignment burden to the caller*.
+  `tensor[n, Option[f64]]` is separately not expressible. The text states
+  grounds for the proposed shapes and deliberately does not claim to enumerate
+  every possible tensor return — three red-team rounds each broke a
+  completeness claim in that paragraph, and the claim was never load-bearing.
+  `tensor_crossover`
+  and `tensor_crossunder` take each side's warm-up as a required parameter,
+  which is safe inbound for the same reason the count was unsafe outbound: a
+  required parameter cannot be dropped. `tests/indicators_tensor.ch` pins each
+  variant against its list form with exact equality, and
+  `scripts/check_tensor_surface_parity.py` runs as a gate stage, proving export
+  parity from the module's export list; its second leg, that each counterpart is
+  exercised, is a source-text heuristic and is labelled as one.
+
   `ind_rolling_sum`/`mean`/`std`/`min`/`max`, `ind_shift` and `ind_diff` are
   generic time-series primitives that belong in Nautilus (`nautilus#85`).
   They carry the `ind_` prefix to mark them as borrowed and ship here only

@@ -27,37 +27,45 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
      it authoritatively on every PR.
   9. ``scripts/contract_gate.py`` — offline manifest resolvability + pin
       freshness (also a per-PR CI gate).
-  10. ``scripts/test_check_package_prove_latency.py`` — negative-parity tests
+  10. ``scripts/check_tensor_surface_parity.py`` — the list/tensor export
+      parity guard for ``Shoals.Indicators`` (shoals#83). Proves that every
+      series-taking export has a ``tensor_`` counterpart derivable by the
+      naming rule and that none is orphaned. It also reports whether each
+      counterpart appears in an equality assertion, but that leg is a
+      heuristic over source text, not a proof — see the script's docstring.
+      Offline, instant, stdlib-only.
+  11. ``scripts/test_check_package_prove_latency.py`` — negative-parity tests
       for the chelis#924 release oracle.
-  11. ``scripts/test_risk_invariant_gate.py`` — adversarial compiler-evidence
+  12. ``scripts/test_risk_invariant_gate.py`` — adversarial compiler-evidence
       and risk-family non-vacuity tests.
-  12. ``scripts/test_build_release_assets.py`` — canonical release-builder
+  13. ``scripts/test_build_release_assets.py`` — canonical release-builder
       unit tests for the chelis#1002 narrowing.
-  13. ``scripts/test_release_workflow.py`` — static release/toolchain and
+  14. ``scripts/test_release_workflow.py`` — static release/toolchain and
       hosted/local matrix integrity contracts.
+  15. ``.github/scripts/test_secret_scan.py`` — secret-scan contract tests.
 
 ``--full`` appends the stages CI runs in ``.github/workflows/nightly.yml``
 (scheduled, NOT per-PR) — run this at least once at a pin bump
 (``AGENTS.md`` §Pin Bump Checklist) or before a release tag:
 
-  14. ``chelis test tests/ --timeout 1200 --suite-timeout 2400 --jobs auto`` — the fast unit
+  16. ``chelis test tests/ --timeout 1200 --suite-timeout 2400 --jobs auto`` — the fast unit
       suite (nightly in CI). The suite budget was raised from 1500s at the
       0.18.6 pin to work around chelis#1391, which is OPEN upstream -- a
       narrowing, not a fix; keep it byte-aligned with the hosted nightly step.
-  15. The weekly nightly ``heavy`` matrix, one ``tests-manual/<file>.ch`` at
+  17. The weekly nightly ``heavy`` matrix, one ``tests-manual/<file>.ch`` at
       a time with ``--timeout 1500 --suite-timeout 1650 --jobs 1``. This
       explicitly raises Chelis 0.17.4's separate 600-second whole-suite
       watchdog without weakening any test oracle. It deliberately excludes
       ``modelfit_bfgs_heavy`` pending chelis#408, exactly like hosted nightly;
       an all-directory batch both over-scopes the release gate and hits the
       compiler's whole-suite timeout before completing the reviewed matrix.
-  16. ``scripts/prove_gate.py`` — the keystone canon self-audit against
+  18. ``scripts/prove_gate.py`` — the keystone canon self-audit against
       the release binary (real SMT, ~8.6 min; nightly in CI).
-  17. ``scripts/check_package_prove_latency.py`` — the chelis#924 release
+  19. ``scripts/check_package_prove_latency.py`` — the chelis#924 release
       oracle: install the just-built Shoals candidate, then require a cold
       trivial package prove in <=20s and an unchanged warm prove in <=5s with
       byte-identical NDJSON.
-  18. ``scripts/check_release_artifact_determinism.py`` — two fresh isolated
+  20. ``scripts/check_release_artifact_determinism.py`` — two fresh isolated
       registries (mixed-case manual preseed versus clean canonical) must emit
       byte-identical lock, CHB, and archive payloads despite chelis#1002.
 
@@ -193,6 +201,10 @@ def main() -> int:
         (
             "contract_gate (offline manifest resolvability + pin freshness)",
             ["python3", "scripts/contract_gate.py"],
+        ),
+        (
+            "Shoals.Indicators list/tensor surface parity (shoals#83)",
+            ["python3", "scripts/check_tensor_surface_parity.py"],
         ),
         (
             "chelis#924 latency-oracle unit tests",

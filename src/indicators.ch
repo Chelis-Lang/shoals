@@ -1,5 +1,5 @@
 module Shoals.Indicators
-export (EmaSeed, SeedFirstValue, SeedSma, Alpha, AlphaSpan, AlphaWilder, Smoothing, SmoothWilder, SmoothEma, SmoothSimple, Ddof, DdofPopulation, DdofSample, ind_rolling_sum, ind_rolling_mean, ind_rolling_std, ind_rolling_min, ind_rolling_max, ind_shift, ind_diff, sma, ema, rma, true_range, atr, rsi, macd, bollinger, stochastic, adx, donchian, cumulative_vwap, rolling_vwap, crossover, crossunder)
+export (EmaSeed, SeedFirstValue, SeedSma, Alpha, AlphaSpan, AlphaWilder, Smoothing, SmoothWilder, SmoothEma, SmoothSimple, Ddof, DdofPopulation, DdofSample, ind_rolling_sum, ind_rolling_mean, ind_rolling_std, ind_rolling_min, ind_rolling_max, ind_shift, ind_diff, sma, ema, rma, true_range, atr, rsi, macd, bollinger, stochastic, adx, donchian, cumulative_vwap, rolling_vwap, crossover, crossunder, tensor_ind_rolling_sum, tensor_ind_rolling_mean, tensor_ind_rolling_std, tensor_ind_rolling_min, tensor_ind_rolling_max, tensor_ind_shift, tensor_ind_diff, tensor_sma, tensor_ema, tensor_rma, tensor_true_range, tensor_atr, tensor_rsi, tensor_macd, tensor_bollinger, tensor_stochastic, tensor_adx, tensor_donchian, tensor_cumulative_vwap, tensor_rolling_vwap, tensor_crossover, tensor_crossunder)
 -- Technical indicators over `List[f64]`, specified in
 -- `spec/shoals_quant_surface.md` §2.15 and issue shoals#83.
 --
@@ -416,3 +416,99 @@ def ind_cross(a: List[Option[f64]], b: List[Option[f64]], rising: bool) -> List[
 }
 def crossover(a: List[Option[f64]], b: List[Option[f64]]) -> List[Option[bool]] = ind_cross(a, b, true)
 def crossunder(a: List[Option[f64]], b: List[Option[f64]]) -> List[Option[bool]] = ind_cross(a, b, false)
+-- TENSOR-ACCEPTING FORMS. shoals#83 asks that every function "accept
+-- `List[f64]` or `tensor[n, f64]`"; that bullet governs the INPUT. The
+-- return contract is the issue's separate bullet -- "a length-n series with
+-- a warm-up mask" -- which `List[Option[f64]]` already satisfies, so these
+-- return exactly what their list counterparts return. A tensor CANNOT carry
+-- the warm-up: `tensor[n, Option[f64]]` is rejected ("expected precision
+-- type name"), so returning a tensor would force a second, weaker warm-up
+-- convention. These do not.
+--
+-- WHY NOT A TENSOR RETURN. Three grounds, one per candidate shape that has
+-- actually been proposed. This deliberately does NOT claim to enumerate every
+-- conceivable tensor return -- three successive red-team rounds each broke a
+-- completeness claim here (first "only two candidates", then one criterion,
+-- then two), and the claim was never load-bearing: the decision is the return
+-- type, not a proof of impossibility. If a fourth shape turns up, judge it on
+-- its own terms rather than extending a lemma.
+--
+--   * A SIBLING channel -- a scalar count, a parallel `bool` tensor, a record
+--     field, a tuple component -- is droppable: a caller reads one component
+--     and the marker is gone. That is §2.15.2's hazard verbatim.
+--     `(tensor[n, f64], tensor[n, bool])` type-checks at this pin and falls
+--     here, not to non-existence.
+--   * An IN-ELEMENT SENTINEL (a NaN fill) has no sibling to drop, so the
+--     droppability ground does not reach it. It fails because it is
+--     indistinguishable from a computed value and propagates silently --
+--     "represented, not filled", above.
+--   * A MARKER-FREE return (hand the tensor back and document that the first
+--     n-1 entries are unspecified) or a SHORTENED one fails on a
+--     ground §2.15.2 already states: it moves the alignment burden onto the
+--     caller, which is where the measured off-by-one and look-ahead defects
+--     appear (nautilus#85).
+--
+-- `tensor[n, Option[f64]]` is separately not expressible: a tensor element
+-- must be a precision type.
+--
+-- The name of every variant is `tensor_` prepended to the list name, with no
+-- exceptions, so a generator can derive it by rule rather than by lookup.
+-- That is also why the borrowed-layer `ind_` marker survives into
+-- `tensor_ind_rolling_sum` instead of being tidied away: predictability beats
+-- the shorter spelling. A `_tensor` SUFFIX was rejected for a duller reason --
+-- `true_range_tensor` shares the `true_` prefix with `true_range` and trips
+-- §7.1's shared-prefix rule.
+def tensor_ind_rolling_sum[n](xs: tensor[n, f64], window: i64) -> List[Option[f64]] = ind_rolling_sum(to_list(xs), window)
+def tensor_ind_rolling_mean[n](xs: tensor[n, f64], window: i64) -> List[Option[f64]] = ind_rolling_mean(to_list(xs), window)
+def tensor_ind_rolling_std[n](xs: tensor[n, f64], window: i64, ddof: Ddof) -> List[Option[f64]] = ind_rolling_std(to_list(xs), window, ddof)
+def tensor_ind_rolling_min[n](xs: tensor[n, f64], window: i64) -> List[Option[f64]] = ind_rolling_min(to_list(xs), window)
+def tensor_ind_rolling_max[n](xs: tensor[n, f64], window: i64) -> List[Option[f64]] = ind_rolling_max(to_list(xs), window)
+def tensor_ind_shift[n](xs: tensor[n, f64], k: i64) -> List[Option[f64]] = ind_shift(to_list(xs), k)
+def tensor_ind_diff[n](xs: tensor[n, f64], k: i64) -> List[Option[f64]] = ind_diff(to_list(xs), k)
+def tensor_sma[n](xs: tensor[n, f64], window: i64) -> List[Option[f64]] = sma(to_list(xs), window)
+def tensor_ema[n](xs: tensor[n, f64], window: i64, seed: EmaSeed, alpha: Alpha) -> List[Option[f64]] = ema(to_list(xs), window, seed, alpha)
+def tensor_rma[n](xs: tensor[n, f64], window: i64) -> List[Option[f64]] = rma(to_list(xs), window)
+def tensor_true_range[n](high: tensor[n, f64], low: tensor[n, f64], close: tensor[n, f64]) -> List[Option[f64]] = true_range(to_list(high), to_list(low), to_list(close))
+def tensor_atr[n](high: tensor[n, f64], low: tensor[n, f64], close: tensor[n, f64], window: i64, smoothing: Smoothing) -> List[Option[f64]] = atr(to_list(high), to_list(low), to_list(close), window, smoothing)
+def tensor_rsi[n](close: tensor[n, f64], window: i64, smoothing: Smoothing) -> List[Option[f64]] = rsi(to_list(close), window, smoothing)
+def tensor_macd[n](close: tensor[n, f64], fast: i64, slow: i64, signal: i64, seed: EmaSeed, alpha: Alpha) -> (List[Option[f64]], List[Option[f64]], List[Option[f64]]) = macd(to_list(close), fast, slow, signal, seed, alpha)
+def tensor_bollinger[n](close: tensor[n, f64], window: i64, k: f64, ddof: Ddof) -> (List[Option[f64]], List[Option[f64]], List[Option[f64]]) = bollinger(to_list(close), window, k, ddof)
+def tensor_stochastic[n](high: tensor[n, f64], low: tensor[n, f64], close: tensor[n, f64], k_n: i64, d_n: i64, smoothing: Smoothing) -> (List[Option[f64]], List[Option[f64]]) = stochastic(to_list(high), to_list(low), to_list(close), k_n, d_n, smoothing)
+def tensor_adx[n](high: tensor[n, f64], low: tensor[n, f64], close: tensor[n, f64], window: i64) -> (List[Option[f64]], List[Option[f64]], List[Option[f64]]) = adx(to_list(high), to_list(low), to_list(close), window)
+def tensor_donchian[n](high: tensor[n, f64], low: tensor[n, f64], window: i64) -> (List[Option[f64]], List[Option[f64]], List[Option[f64]]) = donchian(to_list(high), to_list(low), window)
+def tensor_cumulative_vwap[n](price: tensor[n, f64], volume: tensor[n, f64]) -> List[Option[f64]] = cumulative_vwap(to_list(price), to_list(volume))
+def tensor_rolling_vwap[n](price: tensor[n, f64], volume: tensor[n, f64], window: i64) -> List[Option[f64]] = rolling_vwap(to_list(price), to_list(volume), window)
+-- Lift a tensor and an explicit warm-up count into the masked shape. Private:
+-- the only callers are the two crossover variants below.
+def ind_mask_tensor[n](t: tensor[n, f64], warmup: i64) -> List[Option[f64]] = {
+  vs = to_list(t)
+  m = len(vs)
+  -- The warm-up is the only integer the tensor surface accepts that the list
+  -- surface does not, and it was the only one on this module with no domain
+  -- guard. Unguarded, a negative warm-up read silently as 0, and a warm-up
+  -- past the end returned an all-`None` series -- which §2.15.6 names in so
+  -- many words as the wrong answer to a caller bug. `ind_shift` traps its
+  -- negative offset; this is the same defect shape and now traps too. A
+  -- warm-up EQUAL to the length stays legal: a producing indicator whose
+  -- window exceeded the series legitimately warms up for all of it.
+  bounded = if lt(warmup, cast(0, i64)) then fail("Shoals.Indicators: warm-up must be >= 0") else if lt(m, warmup) then fail("Shoals.Indicators: warm-up must not exceed the series length") else warmup
+  map(fn (pr: (i64, f64)) -> if lt(pr.0, bounded) then None else Some(pr.1), enumerate(vs))
+}
+-- THE CROSSOVER PAIR NEEDS AN ARGUMENT ITS LIST FORM DOES NOT, and this is
+-- the one place the tensor surface is not a pure adapter. `crossover` consumes
+-- already-masked series, and a tensor cannot carry a mask, so each side's
+-- warm-up has to come in separately.
+--
+-- Supplying it as a REQUIRED PARAMETER is what makes this acceptable. The
+-- reason a `valid_from` count was rejected for the RETURN type is that a
+-- caller can drop it and read filler as data; a required parameter cannot be
+-- dropped -- the call does not compile without it. So the same integer that
+-- was unsafe outbound is safe inbound.
+--
+-- Pass the warm-up the producing indicator documents: `n - 1` for
+-- `sma`/`rma`/`ind_rolling_*`, 0 for `SeedFirstValue`, `n` for Wilder ATR and
+-- RSI, `2n - 1` for ADX. Getting it wrong reports a crossing out of a
+-- warm-up, which is the defect the masked form exists to prevent -- so prefer
+-- the list forms, which carry the mask for you, whenever you have the choice.
+def tensor_crossover[n](fast: tensor[n, f64], fast_warmup: i64, slow: tensor[n, f64], slow_warmup: i64) -> List[Option[bool]] = crossover(ind_mask_tensor(fast, fast_warmup), ind_mask_tensor(slow, slow_warmup))
+def tensor_crossunder[n](fast: tensor[n, f64], fast_warmup: i64, slow: tensor[n, f64], slow_warmup: i64) -> List[Option[bool]] = crossunder(ind_mask_tensor(fast, fast_warmup), ind_mask_tensor(slow, slow_warmup))

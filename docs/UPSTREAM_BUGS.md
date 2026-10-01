@@ -425,7 +425,28 @@ in code that is CLOSED upstream but not sitting in §Archived.
       second copy:** `Nautilus.TimeSeries` is
       f32 and tensor-shaped, per the declaration above. `Coral.Window` has
       rolling sum, mean, std, min, max and `ewm` already, but is f32-only AND
-      not a compiled lane (coral#26), so it is not a path at either width.
+      not a compiled lane (coral#26).
+    - **The INPUT shape converged; the RETURN shape and the warm-up
+      representation did not.** shoals#83's tensor forms take
+      `tensor[n, f64]`, so the duplication is closer than it was on the
+      argument side. Three differences remain, measured against
+      `coral-0.7.43` as pinned: `Coral.Window` is f32 throughout (the package
+      contains no `f64` at all -- `src/frame.ch` is `FloatCol(tensor[n, f32])`);
+      it RETURNS `tensor[n, f32]` where these return `List[Option[f64]]`; and
+      it fills the warm-up with `nan_f32()` (`src/window.ch` lines 34, 39, 44, 49 -- 4 fill sites; the other four `nan_f32` tokens there are its definition, a degenerate-window guard, and two propagation sites in the min/max folds) where
+      these carry an `Option` mask -- the very representation
+      `spec/shoals_quant_surface.md` §2.15.5 exists to require. It also offers
+      no `Ddof` choice (sample only) and no shift or diff.
+      **A previous revision of this bullet said the remaining difference was
+      dtype alone and that the narrowing was therefore wider. That
+      over-corrected.** The risk it created is concrete: a future bump could
+      retire the borrowed layer believing only width separates it, and lose
+      the mask.
+    - **The layer's export footprint doubled from 7 to 14** with those tensor
+      forms, so §2.15.3's commitment to delete it when nautilus#85 lands now
+      covers 14 exports. The deletion stays mechanical -- each tensor form is a
+      one-line `to_list` delegation -- but the count is recorded here so the
+      bump that retires the layer is not surprised by it.
     - **Executable probe:** `tests_blocked/timeseries/rolling_f64_absent.ch`,
       keyed on `ts_ewma_series` because it EXISTS. A probe naming a
       not-yet-written `rolling_mean` would keep failing after nautilus#85
