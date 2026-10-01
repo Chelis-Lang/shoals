@@ -423,9 +423,13 @@ No parked entries.
       hand-rolled `if` would return NaN at `+inf` is withdrawn as unmeasured --
       it returns `inf`, exactly as the intrinsic does.
     - **The rule, since two revisions got it wrong:** a clamp is an `if`, so
-      under masked select it is safe only when its UNTAKEN arm has a finite
-      VALUE **and** a finite DERIVATIVE over the domain totality is claimed
-      for. The derivative half was missing from an earlier revision:
+      under masked select it is safe when its UNTAKEN arm has a finite
+      DERIVATIVE over the domain totality is claimed for. This entry asks for a
+      finite VALUE as well, and that half is conservative margin rather than a
+      measured requirement at this pin: an untaken arm with an infinite or NaN
+      value but a finite derivative differentiates cleanly (measured). Keeping
+      the stronger form can only retain a clamp that is not needed; it cannot
+      license removing one that is. The derivative half was missing from an earlier revision:
       `if c then k else sqrt(x)` has a finite untaken value at x = 0 and an
       infinite derivative, satisfies the weaker rule, and still NaNs under
       `grad` because the adjoint multiplies that derivative by the 0 mask.

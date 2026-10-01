@@ -72,15 +72,14 @@ EXPECTED_NODE_COUNT = 1665
 #
 # NOTE for whoever drifts this next: the raw artifact embeds source spans, so
 # editing a COMMENT in src/pricing.ch moves this hash while leaving the graph
-# identical. This is routine rather than rare: it has now happened on three
-# consecutive changes whose only edit to this file was prose above `d1_64`
-# (9709d1a4... -> 904bd65b... -> the value below). The signature of a
-# non-semantic edit is therefore: this hash check fails while the root, node
-# count, 15 named loads and op kinds all still match. The node count is checked
-# BEFORE the hash, so a hash-only failure already tells you the count agreed.
-# Confirm that shape, then re-pin; do not go looking for a numerical
-# regression.
-EXPECTED_RAW_SHA256 = "7b116848481ce3610f45f3d35848587093b72ac1d8c878c86a59060a176ff73e"
+# identical. Expect this on ANY edit to this file, prose included -- it is the
+# normal case, not a surprise, and an earlier version of this note tried to keep
+# a count of how often it had happened and went stale twice. The signature of a
+# non-semantic edit is: this hash check fails while the root, node count, 15
+# named loads and op kinds all still match. The node count is checked BEFORE the
+# hash, so a hash-only failure already tells you the count agreed. Confirm that
+# shape, then re-pin; do not go looking for a numerical regression.
+EXPECTED_RAW_SHA256 = "11db75226201dd8110365865c03841aa6a769dfd376b77d3ce4aa53d47e1a925"
 FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
 EXPECTED_LOADS = {
     "a1",

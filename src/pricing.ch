@@ -105,7 +105,9 @@ def erf64_core_erfc_tail(axr: f64) -> f64 = {
 -- though its value does not propagate (chelis#2640, against
 -- `spec/06-transformations.md` §2.10.1; fixed upstream at 0.18.12, not at this
 -- pin). The claim that an out-of-region non-finite VALUE poisons the selected
--- arm is withdrawn: measured at this pin, it does not. Every core needs one, not only region 3: regions 1 and 2 are
+-- arm is withdrawn: measured at this pin, it does not.
+--
+-- Every core needs one, not only region 3: regions 1 and 2 are
 -- P(y)/Q(y) Horner chains with positive coefficients, so numerator AND
 -- denominator overflow to +inf and inf/inf = NaN -- their hazard is not
 -- division. The clamps never bind where the dispatcher routes, so no returned
