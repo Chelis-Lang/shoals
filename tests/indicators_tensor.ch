@@ -78,30 +78,25 @@ def test_tensor_range_indicators_match_list() -> unit ! { Test } = {
   assert_close(to01(identical(tensor_rsi(series_close_tensor(), w(), SmoothWilder), rsi(series_close(), w(), SmoothWilder))), cast(1.0, f64), tight(), "tensor_rsi")
 }
 def test_tensor_tuple_indicators_match_list() -> unit ! { Test } = {
-  tm = tensor_macd(series_close_tensor(), cast(2, i64), cast(4, i64), w(), SeedFirstValue, AlphaSpan)
-  lm = macd(series_close(), cast(2, i64), cast(4, i64), w(), SeedFirstValue, AlphaSpan)
-  _ = assert_close(to01(identical(tm.0, lm.0)), cast(1.0, f64), tight(), "tensor_macd line")
-  _ = assert_close(to01(identical(tm.1, lm.1)), cast(1.0, f64), tight(), "tensor_macd signal")
-  _ = assert_close(to01(identical(tm.2, lm.2)), cast(1.0, f64), tight(), "tensor_macd histogram")
-  tb = tensor_bollinger(series_close_tensor(), cast(4, i64), cast(2.0, f64), DdofPopulation)
-  lb = bollinger(series_close(), cast(4, i64), cast(2.0, f64), DdofPopulation)
-  _ = assert_close(to01(identical(tb.0, lb.0)), cast(1.0, f64), tight(), "tensor_bollinger lower")
-  _ = assert_close(to01(identical(tb.1, lb.1)), cast(1.0, f64), tight(), "tensor_bollinger mid")
-  _ = assert_close(to01(identical(tb.2, lb.2)), cast(1.0, f64), tight(), "tensor_bollinger upper")
-  ts = tensor_stochastic(series_high_tensor(), series_low_tensor(), series_close_tensor(), w(), d(), SmoothSimple)
-  ls = stochastic(series_high(), series_low(), series_close(), w(), d(), SmoothSimple)
-  _ = assert_close(to01(identical(ts.0, ls.0)), cast(1.0, f64), tight(), "tensor_stochastic k")
-  _ = assert_close(to01(identical(ts.1, ls.1)), cast(1.0, f64), tight(), "tensor_stochastic d")
-  ta = tensor_adx(series_high_tensor(), series_low_tensor(), series_close_tensor(), w())
-  la = adx(series_high(), series_low(), series_close(), w())
-  _ = assert_close(to01(identical(ta.0, la.0)), cast(1.0, f64), tight(), "tensor_adx plus_di")
-  _ = assert_close(to01(identical(ta.1, la.1)), cast(1.0, f64), tight(), "tensor_adx minus_di")
-  _ = assert_close(to01(identical(ta.2, la.2)), cast(1.0, f64), tight(), "tensor_adx adx")
-  td = tensor_donchian(series_high_tensor(), series_low_tensor(), w())
-  ld = donchian(series_high(), series_low(), w())
-  _ = assert_close(to01(identical(td.0, ld.0)), cast(1.0, f64), tight(), "tensor_donchian lower")
-  _ = assert_close(to01(identical(td.1, ld.1)), cast(1.0, f64), tight(), "tensor_donchian mid")
-  assert_close(to01(identical(td.2, ld.2)), cast(1.0, f64), tight(), "tensor_donchian upper")
+  -- Every variant name appears directly inside an `identical(` argument via
+  -- `.N` on the call, rather than being bound to a variable first. That keeps
+  -- all 22 checks uniform in shape, which is what lets
+  -- `scripts/check_tensor_surface_parity.py` hold one strict rule instead of
+  -- special-casing the tuple-returning five.
+  _ = assert_close(to01(identical(tensor_macd(series_close_tensor(), cast(2, i64), cast(4, i64), w(), SeedFirstValue, AlphaSpan).0, macd(series_close(), cast(2, i64), cast(4, i64), w(), SeedFirstValue, AlphaSpan).0)), cast(1.0, f64), tight(), "tensor_macd line")
+  _ = assert_close(to01(identical(tensor_macd(series_close_tensor(), cast(2, i64), cast(4, i64), w(), SeedFirstValue, AlphaSpan).1, macd(series_close(), cast(2, i64), cast(4, i64), w(), SeedFirstValue, AlphaSpan).1)), cast(1.0, f64), tight(), "tensor_macd signal")
+  _ = assert_close(to01(identical(tensor_macd(series_close_tensor(), cast(2, i64), cast(4, i64), w(), SeedFirstValue, AlphaSpan).2, macd(series_close(), cast(2, i64), cast(4, i64), w(), SeedFirstValue, AlphaSpan).2)), cast(1.0, f64), tight(), "tensor_macd histogram")
+  _ = assert_close(to01(identical(tensor_bollinger(series_close_tensor(), cast(4, i64), cast(2.0, f64), DdofPopulation).0, bollinger(series_close(), cast(4, i64), cast(2.0, f64), DdofPopulation).0)), cast(1.0, f64), tight(), "tensor_bollinger lower")
+  _ = assert_close(to01(identical(tensor_bollinger(series_close_tensor(), cast(4, i64), cast(2.0, f64), DdofPopulation).1, bollinger(series_close(), cast(4, i64), cast(2.0, f64), DdofPopulation).1)), cast(1.0, f64), tight(), "tensor_bollinger mid")
+  _ = assert_close(to01(identical(tensor_bollinger(series_close_tensor(), cast(4, i64), cast(2.0, f64), DdofPopulation).2, bollinger(series_close(), cast(4, i64), cast(2.0, f64), DdofPopulation).2)), cast(1.0, f64), tight(), "tensor_bollinger upper")
+  _ = assert_close(to01(identical(tensor_stochastic(series_high_tensor(), series_low_tensor(), series_close_tensor(), w(), d(), SmoothSimple).0, stochastic(series_high(), series_low(), series_close(), w(), d(), SmoothSimple).0)), cast(1.0, f64), tight(), "tensor_stochastic k")
+  _ = assert_close(to01(identical(tensor_stochastic(series_high_tensor(), series_low_tensor(), series_close_tensor(), w(), d(), SmoothSimple).1, stochastic(series_high(), series_low(), series_close(), w(), d(), SmoothSimple).1)), cast(1.0, f64), tight(), "tensor_stochastic d")
+  _ = assert_close(to01(identical(tensor_adx(series_high_tensor(), series_low_tensor(), series_close_tensor(), w()).0, adx(series_high(), series_low(), series_close(), w()).0)), cast(1.0, f64), tight(), "tensor_adx plus_di")
+  _ = assert_close(to01(identical(tensor_adx(series_high_tensor(), series_low_tensor(), series_close_tensor(), w()).1, adx(series_high(), series_low(), series_close(), w()).1)), cast(1.0, f64), tight(), "tensor_adx minus_di")
+  _ = assert_close(to01(identical(tensor_adx(series_high_tensor(), series_low_tensor(), series_close_tensor(), w()).2, adx(series_high(), series_low(), series_close(), w()).2)), cast(1.0, f64), tight(), "tensor_adx adx")
+  _ = assert_close(to01(identical(tensor_donchian(series_high_tensor(), series_low_tensor(), w()).0, donchian(series_high(), series_low(), w()).0)), cast(1.0, f64), tight(), "tensor_donchian lower")
+  _ = assert_close(to01(identical(tensor_donchian(series_high_tensor(), series_low_tensor(), w()).1, donchian(series_high(), series_low(), w()).1)), cast(1.0, f64), tight(), "tensor_donchian mid")
+  assert_close(to01(identical(tensor_donchian(series_high_tensor(), series_low_tensor(), w()).2, donchian(series_high(), series_low(), w()).2)), cast(1.0, f64), tight(), "tensor_donchian upper")
 }
 def test_tensor_vwap_matches_list() -> unit ! { Test } = {
   _ = assert_close(to01(identical(tensor_cumulative_vwap(series_close_tensor(), series_volume_tensor()), cumulative_vwap(series_close(), series_volume()))), cast(1.0, f64), tight(), "tensor_cumulative_vwap")
@@ -128,7 +123,16 @@ def test_tensor_crossover_fixture_actually_crosses() -> unit ! { Test } = {
 }
 -- A wrong warm-up must change the answer, else the parameter is decoration.
 def test_tensor_crossover_warmup_argument_is_load_bearing() -> unit ! { Test } = assert_close(to01(identical_bool(tensor_crossover(series_rising_tensor(), cast(4, i64), series_level_tensor(), cast(4, i64)), tensor_crossover(series_rising_tensor(), cast(0, i64), series_level_tensor(), cast(0, i64)))), cast(0.0, f64), tight(), "a different warm-up must give a different verdict series")
--- SWAPPING THE TWO WARM-UPS IS A PROVABLE NO-OP, NOT A TEST GAP. `ind_cross`
+-- SWAPPING THE TWO WARM-UPS IS A NO-OP ON THE SUCCESS DOMAIN, which is where
+-- this test exercises it. It is NOT a no-op once either value is out of
+-- domain: `(-1, 99)` traps with "warm-up must be >= 0" and `(99, -1)` with
+-- "warm-up must not exceed the series length", because the guards check the
+-- first argument first. The warm-up guards added in the same commit as this
+-- comment created that counterexample, and an earlier revision called the
+-- swap "provable" without qualification. Which of two traps fires first is an
+-- evaluation-order detail rather than a contract, so it is not pinned.
+--
+-- On the success domain the mechanism holds: `ind_cross`
 -- yields a value only where all four of a[i-1], b[i-1], a[i], b[i] are
 -- `Some`, so the `None` pattern is the UNION of the two masks and depends only
 -- on `max(fast_warmup, slow_warmup)`; the values at defined positions do not
@@ -153,24 +157,14 @@ def test_tensor_variants_at_a_second_argument_tuple() -> unit ! { Test } = {
   _ = assert_close(to01(identical(tensor_rma(series_close_tensor(), v), rma(series_close(), v))), cast(1.0, f64), tight(), "rma @ 4")
   _ = assert_close(to01(identical(tensor_atr(series_high_tensor(), series_low_tensor(), series_close_tensor(), v, SmoothSimple), atr(series_high(), series_low(), series_close(), v, SmoothSimple))), cast(1.0, f64), tight(), "atr @ 4 SmoothSimple -- pins that `window` and `smoothing` are forwarded")
   _ = assert_close(to01(identical(tensor_rsi(series_close_tensor(), v, SmoothSimple), rsi(series_close(), v, SmoothSimple))), cast(1.0, f64), tight(), "rsi @ 4 SmoothSimple")
-  tm = tensor_macd(series_close_tensor(), cast(3, i64), cast(5, i64), v, SeedSma, AlphaWilder)
-  lm = macd(series_close(), cast(3, i64), cast(5, i64), v, SeedSma, AlphaWilder)
-  _ = assert_close(to01(identical(tm.0, lm.0)), cast(1.0, f64), tight(), "macd @ 3/5/4 SeedSma/AlphaWilder line")
-  _ = assert_close(to01(identical(tm.2, lm.2)), cast(1.0, f64), tight(), "macd histogram")
-  tb = tensor_bollinger(series_close_tensor(), cast(5, i64), cast(1.5, f64), DdofSample)
-  lb = bollinger(series_close(), cast(5, i64), cast(1.5, f64), DdofSample)
-  _ = assert_close(to01(identical(tb.0, lb.0)), cast(1.0, f64), tight(), "bollinger @ 5/1.5/sample lower -- pins k and ddof are forwarded")
-  _ = assert_close(to01(identical(tb.2, lb.2)), cast(1.0, f64), tight(), "bollinger upper")
-  ts = tensor_stochastic(series_high_tensor(), series_low_tensor(), series_close_tensor(), v, cast(3, i64), SmoothWilder)
-  ls = stochastic(series_high(), series_low(), series_close(), v, cast(3, i64), SmoothWilder)
-  _ = assert_close(to01(identical(ts.0, ls.0)), cast(1.0, f64), tight(), "stochastic @ 4/3 Wilder k")
-  _ = assert_close(to01(identical(ts.1, ls.1)), cast(1.0, f64), tight(), "stochastic d")
-  ta = tensor_adx(series_high_tensor(), series_low_tensor(), series_close_tensor(), v)
-  la = adx(series_high(), series_low(), series_close(), v)
-  _ = assert_close(to01(identical(ta.2, la.2)), cast(1.0, f64), tight(), "adx @ 4")
-  td = tensor_donchian(series_high_tensor(), series_low_tensor(), v)
-  ld = donchian(series_high(), series_low(), v)
-  _ = assert_close(to01(identical(td.1, ld.1)), cast(1.0, f64), tight(), "donchian @ 4 mid")
+  _ = assert_close(to01(identical(tensor_macd(series_close_tensor(), cast(3, i64), cast(5, i64), v, SeedSma, AlphaWilder).0, macd(series_close(), cast(3, i64), cast(5, i64), v, SeedSma, AlphaWilder).0)), cast(1.0, f64), tight(), "macd @ second tuple line")
+  _ = assert_close(to01(identical(tensor_macd(series_close_tensor(), cast(3, i64), cast(5, i64), v, SeedSma, AlphaWilder).2, macd(series_close(), cast(3, i64), cast(5, i64), v, SeedSma, AlphaWilder).2)), cast(1.0, f64), tight(), "macd @ second tuple histogram")
+  _ = assert_close(to01(identical(tensor_bollinger(series_close_tensor(), cast(5, i64), cast(1.5, f64), DdofSample).0, bollinger(series_close(), cast(5, i64), cast(1.5, f64), DdofSample).0)), cast(1.0, f64), tight(), "bollinger @ second tuple lower")
+  _ = assert_close(to01(identical(tensor_bollinger(series_close_tensor(), cast(5, i64), cast(1.5, f64), DdofSample).2, bollinger(series_close(), cast(5, i64), cast(1.5, f64), DdofSample).2)), cast(1.0, f64), tight(), "bollinger @ second tuple upper")
+  _ = assert_close(to01(identical(tensor_stochastic(series_high_tensor(), series_low_tensor(), series_close_tensor(), v, cast(3, i64), SmoothWilder).0, stochastic(series_high(), series_low(), series_close(), v, cast(3, i64), SmoothWilder).0)), cast(1.0, f64), tight(), "stochastic @ second tuple k")
+  _ = assert_close(to01(identical(tensor_stochastic(series_high_tensor(), series_low_tensor(), series_close_tensor(), v, cast(3, i64), SmoothWilder).1, stochastic(series_high(), series_low(), series_close(), v, cast(3, i64), SmoothWilder).1)), cast(1.0, f64), tight(), "stochastic @ second tuple d")
+  _ = assert_close(to01(identical(tensor_adx(series_high_tensor(), series_low_tensor(), series_close_tensor(), v).2, adx(series_high(), series_low(), series_close(), v).2)), cast(1.0, f64), tight(), "adx @ second tuple adx")
+  _ = assert_close(to01(identical(tensor_donchian(series_high_tensor(), series_low_tensor(), v).1, donchian(series_high(), series_low(), v).1)), cast(1.0, f64), tight(), "donchian @ second tuple mid")
   _ = assert_close(to01(identical(tensor_true_range(series_high_tensor(), series_low_tensor(), series_close_tensor()), true_range(series_high(), series_low(), series_close()))), cast(1.0, f64), tight(), "true_range (no scalar args; the fixture asymmetry is what pins it)")
   _ = assert_close(to01(identical(tensor_cumulative_vwap(series_close_tensor(), series_volume_tensor()), cumulative_vwap(series_close(), series_volume()))), cast(1.0, f64), tight(), "cumulative_vwap")
   assert_close(to01(identical(tensor_rolling_vwap(series_close_tensor(), series_volume_tensor(), v), rolling_vwap(series_close(), series_volume(), v))), cast(1.0, f64), tight(), "rolling_vwap @ 4")

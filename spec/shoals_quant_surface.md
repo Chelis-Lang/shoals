@@ -516,14 +516,27 @@ prepending `tensor_` to the list name with no exceptions, so the name is
 derivable by rule. They take `tensor[n, f64]` and return exactly what their
 list counterparts return.
 
-**The return type stays `List[Option[f64]]`,** and the reason generalises
-rather than enumerating alternatives: §2.15.2 requires a representation a
-caller cannot misread, which means absence has to live *inside the element* to
-be undroppable. Any sibling channel — a scalar count, a parallel validity
-tensor, a record field, a tuple component — can be projected away, which is
-§2.15.2's drop hazard restated. A tensor element is a precision type, so
-`tensor[n, Option[f64]]` does not exist and no tensor return can carry an
-undroppable warm-up. The tensor admitted here is therefore the input.
+**The return type stays `List[Option[f64]]`.** §2.15.2 requires a
+representation a caller cannot misread, and that is two requirements: the
+absence marker must be **undroppable** and it must be **distinguishable** from
+a computed value. They exclude different candidates, and both are needed.
+
+Undroppable excludes every *sibling* channel — a scalar count, a parallel
+validity tensor, a record field, a tuple component — since each can be
+projected away, which is §2.15.2's drop hazard restated.
+`(tensor[n, f64], tensor[n, bool])` is admissible to the type system and falls
+here.
+
+Distinguishable excludes an *in-element sentinel*. A NaN fill has no sibling to
+drop, so the first requirement does not reach it; it is excluded because it
+cannot be told apart from a computed value and propagates silently. **A
+NaN-filled `tensor[n, f64]` return is rejected on this ground and not on the
+other.**
+
+A tensor element is a precision type, so absence in a tensor return must
+either sit in a sibling or be a sentinel. Both are excluded, so no tensor
+return satisfies §2.15.2, and `tensor[n, Option[f64]]` does not exist in any
+case. The tensor admitted here is therefore the input.
 
 `crossover` and `crossunder` consume masked series, so their tensor forms take
 each side's warm-up as a required parameter, which cannot be dropped. That

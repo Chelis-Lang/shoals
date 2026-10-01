@@ -425,14 +425,28 @@ def crossunder(a: List[Option[f64]], b: List[Option[f64]]) -> List[Option[bool]]
 -- type name"), so returning a tensor would force a second, weaker warm-up
 -- convention. These do not.
 --
--- THE ARGUMENT IN ITS GENERAL FORM, shorter than enumerating candidates and
--- covering more of them: absence has to live INSIDE THE ELEMENT to be
--- undroppable. Any sibling channel -- a scalar count, a parallel `bool`
--- tensor, a record field, a tuple component -- can be projected away by
--- reading `.0`, which is exactly §2.15.2's drop hazard. A tensor element is a
--- precision type, so NO tensor return can carry an undroppable warm-up. That
--- covers `(tensor[n, f64], tensor[n, bool])`, which does type-check at this
--- pin, as much as it covers a count or a NaN fill.
+-- TWO CRITERIA, NOT ONE. A representation a caller cannot misread has to be
+-- both UNDROPPABLE and DISTINGUISHABLE from a computed value, and the two
+-- exclude different candidates.
+--
+-- Undroppable rules out every SIBLING channel -- a scalar count, a parallel
+-- `bool` tensor, a record field, a tuple component -- because each can be
+-- projected away by reading one component, which is §2.15.2's drop hazard.
+-- `(tensor[n, f64], tensor[n, bool])` does type-check at this pin and falls
+-- here, not to non-existence.
+--
+-- Distinguishable is what rules out an IN-ELEMENT SENTINEL. A NaN fill lives
+-- inside the f64 element and has no sibling to drop, so the first criterion
+-- does not reach it; what disqualifies it is that it is indistinguishable
+-- from a computed value and propagates silently -- "represented, not filled",
+-- above. An earlier revision of this comment claimed the undroppable
+-- criterion alone covered the NaN fill "as much as a count". It does not, and
+-- generalising to one criterion quietly dropped the only argument against the
+-- NaN form.
+--
+-- Together they are exhaustive for a tensor return: a tensor element is a
+-- precision type, so absence must either sit in a sibling (droppable) or be
+-- a sentinel value (indistinguishable).
 --
 -- The name of every variant is `tensor_` prepended to the list name, with no
 -- exceptions, so a generator can derive it by rule rather than by lookup.

@@ -426,14 +426,22 @@ in code that is CLOSED upstream but not sitting in §Archived.
       f32 and tensor-shaped, per the declaration above. `Coral.Window` has
       rolling sum, mean, std, min, max and `ewm` already, but is f32-only AND
       not a compiled lane (coral#26).
-    - **The remaining difference is DTYPE, not shape, since shoals#83's tensor
-      forms landed.** An earlier revision of this entry argued the duplication
-      was narrow because `Coral.Window` is f32 *and* tensor-shaped while the
-      Shoals layer was list-shaped. `tensor_ind_rolling_sum` and its four
-      siblings now take `tensor[n, f64]`, so the shape half of that argument no
-      longer holds: the two surfaces differ only in width (and in Coral's
-      build-lane block). The narrowing is therefore wider than it was, not
-      narrower.
+    - **The INPUT shape converged; the RETURN shape and the warm-up
+      representation did not.** shoals#83's tensor forms take
+      `tensor[n, f64]`, so the duplication is closer than it was on the
+      argument side. Three differences remain, measured against
+      `coral-0.7.43` as pinned: `Coral.Window` is f32 throughout (the package
+      contains no `f64` at all -- `src/frame.ch` is `FloatCol(tensor[n, f32])`);
+      it RETURNS `tensor[n, f32]` where these return `List[Option[f64]]`; and
+      it fills the warm-up with `nan_f32()` (`src/window.ch`, 8 sites) where
+      these carry an `Option` mask -- the very representation
+      `spec/shoals_quant_surface.md` §2.15.5 exists to require. It also offers
+      no `Ddof` choice (sample only) and no shift or diff.
+      **A previous revision of this bullet said the remaining difference was
+      dtype alone and that the narrowing was therefore wider. That
+      over-corrected.** The risk it created is concrete: a future bump could
+      retire the borrowed layer believing only width separates it, and lose
+      the mask.
     - **The layer's export footprint doubled from 7 to 14** with those tensor
       forms, so §2.15.3's commitment to delete it when nautilus#85 lands now
       covers 14 exports. The deletion stays mechanical -- each tensor form is a
