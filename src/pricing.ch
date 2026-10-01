@@ -23,9 +23,12 @@ export (erf64, n_cdf64, bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_
 --
 -- Three named helpers rather than one expression, because the AD Greeks
 -- differentiate through this path and each branch is separately checkable.
--- `abs` is the intrinsic, not a hand-rolled `if`: that would have the operand
--- as its untaken arm, which under vmap's masked select returns NaN at +inf
--- (chelis#1464).
+-- `abs` is the intrinsic rather than a hand-rolled `if`, which is the clearer
+-- spelling and keeps the derivative rule below trivially satisfied. An earlier
+-- revision justified it by claiming a hand-rolled `if` returns NaN at +inf; that
+-- is withdrawn as unmeasured. Measured at this pin it returns +inf, exactly as
+-- the intrinsic does, because a scalar `if` does not propagate the untaken arm's
+-- value. The rule that does bind is the DERIVATIVE one (chelis#2640).
 def abs_f64(x: f64) -> f64 = abs(x)
 -- Cody region 1 (|x| <= 0.5): erf(x) = x * P(x^2)/Q(x^2), odd by construction.
 def erf64_core_small(x: f64) -> f64 = {
@@ -94,11 +97,15 @@ def erf64_core_erfc_tail(axr: f64) -> f64 = {
   div(mul(exp(neg(mul(ax, ax))), sub(cast(0.5641895835477563, f64), r)), guarded)
 }
 -- EVERY core clamps its argument into its own region at entry: load-bearing,
--- not defensive. Narrowing for chelis#1464 (`vmap` lowers `if` to a masked
--- select which evaluates BOTH arms, against `spec/06-transformations.md`
--- §2.10.1), so every core runs on every operand the dispatcher sees, and a core
--- returning a non-finite value outside its own region poisons the arm that WAS
--- selected. Every core needs one, not only region 3: regions 1 and 2 are
+-- not defensive. Two reasons, and the first is not the one an earlier revision
+-- gave. (1) Numerical: every core runs on every operand the dispatcher sees,
+-- and a core evaluated outside its own Cody region returns a wrong number --
+-- true of any transform or none. (2) The adjoint: a clamp is an `if`, and under
+-- `grad` an untaken arm with an unbounded DERIVATIVE poisons the result even
+-- though its value does not propagate (chelis#2640, against
+-- `spec/06-transformations.md` §2.10.1; fixed upstream at 0.18.12, not at this
+-- pin). The claim that an out-of-region non-finite VALUE poisons the selected
+-- arm is withdrawn: measured at this pin, it does not. Every core needs one, not only region 3: regions 1 and 2 are
 -- P(y)/Q(y) Horner chains with positive coefficients, so numerator AND
 -- denominator overflow to +inf and inf/inf = NaN -- their hazard is not
 -- division. The clamps never bind where the dispatcher routes, so no returned
@@ -169,7 +176,7 @@ def n_cdf64(x: f64) -> f64 = {
 -- The hazard is not vmap-specific either: `grad(if lt(x,1) then 2.0 else
 -- sqrt(x))` at x = 0 is NaN with no `vmap` anywhere, the untaken arm's value
 -- being a finite 0.0 while its derivative is infinite. This is the derivative
--- rule the chelis#1464 entry in `docs/UPSTREAM_BUGS.md` states; every Greek and
+-- rule the chelis#2640 entry in `docs/UPSTREAM_BUGS.md` states; every Greek and
 -- both f32 entry points differentiate this body, so it binds here. This clamp
 -- is safe under the same rule because its arms are `den` and a positive
 -- constant: finite in value AND in derivative.
@@ -255,11 +262,13 @@ def pricing_wire_normal_cdf_f64[n](x: &tensor[n, f64], half: &tensor[n, f64], in
 -- selector is arithmetic, and `0 * inf` is NaN.
 --
 -- The first NaN is in `pricing_wire_abs_f64`: at x = +inf its mask is 0 and it
--- evaluates `0 * neg(inf) + 1 * inf`, whose first term is NaN. That is exactly
--- what the note above `erf64` warns about -- "`abs` is the intrinsic, not a
--- hand-rolled `if`: that would have the operand as its untaken arm, which
--- under vmap's masked select returns NaN at +inf (chelis#1464)". The scalar
--- lane took that advice; this lane hand-rolls `abs` out of a select and cannot.
+-- evaluates `0 * neg(inf) + 1 * inf`, whose first term is NaN. Note what this
+-- is and is not. It is plain arithmetic in THIS lane's own hand-rolled select,
+-- so it needs no upstream citation: `0 * inf` is NaN by IEEE, whatever the
+-- compiler does with a real `if`. The scalar lane is not exposed to it, because
+-- a scalar `if` is a genuine select and does not propagate the untaken arm's
+-- value. This lane has no `if` to use: it must stay producer-clean for the
+-- WireDag seam, so every selector here is multiplication and addition.
 -- `linear` has the same shape: `x * two_over_sqrt_pi` is inf, and the
 -- `small_mask` select multiplies it by 0.
 --
