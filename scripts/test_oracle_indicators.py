@@ -155,9 +155,19 @@ class DegenerateCases(unittest.TestCase):
     """The documented reference behaviours, which are silent fallbacks in the
     module and would otherwise be untested on the Python side."""
 
-    def test_flat_series_rsi_reads_one_hundred(self):
-        # TA-Lib's `if prevLoss == 0 then 100`. Not 50, not NaN.
+    def test_flat_series_rsi_reads_zero(self):
+        # TA-Lib guards the SUM: `if (prevGain + prevLoss > 0.0) ... else 0.0`.
+        # A dead-flat window has both at zero, so it reads 0 -- not 100, not
+        # 50, not NaN. This is the case an earlier revision got backwards.
         _, vals = defined(o.rsi([5.0] * 10, 3, "wilder"))
+        for v in vals:
+            self.assertEqual(v, 0.0)
+
+    def test_monotone_rise_still_reads_one_hundred(self):
+        # The sibling of the above, and the reason the guard must be on the
+        # SUM rather than on the loss: a zero loss with a POSITIVE gain is an
+        # ordinary division and still reads exactly 100.
+        _, vals = defined(o.rsi([100.0 + i for i in range(12)], 3, "wilder"))
         for v in vals:
             self.assertEqual(v, 100.0)
 

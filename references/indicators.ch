@@ -36,9 +36,16 @@ def ema_closed_form_textbook(xs: List[f64], n: i64) -> List[f64] = {
     add(acc, mul(weight, p.1))
   }, cast(0.0, f64), enumerate(take(xs, add(i, cast(1, i64))))), range(cast(0, i64), len(xs)))
 }
--- 100*g/(g+l), algebraically equal to the shipped `100 - 100/(1 + g/l)`.
--- Zero total movement reads 100, matching TA-Lib's zero-average-loss guard.
-def rsi_from_smoothed_averages(g: f64, l: f64) -> f64 = if eq(add(g, l), cast(0.0, f64)) then cast(100.0, f64) else mul(cast(100.0, f64), div(g, add(g, l)))
+-- Wilder's `100 - 100/(1 + RS)` with `RS = g/l`, which is algebraically
+-- equal to the shipped kernel's `100*g/(g+l)` whenever l > 0. The two
+-- spellings are kept on opposite sides deliberately: if both evaluated the
+-- same expression this cross-check would be a restatement.
+--
+-- No movement at all reads 0, matching TA-Lib's sum guard. A zero loss with
+-- a positive gain reads 100 through the RS = +inf limit, which is the same
+-- answer the shipped form gives by ordinary division -- so the agreement
+-- below covers the degenerate boundary, not just the interior.
+def rsi_from_smoothed_averages(g: f64, l: f64) -> f64 = if lte(add(g, l), cast(0.0, f64)) then cast(0.0, f64) else if eq(l, cast(0.0, f64)) then cast(100.0, f64) else sub(cast(100.0, f64), div(cast(100.0, f64), add(cast(1.0, f64), div(g, l))))
 -- max(h - l, |h - prev_c|, |l - prev_c|), Wilder 1978.
 def true_range_textbook(h: f64, l: f64, prev_c: f64) -> f64 = {
   a = sub(h, l)

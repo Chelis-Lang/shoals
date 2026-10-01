@@ -30,13 +30,19 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   `i` is input index `i` and a warm-up entry cannot be read as a number. A
   `valid_from` count was rejected as ignorable and a shortened list as moving
   the index arithmetic to the caller. `None` means warm-up only — degenerate
-  cases follow their cited reference instead (a flat RSI window reads 100 per
-  TA-Lib's zero-average-loss guard, a zero-range stochastic window reads 0).
+  cases take a defined value instead: a dead-flat RSI window reads **0**,
+  guarding the sum of smoothed gain and loss exactly as TA-Lib's `ta_RSI.c`
+  does, while a monotone rise still reads 100. The stochastic and ADX
+  degenerate cases are documented at their sites together with the two places
+  the module and current TA-Lib differ.
 
   A period below 1, a negative `ind_shift`, unequal input lengths and
   negative volume all `fail(...)`; `tests_neg/indicators/` covers each, and
-  each probe asserts the length an *unguarded* implementation would return so
-  removing a guard turns the probe green and `--expect neg` flags it.
+  all four are non-vacuous — removing any one guard makes `--expect neg`
+  flag the file. Two do so by the intended mechanism (the probe asserts the
+  length an *unguarded* implementation would return, so it goes green); the
+  other two trip a `WRONG-DIAGNOSTIC` instead, because removing the guard
+  changes the failure rather than removing it.
 
   Verification is analytic first: `properties/indicators.ch` checks
   identities that hold by derivation (a constant series' EMA is that
@@ -53,10 +59,14 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   `ind_rolling_sum`/`mean`/`std`/`min`/`max`, `ind_shift` and `ind_diff` are
   generic time-series primitives that belong in Nautilus (`nautilus#85`).
   They carry the `ind_` prefix to mark them as borrowed and ship here only
-  because neither existing implementation serves `List[f64]`:
-  `Nautilus.TimeSeries` is an f32-tensor EWMA (`nautilus#70`, `shoals#72`)
-  and `Coral.Window` is f32-only and not a compiled lane (`coral#26`).
-  Delete this layer and re-export when `nautilus#85` lands.
+  because the rolling family exists in exactly one other place in the
+  ecosystem and that copy does not serve `List[f64]`: `Coral.Window` has the
+  five rolling reductions but only on `tensor[n, f32]`, and Coral is not a
+  compiled lane (`coral#26`). `Nautilus.TimeSeries` is not a second copy — it
+  has no rolling family at any width, only exponential smoothing and AR/ARMA
+  prediction (`nautilus#70`, `shoals#72`). So `ind_rolling_*` is the second
+  implementation of the reductions, and `ind_shift` / `ind_diff` duplicate
+  nothing at all. Delete this layer and re-export when `nautilus#85` lands.
 
 - Add a pinned, redacted secret scan for pull requests and branch pushes, with a manual full-history scan.
 

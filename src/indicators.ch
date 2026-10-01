@@ -218,13 +218,24 @@ def true_range(high: List[f64], low: List[f64], close: List[f64]) -> List[Option
 -- `SmoothEma` the alpha = 2/(n+1) scan, `SmoothSimple` the rolling mean.
 def atr(high: List[f64], low: List[f64], close: List[f64], n: i64, smoothing: Smoothing) -> List[Option[f64]] = ind_mask(ind_smooth_series(ind_true_range_series(high, low, close), ind_require_period(n), smoothing))
 -- RSI, Wilder 1978. Gains and losses are smoothed separately, then
--- RSI = 100 - 100/(1 + avg_gain/avg_loss). `SmoothWilder` is the
--- published definition.
+-- RSI = 100 * avg_gain / (avg_gain + avg_loss), which is Wilder's
+-- 100 - 100/(1 + RS) rearranged. `SmoothWilder` is the published
+-- definition.
 --
--- ZERO AVERAGE LOSS YIELDS 100, following TA-Lib's guard
--- (`if prevLoss == 0 then 100`). A flat series therefore reads 100, not
--- 50 and not NaN. That is the reference behaviour rather than this
--- module's invention, and it keeps `None` meaning warm-up only.
+-- NO MOVEMENT AT ALL YIELDS 0, which is TA-Lib's guard verbatim
+-- (`ta_RSI.c`: `tempValue1 = prevGain + prevLoss; if (tempValue1 > 0.0)
+-- outReal = 100.0 * (prevGain / tempValue1); else outReal = 0.0;`).
+-- A dead-flat window therefore reads 0, not 100 and not NaN, and `None`
+-- keeps meaning warm-up only.
+--
+-- The guard is on the SUM, not on the loss alone. Those differ only when
+-- gain and loss are BOTH zero, and there they land on opposite ends of
+-- the oscillator -- 0 against 100. An earlier revision of this module
+-- guarded the loss and returned 100 while citing TA-Lib for it; a
+-- dead-flat window is reachable mid-series on a halted or illiquid
+-- instrument, so that read as maximum overbought on a market that had not
+-- moved. A monotone rise still reads 100 here, because then the sum is
+-- positive and the division is the ordinary one.
 def rsi(close: List[f64], n: i64, smoothing: Smoothing) -> List[Option[f64]] = {
   nn = ind_require_period(n)
   m = len(close)
@@ -239,7 +250,7 @@ def rsi(close: List[f64], n: i64, smoothing: Smoothing) -> List[Option[f64]] = {
   one = ind_min_i64(cast(1, i64), m)
   avg_gain = ind_smooth_series(Series { values: gains, warmup: one }, nn, smoothing)
   avg_loss = ind_smooth_series(Series { values: losses, warmup: one }, nn, smoothing)
-  ind_mask(ind_zip_series(avg_gain, avg_loss, fn (g: f64, l: f64) -> if eq(l, cast(0.0, f64)) then cast(100.0, f64) else sub(cast(100.0, f64), div(cast(100.0, f64), add(cast(1.0, f64), div(g, l))))))
+  ind_mask(ind_zip_series(avg_gain, avg_loss, fn (g: f64, l: f64) -> if lt(cast(0.0, f64), add(g, l)) then mul(cast(100.0, f64), div(g, add(g, l))) else cast(0.0, f64)))
 }
 -- MACD, Appel. Returned as one tuple from one set of bindings so the line,
 -- the signal and the histogram cannot drift apart. Appel's original is
@@ -255,7 +266,7 @@ def macd(close: List[f64], fast: i64, slow: i64, signal: i64, seed: EmaSeed, alp
 }
 -- Bollinger bands. `mid` is the SMA and the bands sit k standard
 -- deviations out. Bollinger's definition is n = 20, k = 2 and the
--- POPULATION deviation; `DdofSample` narrows every band and nothing
+-- POPULATION deviation; `DdofSample` widens every band and nothing
 -- reports it, so the choice is explicit.
 def bollinger(close: List[f64], n: i64, k: f64, ddof: Ddof) -> (List[Option[f64]], List[Option[f64]], List[Option[f64]]) = {
   nn = ind_require_period(n)
@@ -273,8 +284,16 @@ def bollinger(close: List[f64], n: i64, k: f64, ddof: Ddof) -> (List[Option[f64]
 -- Stochastic oscillator, Lane. k = 100 * (c - min(low, k_n)) /
 -- (max(high, k_n) - min(low, k_n)); d is k smoothed over d_n.
 --
--- A ZERO RANGE YIELDS 0, following TA-Lib's `if diff != 0 ... else 0`
--- guard rather than dividing by zero.
+-- A ZERO RANGE YIELDS 0 rather than dividing by zero. TA-Lib reaches the
+-- same answer but NOT by this test: `ta_STOCH.c` guards with
+-- `TA_IS_ZERO_SCALED(highest - lowest, fabs(highest) + fabs(lowest))`, and
+-- its change history records the exact comparison used here AS the defect it
+-- fixed (fix #107, later scaled by #253). So a window that is flat to 15
+-- significant digits but carries a sub-epsilon rounding residue -- which
+-- ordinary price arithmetic produces, e.g. 0.1 + 0.2 against 0.3 -- reads as
+-- a FULL-RANGE window here and as a zero-range window in TA-Lib. Matching
+-- the scaled test is a dtype-aware epsilon decision, so it is tracked rather
+-- than guessed at: shoals#83 follow-up.
 def stochastic(high: List[f64], low: List[f64], close: List[f64], k_n: i64, d_n: i64, smoothing: Smoothing) -> (List[Option[f64]], List[Option[f64]]) = {
   kn = ind_require_period(k_n)
   dn = ind_require_period(d_n)
@@ -290,10 +309,18 @@ def stochastic(high: List[f64], low: List[f64], close: List[f64], k_n: i64, d_n:
   (ind_mask(kser), ind_mask(ind_smooth_series(kser, dn, smoothing)))
 }
 -- +DI / -DI from a Wilder-smoothed directional movement over a
--- Wilder-smoothed true range. A ZERO SMOOTHED RANGE YIELDS 0, following
--- TA-Lib's guard.
+-- Wilder-smoothed true range. A ZERO SMOOTHED RANGE YIELDS 0 here. TA-Lib
+-- does something different: `ta_ADX.c` wraps the whole DI/DX/ADX block in
+-- `if (prevTR > 0.0)` and SKIPS it, holding the previous ADX rather than
+-- emitting a value. The divergence needs a Wilder-smoothed true range of
+-- exactly 0.0, which decays geometrically and does not reach it, so no
+-- numerical difference has been demonstrated -- but the citation is stated
+-- as a difference rather than as parity.
 def ind_di(d: f64, t: f64) -> f64 = if eq(t, cast(0.0, f64)) then cast(0.0, f64) else mul(cast(100.0, f64), div(d, t))
--- DX = 100 * |+DI - -DI| / (+DI + -DI). A ZERO SUM YIELDS 0, per TA-Lib.
+-- DX = 100 * |+DI - -DI| / (+DI + -DI). A ZERO SUM YIELDS 0 here; TA-Lib
+-- again SKIPS the ADX update and holds `prevADX` (`!TA_IS_ZERO(tempReal)`),
+-- contributing 0 only inside its seed accumulation. Same reachability
+-- caveat as `ind_di`.
 def ind_dx(p: f64, q: f64) -> f64 = {
   s = add(p, q)
   if eq(s, cast(0.0, f64)) then cast(0.0, f64) else mul(cast(100.0, f64), div(abs(sub(p, q)), s))

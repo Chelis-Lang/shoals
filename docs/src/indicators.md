@@ -68,10 +68,30 @@ the caller the index arithmetic — which is where hand-written indicators
 actually go wrong. You cannot accidentally read a warm-up entry as a number
 here; the type will not let you.
 
-**`None` means warm-up and nothing else.** Degenerate cases follow the cited
-reference instead: a flat RSI window reads 100 (TA-Lib's zero-average-loss
-guard), a zero-range stochastic window reads 0, and a zero `+DI + -DI` gives
-`DX = 0`. Each is commented at its site in `src/indicators.ch`.
+**`None` means warm-up and nothing else.** Degenerate cases take a defined
+value instead: a dead-flat RSI window reads **0** (TA-Lib guards the *sum* of
+smoothed gain and loss and outputs 0 — a monotone rise still reads 100), a
+zero-range stochastic window reads 0, and a zero `+DI + -DI` gives `DX = 0`.
+Each is commented at its site in `src/indicators.ch`, including where the
+module and current TA-Lib differ: the stochastic guard is an exact zero test
+where TA-Lib uses a scaled epsilon, and ADX emits 0 where TA-Lib skips the
+update and holds the previous value.
+
+**Three cases reach a reported `Some` that is not an ordinary value**, and
+they are limitations rather than conventions:
+
+- `ind_rolling_std(xs, 1, DdofSample)` divides by `n - 1 = 0` and yields
+  `Some(NaN)`. pandas gives `NaN` here too, so it is reference-consistent,
+  but it is not guarded and `NaN` is not what "a defined value" promises.
+- `bollinger(..., k)` with `k < 0` swaps the bands, so `lower` exceeds
+  `upper`. The module traps negative volume and negative shifts; it does not
+  trap a negative `k`.
+- A non-finite input is position-dependent in `ind_rolling_min` /
+  `ind_rolling_max`: a window `[10, NaN, 12]` gives min 10 and max 12 (the
+  `NaN` is dropped), while `[NaN, 10, 12]` gives `NaN` for both, because the
+  fold seeds on the first element and `lt` is false against `NaN`. **Inputs
+  are assumed finite.** Guarding would need an O(n) scan per call and is a
+  shoals#83 follow-up, not a silent behaviour this page hides.
 
 Warm-up lengths:
 
@@ -143,11 +163,14 @@ def ind_diff(xs: List[f64], k: i64) -> List[Option[f64]]
 
 These are generic time-series primitives, not finance, and they belong in
 Nautilus — they are requested there as `nautilus#85`. They carry the `ind_`
-prefix to mark them as the borrowed layer, and they live here only because
-neither existing implementation serves `List[f64]`: `Nautilus.TimeSeries`
-ships an f32-tensor EWMA (`nautilus#70`, `shoals#72`) and `Coral.Window` is
-f32-only and not a compiled lane (`coral#26`). When `nautilus#85` lands, this
-layer should be deleted and re-exported.
+prefix to mark them as the borrowed layer, and they live here only because the rolling family exists in exactly one place in the ecosystem and that copy does not serve `List[f64]`: `Coral.Window` has the five rolling reductions but only on
+`tensor[n, f32]`, and Coral is not a compiled lane (`coral#26`).
+`Nautilus.TimeSeries` is **not** a second copy — it has no rolling family at
+any width, only exponential smoothing and AR/ARMA prediction (`nautilus#70`,
+`shoals#72`). So `ind_rolling_*` is the second implementation of the
+reductions, and `ind_shift` / `ind_diff` duplicate nothing at all: neither
+package has a shift, lag or diff. When `nautilus#85` lands, this layer should
+be deleted and re-exported.
 
 The rolling reductions re-sum every window rather than carrying a running
 total — `O(n*w)` where a running total is `O(n)`. That is deliberate: a
@@ -174,8 +197,10 @@ covers each one.
   they cannot be satisfied by a convention that was misunderstood on both
   sides.
 - Two properties assert **no look-ahead** by perturbing only the last input
-  and requiring every earlier output to be unchanged. That is a check on
-  behaviour, not on source reading.
+  and requiring every earlier output to be unchanged — a check on behaviour,
+  not on source reading. They cover `ema` and `rsi`. A red-team pass extended
+  the same technique to all ~16 exports with injected-look-ahead detectors
+  and found none, but only those two are pinned in the committed suite.
 - One property is negative: `wilder_rma_differs_from_span_ema` requires the
   two conflated alphas to be *distinguishable*. Without it, every positive
   test would still pass if `rma` quietly used the span alpha — the exact

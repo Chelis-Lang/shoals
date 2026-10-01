@@ -1,7 +1,7 @@
 module Shoals.Tests.Indicators
 import Std.Test (assert_close, assert_eq)
 import Shoals.Indicators (sma, ema, rma, atr, rsi, macd, bollinger, stochastic, adx, donchian, cumulative_vwap, rolling_vwap, true_range, crossover, crossunder, ind_rolling_sum, ind_rolling_mean, ind_rolling_std, ind_rolling_min, ind_rolling_max, ind_shift, ind_diff, SeedFirstValue, SeedSma, AlphaSpan, AlphaWilder, SmoothWilder, SmoothEma, SmoothSimple, DdofPopulation, DdofSample)
-import Shoals.Properties.Indicators (opt_value_or, none_count, closed_form_ema_agrees, constant_series_ema_is_constant, monotone_up_rsi_is_hundred, monotone_down_rsi_is_zero, wilder_rma_differs_from_span_ema, ramp_sma_is_window_midpoint, bollinger_mid_equals_sma, bollinger_width_is_two_k_sigma, ddof_ratio_is_exact, atr_constant_range_recovers_range, ema_look_ahead_absent, rsi_look_ahead_absent, warmup_lengths_match_spec, crossover_silent_during_warmup, output_length_equals_input_length)
+import Shoals.Properties.Indicators (opt_value_or, none_count, algebra_agrees_at_both_rsi_guard_branches, true_range_agrees_with_textbook, alpha_formulas_match_their_definitions, closed_form_ema_agrees, constant_series_ema_is_constant, monotone_up_rsi_is_hundred, monotone_down_rsi_is_zero, wilder_rma_differs_from_span_ema, ramp_sma_is_window_midpoint, bollinger_mid_equals_sma, bollinger_width_is_two_k_sigma, ddof_ratio_is_exact, atr_constant_range_recovers_range, ema_look_ahead_absent, rsi_look_ahead_absent, warmup_lengths_match_spec, crossover_silent_during_warmup, output_length_equals_input_length)
 -- Executable suite for `Shoals.Indicators` (shoals#83).
 --
 -- TWO TIERS, and the second is the one that carries the weight.
@@ -43,6 +43,9 @@ def test_property_rsi_look_ahead_absent() -> unit ! { Test } = assert_close(to01
 def test_property_warmup_lengths_match_spec() -> unit ! { Test } = assert_close(to01(warmup_lengths_match_spec(close_series(), cast(4, i64))), cast(1.0, f64), tight(), "documented warm-up lengths hold (§2.15.4)")
 def test_property_output_length_equals_input_length() -> unit ! { Test } = assert_close(to01(output_length_equals_input_length(close_series(), cast(4, i64))), cast(1.0, f64), tight(), "every series export returns the input length")
 def test_property_crossover_silent_during_warmup() -> unit ! { Test } = assert_close(to01(crossover_silent_during_warmup(close_series(), cast(2, i64), cast(5, i64))), cast(1.0, f64), tight(), "no crossing is reported out of a warm-up")
+def test_property_rsi_algebra_agrees_at_both_guard_branches() -> unit ! { Test } = assert_close(to01(algebra_agrees_at_both_rsi_guard_branches(tight())), cast(1.0, f64), tight(), "shipped 100*(g/(g+l)) == Wilder's 100-100/(1+g/l) across both guard branches")
+def test_property_true_range_agrees_with_textbook() -> unit ! { Test } = assert_close(to01(true_range_agrees_with_textbook(high_series(), low_series(), close_series(), tight())), cast(1.0, f64), tight(), "shipped true_range == the pointwise textbook max")
+def test_property_alpha_formulas_match_their_definitions() -> unit ! { Test } = assert_close(to01(alpha_formulas_match_their_definitions(tight())), cast(1.0, f64), tight(), "span alpha == 2/(n+1) and Wilder alpha == 1/n, distinct for n > 1, at n = 1..29")
 -- Tier 2: negative parity. The conflated conventions must be distinguishable.
 def test_negative_wilder_rma_differs_from_span_ema() -> unit ! { Test } = assert_close(to01(wilder_rma_differs_from_span_ema(close_series(), cast(3, i64), cast(0.01, f64))), cast(1.0, f64), tight(), "rma (alpha=1/n) is NOT the span average (alpha=2/(n+1))")
 def test_negative_ema_seeding_is_observable() -> unit ! { Test } = {
@@ -99,7 +102,7 @@ def test_oracle_atr_three_variants() -> unit ! { Test } = {
 def test_oracle_rsi() -> unit ! { Test } = {
   wilder = rsi(close_series(), cast(3, i64), SmoothWilder)
   _ = assert_close(value_at(wilder, cast(3, i64)), cast(66.66666666666666, f64), cast(1e-10, f64), "rsi wilder[3]")
-  _ = assert_close(value_at(wilder, cast(11, i64)), cast(77.93025962040046, f64), cast(1e-10, f64), "rsi wilder[11]")
+  _ = assert_close(value_at(wilder, cast(11, i64)), cast(77.93025962040045, f64), cast(1e-10, f64), "rsi wilder[11]")
   assert_close(value_at(rsi(close_series(), cast(3, i64), SmoothSimple), cast(7, i64)), cast(100.0, f64), tight(), "rsi simple[7] == 100 (window all gains)")
 }
 def test_oracle_macd() -> unit ! { Test } = {
@@ -185,11 +188,17 @@ def test_edge_single_element_window_is_identity() -> unit ! { Test } = {
   _ = assert_eq(none_count(sma(close_series(), cast(1, i64))), cast(0, i64), "a window of 1 has no warm-up")
   assert_close(value_at(sma(close_series(), cast(1, i64)), cast(7, i64)), cast(14.0, f64), tight(), "sma(xs, 1) is xs")
 }
-def test_edge_flat_series_rsi_is_one_hundred() -> unit ! { Test } = {
+def test_edge_flat_series_rsi_is_zero() -> unit ! { Test } = {
   flat = [cast(5.0, f64), cast(5.0, f64), cast(5.0, f64), cast(5.0, f64), cast(5.0, f64), cast(5.0, f64)]
   out = rsi(flat, cast(3, i64), SmoothWilder)
   _ = assert_eq(none_count(out), cast(3, i64), "flat-series RSI still warms up for n")
-  assert_close(value_at(out, cast(5, i64)), cast(100.0, f64), tight(), "zero average loss reads 100, per TA-Lib's guard -- not 50 and not NaN")
+  assert_close(value_at(out, cast(5, i64)), cast(0.0, f64), tight(), "no movement at all reads 0, per TA-Lib's sum guard -- not 100, not 50, not NaN")
+}
+def test_edge_monotone_rise_rsi_is_one_hundred() -> unit ! { Test } = {
+  rising = [cast(100.0, f64), cast(101.0, f64), cast(102.0, f64), cast(103.0, f64), cast(104.0, f64), cast(105.0, f64)]
+  out = rsi(rising, cast(3, i64), SmoothWilder)
+  _ = assert_eq(none_count(out), cast(3, i64), "monotone-rise RSI warms up for n")
+  assert_close(value_at(out, cast(5, i64)), cast(100.0, f64), tight(), "a zero loss with a POSITIVE gain still reads 100 -- the other half of the sum guard")
 }
 def test_edge_zero_range_stochastic_is_zero() -> unit ! { Test } = {
   flat = [cast(7.0, f64), cast(7.0, f64), cast(7.0, f64), cast(7.0, f64), cast(7.0, f64)]

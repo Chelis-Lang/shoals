@@ -425,8 +425,12 @@ and look-ahead defects appear (nautilus#85). `Option[T]` is `@pin` in
 
 Warm-up lengths are part of the contract and are stated per function in
 `src/indicators.ch`. No export reads any input index greater than its
-own output index, which is the look-ahead property the properties suite
-checks directly rather than by inspection.
+own output index. Two properties check that directly rather than by
+inspection, by perturbing only the last input and requiring every earlier
+output to be unchanged; they cover `ema` and `rsi`. The requirement is
+stated for the whole surface, and a red-team pass confirmed it for every
+export with validated detectors, but the committed suite does not pin all
+of them.
 
 #### 2.15.3 Rolling layer (on loan from Nautilus)
 
@@ -434,11 +438,14 @@ checks directly rather than by inspection.
 `ind_rolling_min`, `ind_rolling_max`, `ind_shift` and `ind_diff` are
 generic time-series primitives, not finance. They belong in Nautilus and
 are requested there as nautilus#85. They live here, under an `ind_`
-prefix that marks them as the borrowed layer, because the two existing
-implementations do not serve `List[f64]`: `Nautilus.TimeSeries` ships an
-f32 tensor EWMA (nautilus#70, shoals#72) and `Coral.Window` is f32-only
-and not a compiled lane (coral#26). Delete this layer and re-export from
-Nautilus when nautilus#85 lands.
+prefix that marks them as the borrowed layer, because the rolling family exists in exactly one place in the ecosystem and that copy does not serve `List[f64]`:
+`Coral.Window` has `rolling_sum`, `rolling_mean`, `rolling_std`,
+`rolling_min` and `rolling_max`, but only on `tensor[n, f32]`, and Coral is
+not a compiled lane (coral#26). `Nautilus.TimeSeries` is not a second copy —
+it has no rolling family at any width, only exponential smoothing and
+AR/ARMA prediction (nautilus#70, shoals#72). `ind_shift` and `ind_diff`
+duplicate nothing: neither package has a shift, lag or diff. Delete this
+layer and re-export from Nautilus when nautilus#85 lands.
 
 The rolling reductions re-sum each window rather than carrying a running
 total. That is `O(n * w)` where a running total is `O(n)`, and it is the
@@ -468,9 +475,11 @@ choice made inside the function.
   previous close, and that is a `None`, not `h - l`.
 - **`atr(high, low, close, n, smoothing)`** — `smoothing` applied to
   `true_range`. All three measured variants are reachable and named.
-- **`rsi(close, n, smoothing)`** — `100 - 100 / (1 + RS)` with `RS` the
-  smoothed gain over the smoothed loss (Wilder 1978). `SmoothWilder`
-  is the published definition.
+- **`rsi(close, n, smoothing)`** — `100 * g / (g + l)` for smoothed gain
+  `g` and smoothed loss `l`, which is Wilder 1978's `100 - 100/(1 + RS)`
+  rearranged. `SmoothWilder` is the published definition. **No movement at
+  all reads 0**, guarding the sum exactly as TA-Lib's `ta_RSI.c` does; a
+  monotone rise still reads 100, because there the sum is positive.
 - **`macd(close, fast, slow, signal, seed, alpha)`** — returns
   `(line, signal_line, histogram)` in one pass so the three cannot
   drift apart. `line = ema(fast) - ema(slow)`,
@@ -483,15 +492,17 @@ choice made inside the function.
   `(k, d)`. `k = 100 * (c - min(low, k_n)) / (max(high, k_n) -
   min(low, k_n))`; `d` is `k` smoothed over `d_n` (Lane). A zero range
   is a defined case and is specified in the module, not left to
-  division by zero.
+  division by zero. The module tests the range for exact zero; TA-Lib
+  tests a scaled epsilon, so the two disagree on a sub-epsilon residue.
+  See the note at the site.
 - **`adx(high, low, close, n)`** — returns `(plus_di, minus_di, adx)`.
   Directional movement, Wilder-smoothed, then `DX` and `ADX = rma(DX)`
   (Wilder 1978). Wilder's smoothing is not a convention argument here
   because ADX is defined with it.
 - **`donchian(high, low, n)`** — returns `(lower, mid, upper)`, the
   rolling low, midpoint and high over `n`.
-- **`vwap_cumulative(price, volume)`** and
-  **`vwap_rolling(price, volume, n)`** — volume-weighted average price,
+- **`cumulative_vwap(price, volume)`** and
+  **`rolling_vwap(price, volume, n)`** — volume-weighted average price,
   from the start of the series and over a rolling window.
 - **`crossover(a, b)`** / **`crossunder(a, b)`** — `List[Option[bool]]`,
   true at `i` when `a` crosses `b` between `i-1` and `i`. `None`

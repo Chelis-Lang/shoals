@@ -9,13 +9,19 @@ disagreement rather than passing both sides.
 This is a SUPPORT oracle, not the acceptance oracle: it produces the decimals
 that the Chelis tests assert. The load-bearing checks in
 `properties/indicators.ch` are analytic identities (a constant series' EMA is
-that constant; a monotone-up RSI is exactly 100; ADX on a pure uptrend is
-exactly 100), which cannot agree with a shared misunderstanding the way a
-transcribed decimal can.
+that constant; a monotone-up RSI is exactly 100; an SMA over an arithmetic
+ramp is the window midpoint), which cannot agree with a shared
+misunderstanding the way a transcribed decimal can.
 
 Re-run after any kernel change and compare:
 
-    .venv/bin/python scripts/oracle_indicators.py
+    python3 scripts/oracle_indicators.py
+
+This script and its self-checks are standard-library only, and every other
+Python entry point in this repo is invoked as bare `python3` (8 call sites
+across `run_local_gate.py` and `ci.yml`), so that is the spelling here. The
+inherited Chelis contract asks for a uv-managed interpreter; that gap is
+repo-wide and pre-existing, not specific to this script.
 
 Warm-up positions print as `None` and correspond to `None` in the Chelis
 `List[Option[f64]]` outputs at the same index.
@@ -109,8 +115,9 @@ def true_range(high: list[float], low: list[float], close: list[float]) -> Serie
 
 
 def rsi(close: list[float], n: int, kind: str) -> Series:
-    """100 - 100/(1+avg_gain/avg_loss), Wilder 1978. Zero average loss reads
-    100, following TA-Lib's `if prevLoss == 0` guard."""
+    """100*avg_gain/(avg_gain+avg_loss), Wilder 1978 rearranged. TA-Lib guards
+    the SUM and outputs 0.0 when it is not positive (`ta_RSI.c`), so a
+    dead-flat window reads 0, not 100."""
     gains: Series = [None] + [max(close[i] - close[i - 1], 0.0) for i in range(1, len(close))]
     losses: Series = [None] + [max(close[i - 1] - close[i], 0.0) for i in range(1, len(close))]
     ag = smooth(gains, n, kind)
@@ -119,10 +126,12 @@ def rsi(close: list[float], n: int, kind: str) -> Series:
     for g, l in zip(ag, al):
         if g is None or l is None:
             out.append(None)
-        elif l == 0.0:
-            out.append(100.0)
+        elif g + l > 0.0:
+            # Grouped as TA-Lib writes it: 100.0 * (prevGain / tempValue1).
+            # (100*g)/(g+l) differs in the last bit and loses the exact 100.0.
+            out.append(100.0 * (g / (g + l)))
         else:
-            out.append(100.0 - 100.0 / (1.0 + g / l))
+            out.append(0.0)
     return out
 
 

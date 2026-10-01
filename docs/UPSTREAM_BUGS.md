@@ -410,9 +410,16 @@ in code that is CLOSED upstream but not sitting in §Archived.
       (shoals#83). These are generic time-series primitives, not finance; the
       `ind_` prefix marks them as a borrowed layer. No Shoals-facing behaviour
       is narrowed — the layer is complete for the indicators built on it. The
-      cost is duplication: this is the THIRD implementation of rolling
-      reductions in the ecosystem.
-    - **Why neither existing implementation serves:** `Nautilus.TimeSeries` is
+      cost is duplication, and it is narrower than it first looks: the rolling
+      family exists in exactly ONE other place in the ecosystem, so
+      `ind_rolling_*` is the SECOND implementation, and `ind_shift` / `ind_diff`
+      duplicate nothing at all — no package has a shift, lag or diff at any
+      width or shape. Measured 2026-10-01: zero defs matching
+      rolling|window|shift|lag|diff anywhere in nautilus 0.7.46 `src/`, and
+      `Coral.Window` exporting exactly `rolling_sum`, `rolling_mean`,
+      `rolling_std`, `rolling_min`, `rolling_max`, `ewm`.
+    - **Why the one existing copy does not serve, and why Nautilus is not a
+      second copy:** `Nautilus.TimeSeries` is
       f32 and tensor-shaped, per the declaration above. `Coral.Window` has
       rolling sum, mean, std, min, max and `ewm` already, but is f32-only AND
       not a compiled lane (coral#26), so it is not a path at either width.

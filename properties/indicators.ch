@@ -1,7 +1,7 @@
 module Shoals.Properties.Indicators
-import Shoals.Indicators (sma, ema, rma, atr, rsi, bollinger, crossover, ind_rolling_std, SeedFirstValue, SeedSma, AlphaSpan, AlphaWilder, SmoothWilder, SmoothSimple, DdofPopulation, DdofSample)
-import Shoals.References.Indicators (ema_closed_form_textbook)
-export (opt_value_or, none_count, max_abs_gap, gap_from_index, both, option_shape_gap, linear_ramp, flat_series, closed_form_ema_agrees, constant_series_ema_is_constant, monotone_up_rsi_is_hundred, monotone_down_rsi_is_zero, wilder_rma_differs_from_span_ema, ramp_sma_is_window_midpoint, bollinger_mid_equals_sma, bollinger_width_is_two_k_sigma, ddof_ratio_is_exact, atr_constant_range_recovers_range, ema_look_ahead_absent, rsi_look_ahead_absent, warmup_lengths_match_spec, crossover_silent_during_warmup, output_length_equals_input_length)
+import Shoals.Indicators (sma, ema, rma, atr, rsi, true_range, bollinger, crossover, ind_rolling_std, SeedFirstValue, SeedSma, AlphaSpan, AlphaWilder, SmoothWilder, SmoothSimple, DdofPopulation, DdofSample)
+import Shoals.References.Indicators (ema_closed_form_textbook, rsi_from_smoothed_averages, true_range_textbook, span_alpha_textbook, wilder_alpha_textbook)
+export (opt_value_or, none_count, max_abs_gap, gap_from_index, both, option_shape_gap, algebra_agrees_at_both_rsi_guard_branches, true_range_agrees_with_textbook, alpha_formulas_match_their_definitions, linear_ramp, flat_series, closed_form_ema_agrees, constant_series_ema_is_constant, monotone_up_rsi_is_hundred, monotone_down_rsi_is_zero, wilder_rma_differs_from_span_ema, ramp_sma_is_window_midpoint, bollinger_mid_equals_sma, bollinger_width_is_two_k_sigma, ddof_ratio_is_exact, atr_constant_range_recovers_range, ema_look_ahead_absent, rsi_look_ahead_absent, warmup_lengths_match_spec, crossover_silent_during_warmup, output_length_equals_input_length)
 -- Properties for `Shoals.Indicators`. Two kinds, and the distinction
 -- matters for what they are worth as evidence:
 --
@@ -137,14 +137,22 @@ def bollinger_width_is_two_k_sigma(xs: List[f64], n: i64, k: f64, ddof_pop: bool
   m = len(xs)
   bands = if ddof_pop then bollinger(xs, n, k, DdofPopulation) else bollinger(xs, n, k, DdofSample)
   dev = if ddof_pop then ind_rolling_std(xs, n, DdofPopulation) else ind_rolling_std(xs, n, DdofSample)
+  warm = sub(n, cast(1, i64))
   gap = fold(fn (acc: f64, i: i64) -> {
     lo = opt_value_or(index(bands.0, i), cast(0.0, f64))
     hi = opt_value_or(index(bands.2, i), cast(0.0, f64))
     s = opt_value_or(index(dev, i), cast(0.0, f64))
     g = abs(sub(sub(hi, lo), mul(mul(cast(2.0, f64), k), s)))
     if lt(acc, g) then g else acc
-  }, cast(0.0, f64), range(cast(0, i64), m))
-  lt(gap, tol)
+  }, cast(0.0, f64), range(warm, m))
+  -- Shape companion. Without it this property is vacuous under an all-`None`
+  -- regression: `opt_value_or` reads every absent band and deviation as 0.0,
+  -- so `(0 - 0) - 2k*0` is 0 and the width "agrees" everywhere. A red-team
+  -- pass confirmed exactly that -- forcing `bollinger` and `ind_rolling_std`
+  -- to return all-`None` left this property PASSING. Same trap as the one
+  -- the note above `gap_from_index` describes; three of ten properties did
+  -- not get the fix the first time round.
+  both(eq(none_count(dev), warm), both(eq(none_count(bands.0), warm), both(eq(none_count(bands.2), warm), lt(gap, tol))))
 }
 -- ANALYTIC. The population and sample deviations of the same window differ
 -- by exactly sqrt(n/(n-1)). This is the `Ddof` axis being real rather than
@@ -155,13 +163,19 @@ def ddof_ratio_is_exact(xs: List[f64], n: i64, tol: f64) -> bool = {
   pop = ind_rolling_std(xs, n, DdofPopulation)
   samp = ind_rolling_std(xs, n, DdofSample)
   expected = sqrt(div(cast(n, f64), cast(sub(n, cast(1, i64)), f64)))
+  warm = sub(n, cast(1, i64))
   gap = fold(fn (acc: f64, i: i64) -> {
     p = opt_value_or(index(pop, i), cast(0.0, f64))
     s = opt_value_or(index(samp, i), cast(0.0, f64))
     g = if lt(p, cast(1e-10, f64)) then cast(0.0, f64) else abs(sub(div(s, p), expected))
     if lt(acc, g) then g else acc
-  }, cast(0.0, f64), range(cast(0, i64), m))
-  lt(gap, tol)
+  }, cast(0.0, f64), range(warm, m))
+  -- Shape companion, and this one needed it twice over: the `p < 1e-10` skip
+  -- above silently exempts every index whose deviation is absent, because
+  -- `opt_value_or` reads `None` as 0.0. Under an all-`None` regression every
+  -- index was skipped and the property still PASSED (confirmed by a red-team
+  -- mutation). The counts are what make the skip safe.
+  both(eq(none_count(pop), warm), both(eq(none_count(samp), warm), lt(gap, tol)))
 }
 -- ANALYTIC. With a constant bar range r and each close equal to the
 -- previous close, every true range is exactly r, so any smoothing of it is
@@ -220,3 +234,46 @@ def crossover_silent_during_warmup(xs: List[f64], fast: i64, slow: i64) -> bool 
     | None => true
   } else false, true, range(cast(0, i64), warm))
 }
+-- CROSS-CHECKS that `references/indicators.ch` claims to provide. Until a
+-- red-team pass pointed it out, four of that file's six exports had no
+-- consumer anywhere, so the "agreement checks the algebra, not the
+-- transcription" line in its own header described a check that did not
+-- exist -- and its RSI entry encoded the same misreading of TA-Lib's guard
+-- that the shipped kernel had, so wiring it up unchanged would not have
+-- caught that either. Both are fixed, and both are exercised below.
+-- The shipped kernel evaluates `100*(g/(g+l))`, TA-Lib's grouping. The
+-- reference evaluates Wilder's `100 - 100/(1 + g/l)`. Equal whenever l > 0,
+-- and the grid straddles BOTH guard branches: all-zero (reads 0) and
+-- zero-loss-with-positive-gain (reads 100).
+def algebra_agrees_at_both_rsi_guard_branches(tol: f64) -> bool = {
+  gains = [cast(0.0, f64), cast(0.5, f64), cast(1.0, f64), cast(7.25, f64), cast(100.0, f64)]
+  losses = [cast(0.0, f64), cast(0.25, f64), cast(1.0, f64), cast(3.5, f64), cast(99.0, f64)]
+  fold(fn (acc: bool, pair: (f64, f64)) -> {
+    g = pair.0
+    l = pair.1
+    shipped = if lt(cast(0.0, f64), add(g, l)) then mul(cast(100.0, f64), div(g, add(g, l))) else cast(0.0, f64)
+    if acc then lt(abs(sub(shipped, rsi_from_smoothed_averages(g, l))), tol) else false
+  }, true, flat_map(fn (g: f64) -> map(fn (l: f64) -> (g, l), losses), gains))
+}
+def ind_min_one(m: i64) -> i64 = if lt(m, cast(1, i64)) then m else cast(1, i64)
+-- Pointwise true range against the textbook max, every index past warm-up.
+def true_range_agrees_with_textbook(high: List[f64], low: List[f64], close: List[f64], tol: f64) -> bool = {
+  m = len(close)
+  shipped = true_range(high, low, close)
+  gap = fold(fn (acc: f64, i: i64) -> {
+    reference = true_range_textbook(index(high, i), index(low, i), index(close, sub(i, cast(1, i64))))
+    g = abs(sub(opt_value_or(index(shipped, i), cast(0.0, f64)), reference))
+    if lt(acc, g) then g else acc
+  }, cast(0.0, f64), range(cast(1, i64), m))
+  both(eq(none_count(shipped), ind_min_one(m)), lt(gap, tol))
+}
+-- The two alphas against their stated formulas and against each other.
+def alpha_formulas_match_their_definitions(tol: f64) -> bool =
+  fold(fn (acc: bool, n: i64) -> {
+    span = span_alpha_textbook(n)
+    wilder = wilder_alpha_textbook(n)
+    ok_span = lt(abs(sub(span, div(cast(2.0, f64), cast(add(n, cast(1, i64)), f64)))), tol)
+    ok_wilder = lt(abs(sub(wilder, div(cast(1.0, f64), cast(n, f64)))), tol)
+    distinct = if eq(n, cast(1, i64)) then true else lt(tol, abs(sub(span, wilder)))
+    if acc then both(ok_span, both(ok_wilder, distinct)) else false
+  }, true, range(cast(1, i64), cast(30, i64)))
