@@ -509,7 +509,27 @@ choice made inside the function.
   wherever either input is `None` at `i` or `i-1`, so a crossing is
   never reported out of a warm-up.
 
-#### 2.15.5 Out-of-domain inputs trap
+#### 2.15.5 Tensor-accepting forms
+
+Every function in §2.15.4 has a tensor-accepting form, named by prepending
+`tensor_` to the list name with no exceptions, so the name is derivable by
+rule. They take `tensor[n, f64]` and return exactly what their list
+counterparts return.
+
+**The return type stays `List[Option[f64]]`.** §2.15.2's requirement is a
+representation a caller cannot misread, and a tensor cannot express it: a
+tensor element is a precision type, so `tensor[n, Option[f64]]` does not
+exist. A tensor return would need a separate count or a NaN fill, which are
+the two forms §2.15.2 rejects. The tensor admitted here is the input.
+
+`crossover` and `crossunder` consume masked series, so their tensor forms take
+each side's warm-up as a required parameter. A required parameter cannot be
+dropped, which is the property the rejected `valid_from` return lacked.
+
+The 1:1 correspondence between the two surfaces is a contract invariant and is
+enforced mechanically, not by inspection.
+
+#### 2.15.6 Out-of-domain inputs trap
 
 A window or period below 1, and a multi-series call whose inputs have
 unequal lengths, are domain errors and `fail(...)`. They are not

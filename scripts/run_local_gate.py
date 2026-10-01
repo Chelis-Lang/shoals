@@ -27,7 +27,12 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
      it authoritatively on every PR.
   9. ``scripts/contract_gate.py`` — offline manifest resolvability + pin
       freshness (also a per-PR CI gate).
-  10. ``scripts/test_check_package_prove_latency.py`` — negative-parity tests
+  10. ``scripts/check_tensor_surface_parity.py`` — the list/tensor export
+      parity guard for ``Shoals.Indicators`` (shoals#83): every series-taking
+      export has a ``tensor_`` counterpart derivable by the naming rule, and
+      every ``tensor_`` export is exercised by the equivalence suite. Offline,
+      instant, stdlib-only.
+  11. ``scripts/test_check_package_prove_latency.py`` — negative-parity tests
       for the chelis#924 release oracle.
   11. ``scripts/test_risk_invariant_gate.py`` — adversarial compiler-evidence
       and risk-family non-vacuity tests.
@@ -193,6 +198,10 @@ def main() -> int:
         (
             "contract_gate (offline manifest resolvability + pin freshness)",
             ["python3", "scripts/contract_gate.py"],
+        ),
+        (
+            "Shoals.Indicators list/tensor surface parity (shoals#83)",
+            ["python3", "scripts/check_tensor_surface_parity.py"],
         ),
         (
             "chelis#924 latency-oracle unit tests",

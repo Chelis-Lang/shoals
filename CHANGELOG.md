@@ -111,6 +111,20 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   `scripts/oracle_indicators.py` re-derives every series in Python from the
   cited definitions with no shared code.
 
+  **Every function also has a tensor-accepting form**, named by prepending
+  `tensor_` to the list name with no exceptions so the name is derivable by
+  rule (shoals#83's "accept `List[f64]` or `tensor[n, f64]`" bullet). They
+  return `List[Option[f64]]`, not a tensor: a tensor element must be a
+  precision type, so `tensor[n, Option[f64]]` does not exist and a tensor
+  return would have to carry the warm-up as a droppable count or a silently
+  propagating NaN fill — the two forms this module rejects. `tensor_crossover`
+  and `tensor_crossunder` take each side's warm-up as a required parameter,
+  which is safe inbound for the same reason the count was unsafe outbound: a
+  required parameter cannot be dropped. `tests/indicators_tensor.ch` pins each
+  variant against its list form with exact equality, and
+  `scripts/check_tensor_surface_parity.py` enforces the 1:1 correspondence as
+  a gate stage.
+
   `ind_rolling_sum`/`mean`/`std`/`min`/`max`, `ind_shift` and `ind_diff` are
   generic time-series primitives that belong in Nautilus (`nautilus#85`).
   They carry the `ind_` prefix to mark them as borrowed and ship here only

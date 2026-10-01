@@ -1,0 +1,112 @@
+module Shoals.Tests.IndicatorsTensor
+import Std.Test (assert_close, assert_eq)
+import Shoals.Indicators (sma, ema, rma, true_range, atr, rsi, macd, bollinger, stochastic, adx, donchian, cumulative_vwap, rolling_vwap, crossover, crossunder, ind_rolling_sum, ind_rolling_mean, ind_rolling_std, ind_rolling_min, ind_rolling_max, ind_shift, ind_diff, tensor_sma, tensor_ema, tensor_rma, tensor_true_range, tensor_atr, tensor_rsi, tensor_macd, tensor_bollinger, tensor_stochastic, tensor_adx, tensor_donchian, tensor_cumulative_vwap, tensor_rolling_vwap, tensor_crossover, tensor_crossunder, tensor_ind_rolling_sum, tensor_ind_rolling_mean, tensor_ind_rolling_std, tensor_ind_rolling_min, tensor_ind_rolling_max, tensor_ind_shift, tensor_ind_diff, SeedFirstValue, SeedSma, AlphaSpan, AlphaWilder, SmoothWilder, SmoothSimple, DdofPopulation, DdofSample)
+import Shoals.Properties.Indicators (expect_from)
+-- Every tensor-accepting variant must be IDENTICAL to its list counterpart,
+-- not merely close: it delegates to the same kernel after one `to_list`, so
+-- any difference at all means the delegation is wrong. Exact equality is the
+-- assertion that catches a mis-wired variant -- `tensor_rsi` calling `atr`
+-- would still produce plausible numbers, and a tolerance would hide it.
+--
+-- There are 22 exported variants and a check below for every one of them.
+-- That correspondence is NOT asserted here -- Chelis cannot enumerate its own
+-- exports at run time, so a test in this file can only check the names it
+-- already mentions, which is exactly what goes stale when a 23rd export is
+-- added. `scripts/check_tensor_surface_parity.py` does the enumeration over
+-- the source instead, and runs as a gate stage.
+def identical(a: List[Option[f64]], b: List[Option[f64]]) -> bool = {
+  m = len(a)
+  if eq(len(b), m) then fold(fn (acc: bool, i: i64) -> if acc then match (index(a, i), index(b, i)) with {
+    | (Some(x), Some(y)) => eq(x, y)
+    | (None, None) => true
+    | _ => false
+  } else false, true, range(cast(0, i64), m)) else false
+}
+def identical_bool(a: List[Option[bool]], b: List[Option[bool]]) -> bool = {
+  m = len(a)
+  if eq(len(b), m) then fold(fn (acc: bool, i: i64) -> if acc then match (index(a, i), index(b, i)) with {
+    | (Some(x), Some(y)) => eq(x, y)
+    | (None, None) => true
+    | _ => false
+  } else false, true, range(cast(0, i64), m)) else false
+}
+def to01(b: bool) -> f64 = if b then cast(1.0, f64) else cast(0.0, f64)
+def tight() -> f64 = cast(1e-12, f64)
+def series_high() -> List[f64] = [cast(10.5, f64), cast(11.5, f64), cast(12.5, f64), cast(11.8, f64), cast(10.4, f64), cast(11.6, f64), cast(13.4, f64), cast(14.2, f64), cast(13.5, f64), cast(12.6, f64), cast(14.3, f64), cast(15.4, f64)]
+def series_low() -> List[f64] = [cast(9.6, f64), cast(10.4, f64), cast(11.3, f64), cast(10.7, f64), cast(9.5, f64), cast(10.2, f64), cast(11.9, f64), cast(13.1, f64), cast(12.4, f64), cast(11.6, f64), cast(12.9, f64), cast(14.1, f64)]
+def series_close() -> List[f64] = [cast(10.0, f64), cast(11.0, f64), cast(12.0, f64), cast(11.0, f64), cast(10.0, f64), cast(11.0, f64), cast(13.0, f64), cast(14.0, f64), cast(13.0, f64), cast(12.0, f64), cast(14.0, f64), cast(15.0, f64)]
+def series_volume() -> List[f64] = [cast(100.0, f64), cast(150.0, f64), cast(120.0, f64), cast(180.0, f64), cast(90.0, f64), cast(110.0, f64), cast(200.0, f64), cast(160.0, f64), cast(140.0, f64), cast(130.0, f64), cast(170.0, f64), cast(190.0, f64)]
+def series_high_tensor() -> tensor[12, f64] = to_tensor(series_high())
+def series_low_tensor() -> tensor[12, f64] = to_tensor(series_low())
+def series_close_tensor() -> tensor[12, f64] = to_tensor(series_close())
+def series_volume_tensor() -> tensor[12, f64] = to_tensor(series_volume())
+def w() -> i64 = cast(3, i64)
+def test_tensor_rolling_layer_matches_list() -> unit ! { Test } = {
+  _ = assert_close(to01(identical(tensor_ind_rolling_sum(series_close_tensor(), w()), ind_rolling_sum(series_close(), w()))), cast(1.0, f64), tight(), "tensor_ind_rolling_sum")
+  _ = assert_close(to01(identical(tensor_ind_rolling_mean(series_close_tensor(), w()), ind_rolling_mean(series_close(), w()))), cast(1.0, f64), tight(), "tensor_ind_rolling_mean")
+  _ = assert_close(to01(identical(tensor_ind_rolling_std(series_close_tensor(), w(), DdofPopulation), ind_rolling_std(series_close(), w(), DdofPopulation))), cast(1.0, f64), tight(), "tensor_ind_rolling_std population")
+  _ = assert_close(to01(identical(tensor_ind_rolling_std(series_close_tensor(), w(), DdofSample), ind_rolling_std(series_close(), w(), DdofSample))), cast(1.0, f64), tight(), "tensor_ind_rolling_std sample")
+  _ = assert_close(to01(identical(tensor_ind_rolling_min(series_close_tensor(), w()), ind_rolling_min(series_close(), w()))), cast(1.0, f64), tight(), "tensor_ind_rolling_min")
+  _ = assert_close(to01(identical(tensor_ind_rolling_max(series_close_tensor(), w()), ind_rolling_max(series_close(), w()))), cast(1.0, f64), tight(), "tensor_ind_rolling_max")
+  _ = assert_close(to01(identical(tensor_ind_shift(series_close_tensor(), cast(2, i64)), ind_shift(series_close(), cast(2, i64)))), cast(1.0, f64), tight(), "tensor_ind_shift")
+  assert_close(to01(identical(tensor_ind_diff(series_close_tensor(), cast(1, i64)), ind_diff(series_close(), cast(1, i64)))), cast(1.0, f64), tight(), "tensor_ind_diff")
+}
+def test_tensor_averages_match_list() -> unit ! { Test } = {
+  _ = assert_close(to01(identical(tensor_sma(series_close_tensor(), w()), sma(series_close(), w()))), cast(1.0, f64), tight(), "tensor_sma")
+  _ = assert_close(to01(identical(tensor_ema(series_close_tensor(), w(), SeedFirstValue, AlphaSpan), ema(series_close(), w(), SeedFirstValue, AlphaSpan))), cast(1.0, f64), tight(), "tensor_ema pandas seeding")
+  _ = assert_close(to01(identical(tensor_ema(series_close_tensor(), w(), SeedSma, AlphaWilder), ema(series_close(), w(), SeedSma, AlphaWilder))), cast(1.0, f64), tight(), "tensor_ema Wilder")
+  assert_close(to01(identical(tensor_rma(series_close_tensor(), w()), rma(series_close(), w()))), cast(1.0, f64), tight(), "tensor_rma")
+}
+def test_tensor_range_indicators_match_list() -> unit ! { Test } = {
+  _ = assert_close(to01(identical(tensor_true_range(series_high_tensor(), series_low_tensor(), series_close_tensor()), true_range(series_high(), series_low(), series_close()))), cast(1.0, f64), tight(), "tensor_true_range")
+  _ = assert_close(to01(identical(tensor_atr(series_high_tensor(), series_low_tensor(), series_close_tensor(), w(), SmoothWilder), atr(series_high(), series_low(), series_close(), w(), SmoothWilder))), cast(1.0, f64), tight(), "tensor_atr Wilder")
+  assert_close(to01(identical(tensor_rsi(series_close_tensor(), w(), SmoothWilder), rsi(series_close(), w(), SmoothWilder))), cast(1.0, f64), tight(), "tensor_rsi")
+}
+def test_tensor_tuple_indicators_match_list() -> unit ! { Test } = {
+  tm = tensor_macd(series_close_tensor(), cast(2, i64), cast(4, i64), w(), SeedFirstValue, AlphaSpan)
+  lm = macd(series_close(), cast(2, i64), cast(4, i64), w(), SeedFirstValue, AlphaSpan)
+  _ = assert_close(to01(identical(tm.0, lm.0)), cast(1.0, f64), tight(), "tensor_macd line")
+  _ = assert_close(to01(identical(tm.1, lm.1)), cast(1.0, f64), tight(), "tensor_macd signal")
+  _ = assert_close(to01(identical(tm.2, lm.2)), cast(1.0, f64), tight(), "tensor_macd histogram")
+  tb = tensor_bollinger(series_close_tensor(), cast(4, i64), cast(2.0, f64), DdofPopulation)
+  lb = bollinger(series_close(), cast(4, i64), cast(2.0, f64), DdofPopulation)
+  _ = assert_close(to01(identical(tb.0, lb.0)), cast(1.0, f64), tight(), "tensor_bollinger lower")
+  _ = assert_close(to01(identical(tb.1, lb.1)), cast(1.0, f64), tight(), "tensor_bollinger mid")
+  _ = assert_close(to01(identical(tb.2, lb.2)), cast(1.0, f64), tight(), "tensor_bollinger upper")
+  ts = tensor_stochastic(series_high_tensor(), series_low_tensor(), series_close_tensor(), w(), w(), SmoothSimple)
+  ls = stochastic(series_high(), series_low(), series_close(), w(), w(), SmoothSimple)
+  _ = assert_close(to01(identical(ts.0, ls.0)), cast(1.0, f64), tight(), "tensor_stochastic k")
+  _ = assert_close(to01(identical(ts.1, ls.1)), cast(1.0, f64), tight(), "tensor_stochastic d")
+  ta = tensor_adx(series_high_tensor(), series_low_tensor(), series_close_tensor(), w())
+  la = adx(series_high(), series_low(), series_close(), w())
+  _ = assert_close(to01(identical(ta.0, la.0)), cast(1.0, f64), tight(), "tensor_adx plus_di")
+  _ = assert_close(to01(identical(ta.1, la.1)), cast(1.0, f64), tight(), "tensor_adx minus_di")
+  _ = assert_close(to01(identical(ta.2, la.2)), cast(1.0, f64), tight(), "tensor_adx adx")
+  td = tensor_donchian(series_high_tensor(), series_low_tensor(), w())
+  ld = donchian(series_high(), series_low(), w())
+  _ = assert_close(to01(identical(td.0, ld.0)), cast(1.0, f64), tight(), "tensor_donchian lower")
+  _ = assert_close(to01(identical(td.1, ld.1)), cast(1.0, f64), tight(), "tensor_donchian mid")
+  assert_close(to01(identical(td.2, ld.2)), cast(1.0, f64), tight(), "tensor_donchian upper")
+}
+def test_tensor_vwap_matches_list() -> unit ! { Test } = {
+  _ = assert_close(to01(identical(tensor_cumulative_vwap(series_close_tensor(), series_volume_tensor()), cumulative_vwap(series_close(), series_volume()))), cast(1.0, f64), tight(), "tensor_cumulative_vwap")
+  assert_close(to01(identical(tensor_rolling_vwap(series_close_tensor(), series_volume_tensor(), w()), rolling_vwap(series_close(), series_volume(), w()))), cast(1.0, f64), tight(), "tensor_rolling_vwap")
+}
+-- The crossover pair is the one place the tensor form takes an argument the
+-- list form does not, so its equivalence must be stated against an EXPLICITLY
+-- masked list input rather than against a bare series.
+def test_tensor_crossover_matches_explicitly_masked_list() -> unit ! { Test } = {
+  fast_w = cast(1, i64)
+  slow_w = cast(4, i64)
+  fast_masked = expect_from(series_close(), fast_w)
+  slow_masked = expect_from(series_high(), slow_w)
+  _ = assert_close(to01(identical_bool(tensor_crossover(series_close_tensor(), fast_w, series_high_tensor(), slow_w), crossover(fast_masked, slow_masked))), cast(1.0, f64), tight(), "tensor_crossover == crossover over the same masks")
+  assert_close(to01(identical_bool(tensor_crossunder(series_close_tensor(), fast_w, series_high_tensor(), slow_w), crossunder(expect_from(series_close(), fast_w), expect_from(series_high(), slow_w)))), cast(1.0, f64), tight(), "tensor_crossunder == crossunder over the same masks")
+}
+-- A wrong warm-up argument must change the answer, else the parameter is
+-- decoration and callers could pass anything.
+def test_tensor_crossover_warmup_argument_is_load_bearing() -> unit ! { Test } = {
+  honest = tensor_crossover(series_close_tensor(), cast(4, i64), series_high_tensor(), cast(4, i64))
+  understated = tensor_crossover(series_close_tensor(), cast(0, i64), series_high_tensor(), cast(0, i64))
+  assert_close(to01(identical_bool(honest, understated)), cast(0.0, f64), tight(), "a different warm-up must give a different verdict series -- otherwise the parameter is ignored")
+}
