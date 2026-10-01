@@ -48,24 +48,24 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
 (scheduled, NOT per-PR) — run this at least once at a pin bump
 (``AGENTS.md`` §Pin Bump Checklist) or before a release tag:
 
-  14. ``chelis test tests/ --timeout 1200 --suite-timeout 2400 --jobs auto`` — the fast unit
+  16. ``chelis test tests/ --timeout 1200 --suite-timeout 2400 --jobs auto`` — the fast unit
       suite (nightly in CI). The suite budget was raised from 1500s at the
       0.18.6 pin to work around chelis#1391, which is OPEN upstream -- a
       narrowing, not a fix; keep it byte-aligned with the hosted nightly step.
-  15. The weekly nightly ``heavy`` matrix, one ``tests-manual/<file>.ch`` at
+  17. The weekly nightly ``heavy`` matrix, one ``tests-manual/<file>.ch`` at
       a time with ``--timeout 1500 --suite-timeout 1650 --jobs 1``. This
       explicitly raises Chelis 0.17.4's separate 600-second whole-suite
       watchdog without weakening any test oracle. It deliberately excludes
       ``modelfit_bfgs_heavy`` pending chelis#408, exactly like hosted nightly;
       an all-directory batch both over-scopes the release gate and hits the
       compiler's whole-suite timeout before completing the reviewed matrix.
-  16. ``scripts/prove_gate.py`` — the keystone canon self-audit against
+  18. ``scripts/prove_gate.py`` — the keystone canon self-audit against
       the release binary (real SMT, ~8.6 min; nightly in CI).
-  17. ``scripts/check_package_prove_latency.py`` — the chelis#924 release
+  19. ``scripts/check_package_prove_latency.py`` — the chelis#924 release
       oracle: install the just-built Shoals candidate, then require a cold
       trivial package prove in <=20s and an unchanged warm prove in <=5s with
       byte-identical NDJSON.
-  18. ``scripts/check_release_artifact_determinism.py`` — two fresh isolated
+  20. ``scripts/check_release_artifact_determinism.py`` — two fresh isolated
       registries (mixed-case manual preseed versus clean canonical) must emit
       byte-identical lock, CHB, and archive payloads despite chelis#1002.
 

@@ -24,7 +24,7 @@ TWO LEGS, AND ONLY ONE OF THEM IS SOUND. Read this before trusting a green.
      here. It pattern-matches the test source for the name inside an
      `identical(`/`identical_bool(` argument. Source text can always be
      arranged to satisfy a pattern without asserting anything, and two
-     red-team rounds demonstrated four such spellings: a whole-line `--`
+     red-team rounds demonstrated five such spellings: a whole-line `--`
      comment (round 1), then a nestable `{- -}` block comment, a trailing
      inline comment, a string literal, and a call bound with `_ =` and never
      asserted (round 2). Each fix was followed by another spelling, which is

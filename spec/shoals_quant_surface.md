@@ -516,9 +516,16 @@ prepending `tensor_` to the list name with no exceptions, so the name is
 derivable by rule. They take `tensor[n, f64]` and return exactly what their
 list counterparts return.
 
-**The return type stays `List[Option[f64]]`.** §2.15.2 requires a
-representation a caller cannot misread. Each tensor-return shape that has been
-proposed fails one of §2.15.2's three grounds, and they are different grounds:
+A tensor form's result preserves its list counterpart's type in full,
+structure and element type included. Each numeric result series keeps its
+`Option[f64]` mask; `crossover` and `crossunder` keep `List[Option[bool]]`; and
+a list form that returns a tuple of series has a tensor form that returns the
+same tuple of the same arity. Masked-series length equals the input length per
+§2.15.2.
+
+**No tensor form returns a tensor.** §2.15.2 requires a representation a caller
+cannot misread. Each tensor-return shape that has been proposed fails one of
+§2.15.2's grounds, and they are different grounds:
 
 - A *sibling* channel — a scalar count, a parallel validity tensor, a record
   field, a tuple component — is **droppable**: a caller reads one component and
