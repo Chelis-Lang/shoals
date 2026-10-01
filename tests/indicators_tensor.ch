@@ -32,8 +32,8 @@ def identical_bool(a: List[Option[bool]], b: List[Option[bool]]) -> bool = {
 }
 def to01(b: bool) -> f64 = if b then cast(1.0, f64) else cast(0.0, f64)
 def tight() -> f64 = cast(1e-12, f64)
-def series_high() -> List[f64] = [cast(10.5, f64), cast(11.5, f64), cast(12.5, f64), cast(11.8, f64), cast(10.4, f64), cast(11.6, f64), cast(13.4, f64), cast(14.2, f64), cast(13.5, f64), cast(12.6, f64), cast(14.3, f64), cast(15.4, f64)]
-def series_low() -> List[f64] = [cast(9.6, f64), cast(10.4, f64), cast(11.3, f64), cast(10.7, f64), cast(9.5, f64), cast(10.2, f64), cast(11.9, f64), cast(13.1, f64), cast(12.4, f64), cast(11.6, f64), cast(12.9, f64), cast(14.1, f64)]
+def series_high() -> List[f64] = [cast(10.5, f64), cast(11.5, f64), cast(13.0, f64), cast(11.8, f64), cast(10.4, f64), cast(11.6, f64), cast(13.4, f64), cast(14.2, f64), cast(13.5, f64), cast(12.6, f64), cast(14.3, f64), cast(15.4, f64)]
+def series_low() -> List[f64] = [cast(9.6, f64), cast(10.4, f64), cast(9.0, f64), cast(10.7, f64), cast(9.5, f64), cast(10.2, f64), cast(11.9, f64), cast(13.1, f64), cast(12.4, f64), cast(11.6, f64), cast(12.9, f64), cast(14.1, f64)]
 def series_close() -> List[f64] = [cast(10.0, f64), cast(11.0, f64), cast(12.0, f64), cast(11.0, f64), cast(10.0, f64), cast(11.0, f64), cast(13.0, f64), cast(14.0, f64), cast(13.0, f64), cast(12.0, f64), cast(14.0, f64), cast(15.0, f64)]
 def series_volume() -> List[f64] = [cast(100.0, f64), cast(150.0, f64), cast(120.0, f64), cast(180.0, f64), cast(90.0, f64), cast(110.0, f64), cast(200.0, f64), cast(160.0, f64), cast(140.0, f64), cast(130.0, f64), cast(170.0, f64), cast(190.0, f64)]
 def series_high_tensor() -> tensor[12, f64] = to_tensor(series_high())
@@ -41,6 +41,21 @@ def series_low_tensor() -> tensor[12, f64] = to_tensor(series_low())
 def series_close_tensor() -> tensor[12, f64] = to_tensor(series_close())
 def series_volume_tensor() -> tensor[12, f64] = to_tensor(series_volume())
 def w() -> i64 = cast(3, i64)
+def d() -> i64 = cast(2, i64)
+-- A CROSSING PAIR. The first fixture never crossed -- `series_close` is below
+-- `series_high` at all 12 bars -- so both crossover tests asserted over `None`s
+-- and `Some(false)`s only, with zero `Some(true)`, and a fast/slow
+-- transposition was invisible. `series_rising` crosses the flat `series_level`
+-- upward at index 3 and back down at index 5.
+def series_rising() -> List[f64] = [cast(10.0, f64), cast(11.0, f64), cast(12.0, f64), cast(13.0, f64), cast(12.0, f64), cast(11.0, f64), cast(10.0, f64), cast(9.0, f64), cast(10.0, f64), cast(11.0, f64), cast(12.0, f64), cast(13.0, f64)]
+def series_level() -> List[f64] = map(fn (_i: i64) -> cast(12.0, f64), range(cast(0, i64), cast(12, i64)))
+def series_rising_tensor() -> tensor[12, f64] = to_tensor(series_rising())
+def series_level_tensor() -> tensor[12, f64] = to_tensor(series_level())
+def count_true(xs: List[Option[bool]]) -> i64 =
+  fold(fn (acc: i64, v: Option[bool]) -> match v with {
+    | Some(b) => if b then add(acc, cast(1, i64)) else acc
+    | None => acc
+  }, cast(0, i64), xs)
 def test_tensor_rolling_layer_matches_list() -> unit ! { Test } = {
   _ = assert_close(to01(identical(tensor_ind_rolling_sum(series_close_tensor(), w()), ind_rolling_sum(series_close(), w()))), cast(1.0, f64), tight(), "tensor_ind_rolling_sum")
   _ = assert_close(to01(identical(tensor_ind_rolling_mean(series_close_tensor(), w()), ind_rolling_mean(series_close(), w()))), cast(1.0, f64), tight(), "tensor_ind_rolling_mean")
@@ -73,8 +88,8 @@ def test_tensor_tuple_indicators_match_list() -> unit ! { Test } = {
   _ = assert_close(to01(identical(tb.0, lb.0)), cast(1.0, f64), tight(), "tensor_bollinger lower")
   _ = assert_close(to01(identical(tb.1, lb.1)), cast(1.0, f64), tight(), "tensor_bollinger mid")
   _ = assert_close(to01(identical(tb.2, lb.2)), cast(1.0, f64), tight(), "tensor_bollinger upper")
-  ts = tensor_stochastic(series_high_tensor(), series_low_tensor(), series_close_tensor(), w(), w(), SmoothSimple)
-  ls = stochastic(series_high(), series_low(), series_close(), w(), w(), SmoothSimple)
+  ts = tensor_stochastic(series_high_tensor(), series_low_tensor(), series_close_tensor(), w(), d(), SmoothSimple)
+  ls = stochastic(series_high(), series_low(), series_close(), w(), d(), SmoothSimple)
   _ = assert_close(to01(identical(ts.0, ls.0)), cast(1.0, f64), tight(), "tensor_stochastic k")
   _ = assert_close(to01(identical(ts.1, ls.1)), cast(1.0, f64), tight(), "tensor_stochastic d")
   ta = tensor_adx(series_high_tensor(), series_low_tensor(), series_close_tensor(), w())
@@ -93,20 +108,74 @@ def test_tensor_vwap_matches_list() -> unit ! { Test } = {
   assert_close(to01(identical(tensor_rolling_vwap(series_close_tensor(), series_volume_tensor(), w()), rolling_vwap(series_close(), series_volume(), w()))), cast(1.0, f64), tight(), "tensor_rolling_vwap")
 }
 -- The crossover pair is the one place the tensor form takes an argument the
--- list form does not, so its equivalence must be stated against an EXPLICITLY
--- masked list input rather than against a bare series.
+-- list form does not, so its equivalence is stated against an EXPLICITLY
+-- masked list input rather than a bare series.
 def test_tensor_crossover_matches_explicitly_masked_list() -> unit ! { Test } = {
-  fast_w = cast(1, i64)
-  slow_w = cast(4, i64)
-  fast_masked = expect_from(series_close(), fast_w)
-  slow_masked = expect_from(series_high(), slow_w)
-  _ = assert_close(to01(identical_bool(tensor_crossover(series_close_tensor(), fast_w, series_high_tensor(), slow_w), crossover(fast_masked, slow_masked))), cast(1.0, f64), tight(), "tensor_crossover == crossover over the same masks")
-  assert_close(to01(identical_bool(tensor_crossunder(series_close_tensor(), fast_w, series_high_tensor(), slow_w), crossunder(expect_from(series_close(), fast_w), expect_from(series_high(), slow_w)))), cast(1.0, f64), tight(), "tensor_crossunder == crossunder over the same masks")
+  fw = cast(1, i64)
+  sw = cast(1, i64)
+  _ = assert_close(to01(identical_bool(tensor_crossover(series_rising_tensor(), fw, series_level_tensor(), sw), crossover(expect_from(series_rising(), fw), expect_from(series_level(), sw)))), cast(1.0, f64), tight(), "tensor_crossover == crossover over the same masks")
+  assert_close(to01(identical_bool(tensor_crossunder(series_rising_tensor(), fw, series_level_tensor(), sw), crossunder(expect_from(series_rising(), fw), expect_from(series_level(), sw)))), cast(1.0, f64), tight(), "tensor_crossunder == crossunder over the same masks")
 }
--- A wrong warm-up argument must change the answer, else the parameter is
--- decoration and callers could pass anything.
-def test_tensor_crossover_warmup_argument_is_load_bearing() -> unit ! { Test } = {
-  honest = tensor_crossover(series_close_tensor(), cast(4, i64), series_high_tensor(), cast(4, i64))
-  understated = tensor_crossover(series_close_tensor(), cast(0, i64), series_high_tensor(), cast(0, i64))
-  assert_close(to01(identical_bool(honest, understated)), cast(0.0, f64), tight(), "a different warm-up must give a different verdict series -- otherwise the parameter is ignored")
+-- The fixture must actually CROSS, or every assertion above is over `None`s
+-- and `Some(false)`s and a fast/slow transposition is undetectable. Pinned
+-- here so a future fixture edit that removes the crossing fails loudly.
+def test_tensor_crossover_fixture_actually_crosses() -> unit ! { Test } = {
+  fw = cast(1, i64)
+  _ = assert_eq(count_true(tensor_crossover(series_rising_tensor(), fw, series_level_tensor(), fw)), cast(2, i64), "the rising series crosses the level upward twice (indices 3 and 11)")
+  _ = assert_eq(count_true(tensor_crossunder(series_rising_tensor(), fw, series_level_tensor(), fw)), cast(1, i64), "and downward once (index 5)")
+  -- and the transposition is therefore observable
+  assert_close(to01(identical_bool(tensor_crossover(series_rising_tensor(), fw, series_level_tensor(), fw), tensor_crossover(series_level_tensor(), fw, series_rising_tensor(), fw))), cast(0.0, f64), tight(), "swapping fast and slow must change the verdict series")
 }
+-- A wrong warm-up must change the answer, else the parameter is decoration.
+def test_tensor_crossover_warmup_argument_is_load_bearing() -> unit ! { Test } = assert_close(to01(identical_bool(tensor_crossover(series_rising_tensor(), cast(4, i64), series_level_tensor(), cast(4, i64)), tensor_crossover(series_rising_tensor(), cast(0, i64), series_level_tensor(), cast(0, i64)))), cast(0.0, f64), tight(), "a different warm-up must give a different verdict series")
+-- SWAPPING THE TWO WARM-UPS IS A PROVABLE NO-OP, NOT A TEST GAP. `ind_cross`
+-- yields a value only where all four of a[i-1], b[i-1], a[i], b[i] are
+-- `Some`, so the `None` pattern is the UNION of the two masks and depends only
+-- on `max(fast_warmup, slow_warmup)`; the values at defined positions do not
+-- depend on either. A red-team round reported the swap as undetected, which is
+-- correct behaviour -- pinned here so nobody "fixes" it later.
+def test_tensor_crossover_warmup_order_is_a_no_op() -> unit ! { Test } = assert_close(to01(identical_bool(tensor_crossover(series_rising_tensor(), cast(1, i64), series_level_tensor(), cast(4, i64)), tensor_crossover(series_rising_tensor(), cast(4, i64), series_level_tensor(), cast(1, i64)))), cast(1.0, f64), tight(), "only max(fast_warmup, slow_warmup) is observable, so the order cannot matter")
+-- P1(c): EVERY variant at a SECOND argument tuple. With one tuple each, a
+-- wrapper can hardcode a forwarded scalar or ADT instead of passing it and
+-- still agree -- demonstrated by a red-team mutation where `tensor_atr`
+-- ignored its `window` and the suite stayed green.
+def test_tensor_variants_at_a_second_argument_tuple() -> unit ! { Test } = {
+  v = cast(4, i64)
+  _ = assert_close(to01(identical(tensor_ind_rolling_sum(series_close_tensor(), v), ind_rolling_sum(series_close(), v))), cast(1.0, f64), tight(), "rolling_sum @ 4")
+  _ = assert_close(to01(identical(tensor_ind_rolling_mean(series_close_tensor(), v), ind_rolling_mean(series_close(), v))), cast(1.0, f64), tight(), "rolling_mean @ 4")
+  _ = assert_close(to01(identical(tensor_ind_rolling_std(series_close_tensor(), v, DdofSample), ind_rolling_std(series_close(), v, DdofSample))), cast(1.0, f64), tight(), "rolling_std @ 4 sample")
+  _ = assert_close(to01(identical(tensor_ind_rolling_min(series_close_tensor(), v), ind_rolling_min(series_close(), v))), cast(1.0, f64), tight(), "rolling_min @ 4")
+  _ = assert_close(to01(identical(tensor_ind_rolling_max(series_close_tensor(), v), ind_rolling_max(series_close(), v))), cast(1.0, f64), tight(), "rolling_max @ 4")
+  _ = assert_close(to01(identical(tensor_ind_shift(series_close_tensor(), cast(3, i64)), ind_shift(series_close(), cast(3, i64)))), cast(1.0, f64), tight(), "shift @ 3")
+  _ = assert_close(to01(identical(tensor_ind_diff(series_close_tensor(), cast(2, i64)), ind_diff(series_close(), cast(2, i64)))), cast(1.0, f64), tight(), "diff @ 2")
+  _ = assert_close(to01(identical(tensor_sma(series_close_tensor(), v), sma(series_close(), v))), cast(1.0, f64), tight(), "sma @ 4")
+  _ = assert_close(to01(identical(tensor_ema(series_close_tensor(), v, SeedSma, AlphaSpan), ema(series_close(), v, SeedSma, AlphaSpan))), cast(1.0, f64), tight(), "ema @ 4 SeedSma/AlphaSpan")
+  _ = assert_close(to01(identical(tensor_rma(series_close_tensor(), v), rma(series_close(), v))), cast(1.0, f64), tight(), "rma @ 4")
+  _ = assert_close(to01(identical(tensor_atr(series_high_tensor(), series_low_tensor(), series_close_tensor(), v, SmoothSimple), atr(series_high(), series_low(), series_close(), v, SmoothSimple))), cast(1.0, f64), tight(), "atr @ 4 SmoothSimple -- pins that `window` and `smoothing` are forwarded")
+  _ = assert_close(to01(identical(tensor_rsi(series_close_tensor(), v, SmoothSimple), rsi(series_close(), v, SmoothSimple))), cast(1.0, f64), tight(), "rsi @ 4 SmoothSimple")
+  tm = tensor_macd(series_close_tensor(), cast(3, i64), cast(5, i64), v, SeedSma, AlphaWilder)
+  lm = macd(series_close(), cast(3, i64), cast(5, i64), v, SeedSma, AlphaWilder)
+  _ = assert_close(to01(identical(tm.0, lm.0)), cast(1.0, f64), tight(), "macd @ 3/5/4 SeedSma/AlphaWilder line")
+  _ = assert_close(to01(identical(tm.2, lm.2)), cast(1.0, f64), tight(), "macd histogram")
+  tb = tensor_bollinger(series_close_tensor(), cast(5, i64), cast(1.5, f64), DdofSample)
+  lb = bollinger(series_close(), cast(5, i64), cast(1.5, f64), DdofSample)
+  _ = assert_close(to01(identical(tb.0, lb.0)), cast(1.0, f64), tight(), "bollinger @ 5/1.5/sample lower -- pins k and ddof are forwarded")
+  _ = assert_close(to01(identical(tb.2, lb.2)), cast(1.0, f64), tight(), "bollinger upper")
+  ts = tensor_stochastic(series_high_tensor(), series_low_tensor(), series_close_tensor(), v, cast(3, i64), SmoothWilder)
+  ls = stochastic(series_high(), series_low(), series_close(), v, cast(3, i64), SmoothWilder)
+  _ = assert_close(to01(identical(ts.0, ls.0)), cast(1.0, f64), tight(), "stochastic @ 4/3 Wilder k")
+  _ = assert_close(to01(identical(ts.1, ls.1)), cast(1.0, f64), tight(), "stochastic d")
+  ta = tensor_adx(series_high_tensor(), series_low_tensor(), series_close_tensor(), v)
+  la = adx(series_high(), series_low(), series_close(), v)
+  _ = assert_close(to01(identical(ta.2, la.2)), cast(1.0, f64), tight(), "adx @ 4")
+  td = tensor_donchian(series_high_tensor(), series_low_tensor(), v)
+  ld = donchian(series_high(), series_low(), v)
+  _ = assert_close(to01(identical(td.1, ld.1)), cast(1.0, f64), tight(), "donchian @ 4 mid")
+  _ = assert_close(to01(identical(tensor_true_range(series_high_tensor(), series_low_tensor(), series_close_tensor()), true_range(series_high(), series_low(), series_close()))), cast(1.0, f64), tight(), "true_range (no scalar args; the fixture asymmetry is what pins it)")
+  _ = assert_close(to01(identical(tensor_cumulative_vwap(series_close_tensor(), series_volume_tensor()), cumulative_vwap(series_close(), series_volume()))), cast(1.0, f64), tight(), "cumulative_vwap")
+  assert_close(to01(identical(tensor_rolling_vwap(series_close_tensor(), series_volume_tensor(), v), rolling_vwap(series_close(), series_volume(), v))), cast(1.0, f64), tight(), "rolling_vwap @ 4")
+}
+-- The fixture property the true-range checks depend on. Without a bar whose
+-- intrabar range strictly exceeds both gap terms, `tr(h,l,c) == tr(l,h,c)` and
+-- the archetypal high/low transposition is undetectable.
+def test_fixture_is_high_low_asymmetric_for_true_range() -> unit ! { Test } = assert_close(to01(identical(true_range(series_high(), series_low(), series_close()), true_range(series_low(), series_high(), series_close()))), cast(0.0, f64), tight(), "swapping high and low must change true_range on this fixture")

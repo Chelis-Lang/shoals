@@ -425,6 +425,15 @@ def crossunder(a: List[Option[f64]], b: List[Option[f64]]) -> List[Option[bool]]
 -- type name"), so returning a tensor would force a second, weaker warm-up
 -- convention. These do not.
 --
+-- THE ARGUMENT IN ITS GENERAL FORM, shorter than enumerating candidates and
+-- covering more of them: absence has to live INSIDE THE ELEMENT to be
+-- undroppable. Any sibling channel -- a scalar count, a parallel `bool`
+-- tensor, a record field, a tuple component -- can be projected away by
+-- reading `.0`, which is exactly §2.15.2's drop hazard. A tensor element is a
+-- precision type, so NO tensor return can carry an undroppable warm-up. That
+-- covers `(tensor[n, f64], tensor[n, bool])`, which does type-check at this
+-- pin, as much as it covers a count or a NaN fill.
+--
 -- The name of every variant is `tensor_` prepended to the list name, with no
 -- exceptions, so a generator can derive it by rule rather than by lookup.
 -- That is also why the borrowed-layer `ind_` marker survives into
@@ -454,7 +463,20 @@ def tensor_cumulative_vwap[n](price: tensor[n, f64], volume: tensor[n, f64]) -> 
 def tensor_rolling_vwap[n](price: tensor[n, f64], volume: tensor[n, f64], window: i64) -> List[Option[f64]] = rolling_vwap(to_list(price), to_list(volume), window)
 -- Lift a tensor and an explicit warm-up count into the masked shape. Private:
 -- the only callers are the two crossover variants below.
-def ind_mask_tensor[n](t: tensor[n, f64], warmup: i64) -> List[Option[f64]] = map(fn (pr: (i64, f64)) -> if lt(pr.0, warmup) then None else Some(pr.1), enumerate(to_list(t)))
+def ind_mask_tensor[n](t: tensor[n, f64], warmup: i64) -> List[Option[f64]] = {
+  vs = to_list(t)
+  m = len(vs)
+  -- The warm-up is the only integer the tensor surface accepts that the list
+  -- surface does not, and it was the only one on this module with no domain
+  -- guard. Unguarded, a negative warm-up read silently as 0, and a warm-up
+  -- past the end returned an all-`None` series -- which §2.15.6 names in so
+  -- many words as the wrong answer to a caller bug. `ind_shift` traps its
+  -- negative offset; this is the same defect shape and now traps too. A
+  -- warm-up EQUAL to the length stays legal: a producing indicator whose
+  -- window exceeded the series legitimately warms up for all of it.
+  bounded = if lt(warmup, cast(0, i64)) then fail("Shoals.Indicators: warm-up must be >= 0") else if lt(m, warmup) then fail("Shoals.Indicators: warm-up must not exceed the series length") else warmup
+  map(fn (pr: (i64, f64)) -> if lt(pr.0, bounded) then None else Some(pr.1), enumerate(vs))
+}
 -- THE CROSSOVER PAIR NEEDS AN ARGUMENT ITS LIST FORM DOES NOT, and this is
 -- the one place the tensor surface is not a pure adapter. `crossover` consumes
 -- already-masked series, and a tensor cannot carry a mask, so each side's

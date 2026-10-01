@@ -34,12 +34,13 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
       instant, stdlib-only.
   11. ``scripts/test_check_package_prove_latency.py`` — negative-parity tests
       for the chelis#924 release oracle.
-  11. ``scripts/test_risk_invariant_gate.py`` — adversarial compiler-evidence
+  12. ``scripts/test_risk_invariant_gate.py`` — adversarial compiler-evidence
       and risk-family non-vacuity tests.
-  12. ``scripts/test_build_release_assets.py`` — canonical release-builder
+  13. ``scripts/test_build_release_assets.py`` — canonical release-builder
       unit tests for the chelis#1002 narrowing.
-  13. ``scripts/test_release_workflow.py`` — static release/toolchain and
+  14. ``scripts/test_release_workflow.py`` — static release/toolchain and
       hosted/local matrix integrity contracts.
+  15. ``.github/scripts/test_secret_scan.py`` — secret-scan contract tests.
 
 ``--full`` appends the stages CI runs in ``.github/workflows/nightly.yml``
 (scheduled, NOT per-PR) — run this at least once at a pin bump

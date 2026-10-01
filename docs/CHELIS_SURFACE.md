@@ -206,6 +206,7 @@ tiers: **A** (type/dimension/linearity), **B** (SMT via cvc5 over the reals),
 | Front-end check throughput | `@pin` | The compiler surface is available. The 0.18.6 measurements (31.6s for `src/modelfit.ch`, 17.0s dependency-load floor, and a 7m54s batched-suite observation) remain historical measurements, not 0.18.11 performance claims. The pin-bump full gate owns current acceptance. |
 | `count` ([05-OP-29]), direct `sub` / `min_elem` ([05-OP-40]/[05-OP-41]) | `@pin` | Shipped before this pin and available, though Shoals does not currently depend on them. |
 | `stop_gradient` ([05-OP-42]) | `@upstream` | The contract exists, but implementation remains open in chelis#1312; Shoals does not claim it at this pin. Relu's dedicated adjoint is a separate closed issue (chelis#1313). |
+| `to_list` / `to_tensor` over `tensor[n, f64]`, incl. a generic `[n]` ([05-OP-57]) | `@pin` | Load-bearing for all 22 `tensor_` exports of `Shoals.Indicators`: each is a one-call `to_list` adapter over its list counterpart (shoals#83, `spec/shoals_quant_surface.md` §2.15.5). Order and length preserved; a symbolic `[n]` composes. Distinct from the `@upstream` grad row below, which is about differentiating *through* such a body, not about the conversion. |
 | chelis-std / nautilus / coral module surface | `@pin` | Pricing, distributions, RNG, curves, dates, vol surfaces per `src/` + `references/`. |
 
 ## Numerical accuracy of shell-authored kernels

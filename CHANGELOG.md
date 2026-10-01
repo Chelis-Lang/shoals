@@ -114,10 +114,13 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   **Every function also has a tensor-accepting form**, named by prepending
   `tensor_` to the list name with no exceptions so the name is derivable by
   rule (shoals#83's "accept `List[f64]` or `tensor[n, f64]`" bullet). They
-  return `List[Option[f64]]`, not a tensor: a tensor element must be a
-  precision type, so `tensor[n, Option[f64]]` does not exist and a tensor
-  return would have to carry the warm-up as a droppable count or a silently
-  propagating NaN fill — the two forms this module rejects. `tensor_crossover`
+  return `List[Option[f64]]`, not a tensor. The reason generalises instead of
+  enumerating alternatives: absence has to live *inside the element* to be
+  undroppable, because any sibling channel — a scalar count, a parallel
+  validity tensor, a record field, a tuple component — can be projected away.
+  A tensor element must be a precision type, so `tensor[n, Option[f64]]` does
+  not exist and no tensor return can carry an undroppable warm-up.
+  `tensor_crossover`
   and `tensor_crossunder` take each side's warm-up as a required parameter,
   which is safe inbound for the same reason the count was unsafe outbound: a
   required parameter cannot be dropped. `tests/indicators_tensor.ch` pins each

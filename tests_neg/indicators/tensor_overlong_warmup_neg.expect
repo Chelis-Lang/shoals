@@ -1,0 +1,6 @@
+Shoals.Indicators: warm-up must not exceed the series length
+
+Assumption: returning an all-`None` series for an out-of-range warm-up reports
+"no data" for what is a caller bug, which §2.15.6 rejects for every other
+out-of-domain input on this module. A warm-up equal to the length is legal and
+is deliberately not covered by this probe.

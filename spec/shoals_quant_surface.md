@@ -511,20 +511,24 @@ choice made inside the function.
 
 #### 2.15.5 Tensor-accepting forms
 
-Every function in §2.15.4 has a tensor-accepting form, named by prepending
-`tensor_` to the list name with no exceptions, so the name is derivable by
-rule. They take `tensor[n, f64]` and return exactly what their list
-counterparts return.
+Every function in §2.15.3 and §2.15.4 has a tensor-accepting form, named by
+prepending `tensor_` to the list name with no exceptions, so the name is
+derivable by rule. They take `tensor[n, f64]` and return exactly what their
+list counterparts return.
 
-**The return type stays `List[Option[f64]]`.** §2.15.2's requirement is a
-representation a caller cannot misread, and a tensor cannot express it: a
-tensor element is a precision type, so `tensor[n, Option[f64]]` does not
-exist. A tensor return would need a separate count or a NaN fill, which are
-the two forms §2.15.2 rejects. The tensor admitted here is the input.
+**The return type stays `List[Option[f64]]`,** and the reason generalises
+rather than enumerating alternatives: §2.15.2 requires a representation a
+caller cannot misread, which means absence has to live *inside the element* to
+be undroppable. Any sibling channel — a scalar count, a parallel validity
+tensor, a record field, a tuple component — can be projected away, which is
+§2.15.2's drop hazard restated. A tensor element is a precision type, so
+`tensor[n, Option[f64]]` does not exist and no tensor return can carry an
+undroppable warm-up. The tensor admitted here is therefore the input.
 
 `crossover` and `crossunder` consume masked series, so their tensor forms take
-each side's warm-up as a required parameter. A required parameter cannot be
-dropped, which is the property the rejected `valid_from` return lacked.
+each side's warm-up as a required parameter, which cannot be dropped. That
+closes the drop hazard and not the wrong-value one: an out-of-range warm-up is
+an out-of-domain input and traps under §2.15.6.
 
 The 1:1 correspondence between the two surfaces is a contract invariant and is
 enforced mechanically, not by inspection.

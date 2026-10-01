@@ -425,7 +425,20 @@ in code that is CLOSED upstream but not sitting in §Archived.
       second copy:** `Nautilus.TimeSeries` is
       f32 and tensor-shaped, per the declaration above. `Coral.Window` has
       rolling sum, mean, std, min, max and `ewm` already, but is f32-only AND
-      not a compiled lane (coral#26), so it is not a path at either width.
+      not a compiled lane (coral#26).
+    - **The remaining difference is DTYPE, not shape, since shoals#83's tensor
+      forms landed.** An earlier revision of this entry argued the duplication
+      was narrow because `Coral.Window` is f32 *and* tensor-shaped while the
+      Shoals layer was list-shaped. `tensor_ind_rolling_sum` and its four
+      siblings now take `tensor[n, f64]`, so the shape half of that argument no
+      longer holds: the two surfaces differ only in width (and in Coral's
+      build-lane block). The narrowing is therefore wider than it was, not
+      narrower.
+    - **The layer's export footprint doubled from 7 to 14** with those tensor
+      forms, so §2.15.3's commitment to delete it when nautilus#85 lands now
+      covers 14 exports. The deletion stays mechanical -- each tensor form is a
+      one-line `to_list` delegation -- but the count is recorded here so the
+      bump that retires the layer is not surprised by it.
     - **Executable probe:** `tests_blocked/timeseries/rolling_f64_absent.ch`,
       keyed on `ts_ewma_series` because it EXISTS. A probe naming a
       not-yet-written `rolling_mean` would keep failing after nautilus#85

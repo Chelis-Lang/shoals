@@ -67,7 +67,14 @@ def main() -> int:
         problems.append(f"`tensor_` exports with no list counterpart: {orphans}")
 
     # 3. Every tensor export is exercised by the equivalence suite.
-    tests_src = io.open(TESTS, encoding="utf-8").read()
+    # Strip Chelis comment lines first. Without this a `-- TODO: re-enable
+    # tensor_rma(...)` line satisfies the regex below, so a DISABLED check
+    # still reports as exercised. Confirmed by a red-team round, which
+    # commented out `tensor_rma`'s equivalence check and still got 22/22.
+    tests_src = "\n".join(
+        line for line in io.open(TESTS, encoding="utf-8").read().splitlines()
+        if not line.lstrip().startswith("--")
+    )
     unchecked = [t for t in tensor if not re.search(rf"\b{re.escape(t)}\s*\(", tests_src)]
     if unchecked:
         problems.append(f"`tensor_` exports with no check in {TESTS}: {unchecked}")

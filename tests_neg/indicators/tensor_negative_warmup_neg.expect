@@ -1,0 +1,6 @@
+Shoals.Indicators: warm-up must be >= 0
+
+Assumption: the warm-up is a count of leading entries with no valid value, so a
+negative one is a caller bug with no correct interpretation. Reading it as 0
+silently reports every entry as valid, which is the opposite of the module's
+warm-up contract. `ind_shift` traps the analogous negative offset.
