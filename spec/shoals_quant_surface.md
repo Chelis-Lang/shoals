@@ -275,8 +275,8 @@ explicitly (§2.11).
 
 #### 2.10.1 No exported sensitivity returns `NaN`
 
-Every exported Greek vector is defined over its whole declared domain,
-expiry included. `NaN` is not an admissible result: it is
+Every exported Greek vector is defined for every non-negative time to
+expiry, expiry itself included. `NaN` is not an admissible result: it is
 indistinguishable from a computed value, propagates silently through
 every downstream aggregation, and reports nothing about which input was
 degenerate.
@@ -293,13 +293,11 @@ the limit. At `t = 0`:
 | vanna, vega, rho, volga | `0` | `0` | `0` |
 
 Delta at the strike is the limit in time, not a midpoint convention:
-`d1` tends to zero there, so `N(d1)` tends to `N(0)`.
+`d1` tends to zero there, so `N(d1)` tends to `N(0)`. The put surface
+mirrors it, with put delta tending to `-1`, `-0.5` and `0` below, at and
+above the strike. (Put delta at the strike is not yet implemented to this
+requirement; see `docs/issue_drafts/put_delta_at_expiry.md`.)
 
-A limit that automatic differentiation of the price body cannot produce
-is supplied in closed form, outside the differentiated body. Supplying it
-by branching inside that body is not conforming: the branch's untaken arm
-is then differentiated, which is what makes the limit unavailable in the
-first place.
 
 Callers aggregating a sensitivity vector test for finiteness. An equality
 test against self admits an infinity and is not a finiteness test.

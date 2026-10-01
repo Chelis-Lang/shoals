@@ -17,8 +17,8 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   `t = 0`: delta is `0`/`0.5`/`1` below/at/above the strike; gamma is `0` off the
   strike and `+inf` at it; theta is `0` below, `-r*k` above, `-inf` at it; vanna,
   vega, rho and volga are `0`. The two infinities are the correct answers —
-  gamma grows like `1/(s*sigma*sqrt(t))` and theta like `-s*sigma/(2*sqrt(t))` —
-  and are now correctly signed rather than `NaN`. Delta at the strike is the
+  gamma grows like `n(d1)/(s*sigma*sqrt(t))` and theta like
+  `-s*sigma*n(d1)/(2*sqrt(t))` — and are now correctly signed rather than `NaN`. Delta at the strike is the
   limit in time (`d1 -> 0`, so `N(d1) -> N(0)`), not a midpoint convention;
   measured approach `0.5140` at `t=1e-2`, `0.5014` at `1e-4`, `0.50014` at `1e-6`.
 

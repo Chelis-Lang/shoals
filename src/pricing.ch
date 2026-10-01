@@ -186,7 +186,8 @@ def n_cdf64(x: f64) -> f64 = {
 -- `den = sigma*sqrt(t)`, whose t-derivative is sigma/(2*sqrt(t)) = +inf at
 -- t = 0, so differentiating wrt t at expiry is exactly the chelis#2640 case.
 -- Measured: `grad` of this clamp wrt t is NaN at t = 0, and 0.1 at t = 1. wrt s
--- and sigma the untaken arm does not depend on the variable, so those are clean
+-- the untaken arm does not depend on s at all, and its sigma-derivative is
+-- sqrt(t) = 0 at t = 0, so both of those directions are finite and clean
 -- -- which is why delta, vega and rho are correct at t = 0 and theta was not.
 -- The t = 0 Greeks are therefore supplied as closed-form limits in the wrappers
 -- rather than by differentiating this body; see the shoals#101 note above
@@ -357,7 +358,8 @@ def put_total[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> f
 --      constant arm is the one selected. Measured: `grad` of that clamp wrt t is
 --      NaN at t = 0 and 0.1 at t = 1. The clamp stays safe for the s and sigma
 --      directions, which is exactly why delta, vega and rho survive at t = 0 --
---      their untaken arm does not depend on the variable being differentiated.
+--      the untaken arm does not depend on s at all, and its sigma-derivative
+--      is sqrt(t), which is 0 at t = 0 rather than unbounded.
 --   2. The second-order Greeks square a first derivative that the floor has made
 --      enormous: d(d1)/ds = 1/(s*den) is 1e298 with den floored to 1e-300, and
 --      squaring that overflows to +inf, which then multiplies an underflowed

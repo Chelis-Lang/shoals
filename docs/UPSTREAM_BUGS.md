@@ -409,7 +409,7 @@ No parked entries.
 
 ## Archived
 
-- **shoals#101 — every exported Greek was `NaN` somewhere at expiry.** Resolved
+- **shoals#101 — three exported Greeks were `NaN` at expiry and call delta was silently wrong at the strike.** Resolved
   in this shell by supplying the `t = 0` limits in closed form in the Greek
   wrappers; `tests/pricing_greeks_expiry.ch` covers all nine cells and the
   finiteness predicate. Recorded here because §4's narrowing-coverage scanner

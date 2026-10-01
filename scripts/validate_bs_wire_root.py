@@ -68,7 +68,10 @@ EXPECTED_NODE_COUNT = 1665
 # figures before they were pinned. Two independent cold lowerings are
 # byte-deterministic. This comparison does not certify shape semantics. Former
 # raw hash at this schema:
-# 3be34d901db81b1a0b250d6cb6e8b8b934f11c13323206fb1894b50e9fcfab02.
+# 3be34d901db81b1a0b250d6cb6e8b8b934f11c13323206fb1894b50e9fcfab02. Later
+# values at this schema, all with root 859 and 1665 nodes: 9709d1a4... and
+# 904bd65b... (shoals#88), 11db7522... (shoals#102's comment retarget), and the
+# value below (shoals#101's expiry limits).
 #
 # NOTE for whoever drifts this next: the raw artifact embeds source spans, so
 # editing a COMMENT in src/pricing.ch moves this hash while leaving the graph
@@ -79,7 +82,7 @@ EXPECTED_NODE_COUNT = 1665
 # named loads and op kinds all still match. The node count is checked BEFORE the
 # hash, so a hash-only failure already tells you the count agreed. Confirm that
 # shape, then re-pin; do not go looking for a numerical regression.
-EXPECTED_RAW_SHA256 = "79745ec0079cd6d43a8ef80ee986bf6e2e4f6df91a2b41c8127471421998027e"
+EXPECTED_RAW_SHA256 = "811f1cda0a046bbe5e24c51514e9f266815849e9824184786c0b9d93e32ad546"
 FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
 EXPECTED_LOADS = {
     "a1",

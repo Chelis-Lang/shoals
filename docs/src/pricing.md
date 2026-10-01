@@ -103,8 +103,9 @@ diverge:
 | `vannas_call` | `0` | `0` | `0` |
 | `vegas_call`, `rhos_call`, `volgas_call` | `0` | `0` | `0` |
 
-Gamma at the strike behaves like `1 / (s * sigma * sqrt(t))` and theta like
-`-s * sigma / (2 * sqrt(t))`, so both grow without bound as `t` falls to zero;
+Gamma at the strike grows like `n(d1) / (s * sigma * sqrt(t))` and theta like
+`-s * sigma * n(d1) / (2 * sqrt(t))`, where `n` is the standard normal density,
+so both grow without bound as `t` falls to zero;
 `+inf` and `-inf` are the answers, not placeholders. Delta at the strike is
 `0.5` because `d1` tends to zero there, so `N(d1)` tends to `N(0)` — it is the
 limit in time, not a midpoint convention.

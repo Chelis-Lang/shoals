@@ -5,8 +5,9 @@ import Shoals.Pricing (deltas_call, vegas_call, rhos_call, thetas_call, gammas_c
 -- by approaching expiry rather than against a transcribed decimal.
 --
 -- Two of the nine cells are genuinely non-finite and that is the correct answer,
--- not a defect: at the strike gamma diverges like 1/(s*sigma*sqrt(t)) and theta
--- like -s*sigma/(2*sqrt(t)). Those are asserted as signed infinities. Every
+-- not a defect: at the strike gamma diverges like n(d1)/(s*sigma*sqrt(t)) and
+-- theta like -s*sigma*n(d1)/(2*sqrt(t)), n being the normal density. Those are
+-- asserted as signed infinities. Every
 -- other cell has a finite limit and is asserted as a number. NO cell is NaN.
 --
 -- The predicate below is the one shoals#101 asked for. `nan_free`-style
@@ -116,6 +117,17 @@ def test_expiry_limits_agree_with_near_expiry_ad() -> unit ! { Test } = {
 def test_positive_t_path_is_unchanged() -> unit ! { Test } = {
   g = to_list(gammas_call(spots3(), k100(), r5(), v20(), cast(0.01, f32)))
   th = to_list(thetas_call(spots3(), k100(), r5(), v20(), cast(0.01, f32)))
+  d = to_list(deltas_call(spots3(), k100(), r5(), v20(), cast(0.01, f32)))
+  vn = to_list(vannas_call(spots3(), k100(), r5(), v20(), cast(0.01, f32)))
   _ = assert_close(index(g, cast(0, i64)), cast(0.199349, f32), cast(0.00001, f32), "gamma at t=0.01 unchanged")
-  assert_close(index(th, cast(0, i64)), cast(-42.398457, f32), cast(0.001, f32), "theta at t=0.01 unchanged")
+  _ = assert_close(index(th, cast(0, i64)), cast(-42.398457, f32), cast(0.001, f32), "theta at t=0.01 unchanged")
+  _ = assert_close(index(d, cast(0, i64)), cast(0.5139601, f32), cast(0.00001, f32), "delta at t=0.01 unchanged -- pins the t==0 branch boundary, not only the limit")
+  _ = assert_close(index(vn, cast(0, i64)), cast(-0.029902348, f32), cast(1e-6, f32), "vanna at t=0.01 unchanged -- same boundary pin")
+  -- The boundary pin that matters sits INSIDE any plausible widening of the
+  -- condition. A t == 0 assertion and a loose near-expiry one both survive
+  -- `eq(t, 0)` becoming `lt(t, 1e-3)`, because the closed form and the AD answer
+  -- agree to about 1e-4 there. At t = 1e-4 the AD delta is 0.5013963 while the
+  -- closed form is 0.5, and a 1e-5 tolerance separates them.
+  dn = to_list(deltas_call(spots3(), k100(), r5(), v20(), cast(0.0001, f32)))
+  assert_close(index(dn, cast(0, i64)), cast(0.5013963, f32), cast(0.00001, f32), "delta at t=1e-4 is the AD value, not the t=0 closed form")
 }
