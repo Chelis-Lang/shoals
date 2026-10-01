@@ -15,7 +15,7 @@ Nautilus 0.7.46 / Coral 0.7.43. Migration evidence is recorded in
 [`chelis_0_18_11_migration.md`](chelis_0_18_11_migration.md).
 Capability markers below are refreshed for the current pin. Numerical
 measurements remain tied to the release named beside each measurement and are
-not silently promoted. The current WireDag is schema 15 (1522 nodes, root 787),
+not silently promoted. The current WireDag is schema 15 (1665 nodes, root 859),
 and Nautilus's f32 `erf` uses a four-term Taylor branch below `|x|=0.25`.
 
 What the Chelis language and the bundled chelis-std actually provide to the
@@ -202,7 +202,7 @@ tiers: **A** (type/dimension/linearity), **B** (SMT via cvc5 over the reals),
 | `if/then/else` | `@pin` | Lowers as ITE in `QF_NRA`. |
 | `Option[T]`, `Some`/`None`, `match`; `@opaque` + `@invariant` | `@pin` | Opaque-invariant abstraction is the path from synthetic green to a green a quant recognizes (report §1, §3); producer obligations discharge at SMT. |
 | `Std.Test` (`assert_close`, `assert_eq`) | `@pin` | The executable numeric suites under `tests/` and `tests-manual/`. **Changed at 0.18.6:** `assert_eq_int` / `assert_eq_bool` / `assert_eq_string` / `assert_eq_tensor_int64` are gone with no alias; use the polymorphic `assert_eq[q](actual, expected, label)`. `assert_close` widened from `f32` to `[p_float]` — a loosening, and its tolerance must now share the tensors' dtype in `assert_close_tensor` (unused here). |
-| WireDag lowering (`chelis tide serve` `/lower`) | `@pin` | Schema **15**, exact-only. Shoals pins `bs_call_wire_f64` byte-exactly in `scripts/validate_bs_wire_root.py`: 1522 nodes, entry root 787, raw SHA-256 `3be34d901db81b1a0b250d6cb6e8b8b934f11c13323206fb1894b50e9fcfab02`. Relative to 0.18.10, 14 `Copy` and 14 `Drop` nodes are added and `cmp_lt` becomes `compare(comparison=lt)`; copy-elided dataflow, op parameters, precisions, and 15 named loads agree. Symbolic dimension names differ, so no shape-equivalence claim is made. |
+| WireDag lowering (`chelis tide serve` `/lower`) | `@pin` | Schema **15**, exact-only. Shoals pins `bs_call_wire_f64` byte-exactly in `scripts/validate_bs_wire_root.py`: 1665 nodes, entry root 859, raw SHA-256 `904bd65b1cf4e9afc9849b7ef5f27fd35358478766531d142d7bdf7bf84bef38` (re-pinned for shoals#88's expiry fix, no compiler change; the prior figures were 1522 / 787 / `3be34d90…`). The 0.18.10-to-0.18.11 comparison below was measured on the pre-shoals#88 source and does not compose with the figures above: against 0.18.10 that source gained 14 `Copy` and 14 `Drop` nodes and `cmp_lt` became `compare(comparison=lt)`, with copy-elided dataflow, op parameters, precisions and 15 named loads agreeing. Symbolic dimension names differ, so no shape-equivalence claim is made. |
 | Front-end check throughput | `@pin` | The compiler surface is available. The 0.18.6 measurements (31.6s for `src/modelfit.ch`, 17.0s dependency-load floor, and a 7m54s batched-suite observation) remain historical measurements, not 0.18.11 performance claims. The pin-bump full gate owns current acceptance. |
 | `count` ([05-OP-29]), direct `sub` / `min_elem` ([05-OP-40]/[05-OP-41]) | `@pin` | Shipped before this pin and available, though Shoals does not currently depend on them. |
 | `stop_gradient` ([05-OP-42]) | `@upstream` | The contract exists, but implementation remains open in chelis#1312; Shoals does not claim it at this pin. Relu's dedicated adjoint is a separate closed issue (chelis#1313). |

@@ -453,6 +453,26 @@ No parked entries.
 
 ## Archived
 
+- **shoals#88 — Black-Scholes returned NaN with no remaining uncertainty, in
+  both the scalar and the WireDag lane.** Resolved in this shell by flooring
+  `sigma*sqrt(t)` in `d1_64` and `pricing_wire_d1_f64`; `tests/pricing_expiry.ch`
+  covers it. Recorded here because §4's narrowing-coverage scanner reads the
+  `shoals#88` citations in `src/pricing.ch`, and those comments explain a
+  deliberate narrowing that outlives the fix: the guard **must** stay a clamp on
+  the denominator and may not become a branch on the price. The binding reason is
+  the **derivative** rule in the chelis#1464 entry above, not the value rule --
+  measured at this pin the rejected branch returns the correct price at every
+  lane, and only its delta is NaN, because the adjoint multiplies the untaken
+  arm's infinite derivative by the zero mask. Anyone who checks only the price
+  will conclude the clamp is unnecessary. The hazard does not need `vmap` either:
+  it reproduces under plain `grad`. The wire lane additionally cannot use a branch at all: its
+  selectors are arithmetic, so it hand-rolls `abs` out of a select and the first
+  `+/-inf` reaching it computes `0 * neg(inf)`. If chelis#1464 is ever fixed and
+  a non-arithmetic select becomes available, both floors may be revisited --
+  until then they are load-bearing. The re-pinned WireDag receipt
+  (`scripts/validate_bs_wire_root.py`, root 859 / 1665 nodes) reflects the
+  floor and involved no compiler change.
+
 - **chelis#1200 — `_ = f(x)` marked `x` consumed when `f` destructured a record
   parameter (0.18.4 regression; RESOLVED on 0.18.5).** A `_ =` wildcard discard
   desugared with the `destructure: true` marker, opening the Linearity-F2
