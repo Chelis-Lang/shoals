@@ -42,16 +42,9 @@ The empirical measures are exercised through the
 On the integer losses `0..100`, the 95% historical VaR is `95` and the 95%
 historical CVaR is the tail mean `97.5`.
 
-## Characterized coherence
-
-The release characterization keeps the two model families distinct. For both
-the Gaussian parametric measures and empirical historical measures it observes
-confidence monotonicity, expected-shortfall dominance over VaR, and positivity
-on positive-loss inputs. These are `fuzz_validated` results over 25 accepted
-constraint-directed samples at each deterministic seed 0, 1, and 2, not global
-proofs. Every family has a corrupt twin with an in-domain counterexample, and
-the gate accepts dependency identity only from the compiler summary graph. An
-ES/VaR relation must report edges to both functions it calls.
-
-For 0.24.5 these are release-gated observations against the official,
-sidecar-verified Chelis 0.18.1, Nautilus 0.7.38, and Coral 0.7.35 artifacts.
+Use a nonempty sample and a confidence level strictly between zero and
+one. The parametric and empirical families have separate sampled
+coherence checks for confidence monotonicity, expected-shortfall dominance,
+and positivity on positive-loss inputs. Their reported `fuzz_validated`
+results describe accepted samples, not global proofs. See
+[Property specifications](properties.md).

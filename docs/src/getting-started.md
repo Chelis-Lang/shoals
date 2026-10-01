@@ -1,105 +1,48 @@
 # Getting started
 
-Shoals is a reef package. It depends on the Chelis compiler and on the
-upstream libraries it builds upon: `chelis-std` (the standard library),
-`nautilus` (distributions, special functions, statistics, interpolation),
-and `coral` (the dataframe runtime). The dependency wiring is declared in
-`reef.toml` at the repository root.
+Shoals is a [Reef](https://github.com/Chelis-Lang/chelis) package. Work from a
+**Shoals source checkout**: the commands below use `reef.toml` and the
+executable tests in `tests/`. The package, compiler, and dependency versions
+are declared in `reef.toml`.
 
-## Building
+## Install the pinned toolchain and dependencies
 
-Shoals 0.24.5 targets Chelis 0.18.1, Nautilus 0.7.38, and Coral 0.7.35.
-All three dependencies are published; their release sidecars authenticate the
-exact artifacts used by the release gate. Do not use source builds or local
-dependency checkouts as release evidence.
-
-The package gate is owned by the compiler:
+The Chelis compiler release is private. You need access to its GitHub repository and an authenticated [GitHub CLI](https://cli.github.com/). Access to the pinned Nautilus and Coral releases is also needed. The [Chelis installation guide](https://github.com/Chelis-Lang/chelis/blob/main/docs/book/src/install.md) covers supported platforms.
 
 ```sh
-# resolve the manifest and lower the package
+gh auth login                      # once, if needed
+gh release download --repo Chelis-Lang/chelis --pattern chelisup.sh --output - | sh
+export PATH="$HOME/.chelis/bin:$PATH"
+gh repo clone Chelis-Lang/shoals
+cd shoals
+chelisup install 0.18.11
 chelis reef build
 ```
 
-The in-tree test suite exercises the finance invariants against the
-reference oracles:
+`chelisup install 0.18.11` installs the compiler pinned by `reef.toml`.
+`chelis reef build` resolves the declared dependencies, fetching missing
+release packages as needed, then checks Shoals and produces its Reef artifacts.
+If you already have `chelisup`, begin with the clone and keep the pinned
+compiler installation step. Run the remaining commands from the checkout root.
+
+## Price a call
+
+The exported `Shoals.Pricing.bs_call_scalar` takes spot, strike, continuously compounded risk-free rate, volatility, and maturity in years, all as `f32`. It prices a European call on a non-dividend-paying underlying. This is the call in `tests/pricing.ch`:
+
+```chelis
+px = bs_call_scalar(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
+```
+
+The expected price is approximately **10.4506**. Run its complete source test with:
 
 ```sh
-# run the runtime test suite
-chelis test tests/ --timeout 1200 --jobs auto
-
-# serial run, useful when debugging a single failure
-chelis test tests/ --timeout 1200 --jobs 1
+chelis test tests/pricing.ch --filter test_bs_call_atm --timeout 120 --suite-timeout 180 --jobs 1
 ```
 
-The formatter checks one file per invocation:
+`tests/pricing.ch` imports the module, calls the pricer, and checks the result. The code above is an excerpt from that test; the command is the runnable example. The companion test `test_bs_put_atm` checks a put price of approximately 5.5735:
 
 ```sh
-chelis fmt --check src/pricing.ch
+chelis test tests/pricing.ch --filter test_bs_put_atm --timeout 120 --suite-timeout 180 --jobs 1
 ```
 
-The local acceptance gate at `scripts/run_local_gate.py` runs the formatter
-check over the `.ch` sources, the linter, `chelis reef build`, and the
-runtime suites. Continuous integration runs the same default steps but leaves
-the heavy `tests-manual/` suite to the nightly/manual lanes.
-
-## A first price
-
-Black-Scholes is the smallest useful call. `bs_call_scalar` takes spot,
-strike, the risk-free rate, volatility, and time to maturity, all `f32`,
-and returns the call price. This call, drawn from `tests/pricing.ch`,
-prices a one-year at-the-money call:
-
-```chelis
-import Shoals.Pricing (bs_call_scalar)
-
-def example() -> f32 = bs_call_scalar(
-  cast(100.0, f32),
-  cast(100.0, f32),
-  cast(0.05, f32),
-  cast(0.2, f32),
-  cast(1.0, f32)
-)
-```
-
-The result is approximately `10.4506`. The companion put,
-`bs_put_scalar`, takes the same arguments and returns approximately
-`5.5735` for the same inputs.
-
-## Pricing a vector of spots
-
-Most pricers have a vectorized form that maps over a tensor of spots. The
-following example, from `tests/pricing.ch`, prices a call at three spot
-levels at once:
-
-```chelis
-import Shoals.Pricing (call_prices)
-
-def example() -> tensor[3, f32] = {
-  spots = to_tensor([cast(80.0, f32), cast(100.0, f32), cast(120.0, f32)])
-  call_prices(spots, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
-}
-```
-
-The three prices are approximately `1.8594`, `10.4506`, and `26.169`.
-
-## A Monte Carlo price
-
-The Monte Carlo engine carries the `Random` effect, so it runs inside a
-`with seed(...)` block that fixes the random stream. The number of paths is
-the length of a template tensor you pass in. This example, from
-`tests/pricing.ch`, prices the same call with twenty thousand paths:
-
-```chelis
-import Shoals.Pricing (mc_call_price)
-
-def example() -> f32 ! { Random } = {
-  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
-  with seed(42) {
-    mc_call_price(template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
-  }
-}
-```
-
-The Monte Carlo estimate converges to the closed-form price as the path
-count grows. The next chapter explains the tensor and effect idioms these
-examples use.
+To inspect the full exported API, start with [Pricing](pricing.md), then [Working with tensors and effects](conventions.md). These chapters distinguish standalone commands from excerpts that require the surrounding module and imports.

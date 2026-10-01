@@ -32,9 +32,10 @@ From `tests/greeks.ch`, an at-the-money call delta with a bump of `0.01`:
 fd = fd_delta_call(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32), cast(0.01, f32))
 ```
 
-Call delta lands in `[0, 1]`, put delta in `[-1, 0]`, and the two differ
-by exactly one. Call and put vega are equal. Call rho is positive, put rho
-negative, and call theta negative.
+For the positive inputs exercised in the tests, call delta is in `[0, 1]`,
+put delta is in `[-1, 0]`, and they differ by approximately one. Call
+and put vega agree within the test tolerance. At the tested points,
+call rho is positive, put rho negative, and call theta negative.
 
 ## Second-order finite-difference Greeks
 

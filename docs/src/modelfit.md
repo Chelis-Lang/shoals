@@ -3,9 +3,9 @@
 Module: `Shoals.ModelFit`.
 
 This module supports least-squares model calibration: weighted squared and
-absolute residuals, a vega-weighted variant for volatility fitting, a
-sum-of-squared-errors loss, bound projection, and a single bound-clamped
-Levenberg-Marquardt step on a scalar parameter.
+absolute residuals, a vega-weighted variant, loss functions, bound
+projection, and bounded optimization helpers for scalar and vector
+parameters.
 
 ## Bound projection
 
@@ -56,8 +56,9 @@ def lm_bounded_step_scalar(jtj: f32, jtr: f32, lambda: f32, current: f32, lo: f3
 `lm_bounded_step_scalar` takes one damped Gauss-Newton step on a scalar
 parameter: it computes `step = jtr / (jtj + lambda)`, moves the current
 value to `current - step`, and projects the result into `[lo, hi]`. The
-damping `lambda` attenuates the step, and a zero `jtr` leaves the parameter
-in place. From `tests/modelfit.ch`:
+damping `lambda` attenuates the step. If `jtj + lambda` is exactly
+zero, the function uses a zero step before clamping. From
+`tests/modelfit.ch`:
 
 ```chelis
 step = lm_bounded_step_scalar(cast(1.0, f32), cast(0.0, f32), cast(0.001, f32), cast(0.5, f32), cast(0.0, f32), cast(1.0, f32))
@@ -66,3 +67,11 @@ step = lm_bounded_step_scalar(cast(1.0, f32), cast(0.0, f32), cast(0.001, f32), 
 
 A proposed step that overshoots a bound is clamped to that bound, and a
 larger `lambda` produces a smaller, more conservative move.
+
+## Vector and pipeline helpers
+
+The module also exports `lm_bounded_nparam` and `bfgs_bounded_nparam` for
+bounded vector parameters, `multi_target_fit`, SABR initializers, and
+two-stage pipeline helpers. Their callbacks, shapes, bounds, and stopping
+settings are explicit. See `src/modelfit.ch` and the corresponding
+`tests-manual/` cases for complete signatures and numerical examples.

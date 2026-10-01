@@ -2,10 +2,10 @@
 
 Module: `Shoals.PricingExtended`.
 
-This module adds four closed-form pricers beyond Black-Scholes: Bachelier
-for a normal underlying, Black for a forward-priced option, Garman-Kohlhagen
-for FX, and Margrabe for an exchange option. It also exposes the standard
-normal cumulative and density used internally, so they can be reused.
+This module includes Bachelier for a normal underlying, Black for a
+forward-priced option, Garman-Kohlhagen for FX, and Margrabe and Stulz
+exchange options. It also exports asset-or-nothing and cash-or-nothing
+calls and puts, and standard-normal helpers.
 
 ## Standard normal helpers
 
@@ -96,20 +96,17 @@ option is worthless. From `tests/pricingextended.ch`:
 px = margrabe_exchange_call(cast(100.0, f32), cast(100.0, f32), cast(0.2, f32), cast(0.2, f32), cast(1.0, f32), cast(1.0, f32))
 // px == 0.0
 ```
+## Other payoffs and numerical helpers
 
+`pe_margrabe_stulz` includes per-asset continuous yields `q1` and `q2`
+in the exchange-option formula. The
+`pe_asset_or_nothing_*` and `pe_cash_or_nothing_*` functions price digital
+calls and puts. These pricers assume the usual positive inputs for their
+model formulas; their constructors do not validate market data.
 
-## Shared lattice and tridiagonal helpers
-
-`Shoals.Trees.tr_binom_european_call_generic` accepts spot, strike, the up/down
-log increments, up probability, per-step discount and an `i64` step count.
-It builds terminal call payoffs and discounts backward through that lattice.
-Supply a nonnegative count, finite inputs and a probability in [0, 1]. The
-helper does not validate these model constraints. At zero steps it returns
-the intrinsic call payoff. The constant-payoff regression checks two steps
-with discount 0.5 against one quarter of the terminal payoff.
-
-`Shoals.Pde.pde_thomas_solve` accepts lower, diagonal, upper and right-hand-side
-lists plus the positive system size. Supply lists of that size and a finite
-system suitable for elimination without pivoting. This helper retains the
-existing numerical guard: a pivot with magnitude below `1e-10` is replaced
-with one without a diagnostic. Such inputs are outside its accuracy contract.
+Separate modules provide lattice and PDE helpers. `Shoals.Trees` includes
+`tr_binom_european_call_generic`, which accepts a nonnegative step count,
+finite inputs, and an up probability in `[0, 1]`. `Shoals.Pde.pde_thomas_solve`
+solves a supplied tridiagonal system without pivoting. It substitutes one
+when a pivot's absolute magnitude is below `1e-10`, without a diagnostic.
+Near-singular systems are outside its accuracy contract.

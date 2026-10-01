@@ -1,112 +1,38 @@
 # Scope and limitations
 
-This chapter is the honest account of where the Shoals surface stops. It
-describes the boundaries of what the library does, so you know what to build
-on top of and what to reach for elsewhere. Everything here is drawn from the
-source in this checkout.
+Shoals implements particular models and numerical methods. Check inputs against each function's assumptions; most constructors and pricers do not validate market data.
 
-## Numerical precision
+## Precision and pricing
 
-Every numeric quantity in Shoals is a 32-bit float (`f32`). Prices, rates,
-volatilities, exposures, and intermediate sums all carry single-precision
-rounding. The test tolerances reflect this: closed-form prices are checked to
-around a thousandth, and Monte Carlo convergence is checked to a couple of
-percent. If you need tighter agreement than single precision supports, that
-is outside what these functions provide.
+Most public finance values are `f32`, including curve rates, risk measures, and money amounts. `Shoals.Pricing` also exports `f64` Black-Scholes kernels and a tensor-valued `bs_call_wire_f64`; the scalar `f32` prices are converted from the `f64` pricing body. The two `f64` entries use different normal-CDF approximations and agree within the bounded comparison exercised in `tests/pricing.ch`, not by exact identity. `n_cdf64` loses relative precision in the far negative tail. Use the price and sensitivity oracles for the domain you need.
 
-## Pricing and Greeks
+Black-Scholes here assumes a non-dividend-paying underlying and positive spot, strike, volatility, and maturity. It has no dividend-yield input. `Shoals.Greeks` provides bump-based sensitivities, while `Shoals.Pricing` exports derivatives of its own displayed price. Their source tests compare representative points with analytic and finite-difference results; they do not certify every market input. The implied-vol solver in `Shoals.VolSurface` searches a fixed volatility bracket by default and returns a NaN sentinel when its strict sign-change test fails. Supply positive maturity and valid SVI/SABR parameters; the surface constructors do not enforce admissibility.
 
-- The Black-Scholes pricers assume a non-dividend-paying underlying. There is
-  no dividend yield or borrow argument.
-- The Greeks in `Shoals.Greeks` are finite-difference estimates that take an
-  explicit bump size, plus analytic references for the call's delta, vega,
-  gamma, and the put delta. There is no analytic theta or rho exposed in that
-  module; the textbook theta and rho live among the
-  [reference oracles](references.md).
-- The gradient-derived sensitivity paths in `Shoals.Pricing` differentiate the
-  displayed price through `grad`: one f64 normal CDF sits behind both the price
-  and every Greek, so a Greek is the automatic-differentiation derivative of the
-  price the same module returns. First-order: `deltas_call`, `deltas_put`,
-  `vegas_call`, `rhos_call`, `thetas_call`. Second-order (via nested grad on
-  the pinned 0.18.1 release): `gammas_call`, `volgas_call`,
-  `vannas_call`. All are validated
-  against the analytic and finite-difference oracles by
-  `scripts/oracle_greeks_gate.py` and carry in-suite `Std.Test` standing
-  assertions (the heavy second-order grad assertions live in
-  `tests-manual/greeks_secondorder.ch`). The finite-difference Greeks in
-  `Shoals.Greeks` remain a separate, independently exercised oracle.
-- Shoals#42 adds sampled producer records for every shipped call Greek. A
-  record directly invokes the exported AD output and `bs_call_scalar`, while
-  compiler-owned dependency edges establish that both reach `bs_call_f64`.
-  Corrupt derivative controls fail in-domain. This establishes runtime-oracle
-  and fuzz consistency; certified-box and global verified-AD claims remain
-  explicitly deferred and are not implied by these greens.
+## Curves and dates
 
-## Curves
+`bootstrap_zero_from_par` assumes annual coupons and integer-year pillars. `bootstrap_multi` accepts deposits, zero-coupon bonds, and par swaps in strictly increasing tenor order; it solves one pillar at a time. Its swap dates are year fractions rather than calendar-rolled dates. Invalid instruments or order raise an error; an unbracketed rate can return NaN. `Shoals.Curves` uses `f32` rates and maturities. Basis-curve helpers are also exported, but there is no general joint multi-curve solve.
 
-- `bootstrap_zero_from_par` handles the single-curve case with one coupon per
-  pillar at integer-year spacing.
-- `bootstrap_multi` bootstraps deposits, zero-coupons, and par swaps
-  sequentially, one pillar per instrument. FRAs and futures are not
-  instruments, and there is no joint (global) solve. Swap coupon dates are
-  `k / payments_per_year` year fractions, not calendar-rolled dates.
-- The curves and the bootstrap are f32-only (shoals#72).
-- The day-count year fraction is available in `Shoals.Date`, but the curve
-  interpolators take maturities directly as `f32` year fractions; they do not
-  consult a calendar.
+`Shoals.Tenor.tenor_apply` and `Shoals.Date.schedule_from_tenor` use fixed 30-day months and 365-day years. `Shoals.Date.add_months` and `schedule_from_tenor_calendar` provide calendar-month stepping instead. The date-roll and business-day functions in `Shoals.Date` skip weekends only: their `weekend_only` argument currently has no effect on that behavior. Use `Shoals.HolidayCal.is_business_day` to check holidays. `parse_tenor` accepts uppercase `ON`, `TN`, `SN`, and an integer followed by `D`, `W`, `M`, or `Y`; malformed strings fail.
 
-## Dates, tenors, and calendars
+`add_business_days` advances for positive counts and does not step backward
+for a negative count. Use a positive `step_months` for either schedule
+generator. `Shoals.Distributions` assumes valid distribution parameters,
+including positive scales and degrees of freedom and an admissible
+correlation; its constructors do not check them.
 
-- Month and year tenors use fixed thirty-day and three-hundred-sixty-five-day
-  approximations. `tenor_apply` and `schedule_from_tenor` therefore do
-  calendar-day arithmetic, not calendar-aware month stepping, and a generated
-  schedule lands on thirty-day multiples rather than on month-end dates.
-- Tenors are constructed programmatically (`days_n`, `weeks_n`, `months_n`,
-  `years_n`, and the overnight family). Parsing a tenor from a string is not
-  part of this surface.
-- The bundled holiday tables are New York and London for the 2025 calendar
-  year. Other centers and years are not included; build a `Calendar` from your
-  own holiday list with `empty_calendar` and the constructors, or combine
-  calendars with `joint_calendar`.
-- The business-day rolling in `Shoals.Date` skips weekends only; it does not
-  consult a holiday calendar. Holiday-aware business-day logic is in
-  `Shoals.HolidayCal` through `is_business_day`, which you apply yourself.
+`hc_nyc_calendar()` and `hc_ldn_calendar()` contain 2025 dates. The year and multi-year constructors generate smaller fixed-rule New York and London lists; they are not complete bank-holiday services. Tokyo, Sydney, Frankfurt, and Hong Kong holiday predicates use separate annual rules. Hong Kong's table-backed dates cover 2025–2030; outside that range its predicate returns false. Verify regional observance rules before using a calendar for settlement.
 
-## Stochastic processes
+## Simulation, risk, and valuation adjustments
 
-- The Merton jump-diffusion terminal uses an aggregate-jump Gaussian
-  approximation: the total jump contribution over the horizon is drawn as a
-  single Gaussian per path rather than as a compound Poisson sum of discrete
-  jumps.
-- Correlation across assets is supported for the two-asset case through a
-  two-by-two Cholesky factor. There is no general n-asset correlated draw.
+Random draws require a seed. `Shoals.Stochastic.merton_jump_terminal` uses an aggregate Gaussian approximation to jump totals rather than drawing a compound Poisson process. Its correlated GBM helper covers two assets. `Shoals.Rng` has committed Sobol direction numbers for 32 dimensions; higher runtime dimensions use a fallback sequence up to the exposed limit. These choices matter for convergence studies.
 
-## Risk
+`Shoals.Risk` computes Gaussian parametric or sample-based empirical VaR and expected shortfall from **losses** supplied by the caller. `Shoals.RiskExt.mc_var` and `mc_expected_shortfall` summarize supplied simulated losses; they do not generate paths. Use nonempty samples and confidence levels strictly between zero and one. Currency tags in `Shoals.CurrencyTag` are checked at runtime. Converting money requires an exchange rate from the caller.
 
-- The Monte Carlo VaR and expected shortfall in `Shoals.RiskExt` are computed
-  from the empirical loss distribution and delegate to the historical
-  measures in `Shoals.Risk`. They summarize a loss sample you supply; they do
-  not run the simulation that produces it.
+The Gaussian parametric functions use a sample standard deviation with
+one degree of freedom, so supply at least two losses for them.
 
-## Currency
+`Shoals.Xva` has constant-hazard CVA/DVA, a hazard-curve CVA, funding and capital adjustment helpers, and a sampled constant-hazard wrong-way-risk estimator. Exposures and times are supplied by the caller. The time-grid methods assume increasing times, suitable exposure values and recovery rates, and do not model collateral. Pointwise netting handles two deals. `Shoals.Orderbook` sorts orders by price, without matching or quantity validation; best prices on an empty side and VWAP for an empty book use NaN sentinels.
 
-- `Shoals.CurrencyTag` supports US dollars, pounds sterling, and euros.
-  Same-currency addition and subtraction are checked at runtime and fail on a
-  currency mismatch rather than converting implicitly. Cross-currency
-  arithmetic goes through `convert` with a rate you provide.
+## What the checks establish
 
-## XVA
-
-- The credit model is a constant hazard rate. Term-structured hazard,
-  wrong-way risk, and collateral are not modeled. Netting is the pointwise
-  sum of two deals.
-
-## Property checks
-
-The ordinary functions in `properties/` are called by the test suite on fixed
-input grids. The canonical `@property` files have an additional proof-gate
-lane: SMT where supported and seeded fuzz otherwise. In particular, the six
-parametric/historical VaR and ES coherence entries require 25 accepted samples
-at each of seeds 0, 1, and 2 plus corrupt witnesses and compiler-owned function
-edges. That is sampled characterization, not exhaustive proof. For 0.24.5 it
-is reproduced by the release gate on the official target dependency chain.
+`tests/` exercises fixed and sampled inputs. `properties/` contains predicates and selected `@property` checks. A `fuzz_validated` result is a seeded sample result, not an exhaustive proof. Some composite properties prove a formula under a separate normal-CDF contract; their sampled comparison with the shipped pricer does not make the two CDF implementations identical. See [Property specifications](properties.md) and the machine-readable `docs/cnote-import-surface.json` for the reported methods and bounds.

@@ -5,7 +5,9 @@ Module: `Shoals.Stochastic`.
 This module generates sample paths and terminal draws for geometric
 Brownian motion, an antithetic-variates terminal-mean estimator, Merton
 lognormal jump-diffusion with a compensated drift, and a two-asset
-correlated GBM driven by a two-by-two Cholesky factor. The random functions
+correlated GBM driven by a two-by-two Cholesky factor. It also exports
+Heston quadratic-exponential steps and terminal simulations and Kou
+double-exponential jump helpers. The random functions
 carry the `Random` effect and run inside a `with seed(...)` block. The path
 length, or the number of terminal draws, is the length of a template
 tensor you supply.
@@ -29,7 +31,7 @@ bit-exactly reproducible under a fixed seed:
 
 ```chelis
 template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(50, i64))))
-path = with seed(7) { gbm_path(template, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32)) }
+path = with seed(7i64) { gbm_path(template, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32)) }
 ```
 
 The terminal draws have mean near `s0 * exp(mu * t)` and variance near the
@@ -42,10 +44,11 @@ def merton_compensated_drift(mu: f32, sigma: f32, lambda: f32, jump_mean: f32, j
 def merton_jump_terminal[n](template: tensor[n, f32], jumps_template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> tensor[n, f32] ! { Random }
 ```
 
-`merton_compensated_drift` returns the drift adjustment that keeps the
-expected terminal value at `s0 * exp(mu * t)` once jumps are added: it
-subtracts the diffusion correction and the expected jump contribution
-`lambda * (exp(jump_mean + 0.5 * jump_vol^2) - 1)`. With `lambda` zero it
+`merton_compensated_drift` computes the log drift for a compound-Poisson
+model with normally distributed log jumps. It subtracts the diffusion
+correction and the expected jump contribution
+`lambda * (exp(jump_mean + 0.5 * jump_vol^2) - 1)`. This gives that model
+an expected terminal value of `s0 * exp(mu * t)`. With `lambda` zero it
 reduces to the plain GBM drift. From `tests/stochastic_extended.ch`:
 
 ```chelis
@@ -53,17 +56,18 @@ d = merton_compensated_drift(cast(0.05, f32), cast(0.2, f32), cast(0.0, f32), ca
 // d == 0.05 - 0.5 * 0.2 * 0.2
 ```
 
-`merton_jump_terminal` draws terminal prices under lognormal jump-diffusion.
-The jump component is aggregated as a single Gaussian per path (the
-aggregate-jump approximation), so it takes two template tensors of the same
-length, one for the diffusion draws and one for the jump draws. The terminal
-prices are positive and their mean stays near `s0 * exp(mu * t)` because of
-the compensated drift:
+`merton_jump_terminal` approximates the total log jump with one Gaussian
+draw per path rather than sampling a compound-Poisson jump count. It takes
+two template tensors of the same length, one for the diffusion draws and
+one for the jump draws. Terminal prices are positive, but their mean does
+not generally equal `s0 * exp(mu * t)`: the Gaussian approximation changes
+the jump distribution's exponential moment. From
+`tests/stochastic_extended.ch`:
 
 ```chelis
 template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
 jumps_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
-paths = with seed(7) {
+paths = with seed(7i64) {
   merton_jump_terminal(template, jumps_template, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(0.3, f32), cast(-0.1, f32), cast(0.15, f32), cast(1.0, f32))
 }
 ```
@@ -92,8 +96,17 @@ marginal mean stays near `s0 * exp(mu * t)`:
 ```chelis
 template_x = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
 template_y = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
-out = with seed(13) {
+out = with seed(13i64) {
   correlated_gbm_terminal_2d(template_x, template_y, cast(100.0, f32), cast(50.0, f32), cast(0.04, f32), cast(0.06, f32), cast(0.2, f32), cast(0.3, f32), cast(0.5, f32), cast(1.0, f32))
 }
 // out.0 is the X terminal tensor, out.1 the Y terminal tensor
 ```
+
+## Other exported processes
+
+`heston_qe_step`, `heston_qe_terminal`, and `heston_qe_paths_terminal`
+implement a quadratic-exponential Heston step and seeded terminal draws.
+`sto_kou_compensator`, `sto_kou_jump_sample`, and `sto_kou_jump_terminal`
+provide double-exponential jump calculations and seeded terminal draws.
+These are model-specific approximations; use the corresponding source
+tests and [Scope and limitations](scope.md) to check parameter assumptions.
