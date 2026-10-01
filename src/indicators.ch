@@ -425,28 +425,31 @@ def crossunder(a: List[Option[f64]], b: List[Option[f64]]) -> List[Option[bool]]
 -- type name"), so returning a tensor would force a second, weaker warm-up
 -- convention. These do not.
 --
--- TWO CRITERIA, NOT ONE. A representation a caller cannot misread has to be
--- both UNDROPPABLE and DISTINGUISHABLE from a computed value, and the two
--- exclude different candidates.
+-- WHY NOT A TENSOR RETURN. Three grounds, one per candidate shape that has
+-- actually been proposed. This deliberately does NOT claim to enumerate every
+-- conceivable tensor return -- three successive red-team rounds each broke a
+-- completeness claim here (first "only two candidates", then one criterion,
+-- then two), and the claim was never load-bearing: the decision is the return
+-- type, not a proof of impossibility. If a fourth shape turns up, judge it on
+-- its own terms rather than extending a lemma.
 --
--- Undroppable rules out every SIBLING channel -- a scalar count, a parallel
--- `bool` tensor, a record field, a tuple component -- because each can be
--- projected away by reading one component, which is §2.15.2's drop hazard.
--- `(tensor[n, f64], tensor[n, bool])` does type-check at this pin and falls
--- here, not to non-existence.
+--   * A SIBLING channel -- a scalar count, a parallel `bool` tensor, a record
+--     field, a tuple component -- is droppable: a caller reads one component
+--     and the marker is gone. That is §2.15.2's hazard verbatim.
+--     `(tensor[n, f64], tensor[n, bool])` type-checks at this pin and falls
+--     here, not to non-existence.
+--   * An IN-ELEMENT SENTINEL (a NaN fill) has no sibling to drop, so the
+--     droppability ground does not reach it. It fails because it is
+--     indistinguishable from a computed value and propagates silently --
+--     "represented, not filled", above.
+--   * A MARKER-FREE return (hand the tensor back and document that the first
+--     n-1 entries are unspecified) or a SHORTENED one fails on the third
+--     ground §2.15.2 already states: it moves the alignment burden onto the
+--     caller, which is where the measured off-by-one and look-ahead defects
+--     appear (nautilus#85).
 --
--- Distinguishable is what rules out an IN-ELEMENT SENTINEL. A NaN fill lives
--- inside the f64 element and has no sibling to drop, so the first criterion
--- does not reach it; what disqualifies it is that it is indistinguishable
--- from a computed value and propagates silently -- "represented, not filled",
--- above. An earlier revision of this comment claimed the undroppable
--- criterion alone covered the NaN fill "as much as a count". It does not, and
--- generalising to one criterion quietly dropped the only argument against the
--- NaN form.
---
--- Together they are exhaustive for a tensor return: a tensor element is a
--- precision type, so absence must either sit in a sibling (droppable) or be
--- a sentinel value (indistinguishable).
+-- `tensor[n, Option[f64]]` is separately not expressible: a tensor element
+-- must be a precision type.
 --
 -- The name of every variant is `tensor_` prepended to the list name, with no
 -- exceptions, so a generator can derive it by rule rather than by lookup.

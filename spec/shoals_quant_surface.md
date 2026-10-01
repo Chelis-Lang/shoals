@@ -517,26 +517,24 @@ derivable by rule. They take `tensor[n, f64]` and return exactly what their
 list counterparts return.
 
 **The return type stays `List[Option[f64]]`.** §2.15.2 requires a
-representation a caller cannot misread, and that is two requirements: the
-absence marker must be **undroppable** and it must be **distinguishable** from
-a computed value. They exclude different candidates, and both are needed.
+representation a caller cannot misread. Each tensor-return shape that has been
+proposed fails one of §2.15.2's three grounds, and they are different grounds:
 
-Undroppable excludes every *sibling* channel — a scalar count, a parallel
-validity tensor, a record field, a tuple component — since each can be
-projected away, which is §2.15.2's drop hazard restated.
-`(tensor[n, f64], tensor[n, bool])` is admissible to the type system and falls
-here.
+- A *sibling* channel — a scalar count, a parallel validity tensor, a record
+  field, a tuple component — is **droppable**: a caller reads one component and
+  the marker is gone. `(tensor[n, f64], tensor[n, bool])` is admissible to the
+  type system and falls here.
+- An *in-element sentinel* such as a NaN fill has no sibling to drop, so
+  droppability does not reach it. It is **indistinguishable from a computed
+  value** and propagates silently.
+- A *marker-free* return (the tensor unchanged, with the warm-up documented) or
+  a *shortened* one **moves the alignment burden onto the caller**, which
+  §2.15.2 already rejects.
 
-Distinguishable excludes an *in-element sentinel*. A NaN fill has no sibling to
-drop, so the first requirement does not reach it; it is excluded because it
-cannot be told apart from a computed value and propagates silently. **A
-NaN-filled `tensor[n, f64]` return is rejected on this ground and not on the
-other.**
-
-A tensor element is a precision type, so absence in a tensor return must
-either sit in a sibling or be a sentinel. Both are excluded, so no tensor
-return satisfies §2.15.2, and `tensor[n, Option[f64]]` does not exist in any
-case. The tensor admitted here is therefore the input.
+`tensor[n, Option[f64]]` is separately not expressible, since a tensor element
+must be a precision type. This section states grounds for the shapes that have
+been proposed; it does not claim to enumerate every possible tensor return, and
+a new shape should be judged against §2.15.2 directly.
 
 `crossover` and `crossunder` consume masked series, so their tensor forms take
 each side's warm-up as a required parameter, which cannot be dropped. That

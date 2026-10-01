@@ -433,7 +433,7 @@ in code that is CLOSED upstream but not sitting in §Archived.
       `coral-0.7.43` as pinned: `Coral.Window` is f32 throughout (the package
       contains no `f64` at all -- `src/frame.ch` is `FloatCol(tensor[n, f32])`);
       it RETURNS `tensor[n, f32]` where these return `List[Option[f64]]`; and
-      it fills the warm-up with `nan_f32()` (`src/window.ch`, 8 sites) where
+      it fills the warm-up with `nan_f32()` (`src/window.ch` lines 34, 39, 44, 49 -- 4 fill sites; the other four `nan_f32` tokens there are its definition, a degenerate-window guard, and two propagation sites in the min/max folds) where
       these carry an `Option` mask -- the very representation
       `spec/shoals_quant_surface.md` §2.15.5 exists to require. It also offers
       no `Ddof` choice (sample only) and no shift or diff.

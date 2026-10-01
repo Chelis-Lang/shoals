@@ -28,10 +28,12 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
   9. ``scripts/contract_gate.py`` — offline manifest resolvability + pin
       freshness (also a per-PR CI gate).
   10. ``scripts/check_tensor_surface_parity.py`` — the list/tensor export
-      parity guard for ``Shoals.Indicators`` (shoals#83): every series-taking
-      export has a ``tensor_`` counterpart derivable by the naming rule, and
-      every ``tensor_`` export is exercised by the equivalence suite. Offline,
-      instant, stdlib-only.
+      parity guard for ``Shoals.Indicators`` (shoals#83). Proves that every
+      series-taking export has a ``tensor_`` counterpart derivable by the
+      naming rule and that none is orphaned. It also reports whether each
+      counterpart appears in an equality assertion, but that leg is a
+      heuristic over source text, not a proof — see the script's docstring.
+      Offline, instant, stdlib-only.
   11. ``scripts/test_check_package_prove_latency.py`` — negative-parity tests
       for the chelis#924 release oracle.
   12. ``scripts/test_risk_invariant_gate.py`` — adversarial compiler-evidence
