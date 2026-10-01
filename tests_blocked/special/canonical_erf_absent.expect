@@ -1,0 +1,10 @@
+unbound variable: erf
+Blocker: chelis#902 has no canonical erf primitive. An imported
+Nautilus.Special.erf is callable at f64 from 0.7.47 but its A&S approximation
+does not meet the observed accuracy of Shoals.Pricing.erf64 (Cody).
+
+On pass: inspect the new primitive's numbered [05-OP-N] atom and numerical
+accuracy; compare it against Shoals.Pricing.erf64 before replacing the kernel.
+Promote this probe to tests/ as a positive test, remove the active chelis#902
+narrowing only after the replacement meets the accuracy contract, and update
+docs/CHELIS_SURFACE.md and docs/UPSTREAM_BUGS.md in the same change set.

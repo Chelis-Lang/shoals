@@ -11,13 +11,14 @@ in `Chelis-Lang/chelis`.
 # Chelis Capability Surface for Shoals
 
 **Draft manifest:** Shoals 0.24.14 / Chelis 0.18.12 / chelis-std 0.4.0 /
-Nautilus 0.7.46 / Coral 0.7.43. The sibling packages still require Chelis
-0.18.11, so this manifest is not a buildable official chain. Compiler-only
-evidence is in [`chelis_0_18_12_migration.md`](chelis_0_18_12_migration.md).
+Nautilus 0.7.47 / Coral 0.7.43. Nautilus 0.7.47 declares Chelis 0.18.12;
+Coral 0.7.43 still requires Chelis 0.18.11, so this is not a buildable
+official chain. Bounded evidence is in
+[`chelis_0_18_12_migration.md`](chelis_0_18_12_migration.md).
 Capability markers and numerical measurements below retain their prior
 0.18.11-chain evidence until the package and full gates run. The last measured
-Black-Scholes WireDag was schema 15 (1522 nodes, root 787), and Nautilus
-0.7.46's f32 `erf` uses a four-term Taylor branch below `|x|=0.25`.
+Black-Scholes WireDag was schema 15 (1522 nodes, root 787). Nautilus 0.7.47's
+generic `erf` retains the four-term Taylor branch below `|x|=0.25`.
 
 What the Chelis language and the bundled chelis-std actually provide to the
 quantitative-finance domain this shell touches — numerical methods, pricing,
@@ -25,13 +26,23 @@ Greeks, and the proof surface over them. **Read this before designing around a
 suspected language gap.**
 
 > **Draft pin:** Shoals 0.24.14; Chelis 0.18.12 (chelis-std 0.4.0,
-> bundled), Nautilus 0.7.46, Coral 0.7.43 (both compiler-incompatible)
-> · **Compiler-only refresh:** 2026-09-30
+> bundled), Nautilus 0.7.47 (compatible), Coral 0.7.43 (incompatible)
+> · **Partial refresh:** 2026-10-01
 
 The last accepted package-chain receipts are in
 [`chelis_0_18_11_migration.md`](chelis_0_18_11_migration.md) and the frozen
 CNote manifest. The release-specific narrative below is historical
 de-narrowing evidence.
+
+**Published Nautilus input for the draft bump.** Annotated tag `v0.7.47`
+dereferences to commit `76a66ae921cafeef538e1ff48ea53fdc253c1724`.
+The downloaded `nautilus-0.7.47.chb` is SHA-256
+`cd5c04ecfcd2445b7f7a7e0a997d721f20c85aac4524ae626571c3db96008603`;
+the archive is
+`dfe18e834c2d6e49282afd682e0452e51575c3d1dcefd4db3267098e98bba716`.
+Both match the release sidecar. The archive declares compiler `=0.18.12`;
+its 25 source modules retain the 0.7.46 exported-name sets. This establishes
+the Nautilus package pin, not a complete Shoals chain.
 
 ## Historical 0.18.6 de-narrowing record
 
@@ -283,11 +294,13 @@ the `f64` entry point was no better than the `f32` `Nautilus.Special.erf` whose
 coefficients it copied, and no wider cast could have improved it. A ~4.1e8x
 reduction. That was this shell's issue 61.
 
-**Still hand-rolled, and why.** Chelis has no canonical `erf` (chelis#902), and
-`Nautilus.Special` is f32-only so its `erf` cannot be called from an `f64` path
-— filed as nautilus#59 and probed by
-`tests_blocked/special/erf_builtin_absent.ch`. The `f32` sibling still carries
-the A&S bound: nautilus#56.
+**Still hand-rolled, and why.** Chelis has no canonical `erf` (chelis#902).
+Nautilus 0.7.47 makes `Nautilus.Special.erf` callable at `f64`, as the
+test `tests/nautilus_erf_f64.ch` observes in an isolated Nautilus-only package,
+resolving the nautilus#59 signature barrier. It retains A&S coefficients whose f64
+approximation gap is tracked by nautilus#74. Replacing Shoals's Cody kernel
+with it would discard the measured f64 accuracy. The missing canonical
+primitive is probed by `tests_blocked/special/canonical_erf_absent.ch`.
 
 **Not covered here.** `Shoals.Greeks`'s `analytic_delta_call` /
 `analytic_delta_put` use a local `n_cdf` over `Nautilus.Special.erfc`, still the
@@ -312,12 +325,11 @@ all in this repository -- plus TWO Python mirrors,
 `research/proof-infra/ad/harness.py` and
 `scripts/oracle_greeks_gate.py::_erf_as_f32`. The second is the one with a live
 maintenance trigger: it models `Nautilus.Special.erf` and must be re-measured at
-the next nautilus pin bump past 0.7.46 (see `docs/UPSTREAM_BUGS.md`).
-Add `Nautilus.Special.erf`/`erf_t`
-upstream. Since `erf64` moved to Cody's these are no longer copies of one
+the next Nautilus kernel change (see `docs/UPSTREAM_BUGS.md`).
+Since `erf64` moved to Cody's these are no longer copies of one
 algorithm but two different ones, so it is drift rather than redundancy, and
-drift is the harder case: a caller cannot assume they agree at all. Tracked on
-this shell's issue 61 and nautilus#59.
+drift is the harder case: a caller cannot assume they agree at all. Tracked by
+nautilus#74 and chelis#902; nautilus#59 resolved the signature barrier.
 
 **Scope.** These are kernels this shell authors. Accuracy of chelis primitives
 is upstream's, and upstream has no accuracy contract for shells to inherit —

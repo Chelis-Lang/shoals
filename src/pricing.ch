@@ -17,9 +17,9 @@ export (erf64, n_cdf64, bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_
 -- bound is a property of its coefficients rather than of the arithmetic, so the
 -- f64 entry point had been no better than the f32 `Nautilus.Special.erf` whose
 -- coefficients it copied. Hand-rolled here because Chelis has no canonical erf
--- (chelis#902) and `Nautilus.Special` is f32-only (nautilus#59,
--- tests_blocked/special/erf_builtin_absent.ch); the f32 sibling keeps the old
--- bound (nautilus#56).
+-- (chelis#902). Nautilus.Special.erf accepts f64 since 0.7.47, but still
+-- evaluates the A&S coefficients at ~1.4e-7 accuracy (nautilus#74);
+-- this Cody kernel preserves the measured f64 accuracy.
 --
 -- Three named helpers rather than one expression, because the AD Greeks
 -- differentiate through this path and each branch is separately checkable.

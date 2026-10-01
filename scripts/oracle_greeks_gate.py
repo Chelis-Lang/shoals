@@ -124,7 +124,7 @@ def erf_pkg(x: float) -> float:
     ~1e-16, ten orders below this gate's tightest tolerance (3e-6).
 
     `_erf_as_f32` models the separate f32 Nautilus.Special.erf path: the
-    pinned 0.7.46 uses a four-term Taylor series below |x|=0.25 and A&S
+    pinned 0.7.47 uses a four-term Taylor series below |x|=0.25 and A&S
     elsewhere. The generated kernel-mirror test checks both arms and their
     boundary against the installed package at every oracle run.
     """

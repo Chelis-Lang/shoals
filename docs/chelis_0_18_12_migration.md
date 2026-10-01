@@ -1,9 +1,32 @@
-# Chelis 0.18.12 draft pin: compiler-only evidence
+# Chelis 0.18.12 draft pin: partial package evidence
 
 Shoals 0.24.14 candidate PR #95 remains a draft. Its compiler pin is
-`=0.18.12`; its Nautilus 0.7.46 and Coral 0.7.43 dependencies still declare
-`=0.18.11`. No Shoals package build, source test suite, blocked probe suite,
-proof-tier receipt, or full local gate on the official chain is claimed here.
+`=0.18.12`; Nautilus 0.7.47 declares `=0.18.12`, while Coral 0.7.43 still
+declares `=0.18.11`. No Shoals package build, source test suite, blocked probe
+suite, proof-tier receipt, or full local gate on the official chain is claimed
+here.
+
+Nautilus's published `v0.7.47` tag dereferences to commit
+`76a66ae921cafeef538e1ff48ea53fdc253c1724`. Its downloaded CHB
+`cd5c04ecfcd2445b7f7a7e0a997d721f20c85aac4524ae626571c3db96008603`
+and archive
+`dfe18e834c2d6e49282afd682e0452e51575c3d1dcefd4db3267098e98bba716`
+matched both SHA-256 sidecar lines. The archived `reef.toml` and `reef.lock`
+identify Nautilus 0.7.47, chelis-std 0.4.0, and compiler 0.18.12.
+Comparing release archives 0.7.46 and 0.7.47 found no exported-name change
+across the 25 source modules. The sampling exports in
+`Nautilus.Distributions` now take a first `key`, matching Shoals's explicit
+key calls. `Nautilus.Special.erf` is now generic over `Float`, and an isolated
+package with the released Nautilus artifact and bundled chelis-std checked
+the old f64 signature probe cleanly and passed
+`tests/nautilus_erf_f64.ch`. The unimported canonical `erf` remains absent,
+as `tests_blocked/special/canonical_erf_absent.ch` confirmed in that package.
+The generated f32 mirror from `scripts/oracle_greeks_gate.py` passed all 19
+published-kernel points in the same isolated package, covering both signs and
+both sides of the Taylor/A&S boundary. This checks the mirror, not Shoals's
+full AD-Greeks oracle.
+Nautilus's f64 A&S approximation remains less accurate than Shoals's Cody
+kernel; nautilus#74 tracks it, and Shoals retains the kernel.
 
 The official Chelis tag resolves to
 `c81d8188de6ebad032c1bb1c0a427eb0408feee3`; release workflow
@@ -46,8 +69,8 @@ Standalone compiler probes with the released binary:
 `docs/cnote-import-surface.json` retains the prior `chelis_pin`, 37 tier
 expectations, and official 0.18.11-chain receipts while its `pkg_version` names
 the distinct 0.24.14 candidate. Updating those tier records or the exact
-Black-Scholes WireDag receipt requires observed results from compatible
-published Nautilus and Coral packages. At that point rerun
+Black-Scholes WireDag receipt requires observed results from a compatible
+published Coral package with Nautilus 0.7.47. At that point rerun
 in-package blocked and negative tests, the full local gate, proof and numeric
 oracles, and the official-chain release checks before considering merge.
 
