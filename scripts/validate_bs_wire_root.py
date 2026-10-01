@@ -79,7 +79,7 @@ EXPECTED_NODE_COUNT = 1665
 # named loads and op kinds all still match. The node count is checked BEFORE the
 # hash, so a hash-only failure already tells you the count agreed. Confirm that
 # shape, then re-pin; do not go looking for a numerical regression.
-EXPECTED_RAW_SHA256 = "11db75226201dd8110365865c03841aa6a769dfd376b77d3ce4aa53d47e1a925"
+EXPECTED_RAW_SHA256 = "79745ec0079cd6d43a8ef80ee986bf6e2e4f6df91a2b41c8127471421998027e"
 FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
 EXPECTED_LOADS = {
     "a1",

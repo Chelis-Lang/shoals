@@ -89,6 +89,29 @@ call rho, theta, gamma, volga, and vanna; the last three use nested
 derivatives. The [Greeks](greeks.md) chapter documents separate
 finite-difference and analytic checks.
 
+### At expiry
+
+At `t = 0` these return the limit as expiry is approached, and none of them
+returns `NaN`. Two values are infinite, because the quantities themselves
+diverge:
+
+| | `s < k` | `s = k` | `s > k` |
+|---|---|---|---|
+| `deltas_call` | `0` | `0.5` | `1` |
+| `gammas_call` | `0` | `+inf` | `0` |
+| `thetas_call` | `0` | `-inf` | `-r * k` |
+| `vannas_call` | `0` | `0` | `0` |
+| `vegas_call`, `rhos_call`, `volgas_call` | `0` | `0` | `0` |
+
+Gamma at the strike behaves like `1 / (s * sigma * sqrt(t))` and theta like
+`-s * sigma / (2 * sqrt(t))`, so both grow without bound as `t` falls to zero;
+`+inf` and `-inf` are the answers, not placeholders. Delta at the strike is
+`0.5` because `d1` tends to zero there, so `N(d1)` tends to `N(0)` — it is the
+limit in time, not a midpoint convention.
+
+If you aggregate a Greek vector, test for finiteness rather than for `NaN`: a
+`x == x` check is true for an infinity and will pass it through.
+
 ## Monte Carlo call price
 
 ```chelis

@@ -409,6 +409,30 @@ No parked entries.
 
 ## Archived
 
+- **shoals#101 — every exported Greek was `NaN` somewhere at expiry.** Resolved
+  in this shell by supplying the `t = 0` limits in closed form in the Greek
+  wrappers; `tests/pricing_greeks_expiry.ch` covers all nine cells and the
+  finiteness predicate. Recorded here because §4's narrowing-coverage scanner
+  reads the `shoals#101` citations in `src/pricing.ch`, and those comments explain
+  two narrowings that outlive the fix, only one of which the pin bump will
+  dissolve.
+    - **The theta half is chelis#2640 and does dissolve.** The shoals#88
+      denominator clamp's untaken arm is `sigma*sqrt(t)`, whose `t`-derivative is
+      `+inf` at `t = 0`; `grad` of that clamp wrt `t` is NaN at `t = 0` and `0.1`
+      at `t = 1`, measured. That is the chelis#2640 case, fixed upstream at
+      0.18.12 and not present at this pin. When the pin reaches 0.18.12, re-probe
+      whether `thetas_call`'s AD path produces `-r*k` and `0` directly.
+    - **The second-order half does NOT dissolve, and is not an upstream defect.**
+      With the denominator floored, `d(d1)/ds` is `1e298`; squaring it overflows
+      to `+inf`, which multiplies an underflowed second-order factor to give
+      `0 * inf = NaN`. That is IEEE arithmetic on our own floored value, so the
+      closed forms for gamma and vanna stay needed at every pin.
+    - **`where` is load-bearing here, not stylistic.** The gamma limit is `+inf`
+      at the strike, so a hand-rolled arithmetic select computes `0 * inf = NaN`
+      for every other lane: measured, `where(...)` gives `[inf, 0, 0]` where
+      `mask*inf + (1-mask)*0` gives `[inf, NaN, NaN]`. A test fails if the select
+      is rewritten as arithmetic. Do not simplify it.
+
 - **chelis#2640 — `grad` through a scalar `if` returns NaN when the untaken
   branch has a non-finite DERIVATIVE, so every `erf64` core must be total.**
   `spec/06-transformations.md` §2.10.1 states that untaken branches contribute

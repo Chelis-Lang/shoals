@@ -273,6 +273,37 @@ challenges are at discontinuities (early exercise, digital payoffs).
 Shoals's API exposes pathwise and likelihood-ratio dispatch
 explicitly (§2.11).
 
+#### 2.10.1 No exported sensitivity returns `NaN`
+
+Every exported Greek vector is defined over its whole declared domain,
+expiry included. `NaN` is not an admissible result: it is
+indistinguishable from a computed value, propagates silently through
+every downstream aggregation, and reports nothing about which input was
+degenerate.
+
+Where a sensitivity is unbounded, the result is the correctly signed
+infinity, which a caller can test for. Where it is bounded, the result is
+the limit. At `t = 0`:
+
+| | `s < k` | `s = k` | `s > k` |
+|---|---|---|---|
+| delta | `0` | `0.5` | `1` |
+| gamma | `0` | `+inf` | `0` |
+| theta | `0` | `-inf` | `-r * k` |
+| vanna, vega, rho, volga | `0` | `0` | `0` |
+
+Delta at the strike is the limit in time, not a midpoint convention:
+`d1` tends to zero there, so `N(d1)` tends to `N(0)`.
+
+A limit that automatic differentiation of the price body cannot produce
+is supplied in closed form, outside the differentiated body. Supplying it
+by branching inside that body is not conforming: the branch's untaken arm
+is then differentiated, which is what makes the limit unavailable in the
+first place.
+
+Callers aggregating a sensitivity vector test for finiteness. An equality
+test against self admits an infinity and is not a finiteness test.
+
 ### 2.11 `Shoals.Greeks` (new module)
 
 Quant teams need Greeks in specific patterns, not just "AD works". The
