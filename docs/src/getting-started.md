@@ -1,6 +1,9 @@
 # Getting started
 
-Shoals is a [Reef](https://github.com/Chelis-Lang/chelis) package. Work from a **Shoals source checkout**: the commands below use `reef.toml` and the executable tests in `tests/`. The package and dependency versions are pinned in `reef.toml` and `reef.lock`.
+Shoals is a [Reef](https://github.com/Chelis-Lang/chelis) package. Work from a
+**Shoals source checkout**: the commands below use `reef.toml` and the
+executable tests in `tests/`. The package, compiler, and dependency versions
+are declared in `reef.toml`.
 
 ## Install the pinned toolchain and dependencies
 
@@ -13,11 +16,14 @@ export PATH="$HOME/.chelis/bin:$PATH"
 gh repo clone Chelis-Lang/shoals
 cd shoals
 chelisup install 0.18.11
-chelis reef setup
 chelis reef build
 ```
 
-`chelisup install 0.18.11` installs the compiler pinned by `reef.toml`. `chelis reef setup` installs the locked dependencies after the compiler is available, and `chelis reef build` checks the package and produces its Reef artifacts. If you already have `chelisup`, begin with the clone and keep the pinned compiler installation step. Run the remaining commands from the checkout root.
+`chelisup install 0.18.11` installs the compiler pinned by `reef.toml`.
+`chelis reef build` resolves the declared dependencies, fetching missing
+release packages as needed, then checks Shoals and produces its Reef artifacts.
+If you already have `chelisup`, begin with the clone and keep the pinned
+compiler installation step. Run the remaining commands from the checkout root.
 
 ## Price a call
 

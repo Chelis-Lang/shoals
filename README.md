@@ -13,12 +13,17 @@ gh auth login                      # once, if needed
 gh release download --repo Chelis-Lang/chelis --pattern chelisup.sh --output - | sh
 export PATH="$HOME/.chelis/bin:$PATH"
 chelisup install 0.18.11
-chelis reef setup
 chelis reef build
 chelis test tests/pricing.ch --filter test_bs_call_atm --timeout 120 --suite-timeout 180 --jobs 1
 ```
 
-`chelisup install 0.18.11` installs the compiler pinned by `reef.toml`; `chelis reef setup` installs packages from `reef.lock` after the compiler is available. `chelis reef build` checks and builds Shoals. The last command runs the source test that prices a one-year at-the-money Black-Scholes call at approximately 10.4506. Run all commands from the repository root. For the pricer and a seeded Monte Carlo example, see [Getting started](docs/src/getting-started.md).
+`chelisup install 0.18.11` installs the compiler pinned by `reef.toml`.
+`chelis reef build` resolves the declared dependencies, fetching missing release
+packages as needed, then checks and builds Shoals. The last command runs the
+source test that prices a one-year at-the-money Black-Scholes call at
+approximately 10.4506. Run all commands from the repository root. For the
+pricer and a seeded Monte Carlo example, see
+[Getting started](docs/src/getting-started.md).
 
 ## Modules
 

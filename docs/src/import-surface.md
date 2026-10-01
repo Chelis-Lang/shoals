@@ -1,6 +1,11 @@
 # Package verification manifest
 
-Shoals publishes a machine-readable invariant manifest alongside its Reef package. Its source in this checkout is [`docs/cnote-import-surface.json`](https://github.com/Chelis-Lang/shoals/blob/main/docs/cnote-import-surface.json). The `pkg_version` and `chelis_pin` fields identify the package and compiler version; `reef.toml` and `reef.lock` identify the corresponding dependencies. Read the version fields from those files when checking a particular release.
+Shoals publishes a machine-readable invariant manifest alongside its Reef
+package. Its source in this checkout is
+[`docs/cnote-import-surface.json`](https://github.com/Chelis-Lang/shoals/blob/main/docs/cnote-import-surface.json).
+The `pkg_version` and `chelis_pin` fields identify the package and compiler
+version; `reef.toml` declares this checkout's compiler and dependency versions.
+Compare those versions when checking a particular release.
 
 The manifest names models, the properties checked for them, the expected verification method, and the dependencies that the compiler must attribute to each check. The expected method is a requirement for the release gate, not a claim that every mathematical input has been proved. A `fuzz_validated` result covers accepted samples under declared seeds and constraints. Some small arithmetic models have SMT-backed results. Certified-box and global differentiation claims are separate from the sampled automatic-differentiation comparisons.
 
