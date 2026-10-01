@@ -6,6 +6,36 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Black-Scholes returned NaN when there was no remaining uncertainty**
+  (shoals#88). Both lanes divided by `sigma*sqrt(t)` without a floor.
+
+  The issue called this an expiry bug in the scalar lane. It is wider in one
+  direction and narrower in the other. Narrower: at `t = 0` the unguarded
+  division was already right at every moneyness except one, because the
+  resulting `+/-inf` saturates `erf64` and the formula collapses to
+  `max(s - k*exp(-rt), 0)`. Only the forward sitting exactly on the strike gave
+  `0/0`. Wider: `s = k` with `sigma = 0` and `r = 0` reaches the same `0/0` at
+  any `t > 0`, so this is a no-uncertainty bug rather than an expiry one, and a
+  `t == 0` special case would have missed it.
+
+  The wire entry `bs_call_wire_f64` was worse and is also fixed here: it
+  returned NaN at *every* moneyness on expiry, because nothing in that lane
+  saturates. Its selectors are arithmetic, so the first `+/-inf` to reach the
+  hand-rolled `pricing_wire_abs_f64` evaluates `0 * neg(inf)` and poisons the
+  result whichever branch the mask selects (chelis#1464).
+
+  Both are fixed by flooring the denominator rather than by branching on the
+  price: every Greek differentiates this body and `bs_call_f64_vector` runs it
+  under `vmap`, where an `if` evaluates both arms, so a branch would have kept
+  the NaN as its untaken arm. No value that works today moves, and the public
+  signature of neither entry point changes.
+
+  This re-pins the WireDag receipt in `scripts/validate_bs_wire_root.py` to root
+  859 / 1665 nodes with no compiler change; `div`, `exp`, `log`, `neg` and
+  `sqrt` counts are unchanged, so the pricing arithmetic itself did not move.
+
 ### Added
 
 - **`Shoals.Indicators`: a technical-indicator module with no default

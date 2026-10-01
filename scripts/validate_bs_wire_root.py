@@ -18,8 +18,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENTRY = "bs_call_wire_f64"
-EXPECTED_ENTRY_ROOT = 787
-EXPECTED_NODE_COUNT = 1522
+EXPECTED_ENTRY_ROOT = 859
+EXPECTED_NODE_COUNT = 1665
 # Schema-13 migration (Chelis 0.18.10). The 0.18.9 pin captured schema 11 with
 # entry root 770 and 1488 nodes (raw hash 955c1df6...). Under the published
 # 0.18.10 binary the same src/pricing.ch lowers to schema 13, entry root 773
@@ -46,7 +46,30 @@ EXPECTED_NODE_COUNT = 1522
 # and precisions match 0.18.10 after that comparison rename. Internal symbolic
 # dimension names changed, so this does not certify shape equivalence. Two
 # independent cold lowerings reproduce the exact response below.
-EXPECTED_RAW_SHA256 = "3be34d901db81b1a0b250d6cb6e8b8b934f11c13323206fb1894b50e9fcfab02"
+# shoals#88 re-pin (no compiler change; same published Chelis 0.18.11). The
+# wire lane returned NaN at EVERY moneyness on expiry, because
+# `pricing_wire_d1_f64` divided by `sigma*sqrt(t)` and every selector in this
+# closure is arithmetic: the first +/-inf reaching `pricing_wire_abs_f64`
+# evaluates `0 * neg(inf)` and poisons the result whichever branch the mask
+# picks. `pricing_wire_d1_f64` now floors the denominator at `small^8` (1e-40,
+# built by squaring an existing load rather than taken as a new parameter), so
+# every intermediate stays finite and `0 * finite` is 0.
+#
+# Entry root 787 -> 859, nodes 1522 -> 1665. Op-kind deltas over the 0.18.11
+# capture, measured by lowering `origin/main`'s src/pricing.ch and this one with
+# the same binary: add +4, cast +2, compare(lt) +2, copy +41, drop +71,
+# extent_witness +10, load +1, mul +10, sub +2. **div, exp, log, neg and sqrt
+# are unchanged**, i.e. the Black-Scholes arithmetic path itself did not move --
+# the growth is the floor construction, its select, and linearity plumbing. The
+# 15 reachable loads still match EXPECTED_LOADS exactly (the threaded `small`
+# was already one of them, which is why no load name was added), no host-only
+# op entered the closure, the comparison ops are intact and the root output
+# type is still tensor[n, f64]; `validate_response` was run against the new
+# figures before they were pinned. Two independent cold lowerings are
+# byte-deterministic. This comparison does not certify shape semantics. Former
+# raw hash at this schema:
+# 3be34d901db81b1a0b250d6cb6e8b8b934f11c13323206fb1894b50e9fcfab02.
+EXPECTED_RAW_SHA256 = "9709d1a41c246554dc65ac9eadbb9bd5abd2f6b11914a729d8156bd987dc9a42"
 FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
 EXPECTED_LOADS = {
     "a1",

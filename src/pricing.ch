@@ -137,9 +137,37 @@ def n_cdf64(x: f64) -> f64 = {
   inv_sqrt_2 = cast(0.7071067811865476, f64)
   mul(cast(0.5, f64), sub(cast(1.0, f64), erf64(neg(mul(x, inv_sqrt_2)))))
 }
+-- DENOMINATOR FLOOR, and why it is a clamp rather than a branch on the price.
+--
+-- `sigma*sqrt(t)` is exactly 0 whenever t = 0 or sigma = 0, i.e. whenever there
+-- is no remaining uncertainty. For num != 0 the unguarded division already
+-- behaved correctly: +/-inf saturates `erf64` and the formula collapses to
+-- `max(s - k*exp(-rt), 0)`, which is the right answer. The defect (shoals#88)
+-- is only the point where num is ALSO 0 -- the forward sitting exactly on the
+-- strike -- where 0/0 is NaN. Measured members of that class: s = k with t = 0
+-- (any sigma, any r), and s = k with sigma = 0 and r = 0 at any t. The issue
+-- describes it as an expiry bug; the second member is not one.
+--
+-- Flooring the denominator fixes all of them at once: num/floor is 0 when
+-- num is 0, so d1 = d2 = 0, both normal CDFs are 0.5, and the price is
+-- 0.5*s - 0.5*k*exp(-rt) = 0 exactly when the forward is at the strike, which
+-- is the correct intrinsic. For num != 0, num/floor is a large finite number
+-- that saturates `erf64` identically to the +/-inf it replaces, so no
+-- currently-correct value moves.
+--
+-- IT MUST BE A CLAMP ON THE DENOMINATOR, NOT A BRANCH ON THE PRICE. Every
+-- Greek and both f32 entry points differentiate this body, and
+-- `bs_call_f64_vector` runs it under `vmap`, where an `if` lowers to a masked
+-- select that evaluates BOTH arms (chelis#1464). `if t = 0 then max(s-k,0)
+-- else <formula>` has NaN as its untaken arm at exactly the broken point, so
+-- the select would reintroduce the NaN it was added to remove. This clamp's
+-- arms are `den` and a positive constant: both finite in value and in
+-- derivative, which is the condition the note above `erf64` states for a
+-- clamp to be safe under masked select.
 def d1_64(s: f64, k: f64, r: f64, sigma: f64, t: f64) -> f64 = {
   num = add(log(div(s, k)), mul(add(r, mul(cast(0.5, f64), mul(sigma, sigma))), t))
-  div(num, mul(sigma, sqrt(t)))
+  den = mul(sigma, sqrt(t))
+  div(num, if lt(den, cast(1e-300, f64)) then cast(1e-300, f64) else den)
 }
 def d2_64(s: f64, k: f64, r: f64, sigma: f64, t: f64) -> f64 = sub(d1_64(s, k, r, sigma, t), mul(sigma, sqrt(t)))
 -- Black-Scholes call/put, pure scalar f64. SINGLE BODY: the f32 entry points and
@@ -211,15 +239,43 @@ def pricing_wire_normal_cdf_f64[n](x: &tensor[n, f64], half: &tensor[n, f64], in
   erf_v = pricing_wire_erf_f64(&neg_scaled, a1, a2, a3, a4, a5, p, two_over_sqrt_pi, small, half)
   mul(copy(half), sub(one, erf_v))
 }
-def pricing_wire_d1_f64[n](s: &tensor[n, f64], k: &tensor[n, f64], r: &tensor[n, f64], sigma: &tensor[n, f64], t: &tensor[n, f64], half: &tensor[n, f64]) -> tensor[n, f64] = {
+-- DENOMINATOR FLOOR, wire lane. Same defect as `d1_64` above (shoals#88) and a
+-- strictly worse symptom: the scalar lane only returned NaN where num was ALSO
+-- zero, because +/-inf saturates `erf64`. This lane returned NaN at EVERY
+-- moneyness on expiry, measured, because nothing here saturates -- every
+-- selector is arithmetic, and `0 * inf` is NaN.
+--
+-- The first NaN is in `pricing_wire_abs_f64`: at x = +inf its mask is 0 and it
+-- evaluates `0 * neg(inf) + 1 * inf`, whose first term is NaN. That is exactly
+-- what the note above `erf64` warns about -- "`abs` is the intrinsic, not a
+-- hand-rolled `if`: that would have the operand as its untaken arm, which
+-- under vmap's masked select returns NaN at +inf (chelis#1464)". The scalar
+-- lane took that advice; this lane hand-rolls `abs` out of a select and cannot.
+-- `linear` has the same shape: `x * two_over_sqrt_pi` is inf, and the
+-- `small_mask` select multiplies it by 0.
+--
+-- So the fix is to keep x FINITE rather than to patch each selector: with a
+-- floored denominator every intermediate is a large finite number, `0 * finite`
+-- is 0, and all three selects behave. The floor is `small^8` (1e-40), built by
+-- squaring rather than taken as a new parameter: `small` is already one of the
+-- 15 named loads this entry is pinned against, so threading it here changes no
+-- load and leaves `bs_call_wire_f64`'s public signature alone. 1e-40 is below
+-- any reachable `sigma*sqrt(t)` -- a 0.01 vol over one day is 5e-4 -- so no
+-- value that works today moves.
+def pricing_wire_d1_f64[n](s: &tensor[n, f64], k: &tensor[n, f64], r: &tensor[n, f64], sigma: &tensor[n, f64], t: &tensor[n, f64], half: &tensor[n, f64], small: &tensor[n, f64]) -> tensor[n, f64] = {
   num = add(log(div(copy(s), copy(k))), mul(add(copy(r), mul(copy(half), mul(copy(sigma), copy(sigma)))), copy(t)))
-  div(num, mul(copy(sigma), sqrt(copy(t))))
+  den = mul(copy(sigma), sqrt(copy(t)))
+  sq2 = mul(copy(small), copy(small))
+  sq4 = mul(copy(&sq2), copy(&sq2))
+  den_floor = mul(copy(&sq4), copy(&sq4))
+  floor_mask = cast(lt(copy(&den), copy(&den_floor)), f64)
+  div(num, pricing_wire_select_f64(&floor_mask, copy(&den_floor), den, half))
 }
 -- A producer-clean tensor entry for content-addressed WireDag consumers.
 -- It deliberately contains no `vmap`, `shape`, scalar conversion, or host
 -- list operation. Beacon binds the coefficient inputs to point intervals.
 def bs_call_wire_f64[n](s: tensor[n, f64], k: tensor[n, f64], r: tensor[n, f64], sigma: tensor[n, f64], t: tensor[n, f64], half: tensor[n, f64], inv_sqrt_2: tensor[n, f64], a1: tensor[n, f64], a2: tensor[n, f64], a3: tensor[n, f64], a4: tensor[n, f64], a5: tensor[n, f64], p: tensor[n, f64], two_over_sqrt_pi: tensor[n, f64], small: tensor[n, f64]) -> tensor[n, f64] = {
-  d1_v = pricing_wire_d1_f64(&s, &k, &r, &sigma, &t, &half)
+  d1_v = pricing_wire_d1_f64(&s, &k, &r, &sigma, &t, &half, &small)
   d2_v = sub(copy(&d1_v), mul(copy(&sigma), sqrt(copy(&t))))
   nd1 = pricing_wire_normal_cdf_f64(&d1_v, &half, &inv_sqrt_2, &a1, &a2, &a3, &a4, &a5, &p, &two_over_sqrt_pi, &small)
   nd2 = pricing_wire_normal_cdf_f64(&d2_v, &half, &inv_sqrt_2, &a1, &a2, &a3, &a4, &a5, &p, &two_over_sqrt_pi, &small)

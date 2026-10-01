@@ -20,6 +20,11 @@ dimension names differ, so this is not a shape-equivalence claim. Two independen
 cold lowerings reproduce the new byte-exact receipt. The validator rejects
 legacy, missing, and changed comparison predicates.
 
+Those figures are this migration's measurement and are not the current pin:
+shoals#88 later floored `pricing_wire_d1_f64`'s denominator, moving the pin to
+root 859 and 1665 nodes under the same published 0.18.11 compiler. See
+`scripts/validate_bs_wire_root.py`.
+
 The frozen CNote manifest retains all 37 invariant IDs, all previous per-pin
 expectations, and their tier values; 0.18.11 expectations are added without
 promotion. A successful proof gate must observe those expectations.
