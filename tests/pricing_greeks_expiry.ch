@@ -134,13 +134,18 @@ def test_positive_t_path_is_unchanged() -> unit ! { Test } = {
 -- PUT DELTA at t = 0 (shoals#106). The limits mirror the call: -1 below the
 -- strike, -0.5 at it, 0 above. At expiry the put price is max(k - s, 0).
 --
--- The parity test below is the load-bearing one, and it is stronger than the
--- three cell assertions. Put-call parity differentiated in the spot gives
--- delta_call - delta_put = 1 for every spot and every t, so it ties the put
--- surface to the call surface -- which is independently pinned above and against
--- `scripts/oracle_greeks_gate.py` -- rather than to a transcribed decimal. It is
--- also falsifiable on exactly the defect this fixes: with put delta 0.0 at the
--- strike and call delta 0.5, parity there reads 0.5, not 1.
+-- Two independent legs, and neither is decoration: with the cell assertions
+-- made vacuous the parity test still catches the defect, and with parity made
+-- vacuous the cells still do.
+--
+-- Parity is the more interesting leg because it is not a transcribed decimal.
+-- Put-call parity differentiated in the spot gives delta_call - delta_put = 1 for
+-- every spot and every t, so it ties the put cells to the call cells. Those call
+-- cells are pinned in this file, against a near-expiry AD evaluation -- NOT by
+-- `scripts/oracle_greeks_gate.py`, whose grid is t in {0.25, 1, 2} and which
+-- never evaluates a put. The oracle pins the AD path; this file pins the expiry
+-- cells. Parity is also falsifiable on exactly the defect this fixes: with put
+-- delta 0.0 at the strike and call delta 0.5, parity there reads 0.5, not 1.
 def test_put_delta_at_expiry_below_the_strike_is_minus_one() -> unit ! { Test } = {
   d = to_list(deltas_put(spots3(), k100(), r5(), v20(), zero()))
   assert_close(index(d, cast(2, i64)), cast(-1.0, f32), tol(), "put delta at t=0, s<k is -1")
@@ -165,6 +170,17 @@ def test_put_call_parity_for_delta_holds_away_from_expiry() -> unit ! { Test } =
   p = to_list(deltas_put(spots3(), k100(), r5(), v20(), cast(1.0, f32)))
   _ = assert_close(sub(index(c, cast(0, i64)), index(p, cast(0, i64))), cast(1.0, f32), tol(), "parity at t=1, s=k -- the AD path")
   assert_close(sub(index(c, cast(2, i64)), index(p, cast(2, i64))), cast(1.0, f32), tol(), "parity at t=1, s<k -- the AD path")
+}
+-- A second strike, because every other assertion here uses k = 100 and the
+-- expiry helpers take `k` as an argument. Without this, both helpers can discard
+-- `k` and hardcode 100.0 with the whole file still green -- measured.
+def test_put_call_parity_at_a_second_strike() -> unit ! { Test } = {
+  k90 = cast(90.0, f32)
+  c = to_list(deltas_call(spots3(), k90, r5(), v20(), zero()))
+  p = to_list(deltas_put(spots3(), k90, r5(), v20(), zero()))
+  _ = assert_close(sub(index(c, cast(2, i64)), index(p, cast(2, i64))), cast(1.0, f32), tol(), "parity at t=0, k=90, s=k")
+  _ = assert_close(index(c, cast(2, i64)), cast(0.5, f32), tol(), "call delta at t=0, k=90, s=k is 0.5")
+  assert_close(index(p, cast(2, i64)), cast(-0.5, f32), tol(), "put delta at t=0, k=90, s=k is -0.5")
 }
 def test_put_delta_positive_t_path_is_unchanged() -> unit ! { Test } = {
   p = to_list(deltas_put(spots3(), k100(), r5(), v20(), cast(0.0001, f32)))

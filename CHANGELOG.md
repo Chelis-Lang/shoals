@@ -18,21 +18,21 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   mirroring the call surface. Measured approach at the strike: `-0.48604` at
   `t=1e-2`, `-0.49860` at `1e-4`.
 
-  The load-bearing check is put-call parity rather than the three cells:
-  differentiating parity in the spot gives `delta_call - delta_put = 1` at every
-  spot and every time to expiry, so the put surface is tied to the call surface —
-  independently pinned, and checked against `scripts/oracle_greeks_gate.py` —
-  instead of to a transcribed decimal. It is also falsifiable on exactly this
-  defect: with put delta `0.0` at the strike and call delta `0.5`, parity there
-  read `0.5`, not `1`.
+  Two independent checks, neither decorative: with the cell assertions made
+  vacuous the parity test still catches the defect, and vice versa. Parity is the
+  more interesting one because it is not a transcribed decimal — differentiating
+  put-call parity in the spot gives `delta_call - delta_put = 1` at every spot and
+  every time to expiry, tying the put cells to the call cells, which this file
+  pins against a near-expiry AD evaluation. (`scripts/oracle_greeks_gate.py` pins
+  the AD *path* at `t` in `{0.25, 1, 2}`; it has no expiry cell and never
+  evaluates a put, so it is not evidence for these values.) Parity is falsifiable
+  on exactly this defect: with put delta `0.0` at the strike and call delta `0.5`,
+  parity there read `0.5`, not `1`.
 
   `§2.10.1`'s non-normative parenthetical is removed, the requirement now being
   met. `t > 0` is untouched. Seven tests added, four mutations proven red
   (reverting the branch, dropping the sign, perturbing the strike cell, and
   folding the strike into the below-branch).
-
-
-### Fixed
 
 - **No exported Greek returns `NaN` at expiry** (shoals#101). `gammas_call`,
   `thetas_call` and `vannas_call` returned `NaN` at `t = 0`, and `deltas_call`
