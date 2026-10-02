@@ -88,7 +88,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
   **An earlier version of this entry claimed "nine injected, nine detected".**
   That was true of the nine defects thought to write, which is the weaker
-  statement, and three separate gaps were found afterwards by review rather than
+  statement, and four separate gaps were found afterwards by review rather than
   by the suite:
 
   - The reference ordinal's Gregorian century term is identically zero for every
@@ -112,9 +112,134 @@ this project adheres to [Semantic Versioning](https://semver.org/).
     including inside the independent-reference property, whose driver passed
     `period_start` too, so both sides moved together.
 
-  All three share one shape — an axis held constant across every instance of an
+  All four share one shape — an axis held constant across every instance of an
   assertion, invisible because each individual assertion is correct. The matrix
   above exists to make that axis explicit rather than to add one more case.
+
+- **Three exported curve entry points accepted `times_so_far` and
+  `rates_so_far` of different lengths and silently read the wrong rate**
+  (shoals#78). The earlier pillars arrive as two caller-supplied lists and
+  nothing tied them together. An extra rate entry was not harmlessly truncated:
+  the annuity reads the pillar rates by position over the times, so the extra
+  entry was used where the candidate pillar's rate belongs and the candidate's
+  own rate was never read. `fd_bump_pillar_rate` returned a finite sensitivity
+  that moved with the supposedly-ignored entry — `0.760` with a trailing `0.02`
+  and `0.477` with a trailing `0.50`, against `0.711` for the matched lists.
+
+  The issue names `fd_bump_pillar_rate` and `bootstrap_residual_at_pillar` and
+  says every other entry point takes its pillars from `bootstrap_multi`.
+  `bootstrap_grad_diagonal` gained the same two parameters in #76, which merged
+  18 minutes *before* the issue was filed, so that enumeration was incomplete
+  when written rather than overtaken afterwards. It was measured to have the
+  same defect (`0.700` versus `1.929` on the same pair) and is guarded too. The
+  opposite mismatch — a pillar time with no rate behind it — already died, but
+  as a bare `index 3 out of bounds for list of len 3` that named neither the
+  function nor the contract; it now reports the same named diagnostic. Each
+  guard names the entry point the caller actually invoked, and each direction
+  has its own negative case rather than one standing in for both.
+
+  The guards are deliberately stricter than the silent-wrong-answer defect
+  alone requires. The `Deposit` and `ZeroCoupon` arms of
+  `bootstrap_residual_at_pillar` and `bootstrap_grad_diagonal` read neither
+  list, so a mismatched pair was genuinely harmless there and returned a
+  correct answer; it is now rejected. #78 calls a mismatched pair malformed
+  input, and matched-length results are bit-identical, so this is intended, but
+  it is a behaviour change beyond "read the wrong rate" and is recorded as
+  one.
+
+- **The `erf64`/`n_cdf64` accuracy oracle read no published file, failed open,
+  ran in no CI job — and was crashing** (shoals#64). The issue named the first
+  three. The fourth was found while fixing them, and it is the reason the other
+  three mattered: `chelis eval --json` replaced schema 2's bare
+  `{"type": "float64", "value": 0.5}` with schema 3's tagged carrier
+  `{"dtype": "f64", "bits": "3fe0..."}` at chelis **0.18.7**, and the oracle
+  read `e["value"]` as a float. On the 0.18.11 pin it evaluated for 90 seconds
+  and then died with `TypeError: cannot create mpf from {'dtype': 'f64', ...}`.
+  It has been dead across three pin bumps, unnoticed, because nothing invoked
+  it. An unrun guard does not merely hide an unknown failure; it rots against
+  the surface it measures. An unrecognised `schema_version` is now a loud,
+  named failure rather than a crash.
+
+  The published figures turned out to be **right**: with the decode repaired,
+  `erf64` measures `3.367545353985726e-16` against a published floor of
+  `3.3675e-16`, and `n_cdf64` `1.9495914774441617e-16` against `1.9495e-16`.
+  Only the guard was broken.
+
+  (Stated without the `>=` marker deliberately: that marker is what the oracle
+  scans for, and a changelog is a historical record — a figure written here as
+  a live floor claim would have to be rewritten whenever the kernel changes.
+  The same convention keeps the derivative residuals in `research/` out of
+  scope.)
+
+  `docs/CHELIS_SURFACE.md`'s accuracy table is now the authoritative
+  publication and the oracle **reads it**, instead of comparing against
+  internal constants of its own. The oracle is split into two legs because
+  they have different prerequisites and so belong in different jobs:
+
+  - `--transcription` — stdlib-only, offline, instant. Parses the floors out of
+    the table and requires every other place in the tracked tree that states
+    one to state the same number. Carriers are **discovered** by `git grep` on
+    a `>=` floor-claim pattern, never listed: a hand-maintained list lets a
+    stale figure survive a repair, and a count rots the moment a carrier is
+    added. All 11 carriers across 8 files are found with no allowlist, because
+    the `>=` does the discriminating — the derivative residuals in `research/`
+    state bounds as "within", a different quantity this oracle must not police.
+  - `--measurement` — needs mpmath and the pinned toolchain, ~3 min. Measures
+    the compiled kernels at 60 dps and requires each published floor to be
+    **true and tight**.
+
+  Tightness, not just floor-ness, is the actual repair. The old check was
+  one-sided (`published <= measured`), which passes `1.0e-30` — that genuinely
+  *is* a floor, and it is the mutation shoals#64 demonstrates. A published
+  figure must now equal the measurement truncated toward zero at its own
+  significant-digit count. Publishing fewer digits stays legal; publishing
+  wrong ones does not.
+
+  Missing mpmath now **fails** instead of printing `SKIP` and exiting 0, and
+  the dependency is declared in `scripts/requirements-oracle.txt`. The
+  offline leg needs none of it, which is what keeps it eligible for the lean
+  per-PR path.
+
+  Wiring, respecting the deliberate per-PR leanness documented in `ci.yml`:
+  the offline leg and its mutation tests join the per-PR `contract-gate` job
+  on the same "offline, no toolchain" grounds as the gates already there; the
+  measurement leg and `scripts/oracle_greeks_gate.py` — unwired for the same
+  reason, though **not** broken — run in a new nightly `accuracy` job. The
+  Greeks gate is immune to the schema change because it never reads
+  `chelis eval --json` at all: it parses `chelis test --json`'s NDJSON report,
+  and its `all_ok` requires `n_pass == len(test_names)`, so an unparseable
+  report fails closed rather than passing vacuously. Its own job, not extra steps on
+  `tests`, because a red unit suite would otherwise skip them and silently
+  restore the state this issue describes; and it is wired into the nightly
+  `report` job so a failure opens the tracking issue rather than going
+  unwatched. `oracle_greeks_gate.py` passes 15/15 groups and 63 cells on its
+  first run in a gated context. It still skips on a clean box without the
+  toolchain, which is right there, but `SHOALS_ORACLE_REQUIRE_CHELIS=1` (which
+  CI sets) turns that skip into a failure.
+
+  44 tests in `scripts/test_oracle_erf64_accuracy.py`. Eleven mutate a
+  published figure in a throwaway git fixture — the exact mutation that shipped
+  among them — and require the oracle to turn red; the rest pin the measurement
+  verdict branches, the eval-wire decode, the fail-closed paths, sweep-length
+  integrity, and the CI wiring. Positive controls are deliberate: a guard that
+  always failed would satisfy every negative test.
+
+  One test asserts what the offline leg **cannot** do, and asserts that it is
+  *green*: rewrite every carrier to the same wrong number and the leg passes,
+  because it proves the carriers agree, never that they are right. It exists so
+  nobody later claims the cheap leg is sufficient.
+
+  **Known limits, recorded rather than implied away.** The carrier predicate
+  keys on the `>=` marker rather than on the governed kernel, which cuts both
+  ways: an unrelated floor inequality in a tracked file fails the gate, and a
+  floor claim spelled with unicode `≥`, `&gt;=`, "at least" or a non-exponent
+  decimal is missed. "Zero false positives" is a measurement of the tree as it
+  stands, not a property of the design. Where a carrier's context names both
+  kernels (three of the eleven), attribution degrades to a membership check, so
+  the two figures could be swapped there undetected — drift to a *non-published*
+  value is still caught at all eleven. A kernel-scoped predicate fixes all of
+  these together and is tracked as follow-up work; a naive widening of the
+  marker would create false positives on prose already in this file.
 
 - **`deltas_put` returned `0.0` at the strike at expiry, where the limit is
   `-0.5`** (shoals#106). The call-side counterpart was fixed in shoals#101; this

@@ -1,0 +1,7 @@
+Shoals.Curves.fd_bump_pillar_rate: times_so_far and rates_so_far must describe the same pillars (equal lengths)
+
+`fd_bump_pillar_rate` takes the earlier pillars as two caller-supplied lists and
+nothing else ties them together. An extra rate entry is not truncated away: the
+annuity reads the pillar rates by position over the times, so the extra entry is
+used where the candidate pillar's rate belongs and the candidate's own rate is
+never read. The result was a finite sensitivity that moved with the extra entry.

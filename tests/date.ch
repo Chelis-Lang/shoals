@@ -298,6 +298,56 @@ def test_add_business_days_weekend_only_lands_on_the_holiday() -> unit ! { Test 
   expected_fri = date(cast(2025, i64), cast(7, i64), cast(4, i64))
   assert_close(same_date(landed, expected_fri), cast(0.0, f32), cast(0.001, f32), "a weekend-only calendar lands on Friday July 4")
 }
+-- Red-team round 4, F14-F17 and the oracle's own conjunctivity. Each closes an
+-- axis the round-4 constant-axis sweep found still held fixed. None is a
+-- behaviour fix: the shipped answers below were measured correct first, and each
+-- has a mutation that survived the suite without it.
+--
+-- F14: `n` was 1, 1, 0, -5, 1 across every `add_business_days` test and nothing
+-- in the repository calls it with n >= 2, so the fold's ACCUMULATION was never
+-- exercised -- clamping the step count to 1 passed. July 4 is a NYC holiday, so
+-- five business days from Thursday July 3 lands on Friday July 11.
+def test_add_business_days_accumulates_beyond_one_step() -> unit ! { Test } = {
+  thu = date(cast(2025, i64), cast(7, i64), cast(3, i64))
+  landed = add_business_days(thu, cast(5, i64), nyc_cal())
+  expected = date(cast(2025, i64), cast(7, i64), cast(11, i64))
+  assert_close(same_date(landed, expected), cast(0.0, f32), cast(0.001, f32), "five business days from Thursday July 3 2025 is Friday July 11 on a NYC calendar")
+}
+-- F15: both modified-following tests sat at 2025-07-31, where the forward roll
+-- either crosses the month or leaves the date untouched. So whenever the month
+-- matched, `rolled == d`, and returning either was indistinguishable -- replacing
+-- `then rolled` with `then d` passed. Saturday 2025-07-05 rolls forward to Monday
+-- July 7, inside the same month, where the two differ.
+def test_roll_modified_following_returns_the_forward_roll_inside_the_month() -> unit ! { Test } = {
+  sat = date(cast(2025, i64), cast(7, i64), cast(5, i64))
+  rolled = date_roll_modified_following(sat, weekend_only_calendar())
+  expected_mon = date(cast(2025, i64), cast(7, i64), cast(7, i64))
+  assert_close(same_date(rolled, expected_mon), cast(0.0, f32), cast(0.001, f32), "a forward modified-following roll that stays inside the month returns the rolled date, not the input")
+}
+-- F16: every ICMA case lay inside or on its coupon period, so the documented
+-- no-validation contract drove nothing -- an implementation that clamped the
+-- accrual to the period, or trapped on an out-of-period accrual, passed. This
+-- pins that an accrual extending past the period end returns the un-clamped
+-- value: 2003-11-01..2004-11-01 is 366 days against a 182-day period.
+def test_act_act_icma_accrual_past_the_period_end_is_not_clamped() -> unit ! { Test } = {
+  far = date(cast(2004, i64), cast(11, i64), cast(1, i64))
+  expected = div(cast(366.0, f64), mul(cast(2.0, f64), cast(182.0, f64)))
+  assert_close(year_fraction(coupon_start(), far, coupon_conv(cast(2, i64))), expected, tight64(), "an accrual running past the period end returns 366/364, neither clamped nor trapped")
+}
+-- F17: `tests_neg/` pins that a zero-length and a reversed coupon period TRAP,
+-- but nothing pinned that the accepting boundary is accepted, so narrowing the
+-- guard from `span < 1` to `span <= 1` passed both oracles. A one-day period at
+-- frequency 1 accrues its whole length.
+def test_act_act_icma_one_day_coupon_period_is_accepted() -> unit ! { Test } = {
+  from = date(cast(2004, i64), cast(2, i64), cast(1, i64))
+  to = date(cast(2004, i64), cast(2, i64), cast(2, i64))
+  conv = ActActIcma { period_start: from, period_end: to, frequency: cast(1, i64) }
+  assert_close(year_fraction(from, to, conv), cast(1.0, f64), tight64(), "a one-day coupon period is accepted, not rejected by the period guard")
+}
+-- The matrices fold their cases with `all_true`, so this pins that the fold is
+-- conjunctive. A disjunctive fold would make every matrix test vacuous while
+-- leaving the whole suite green.
+def test_matrix_oracle_is_conjunctive() -> unit ! { Test } = assert_close(to01_f64(all_true([true, false, true])), cast(0.0, f64), tight64(), "all_true is conjunctive: one false case must sink the group")
 def test_days_in_month_jan() -> unit ! { Test } = assert_close(cast(days_in_month(cast(2025, i64), cast(1, i64)), f32), cast(31.0, f32), cast(0.001, f32), "Jan = 31")
 def test_days_in_month_feb_non_leap() -> unit ! { Test } = assert_close(cast(days_in_month(cast(2025, i64), cast(2, i64)), f32), cast(28.0, f32), cast(0.001, f32), "Feb 2025 = 28")
 def test_days_in_month_feb_leap() -> unit ! { Test } = assert_close(cast(days_in_month(cast(2024, i64), cast(2, i64)), f32), cast(29.0, f32), cast(0.001, f32), "Feb 2024 = 29 (leap)")

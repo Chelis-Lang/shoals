@@ -43,12 +43,12 @@ period that does not end after it starts, traps.
 It does **not** make every invalid ICMA request unrepresentable, and the
 difference matters. `year_fraction` validates the coupon period and the
 frequency; it does **not** check that `start` and `end` lie within that period.
-`year_fraction` does not check that `start` and `end` lie within that period,
-and **the magnitude of the result carries no information about whether they
-did.** An invalid accrual returns a number, not an error, and no bound on that
-number distinguishes it from a valid one — so no assertion on the result is a
-substitute for passing a correct accrual range. Keeping the accrual inside the
-period is the caller's responsibility.
+An invalid accrual returns a number, not an error. The bound runs one way only:
+a valid accrual at frequency `f` lies in `[0, 1/f]`, so a result **outside** that
+range proves the accrual was invalid — but a result **inside** it certifies
+nothing, because an invalid accrual can land there too. So no assertion on the
+result is a substitute for passing a correct accrual range, and keeping the
+accrual inside the period is the caller's responsibility.
 
 Some measured examples, which are illustrations and not an exhaustive list of
 the ways this goes wrong: an accrual lying wholly outside the period and shorter

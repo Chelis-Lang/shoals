@@ -224,11 +224,11 @@ def cur_par_swap_residual_dz(times: List[f32], rates: List[f32], par_rate: f32, 
   add(mul(mul(par_rate, accrual), coupon_part), maturity_part)
 }
 def bootstrap_residual_at_pillar(inst: Instrument, times_so_far: List[f32], rates_so_far: List[f32], zero_rate_candidate: f32) -> f32 =
-  match inst with {
+  if cur_pillars_aligned(times_so_far, rates_so_far) then match inst with {
     | Deposit { tenor: t, rate: r } => sub(zero_rate_candidate, deposit_implied_zero(t, r))
     | ZeroCoupon { tenor: t, price: p } => sub(zero_rate_candidate, zero_coupon_implied_zero(t, p))
     | ParSwap { tenor: t, par_rate: r, payments_per_year: f } => cur_par_swap_residual(t, r, f, times_so_far, rates_so_far, zero_rate_candidate)
-  }
+  } else fail("Shoals.Curves.bootstrap_residual_at_pillar: times_so_far and rates_so_far must describe the same pillars (equal lengths)")
 -- The returned curve is read through `rate_at`, which is only defined over
 -- strictly increasing pillar times, and a par swap interpolates over every
 -- earlier pillar. Each instrument's tenor must therefore exceed all earlier
@@ -237,6 +237,12 @@ def cur_increasing_pillars_below(times_so_far: List[f32], tenor: f32) -> bool = 
   bound = fold(fn (acc: (bool, f32), t: f32) -> (if acc.0 then gt(t, acc.1) else false, t), (true, neg(cast(1.0, f32))), times_so_far)
   if bound.0 then gt(tenor, bound.1) else false
 }
+-- The earlier pillars arrive as two caller-supplied lists, so nothing but this
+-- check ties them together. A longer rate list shifts the candidate pillar's
+-- rate out of the window the annuity reads, so an extra entry is used where the
+-- candidate's rate belongs and the answer is silently wrong; a longer time list
+-- indexes past the rates and traps without naming the contract.
+def cur_pillars_aligned(times_so_far: List[f32], rates_so_far: List[f32]) -> bool = eq(len(times_so_far), len(rates_so_far))
 -- A malformed instrument, or a tenor that does not extend the pillars already
 -- solved, is a structural error with no meaningful rate to propagate: fail
 -- loudly rather than guess a schedule, bracket, or ordering.
@@ -262,7 +268,7 @@ def bootstrap_multi_curve[n](instruments: List[Instrument], times_template: tens
   YieldCurve { kind: Custom { label: "bootstrap-multi" }, times: times_t, rates: rates_t }
 }
 def bootstrap_grad_diagonal(inst: Instrument, times_so_far: List[f32], rates_so_far: List[f32], solved_rate: f32) -> f32 =
-  match inst with {
+  if cur_pillars_aligned(times_so_far, rates_so_far) then match inst with {
     | Deposit { tenor: t, rate: r } => div(cast(1.0, f32), add(cast(1.0, f32), mul(r, t)))
     | ZeroCoupon { tenor: t, price: p } => neg(div(cast(1.0, f32), mul(t, p)))
     | ParSwap { tenor: t, par_rate: r, payments_per_year: f } => {
@@ -272,17 +278,18 @@ def bootstrap_grad_diagonal(inst: Instrument, times_so_far: List[f32], rates_so_
     partial_r = cur_par_swap_annuity(times, rates, t, f)
     neg(div(partial_r, partial_z))
   }
-  }
-def fd_bump_pillar_rate(inst: Instrument, times_so_far: List[f32], rates_so_far: List[f32], step: f32) -> f32 = {
-  bumped = match inst with {
-    | Deposit { tenor: t, rate: r } => deposit(t, add(r, step))
-    | ZeroCoupon { tenor: t, price: p } => zero_coupon(t, add(p, step))
-    | ParSwap { tenor: t, par_rate: r, payments_per_year: f } => cur_par_swap(t, add(r, step), f)
-  }
-  z_up = solve_pillar_rate(bumped, times_so_far, rates_so_far)
-  z_base = solve_pillar_rate(inst, times_so_far, rates_so_far)
-  div(sub(z_up, z_base), step)
-}
+  } else fail("Shoals.Curves.bootstrap_grad_diagonal: times_so_far and rates_so_far must describe the same pillars (equal lengths)")
+def fd_bump_pillar_rate(inst: Instrument, times_so_far: List[f32], rates_so_far: List[f32], step: f32) -> f32 =
+  if cur_pillars_aligned(times_so_far, rates_so_far) then {
+    bumped = match inst with {
+      | Deposit { tenor: t, rate: r } => deposit(t, add(r, step))
+      | ZeroCoupon { tenor: t, price: p } => zero_coupon(t, add(p, step))
+      | ParSwap { tenor: t, par_rate: r, payments_per_year: f } => cur_par_swap(t, add(r, step), f)
+    }
+    z_up = solve_pillar_rate(bumped, times_so_far, rates_so_far)
+    z_base = solve_pillar_rate(inst, times_so_far, rates_so_far)
+    div(sub(z_up, z_base), step)
+  } else fail("Shoals.Curves.fd_bump_pillar_rate: times_so_far and rates_so_far must describe the same pillars (equal lengths)")
 def bootstrap_grad_at_solution(instruments: List[Instrument]) -> List[f32] = {
   init = ([], [], [])
   out = fold(fn (state: (List[f32], List[f32], List[f32]), inst: Instrument) -> {

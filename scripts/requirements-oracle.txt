@@ -1,0 +1,12 @@
+# Dependencies for the measurement legs of the accuracy oracles.
+#
+# Declared because shoals#64 shipped a wrong accuracy figure past a guard that
+# exited 0 when mpmath was absent. The oracles now FAIL on a missing reference
+# implementation rather than reporting success, so this file is what CI and a
+# local run install to make that failure impossible rather than merely loud.
+#
+#   python3 -m pip install -r scripts/requirements-oracle.txt
+#
+# The offline (`--transcription`) legs are stdlib-only by design and need none
+# of this, which is what keeps them eligible for the lean per-PR job.
+mpmath>=1.3

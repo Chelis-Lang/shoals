@@ -221,14 +221,27 @@ stated.
 
 `scripts/oracle_erf64_accuracy.py` computes them, measuring in binary at
 extended precision; `erf64` and `n_cdf64` are exported so the bound can be
-measured from outside the module. The figures below are **transcribed by hand
-from that script's output** and nothing checks the transcription — the script
-compares against its own internal constants, not this file, and runs in no CI
-job (shoals#64). Re-run it and compare after any kernel change.
+measured from outside the module. **The table below is the authoritative
+publication of these figures, and the oracle reads it** — it no longer compares
+against internal constants of its own (shoals#64). Two legs check it:
+
+- Every PR runs the oracle's offline `--transcription` leg, which parses the
+  floors out of this table and requires every other place in the tracked tree
+  that states one of them to state the same number. Carriers are discovered by
+  `git grep`, so adding one needs no registration and a stale one cannot hide.
+- The nightly job runs `--measurement`, which measures the compiled kernels
+  against a 60-dps reference and requires each floor here to be a **true and
+  tight** floor: equal to the measurement truncated toward zero at that
+  figure's own significant-digit count. Publishing fewer digits is allowed;
+  publishing an understated floor (`1.0e-30` is technically a floor) is not.
+
+The division is deliberate — the offline leg proves the carriers agree, never
+that they are right, and only the nightly leg constrains the value. A missing
+`mpmath` now fails the measurement leg instead of skipping it.
 
 | Kernel | Approximation | Worst observed absolute error (a floor) | Method |
 |---|---|---|---|
-| `erf64` | W. J. Cody, Math. Comp. 23 (1969); three ranges split at 0.5 and 4, saturating at 6 | **>= 3.3675e-16** (~1.52 ulp of 1.0) | worst observed at x = 0.507001975, measured at 60 dps by `scripts/oracle_erf64_accuracy.py`; the error is jagged at ulp scale so any grid reports a floor |
+| `erf64` | W. J. Cody, Math. Comp. 23 (1969); three ranges split at 0.5 and 4, saturating at 6 | **>= 3.3675e-16** (~1.52 ulp of 1.0) | worst observed at x = ±0.507001975 (`erf` is odd, so the error magnitude is identical at both signs and the oracle may report either; `n_cdf64` below is **not** symmetric and its sign is significant), measured at 60 dps by `scripts/oracle_erf64_accuracy.py`; the error is jagged at ulp scale so any grid reports a floor |
 | `n_cdf64` | `0.5 * (1 - erf64(-x/√2))` | **>= 1.9495e-16** (~0.88 ulp of 1.0) | worst observed at x = -0.7170090691949448, measured at 60 dps by the same oracle. NOT `erf64`'s halved: the argument reduction `-x/√2` and the final `0.5 * (1 - e)` each round. **ABSOLUTE only — see the left-tail limitation below** |
 
 **`n_cdf64` has no useful RELATIVE accuracy in the left tail.** Both figures above
