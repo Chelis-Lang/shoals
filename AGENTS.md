@@ -184,10 +184,26 @@ one change set (contract §7):
    the just-built Shoals candidate, requires cold <=20s and warm <=5s, and
    requires byte-identical NDJSON from both completed processes.
 
-   `--full` needs the oracle reference dependency once per environment:
-   `python3 -m pip install -r scripts/requirements-oracle.txt`. The
+   `--full` needs the oracle reference dependency once per environment. The
    accuracy-floor measurement leg **fails** rather than skips without it
    (shoals#64), so an absent mpmath cannot be mistaken for a pass.
+
+   **Install it into a virtualenv, not the system Python.** A bare
+   `python3 -m pip install` exits with `error: externally-managed-environment`
+   on a Homebrew or Debian/Ubuntu interpreter (PEP 668), which is most
+   workstations:
+
+   ```sh
+   uv venv --python 3.11            # or: python3 -m venv .venv
+   uv pip install -r scripts/requirements-oracle.txt
+   .venv/bin/python scripts/run_local_gate.py --full
+   ```
+
+   Run `run_local_gate.py --full` through that interpreter, because its
+   measurement stage invokes `python3` and a bare `python3` will not see the
+   venv. CI installs to the runner's Python instead, which works because the
+   GitHub `ubuntu-latest` image ships `/etc/pip.conf` with
+   `break-system-packages = true`.
 
    **A pin bump is exactly when the measurement leg matters.** It evaluates the
    compiled kernel through `chelis eval --json`, so a change to that wire
@@ -195,6 +211,15 @@ one change set (contract §7):
    0.18.7, and because nothing invoked the oracle then, it sat crashing through
    three pin bumps (shoals#64). An unrecognised `schema_version` now fails
    loudly and names the decoder to teach.
+
+   **Known: chelis 0.18.12 emits `schema_version: 4.`** The f64 carrier is
+   byte-identical to schema 3's, but `SUPPORTED_EVAL_SCHEMAS` deliberately does
+   **not** pre-bless 4: blessing a schema nobody has run the oracle against is
+   how you weaken a guard whose entire job is to fail loudly on an unknown
+   wire. Teach `decode_scalar` at the bump, with the 0.18.12 package actually
+   available to verify the whole response shape, and run the measurement leg
+   once as acceptance. Expect the nightly `accuracy` job to be red between the
+   pin bump and that change — which is the designed behaviour, not a surprise.
 
 ## Phase Spec
 

@@ -38,6 +38,13 @@ FLOOR, NOT MAXIMUM: the error is jagged at ulp scale, so any grid reports only
 the worst point it lands on, and a finer but differently spaced refinement can
 miss the argmax. Every published figure is therefore a floor.
 
+PUBLISH A ROUNDED FIGURE, NOT THE ORACLE'S OWN FULL-PRECISION OUTPUT. The
+`--json` report prints `worst_abs` at full repr width (16 significant digits).
+That string is NOT publishable: `Decimal(float)` is the exact binary value, and
+the shortest round-tripping repr sits just ABOVE it, so pasting it in is
+correctly rejected as "not a floor". Publish a rounded-down figure -- four or
+five significant digits, as the table does.
+
 A FLOOR ROUNDS DOWN, AND MUST BE TIGHT. Two different mistakes are possible and
 both are caught. Rounding a floor UP puts it above the observation it claims to
 sit under (the first `n_cdf64` figure written here was 1.9496e-16, the measured
@@ -83,9 +90,27 @@ ACCURACY_DOC = Path("docs/CHELIS_SURFACE.md")
 # ANY negative exponent, deliberately. A band restricted to the exponents an
 # f64 absolute-error floor can actually occupy (-15..-18) would silently IGNORE
 # a carrier rewritten to 1.0e-30 -- shoals#64's own demonstration mutation, and
-# a figure 10^14 better than anything measurable. Measured on the tracked tree,
-# widening to any exponent adds zero false positives: the same 11 carriers are
-# found either way, because the `>=` already does the discriminating.
+# a figure 10^14 better than anything measurable.
+#
+# THE COST, stated plainly because it is a real one: this predicate keys on the
+# `>=` MARKER, not on the governed kernel, so ANY unrelated floor inequality in
+# a tracked file is read as a claim about these kernels and fails the per-PR
+# gate -- a relative tolerance floored at 1e-6, say, or a finite-difference
+# step floored at 1.0e-8, each written as an inequality rather than as prose.
+# (Spelled here WITHOUT the marker, for the reason the note below gives.)
+# On the tree as it stands there are
+# no such lines, but that is a measurement of today's tree, NOT a property of
+# the design, and the ASCII form of prose already in `CHANGELOG.md` (which
+# spells it with a unicode >=) would trip it. The diagnostic teaches the
+# `within ...` convention, so it is recoverable rather than mysterious.
+#
+# The symmetric gap: a floor claim spelled with unicode >=, `&gt;=`, "at least",
+# a line break, or a non-exponent decimal is MISSED. Both halves are the same
+# design choice seen from two sides, and the fix for one must not be a naive
+# widening of the other -- adding unicode >= to this pattern would immediately
+# false-positive on that existing CHANGELOG prose. Keying discovery on a window
+# that names a governed kernel is the shape that fixes both; tracked as
+# follow-up work rather than patched here.
 #
 # Note that this pattern scans THIS FILE too, and that is deliberate: a guard
 # exempt from its own rule is how the next stale figure hides. It is also why
@@ -328,6 +353,18 @@ def evaluate(points: list[float], call: str) -> list[float]:
     out: list[float] = []
     for i in range(0, len(points), BATCH):
         out.extend(_evaluate_batch(points[i:i + BATCH], call))
+    if len(out) != len(points):
+        # `worst` zips points with values, so a short response would be
+        # SILENTLY ignored while the report still claimed the full sweep. It
+        # happens to fail closed today only because the argmax sits mid-sweep;
+        # a truncated prefix that happened to include the argmax would PASS
+        # with most points unmeasured, and would blame the published figure
+        # rather than the sweep.
+        raise SystemExit(
+            f"FAIL: {call} returned {len(out)} values for {len(points)} probe "
+            f"points. The sweep is not measuring what it reports; this is a "
+            f"wire or evaluator fault, not a wrong published figure."
+        )
     return out
 
 

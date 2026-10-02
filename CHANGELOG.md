@@ -65,8 +65,11 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   the offline leg and its mutation tests join the per-PR `contract-gate` job
   on the same "offline, no toolchain" grounds as the gates already there; the
   measurement leg and `scripts/oracle_greeks_gate.py` — unwired for the same
-  reason, though **not** broken, as it already decodes the tagged carrier —
-  run in a new nightly `accuracy` job. Its own job, not extra steps on
+  reason, though **not** broken — run in a new nightly `accuracy` job. The
+  Greeks gate is immune to the schema change because it never reads
+  `chelis eval --json` at all: it parses `chelis test --json`'s NDJSON report,
+  and its `all_ok` requires `n_pass == len(test_names)`, so an unparseable
+  report fails closed rather than passing vacuously. Its own job, not extra steps on
   `tests`, because a red unit suite would otherwise skip them and silently
   restore the state this issue describes; and it is wired into the nightly
   `report` job so a failure opens the tracking issue rather than going
@@ -75,12 +78,29 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   toolchain, which is right there, but `SHOALS_ORACLE_REQUIRE_CHELIS=1` (which
   CI sets) turns that skip into a failure.
 
-  30 mutation tests in `scripts/test_oracle_erf64_accuracy.py`, each of which
-  rewrites a published figure and requires the oracle to turn red — including
-  the exact mutation that shipped. One asserts what the offline leg **cannot**
-  do: rewrite every carrier to the same wrong number and it is green, because
-  it proves the carriers agree, never that they are right. That test exists so
+  44 tests in `scripts/test_oracle_erf64_accuracy.py`. Eleven mutate a
+  published figure in a throwaway git fixture — the exact mutation that shipped
+  among them — and require the oracle to turn red; the rest pin the measurement
+  verdict branches, the eval-wire decode, the fail-closed paths, sweep-length
+  integrity, and the CI wiring. Positive controls are deliberate: a guard that
+  always failed would satisfy every negative test.
+
+  One test asserts what the offline leg **cannot** do, and asserts that it is
+  *green*: rewrite every carrier to the same wrong number and the leg passes,
+  because it proves the carriers agree, never that they are right. It exists so
   nobody later claims the cheap leg is sufficient.
+
+  **Known limits, recorded rather than implied away.** The carrier predicate
+  keys on the `>=` marker rather than on the governed kernel, which cuts both
+  ways: an unrelated floor inequality in a tracked file fails the gate, and a
+  floor claim spelled with unicode `≥`, `&gt;=`, "at least" or a non-exponent
+  decimal is missed. "Zero false positives" is a measurement of the tree as it
+  stands, not a property of the design. Where a carrier's context names both
+  kernels (three of the eleven), attribution degrades to a membership check, so
+  the two figures could be swapped there undetected — drift to a *non-published*
+  value is still caught at all eleven. A kernel-scoped predicate fixes all of
+  these together and is tracked as follow-up work; a naive widening of the
+  marker would create false positives on prose already in this file.
 
 - **`deltas_put` returned `0.0` at the strike at expiry, where the limit is
   `-0.5`** (shoals#106). The call-side counterpart was fixed in shoals#101; this

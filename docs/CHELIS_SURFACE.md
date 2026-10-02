@@ -241,7 +241,7 @@ that they are right, and only the nightly leg constrains the value. A missing
 
 | Kernel | Approximation | Worst observed absolute error (a floor) | Method |
 |---|---|---|---|
-| `erf64` | W. J. Cody, Math. Comp. 23 (1969); three ranges split at 0.5 and 4, saturating at 6 | **>= 3.3675e-16** (~1.52 ulp of 1.0) | worst observed at x = 0.507001975, measured at 60 dps by `scripts/oracle_erf64_accuracy.py`; the error is jagged at ulp scale so any grid reports a floor |
+| `erf64` | W. J. Cody, Math. Comp. 23 (1969); three ranges split at 0.5 and 4, saturating at 6 | **>= 3.3675e-16** (~1.52 ulp of 1.0) | worst observed at x = ±0.507001975 (`erf` is odd, so the error magnitude is identical at both signs and the oracle may report either; `n_cdf64` below is **not** symmetric and its sign is significant), measured at 60 dps by `scripts/oracle_erf64_accuracy.py`; the error is jagged at ulp scale so any grid reports a floor |
 | `n_cdf64` | `0.5 * (1 - erf64(-x/√2))` | **>= 1.9495e-16** (~0.88 ulp of 1.0) | worst observed at x = -0.7170090691949448, measured at 60 dps by the same oracle. NOT `erf64`'s halved: the argument reduction `-x/√2` and the final `0.5 * (1 - e)` each round. **ABSOLUTE only — see the left-tail limitation below** |
 
 **`n_cdf64` has no useful RELATIVE accuracy in the left tail.** Both figures above

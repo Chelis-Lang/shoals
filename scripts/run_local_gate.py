@@ -49,10 +49,13 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
       stdlib-only; the MEASUREMENT leg needs the toolchain and runs under
       ``--full``. This leg proves the carriers agree, never that they are
       right.
-  17. ``scripts/test_oracle_erf64_accuracy.py`` — mutation tests for that
-      oracle. Each one rewrites a published figure and requires the oracle to
-      turn red, because the oracle shoals#64 describes was green against a
-      tree whose accuracy claim had been rewritten to 1.0e-30.
+  17. ``scripts/test_oracle_erf64_accuracy.py`` — 44 tests over that oracle.
+      Eleven mutate a published figure in a throwaway git fixture (the
+      shoals#64 mutation among them) and require the oracle to turn red; the
+      rest pin the measurement verdict branches, the eval-wire decode, the
+      fail-closed paths, sweep-length integrity, and the CI wiring itself.
+      Positive controls are included deliberately, since a guard that always
+      fails would satisfy every negative test.
 
 ``--full`` appends the stages CI runs in ``.github/workflows/nightly.yml``
 (scheduled, NOT per-PR) — run this at least once at a pin bump

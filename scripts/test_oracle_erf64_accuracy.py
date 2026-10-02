@@ -15,11 +15,13 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import math
 import shutil
 import struct
 import subprocess
 import sys
 import tempfile
+import types
 import unittest
 from decimal import Decimal
 from pathlib import Path
@@ -279,6 +281,103 @@ class TightnessCheck(unittest.TestCase):
             self.assertEqual(self.published(spelling).sig_digits, expected, spelling)
 
 
+class MeasurementEnforcement(unittest.TestCase):
+    """`run_measurement`'s verdict branches, which `TightnessCheck` does NOT
+    reach.
+
+    A red-team pass on PR #108 replaced the `elif not published_is_tight:`
+    branch with `elif False:` -- deleting this PR's headline repair -- and the
+    suite stayed green, because `TightnessCheck` exercises `floor_at` and
+    `Published.sig_digits` in isolation and never calls the one function that
+    turns "not tight" into a nonzero exit.
+
+    mpmath and `chelis` are both injected, so this runs under the bare
+    interpreter the per-PR job uses. `worst` is stubbed because the subject here
+    is the VERDICT, not the sweep; the sweep is covered end to end by the
+    nightly measurement leg.
+    """
+
+    # The real measured figures, so the fixtures below are the shipped ones.
+    MEASURED = {"erf64": 3.367545353985726e-16,
+                "n_cdf64": 1.9495914774441617e-16}
+
+    def setUp(self):
+        self.mod = load_oracle()
+        self.nans = 0
+        # `run_measurement` iterates erf64 then n_cdf64, so hand back each
+        # kernel's own measurement in that order. Returning one value for both
+        # made n_cdf64 fail too and masked the attribution test.
+        order = iter(("erf64", "n_cdf64"))
+        self.mod.probe_points = lambda: [0.5]
+        self.mod.evaluate = lambda points, call: [0.0]
+        self.mod.worst = lambda points, values, fn, mp: (
+            self.MEASURED[next(order)], 0.5, self.nans)
+        fake = types.ModuleType("mpmath")
+        fake.mp = types.SimpleNamespace(dps=15)
+        fake.mpf = float
+        fake.erf = math.erf
+        fake.sqrt = math.sqrt
+        self._prev = sys.modules.get("mpmath")
+        sys.modules["mpmath"] = fake
+
+    def tearDown(self):
+        if self._prev is None:
+            sys.modules.pop("mpmath", None)
+        else:
+            sys.modules["mpmath"] = self._prev
+
+    def run_with(self, erf_spelling, ncdf_spelling="1.9495e-16"):
+        published = {
+            "erf64": self.mod.Published("erf64", erf_spelling, "fixture"),
+            "n_cdf64": self.mod.Published("n_cdf64", ncdf_spelling, "fixture"),
+        }
+        return self.mod.run_measurement(published, verbose=False)
+
+    def test_a_tight_floor_passes(self):
+        """Positive control: without it every assertion below could pass
+        because the function always fails."""
+        rc, report = self.run_with("3.3675e-16", "1.9495e-16")
+        self.assertEqual(rc, 0, report["errors"])
+
+    def test_understated_floor_exits_nonzero(self):
+        """The branch the red team deleted. 1.0e-30 IS a floor."""
+        rc, report = self.run_with("1.0e-30")
+        self.assertEqual(rc, 1)
+        self.assertTrue(any("not a TIGHT one" in e for e in report["errors"]),
+                        report["errors"])
+
+    def test_overstated_floor_exits_nonzero(self):
+        rc, report = self.run_with("1.0e-15")
+        self.assertEqual(rc, 1)
+        self.assertTrue(any("EXCEEDS" in e for e in report["errors"]),
+                        report["errors"])
+
+    def test_only_the_offending_kernel_is_named(self):
+        """The leg must attribute, not go blanket-red: a failure naming both
+        kernels would send a maintainer to the wrong figure."""
+        rc, report = self.run_with("1.0e-30", "1.9495e-16")
+        self.assertEqual(rc, 1)
+        joined = " ".join(report["errors"])
+        self.assertIn("erf64", joined)
+        self.assertNotIn("n_cdf64", joined)
+
+    def test_an_unpublished_kernel_is_not_silently_skipped(self):
+        """A measured kernel with no published floor has nothing to check it
+        against, which must fail rather than pass vacuously."""
+        published = {"erf64": self.mod.Published("erf64", "3.3675e-16", "fixture")}
+        rc, report = self.mod.run_measurement(published, verbose=False)
+        self.assertEqual(rc, 1)
+        self.assertTrue(any("no published floor" in e for e in report["errors"]),
+                        report["errors"])
+
+    def test_a_nan_sweep_fails(self):
+        """A sweep that measured nothing must not report a tight floor."""
+        self.nans = 7
+        rc, report = self.run_with("3.3675e-16")
+        self.assertEqual(rc, 1)
+        self.assertTrue(any("NaN" in e for e in report["errors"]), report["errors"])
+
+
 class EvalWireDecode(unittest.TestCase):
     """The break that killed this oracle for three pin bumps."""
 
@@ -305,6 +404,28 @@ class EvalWireDecode(unittest.TestCase):
     def test_unsupported_schema_is_named_in_the_failure(self):
         self.assertNotIn(99, self.mod.SUPPORTED_EVAL_SCHEMAS)
         self.assertIn(3, self.mod.SUPPORTED_EVAL_SCHEMAS)
+
+
+class SweepIntegrity(unittest.TestCase):
+    """A short wire response must not be read as a complete sweep."""
+
+    def setUp(self):
+        self.mod = load_oracle()
+
+    def test_a_truncated_response_is_rejected(self):
+        self.mod._evaluate_batch = lambda pts, call: [0.0] * (len(pts) - 1)
+        with self.assertRaises(SystemExit) as ctx:
+            self.mod.evaluate([0.1, 0.2, 0.3], "erf64")
+        self.assertIn("probe points", str(ctx.exception))
+
+    def test_an_overlong_response_is_rejected(self):
+        self.mod._evaluate_batch = lambda pts, call: [0.0] * (len(pts) + 1)
+        with self.assertRaises(SystemExit):
+            self.mod.evaluate([0.1, 0.2], "erf64")
+
+    def test_a_complete_response_passes(self):
+        self.mod._evaluate_batch = lambda pts, call: [0.0] * len(pts)
+        self.assertEqual(len(self.mod.evaluate([0.1, 0.2, 0.3], "erf64")), 3)
 
 
 class FailClosed(unittest.TestCase):
@@ -354,9 +475,19 @@ class FailClosed(unittest.TestCase):
         self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("refusing to report success", done.stdout + done.stderr)
 
-    def test_ci_sets_the_require_flag(self):
-        nightly = (REPO_ROOT / ".github/workflows/nightly.yml").read_text()
-        self.assertIn("SHOALS_ORACLE_REQUIRE_CHELIS", nightly)
+    def test_ci_sets_the_require_flag_and_the_gate_reads_it(self):
+        """Both halves, because either alone is decorative: a renamed key in
+        the workflow, or a workflow that sets a key no code consumes, both left
+        the old file-wide assertion green."""
+        # Colon-anchored on purpose. A bare substring assertion is satisfied by
+        # `SHOALS_ORACLE_REQUIRE_CHELIS_X`, so renaming the key -- which
+        # silences the flag completely -- stayed green on the first attempt at
+        # this fix.
+        block = job_block("nightly.yml", "accuracy")
+        self.assertIn('SHOALS_ORACLE_REQUIRE_CHELIS: "1"',
+                      "\n".join(live_lines(block)))
+        gate = (REPO_ROOT / "scripts/oracle_greeks_gate.py").read_text()
+        self.assertIn('os.environ.get("SHOALS_ORACLE_REQUIRE_CHELIS") == "1"', gate)
 
     def test_dependency_is_declared(self):
         req = REPO_ROOT / "scripts" / "requirements-oracle.txt"
@@ -364,30 +495,100 @@ class FailClosed(unittest.TestCase):
         self.assertIn("mpmath", req.read_text())
 
 
+def job_block(workflow: str, job: str) -> str:
+    """The YAML text of one job, from its `  <job>:` header to the next job.
+
+    Hand-rolled rather than `yaml.safe_load` because this suite runs in the
+    per-PR `contract-gate` job, whose whole claim to being there is that it is
+    STDLIB-ONLY and needs no toolchain. Importing PyYAML to test that property
+    would destroy it. `scripts/test_release_workflow.py` slices the same way.
+    """
+    lines = (REPO_ROOT / ".github/workflows" / workflow).read_text().splitlines()
+    start = next(i for i, ln in enumerate(lines) if ln == f"  {job}:")
+    end = len(lines)
+    for i in range(start + 1, len(lines)):
+        ln = lines[i]
+        if ln[:2] == "  " and ln[2:3] not in (" ", "", "#") and ln.rstrip().endswith(":"):
+            end = i
+            break
+    return "\n".join(lines[start:end])
+
+
+def live_lines(block: str) -> list[str]:
+    """Uncommented lines only. A commented-out step must not satisfy a wiring
+    assertion -- that was the whole defect: a raw `assertIn` over the file was
+    green with every `run:` line commented out."""
+    return [ln for ln in block.splitlines() if not ln.lstrip().startswith("#")]
+
+
 class WiredIntoCi(unittest.TestCase):
     """shoals#64's third inertness: nothing invoked it.
 
-    These assert the wiring exists, so deleting it is a test failure rather
-    than a silent return to the state this issue describes.
+    These assert the wiring exists IN THE NAMED JOB and is not commented out,
+    so deleting or disabling it is a test failure rather than a silent return
+    to the state this issue describes. An earlier version of this class used
+    `assertIn` over the whole file; a red-team pass on PR #108 showed all four
+    assertions stayed green with each `run:` line commented out and with the
+    env key renamed, so they asserted nothing. Keep these job-scoped and
+    comment-aware.
     """
 
-    def invocations(self, rel):
-        return (REPO_ROOT / rel).read_text()
+    def assertWired(self, workflow, job, needle):
+        block = job_block(workflow, job)
+        hits = [ln for ln in live_lines(block) if needle in ln]
+        self.assertTrue(
+            hits,
+            f"{needle!r} is not live in {workflow}'s `{job}` job. Commented "
+            f"out, moved to another job, or deleted -- any of which returns "
+            f"this guard to the state shoals#64 describes.",
+        )
+        return block
 
     def test_transcription_leg_runs_per_pr(self):
-        ci = self.invocations(".github/workflows/ci.yml")
-        self.assertIn("oracle_erf64_accuracy.py --transcription", ci)
+        """In `contract-gate`, which is the per-PR offline job. Not merely
+        somewhere in the file: a step moved to a workflow_dispatch-only job
+        would satisfy a file-wide check."""
+        self.assertWired("ci.yml", "contract-gate",
+                         "oracle_erf64_accuracy.py --transcription")
+
+    def test_mutation_tests_run_per_pr(self):
+        self.assertWired("ci.yml", "contract-gate",
+                         "scripts/test_oracle_erf64_accuracy.py")
+
+    def test_per_pr_job_is_triggered_by_pull_request(self):
+        """A job nothing triggers is the defect, not the fix."""
+        head = (REPO_ROOT / ".github/workflows/ci.yml").read_text().split("jobs:")[0]
+        self.assertIn("pull_request", head)
 
     def test_measurement_leg_runs_nightly(self):
-        nightly = self.invocations(".github/workflows/nightly.yml")
-        self.assertIn("oracle_erf64_accuracy.py --measurement", nightly)
+        self.assertWired("nightly.yml", "accuracy",
+                         "oracle_erf64_accuracy.py --measurement")
 
     def test_greeks_oracle_runs_nightly(self):
-        nightly = self.invocations(".github/workflows/nightly.yml")
-        self.assertIn("oracle_greeks_gate.py", nightly)
+        self.assertWired("nightly.yml", "accuracy", "oracle_greeks_gate.py")
+
+    def test_nightly_accuracy_job_installs_its_dependency(self):
+        """The measurement leg FAILS without mpmath, so a missing install step
+        turns the job red rather than skipping -- but red-for-the-wrong-reason
+        is still a broken gate."""
+        self.assertWired("nightly.yml", "accuracy", "requirements-oracle.txt")
+
+    def test_nightly_accuracy_job_runs_daily(self):
+        block = job_block("nightly.yml", "accuracy")
+        live = "\n".join(live_lines(block))
+        self.assertIn("0 3 * * *", live,
+                      "the accuracy job must run on the daily cadence")
+
+    def test_accuracy_failure_is_surfaced(self):
+        """A guard that runs but that nothing gates on is only marginally
+        better than one that never runs."""
+        report = job_block("nightly.yml", "report")
+        live = "\n".join(live_lines(report))
+        self.assertIn("accuracy", live)
+        self.assertIn("ACCURACY_RESULT", live)
 
     def test_local_gate_runs_both_legs(self):
-        gate = self.invocations("scripts/run_local_gate.py")
+        gate = (REPO_ROOT / "scripts/run_local_gate.py").read_text()
         self.assertIn("oracle_erf64_accuracy.py", gate)
         self.assertIn("--transcription", gate)
         self.assertIn("--measurement", gate)
