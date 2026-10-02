@@ -10,6 +10,10 @@ name: nightly
 #       - `tests` : the fast deterministic unit suite (tests/, ~13 min).
 #       - `prove` : the keystone canon self-audit (scripts/prove_gate.py,
 #                   real-SMT ~8.6 min).
+#       - `accuracy` : the erf64/n_cdf64 published-floor measurement and the
+#                   AD-Greeks oracle (shoals#64 — both previously ran in no
+#                   CI job at all, and the erf64 one was additionally broken
+#                   against the current eval-JSON schema).
 #   * WEEKLY (Sun 06:00 UTC) — the `heavy` matrix: the Monte-Carlo / PDE /
 #     Fourier / optimization-benchmark files in tests-manual/, sharded one
 #     leg per file so no single leg approaches the 2-vCPU ubuntu-latest
@@ -182,6 +186,86 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
         run: python3 scripts/check_package_prove_latency.py
 
+  # The two numerical-accuracy oracles. Before shoals#64 they ran in NO CI job:
+  # `oracle_erf64_accuracy.py` was additionally CRASHING (it read `chelis eval
+  # --json` schema 2 while the pin emits schema 3's tagged carrier, a break it
+  # survived unnoticed through three pin bumps), and `oracle_greeks_gate.py`
+  # worked but was invoked nowhere.
+  #
+  # Their own job, deliberately, rather than extra steps on `tests`: appended
+  # there, a red unit suite would skip them and silently restore the state this
+  # issue describes. They need the pinned toolchain (they evaluate the compiled
+  # kernel), so the per-PR path is closed to them by the lean-CI decision in
+  # ci.yml -- the erf64 oracle's cheap offline half runs there instead.
+  accuracy:
+    name: accuracy-oracles (erf64 floors + AD Greeks)
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 3 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract versions from reef.toml
+        run: |
+          set -euo pipefail
+          REEF_CHELIS=$(grep -oP '^compiler\s*=\s*"=\K[0-9]+\.[0-9]+\.[0-9]+' reef.toml)
+          NAUTILUS_VERSION=$(grep -A0 '^nautilus' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          CORAL_VERSION=$(grep -A0 '^coral' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ "$REEF_CHELIS" != "$CHELIS_VERSION" ]; then
+            echo "Pin drift: reef.toml chelis=$REEF_CHELIS but literal CHELIS_VERSION=$CHELIS_VERSION" >&2
+            echo "Bump the top-level env pin and reef.toml together (scripts/audit_workarounds.py --pins-only)." >&2
+            exit 1
+          fi
+          echo "NAUTILUS_TAG=v$NAUTILUS_VERSION" >> "$GITHUB_ENV"
+          echo "CORAL_TAG=v$CORAL_VERSION"       >> "$GITHUB_ENV"
+
+      - name: Install chelis toolchain (cached)
+        id: chelis
+        uses: ./.github/actions/install-chelis
+        with:
+          chelis-tag: ${{ env.CHELIS_TAG }}
+          chelis-version: ${{ env.CHELIS_VERSION }}
+          gh-token: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+          reef-cache-key: nautilus-${{ env.NAUTILUS_TAG }}-coral-${{ env.CORAL_TAG }}
+
+      - name: Install released dependencies
+        if: steps.chelis.outputs.reef-cache-hit != 'true'
+        timeout-minutes: 5
+        env:
+          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Canonical lowercase owner is a release-byte narrowing for chelis#1002.
+          chelis reef install --from-github "chelis-lang/nautilus@${NAUTILUS_TAG}"
+          chelis reef install --from-github "chelis-lang/coral@${CORAL_TAG}"
+
+      - name: chelis reef build
+        run: chelis reef build
+
+      # mpmath is a HARD prerequisite, not a nicety: the erf64 oracle used to
+      # exit 0 when it was absent, which is how a wrong figure shipped past it.
+      # It FAILS now, so this install must not be allowed to silently no-op.
+      - name: Install oracle reference dependencies
+        run: |
+          set -euo pipefail
+          python3 -m pip install -r scripts/requirements-oracle.txt
+          python3 -c 'import mpmath; print("mpmath", mpmath.__version__)'
+
+      - name: Measure the published accuracy floors
+        timeout-minutes: 30
+        run: python3 scripts/oracle_erf64_accuracy.py --measurement
+
+      - name: AD-Greeks oracle gate
+        timeout-minutes: 30
+        env:
+          # This gate SKIPs when chelis is unavailable, which is right on a
+          # clean box and wrong here: the toolchain is installed above, so a
+          # SKIP would mean the gate silently stopped running again.
+          SHOALS_ORACLE_REQUIRE_CHELIS: "1"
+        run: python3 scripts/oracle_greeks_gate.py
+
   heavy:
     name: heavy ${{ matrix.file }}
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 6 * * 0'
@@ -292,7 +376,7 @@ jobs:
   # `if: always()` so it runs regardless of outcome.
   report:
     name: Surface nightly status
-    needs: [tests, prove, heavy]
+    needs: [tests, prove, accuracy, heavy]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -303,6 +387,7 @@ jobs:
         env:
           TESTS_RESULT: ${{ needs.tests.result }}
           PROVE_RESULT: ${{ needs.prove.result }}
+          ACCURACY_RESULT: ${{ needs.accuracy.result }}
           HEAVY_RESULT: ${{ needs.heavy.result }}
         with:
           script: |
@@ -316,6 +401,7 @@ jobs:
             const results = {
               tests: process.env.TESTS_RESULT,
               prove: process.env.PROVE_RESULT,
+              accuracy: process.env.ACCURACY_RESULT,
               heavy: process.env.HEAVY_RESULT,
             };
             const failedJobs = Object.entries(results)

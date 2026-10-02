@@ -55,8 +55,9 @@ DERIVED from f32 precision and FD truncation, never a fixed percent (see
 ``tol_*`` / ``*_apriori_band`` below). The JSON report states each derived
 tolerance so the bound is auditable.
 
-Exit 0 on pass (or SKIP when the configured chelis is missing/pre-0.8.0),
-nonzero on fail. A JSON summary is printed to stdout.
+Exit 0 on pass (or SKIP when the configured chelis is missing/pre-0.8.0 --
+set SHOALS_ORACLE_REQUIRE_CHELIS=1 to make that case FAIL instead, which CI
+does), nonzero on fail. A JSON summary is printed to stdout.
 """
 
 from __future__ import annotations
@@ -654,6 +655,28 @@ def build_test_source(grid, refs):
     return "\n".join(lines) + "\n", test_names
 
 
+# shoals#64. The availability SKIP below is correct on a clean box and WRONG in
+# a CI job that installed the pinned toolchain three steps earlier: there, a
+# SKIP means the gate silently stopped running, which is the state shoals#64
+# describes. Setting SHOALS_ORACLE_REQUIRE_CHELIS=1 turns every such SKIP into
+# a FAIL. CI sets it; a developer on a clean box does not.
+REQUIRE_CHELIS = os.environ.get("SHOALS_ORACLE_REQUIRE_CHELIS") == "1"
+
+
+def unavailable_rc(detail: str) -> int:
+    """Exit code for "cannot run": 0 (skip) normally, nonzero where the caller
+    has declared the toolchain a prerequisite."""
+    if REQUIRE_CHELIS:
+        print(
+            f"FAIL: oracle_greeks_gate -- SHOALS_ORACLE_REQUIRE_CHELIS=1 but the "
+            f"configured chelis ({CHELIS!r}) is unavailable: {detail}. This gate "
+            f"was asked to run, so refusing to report success.",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
 class ChelisUnavailable(Exception):
     """The configured chelis binary is missing or cannot run this gate (e.g. a
     pre-0.8.0 compiler that fails to satisfy the package pin). Raised so main()
@@ -714,12 +737,13 @@ def main() -> int:
     # environment from reporting a false negative.
     ok, detail = chelis_available()
     if not ok:
-        print(
-            f"SKIP: oracle_greeks_gate -- configured chelis ({CHELIS!r}) unavailable: "
-            f"{detail}. Set CHELIS_BIN (or CHELIS_PROVE_BIN) to the exact "
-            f"reef.toml compiler pin ({compiler_pin()}) to run this gate."
-        )
-        return 0
+        if not REQUIRE_CHELIS:
+            print(
+                f"SKIP: oracle_greeks_gate -- configured chelis ({CHELIS!r}) unavailable: "
+                f"{detail}. Set CHELIS_BIN (or CHELIS_PROVE_BIN) to the exact "
+                f"reef.toml compiler pin ({compiler_pin()}) to run this gate."
+            )
+        return unavailable_rc(detail)
 
     K = 100.0
     # moneyness x maturity x vol x rate grid + sign-fold straddle.
@@ -804,12 +828,13 @@ def main() -> int:
         try:
             rc, per_test, summary, out, err = run_chelis_test(GEN_TEST)
         except ChelisUnavailable as exc:
-            print(
-                f"SKIP: oracle_greeks_gate -- configured chelis ({CHELIS!r}) "
-                f"unavailable: {exc}. Set CHELIS_BIN (or CHELIS_PROVE_BIN) to "
-                f"the exact reef.toml compiler pin ({compiler_pin()})."
-            )
-            return 0
+            if not REQUIRE_CHELIS:
+                print(
+                    f"SKIP: oracle_greeks_gate -- configured chelis ({CHELIS!r}) "
+                    f"unavailable: {exc}. Set CHELIS_BIN (or CHELIS_PROVE_BIN) to "
+                    f"the exact reef.toml compiler pin ({compiler_pin()})."
+                )
+            return unavailable_rc(str(exc))
         return _finish(grid, refs, test_names, src, rc, per_test, summary, out, err,
                        acc_new_max, acc_old_max)
     finally:
