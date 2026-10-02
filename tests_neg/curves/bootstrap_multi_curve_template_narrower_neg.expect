@@ -1,0 +1,10 @@
+Shoals.Curves.bootstrap_multi_curve: times_template must have one entry per instrument (the declared YieldCurve extent comes from the template): template has 2 entries for 3 instruments
+
+The opposite mismatch to the wider template, and the quieter one: nothing traps
+in this direction. Three instruments against a two-wide template returned a
+value declared `YieldCurve[2]` whose tensors carried three pillars (measured
+with the guard's predicate forced to `true`: actual length 3,
+`rate_at(c, 2.0)` = 0.043088913, `rate_at(c, 3.0)` = 0.046586514). Reads by
+time see the third pillar; anything trusting the declared extent cannot, so the
+type and the value disagree with no diagnostic. Each direction has its own case
+rather than one standing in for both.
