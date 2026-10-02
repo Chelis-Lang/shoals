@@ -58,26 +58,54 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   0.49829 against the correct 61/365 + 121/366 = 0.49772.
 
   Both ACT/ACT conventions are checked against an exact proleptic-Gregorian
-  calendar computed independently in `references/date.ch`, which also states
-  ISDA by a different decomposition (whole interior years count as 1, only the
-  head and tail stubs are divided) than the subject's per-year clamp.
+  calendar computed independently in `references/date.ch`, which also states ISDA
+  by a different decomposition (a per-calendar-year clamp) than the subject's
+  head/interior/tail form. That cross-check is driven over a matrix of
+  {same-year, multi-year} x {ordinary, leap, century non-leap, quadricentennial}
+  x {one day, degenerate stub, whole year, long span}, because two hand-picked
+  spans left the same-year branch unreached entirely.
 
-  **Every claim above is pinned by a mutation that the suite catches.** Nine
-  injected defects, nine detected: rolls reverting to weekend-only (4 tests
-  fail), `ActActIsda` reverting to days/365.25 (11), ICMA silently routing to
-  ISDA (5), the leap denominator flattened to 365 (7), ICMA dropping its
-  frequency scaling (3), the ISDA year loop losing its final year (3),
-  `add_business_days` ceasing to skip (1), modified-following losing its
-  month check (1), and the reference ordinal losing the Gregorian century rule
-  (1).
+  **On cost, stated carefully because earlier drafts of this entry got it wrong
+  in both directions.** `Std.Time.days_before_year` recurses one year at a time
+  from 1970, so a single `days_between` costs O(|year - 1970|) per endpoint and is
+  independent of the span: a ONE-DAY interval at year 2770 measures ~2s, while an
+  eight-hundred-year interval straddling 1970 measures ~1s. The per-calendar-year
+  fold paid that epoch distance once per year of the span, and the product is what
+  made it slow. The shipped form makes a bounded number of those calls whatever
+  the span. Same probe, same machine: the fold took 549s and could not answer an
+  800-year span within 400s; the shipped form answers a 200-year and an 800-year
+  span in 15s together.
 
-  **The last of those initially survived, and closing it is why the suite has a
-  1899/1900 case.** The century term in the reference's ordinal is identically
-  zero for every year in 2000..2099, so a reference with the Gregorian century
-  rule deleted agreed with a correct one at every date the suite then used. Every
-  subject-vs-reference comparison was inside one century block, which made the
-  independent reference unverified outside it. `1899-11-01..1900-05-01` is the
-  case that reaches it, and it also exercises 1900 as the century non-leap.
+  **Mutation evidence, and a correction to how it was first reported.** The suite
+  detects every one of 18 injected defects at this head, measured as a single run
+  against a single commit with an up-front assertion that each pattern is present,
+  so an unapplied probe aborts the run rather than scoring as a pass. The groups
+  are the nine originally written, the four a red-team review found surviving
+  those nine, the seven aimed at the rewritten ISDA, and the same-year denominator
+  in both directions.
+
+  **An earlier version of this entry claimed "nine injected, nine detected".**
+  That was true of the nine defects thought to write, which is the weaker
+  statement, and three separate gaps were found afterwards by review rather than
+  by the suite:
+
+  - The reference ordinal's Gregorian century term is identically zero for every
+    year in 2000..2099, and every subject-vs-reference comparison sat inside that
+    block, so deleting the century rule agreed with a correct reference at every
+    date then tested. `1899-11-01..1900-05-01` reaches it and also exercises 1900
+    as the century non-leap.
+  - Four further mutations survived: a one-day calendar-year segment, a negative
+    ICMA frequency, a reversed ICMA coupon period, and `add_business_days` rolling
+    its own start date.
+  - **Every same-year ISDA assertion sat in a leap year**, so forcing the
+    same-year denominator to 366 passed the whole suite while returning 181/366
+    for an ordinary-year accrual. The earlier probe forced it to 365, which the
+    leap-year test catches, so it read as coverage: a two-valued function mutated
+    in one direction only tests the value that happens to be covered.
+
+  All three share one shape — an axis held constant across every instance of an
+  assertion, invisible because each individual assertion is correct. The matrix
+  above exists to make that axis explicit rather than to add one more case.
 
 - **`deltas_put` returned `0.0` at the strike at expiry, where the limit is
   `-0.5`** (shoals#106). The call-side counterpart was fixed in shoals#101; this

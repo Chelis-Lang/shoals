@@ -44,9 +44,13 @@ It does **not** make every invalid ICMA request unrepresentable, and the
 difference matters. `year_fraction` validates the coupon period and the
 frequency; it does **not** check that `start` and `end` lie within that period.
 An accrual range outside, or longer than, its stated coupon period returns a
-number — one larger than `1/frequency`, which is nonsense for a single period
-but is not reported as an error. Keeping the accrual inside the period is the
-caller's responsibility.
+number rather than an error, and that number is **not** recognisable as wrong by
+its magnitude: an accrual lying wholly outside a period and shorter than it
+returns a *small* fraction (2010-01-01..2010-02-01 against a 2003-11-01 period
+gives 0.0852), a longer one returns a value above `1/frequency`, and a reversed
+accrual returns a negative. So "assert the result is at most `1/frequency`" is
+not a sufficient check. Keeping the accrual inside the period is the caller's
+responsibility.
 
 From `tests/date.ch`:
 

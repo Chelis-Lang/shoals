@@ -21,10 +21,17 @@ def date_require_frequency(n: i64) -> i64 = if lt(n, cast(1, i64)) then fail("Sh
 -- ACT/ACT ISDA weights a day by the length of the calendar year it falls in, so
 -- a leap day counts 1/366 and an ordinary day 1/365. Stated the way a textbook
 -- does: a whole interior year is exactly 1, and only the head and tail stubs are
--- divided. That keeps the cost independent of the span. The formulation matters
--- here: a per-calendar-year fold costs seconds across a multi-decade tenor, and
--- the days/365.25 this replaced was O(1), so a loop would have made a public
--- function slower than the approximation it corrected.
+-- divided. The formulation matters, and the reason is not where it first looks.
+-- `Std.Time.days_before_year` recurses ONE YEAR AT A TIME FROM 1970, so a single
+-- `days_between` costs O(|year - 1970|) per endpoint and is independent of the
+-- span: measured at this pin, a ONE-DAY interval at year 2770 costs ~2s, while an
+-- eight-hundred-year interval straddling 1970 costs ~1s. A per-calendar-year fold
+-- therefore paid that epoch distance once PER YEAR of the span, and it was the
+-- product of the two factors that made it slow, not the loop alone.
+-- This form makes a bounded number of such calls whatever the span, which is the
+-- same class as the days/365.25 approximation it replaced. It is O(1) in the span
+-- and still linear in the distance of its dates from 1970; `civil_ordinal` in
+-- `Shoals.References.Date` is closed-form and has neither cost.
 -- `Shoals.References.Date` carries the per-year-clamp formulation instead, where
 -- the span is always test-sized and the differing shape is what makes the
 -- cross-check worth running. A reversed interval returns the negated fraction.

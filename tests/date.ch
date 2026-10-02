@@ -140,6 +140,43 @@ def test_act_act_icma_differs_from_isda_on_the_same_interval() -> unit ! { Test 
   gap = if lt(icma, isda) then sub(isda, icma) else sub(icma, isda)
   assert_close(to01_f64(gt(gap, cast(0.0001, f64))), cast(1.0, f64), tight64(), "ICMA and ISDA disagree on 2003-11-01..2004-05-01")
 }
+-- Red-team round 2, F7. THE CROSS-CHECK HAD NO REACH. Before this matrix,
+-- `year_fraction_matches_textbook` ran at exactly two hand-picked multi-year
+-- six-month spans, so the independent reference never reached the same-year
+-- branch at all, and every same-year ISDA assertion in this file sat in a LEAP
+-- year. Forcing the same-year denominator to 366 therefore passed all 53 tests
+-- while returning 181/366 instead of 181/365 for an ordinary-year accrual --
+-- the single commonest ACT/ACT ISDA input there is.
+--
+-- The lesson is about the probe, not the line: a two-valued function mutated in
+-- ONE direction only tests the value that happens to be covered. The earlier
+-- probe forced that denominator to 365, which the leap-year test catches, so it
+-- read as coverage.
+--
+-- So this is a matrix over {same-year, multi-year} x {ordinary, leap, century
+-- non-leap, quadricentennial} x {1 day, degenerate stub, whole year, long span},
+-- driven through the independent reference rather than against hand-computed
+-- decimals. Adding one more hand-picked case would have closed the instance and
+-- left the class open.
+def isda_agrees(ys: i64, ms: i64, ds: i64, ye: i64, me: i64, de: i64) -> bool = year_fraction_matches_textbook(date(ys, ms, ds), date(ye, me, de), ActActIsda)
+def all_true(xs: List[bool]) -> bool = fold(fn (acc: bool, x: bool) -> and(acc, x), true, xs)
+def matrix_holds(xs: List[bool], label: string) -> unit ! { Test } = assert_close(to01_f64(all_true(xs)), cast(1.0, f64), tight64(), label)
+def test_isda_matrix_same_year_ordinary() -> unit ! { Test } = matrix_holds([isda_agrees(cast(2025, i64), cast(1, i64), cast(1, i64), cast(2025, i64), cast(7, i64), cast(1, i64)), isda_agrees(cast(2025, i64), cast(3, i64), cast(1, i64), cast(2025, i64), cast(3, i64), cast(2, i64)), isda_agrees(cast(2025, i64), cast(1, i64), cast(1, i64), cast(2025, i64), cast(12, i64), cast(31, i64))], "same-year branch, ordinary year: part-year, one day, almost-whole-year")
+def test_isda_matrix_same_year_leap() -> unit ! { Test } = matrix_holds([isda_agrees(cast(2024, i64), cast(1, i64), cast(1, i64), cast(2024, i64), cast(7, i64), cast(1, i64)), isda_agrees(cast(2024, i64), cast(2, i64), cast(28, i64), cast(2024, i64), cast(2, i64), cast(29, i64)), isda_agrees(cast(2024, i64), cast(2, i64), cast(29, i64), cast(2024, i64), cast(3, i64), cast(1, i64))], "same-year branch, leap year: part-year, the leap day itself, the day after")
+def test_isda_matrix_same_year_century_non_leap() -> unit ! { Test } = matrix_holds([isda_agrees(cast(1900, i64), cast(1, i64), cast(1, i64), cast(1900, i64), cast(7, i64), cast(1, i64)), isda_agrees(cast(1900, i64), cast(2, i64), cast(28, i64), cast(1900, i64), cast(3, i64), cast(1, i64))], "same-year branch, 1900 century non-leap: part-year and the Feb/Mar boundary")
+def test_isda_matrix_same_year_quadricentennial() -> unit ! { Test } = matrix_holds([isda_agrees(cast(2000, i64), cast(1, i64), cast(1, i64), cast(2000, i64), cast(7, i64), cast(1, i64)), isda_agrees(cast(2000, i64), cast(2, i64), cast(28, i64), cast(2000, i64), cast(2, i64), cast(29, i64))], "same-year branch, 2000 quadricentennial leap: part-year and the leap day")
+def test_isda_matrix_adjacent_years() -> unit ! { Test } = matrix_holds([isda_agrees(cast(2025, i64), cast(12, i64), cast(31, i64), cast(2026, i64), cast(1, i64), cast(1, i64)), isda_agrees(cast(2023, i64), cast(12, i64), cast(31, i64), cast(2024, i64), cast(1, i64), cast(2, i64)), isda_agrees(cast(2024, i64), cast(12, i64), cast(31, i64), cast(2025, i64), cast(1, i64), cast(1, i64))], "multi-year branch with interior == 0, in all three leap orderings")
+def test_isda_matrix_degenerate_stubs() -> unit ! { Test } = matrix_holds([isda_agrees(cast(2024, i64), cast(1, i64), cast(1, i64), cast(2025, i64), cast(6, i64), cast(15, i64)), isda_agrees(cast(2023, i64), cast(6, i64), cast(15, i64), cast(2025, i64), cast(1, i64), cast(1, i64)), isda_agrees(cast(2020, i64), cast(1, i64), cast(1, i64), cast(2025, i64), cast(1, i64), cast(1, i64))], "multi-year branch: zero head stub, zero tail stub, both stubs zero")
+def test_isda_matrix_across_century_boundaries() -> unit ! { Test } = matrix_holds([isda_agrees(cast(1899, i64), cast(11, i64), cast(1, i64), cast(1900, i64), cast(5, i64), cast(1, i64)), isda_agrees(cast(1999, i64), cast(11, i64), cast(1, i64), cast(2000, i64), cast(5, i64), cast(1, i64)), isda_agrees(cast(2099, i64), cast(11, i64), cast(1, i64), cast(2100, i64), cast(5, i64), cast(1, i64))], "multi-year branch across 1900, 2000 and 2100 year boundaries")
+def test_isda_matrix_long_span_and_reversed() -> unit ! { Test } = matrix_holds([isda_agrees(cast(1950, i64), cast(3, i64), cast(15, i64), cast(2050, i64), cast(9, i64), cast(20, i64)), isda_agrees(cast(2025, i64), cast(7, i64), cast(1, i64), cast(2025, i64), cast(1, i64), cast(1, i64)), isda_agrees(cast(2004, i64), cast(5, i64), cast(1, i64), cast(2003, i64), cast(11, i64), cast(1, i64))], "multi-year 100-year span, plus reversed intervals on both branches")
+-- The exact value for the case F7 named, stated as a decimal rather than routed
+-- through the reference, so the matrix and this assertion fail independently.
+def test_act_act_isda_same_year_ordinary_exact() -> unit ! { Test } = {
+  start = date(cast(2025, i64), cast(1, i64), cast(1, i64))
+  end = date(cast(2025, i64), cast(7, i64), cast(1, i64))
+  expected = div(cast(181.0, f64), cast(365.0, f64))
+  assert_close(year_fraction(start, end, ActActIsda), expected, tight64(), "2025-01-01..2025-07-01 is 181 days of an ordinary year == 181/365, not 181/366")
+}
 def test_weekend_saturday() -> unit ! { Test } = {
   d = date(cast(2025, i64), cast(1, i64), cast(4, i64))
   assert_close(to01(is_weekend(d)), cast(1.0, f32), cast(0.001, f32), "2025-01-04 is Saturday")

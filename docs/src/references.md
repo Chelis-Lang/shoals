@@ -107,7 +107,13 @@ differently from the subject: the reference clamps every calendar year to the
 interval and divides each segment, where `Shoals.Date` counts a whole interior
 year as exactly 1 and divides only the head and tail stubs. Agreement is
 therefore a real cross-check of the year-boundary handling rather than a
-restatement. The subject carries the O(1) form deliberately — a per-calendar-year
-fold costs seconds across a multi-decade tenor, and the `days / 365.25` it
-replaced was O(1) — while the reference carries the loop, where the span is
-always test-sized.
+restatement. The subject carries the loop-free form deliberately, and the cost
+model is worth stating because it is counter-intuitive:
+`Std.Time.days_before_year` recurses one year at a time from 1970, so a single
+`days_between` costs O(|year − 1970|) per endpoint and does **not** depend on the
+span at all. A per-calendar-year fold paid that epoch distance once per year of
+the span, and the product is what made it slow. The subject now makes a bounded
+number of those calls whatever the span — O(1) in the span, still linear in how
+far its dates sit from 1970. The reference keeps the loop but pays neither cost
+per iteration, because `civil_ordinal` is closed-form era/yoe/doy arithmetic with
+no recursion; its span is test-sized regardless.
