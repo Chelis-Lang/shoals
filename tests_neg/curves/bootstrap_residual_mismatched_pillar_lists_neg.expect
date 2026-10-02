@@ -1,0 +1,6 @@
+Shoals.Curves.bootstrap_residual_at_pillar: times_so_far and rates_so_far must describe the same pillars (equal lengths)
+
+`bootstrap_residual_at_pillar` is exported and does not route through
+`solve_pillar_rate`, so the guards that `bootstrap_multi` relies on do not cover
+it. It needs its own check: with a mismatched pair the residual moved with the
+extra rate entry while still returning a finite number.

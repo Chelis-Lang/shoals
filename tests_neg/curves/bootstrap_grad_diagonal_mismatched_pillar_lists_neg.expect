@@ -1,0 +1,6 @@
+Shoals.Curves.bootstrap_grad_diagonal: times_so_far and rates_so_far must describe the same pillars (equal lengths)
+
+`bootstrap_grad_diagonal` is the third exported entry point that takes the two
+pillar lists independently. It gained them in the #76 refactor, so a mismatched
+pair reached the same positional annuity read and returned a finite but wrong
+diagonal.
