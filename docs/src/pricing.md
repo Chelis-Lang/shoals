@@ -98,6 +98,7 @@ diverge:
 | | `s < k` | `s = k` | `s > k` |
 |---|---|---|---|
 | `deltas_call` | `0` | `0.5` | `1` |
+| `deltas_put` | `-1` | `-0.5` | `0` |
 | `gammas_call` | `0` | `+inf` | `0` |
 | `thetas_call` | `0` | `-inf` | `-r * k` |
 | `vannas_call` | `0` | `0` | `0` |
@@ -121,6 +122,9 @@ here:
   is not zero, but `d2` tends to zero, so vanna does too — it is zero across
   the whole surface at expiry.
 - Vega, rho and volga each carry a `sqrt(t)` or `t` factor.
+- Put delta follows from the call by put-call parity: differentiating it in the
+  spot gives `delta_call - delta_put = 1` at every spot and every `t`, expiry
+  included. At the strike that is `0.5 - (-0.5)`.
 
 Gamma at the strike grows like `n(d1) / (s * sigma * sqrt(t))` and theta like
 `-s * sigma * n(d1) / (2 * sqrt(t))`, where `n` is the standard normal density,
