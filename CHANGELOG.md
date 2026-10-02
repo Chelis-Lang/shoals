@@ -18,15 +18,26 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   that moved with the supposedly-ignored entry — `0.760` with a trailing `0.02`
   and `0.477` with a trailing `0.50`, against `0.711` for the matched lists.
 
-  The issue names `fd_bump_pillar_rate` and `bootstrap_residual_at_pillar`.
-  `bootstrap_grad_diagonal` gained the same two parameters in the #76 refactor,
-  after the issue was written, and was measured to have the same defect
-  (`0.700` versus `1.929` on the same pair), so it is guarded too. The
+  The issue names `fd_bump_pillar_rate` and `bootstrap_residual_at_pillar` and
+  says every other entry point takes its pillars from `bootstrap_multi`.
+  `bootstrap_grad_diagonal` gained the same two parameters in #76, which merged
+  18 minutes *before* the issue was filed, so that enumeration was incomplete
+  when written rather than overtaken afterwards. It was measured to have the
+  same defect (`0.700` versus `1.929` on the same pair) and is guarded too. The
   opposite mismatch — a pillar time with no rate behind it — already died, but
   as a bare `index 3 out of bounds for list of len 3` that named neither the
   function nor the contract; it now reports the same named diagnostic. Each
   guard names the entry point the caller actually invoked, and each direction
   has its own negative case rather than one standing in for both.
+
+  The guards are deliberately stricter than the silent-wrong-answer defect
+  alone requires. The `Deposit` and `ZeroCoupon` arms of
+  `bootstrap_residual_at_pillar` and `bootstrap_grad_diagonal` read neither
+  list, so a mismatched pair was genuinely harmless there and returned a
+  correct answer; it is now rejected. #78 calls a mismatched pair malformed
+  input, and matched-length results are bit-identical, so this is intended, but
+  it is a behaviour change beyond "read the wrong rate" and is recorded as
+  one.
 
 - **The `erf64`/`n_cdf64` accuracy oracle read no published file, failed open,
   ran in no CI job — and was crashing** (shoals#64). The issue named the first
