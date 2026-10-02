@@ -8,6 +8,32 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **`deltas_put` returned `0.0` at the strike at expiry, where the limit is
+  `-0.5`** (shoals#106). The call-side counterpart was fixed in shoals#101; this
+  is the same defect in its silently-wrong form rather than its `NaN` form, which
+  is why the shoals#101 measurements did not surface it — the value was finite,
+  plausible and wrong.
+
+  At `t = 0` put delta is now `-1` below the strike, `-0.5` at it and `0` above,
+  mirroring the call surface. Measured approach at the strike: `-0.48604` at
+  `t=1e-2`, `-0.49860` at `1e-4`.
+
+  The load-bearing check is put-call parity rather than the three cells:
+  differentiating parity in the spot gives `delta_call - delta_put = 1` at every
+  spot and every time to expiry, so the put surface is tied to the call surface —
+  independently pinned, and checked against `scripts/oracle_greeks_gate.py` —
+  instead of to a transcribed decimal. It is also falsifiable on exactly this
+  defect: with put delta `0.0` at the strike and call delta `0.5`, parity there
+  read `0.5`, not `1`.
+
+  `§2.10.1`'s non-normative parenthetical is removed, the requirement now being
+  met. `t > 0` is untouched. Seven tests added, four mutations proven red
+  (reverting the branch, dropping the sign, perturbing the strike cell, and
+  folding the strike into the below-branch).
+
+
+### Fixed
+
 - **No exported Greek returns `NaN` at expiry** (shoals#101). `gammas_call`,
   `thetas_call` and `vannas_call` returned `NaN` at `t = 0`, and `deltas_call`
   returned `0.0` at the strike where the limit is `0.5`.

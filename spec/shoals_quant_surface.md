@@ -314,9 +314,11 @@ Each cell is the limit of the closed form, and is derivable in one step:
   everywhere at expiry.
 - Vega, rho and volga each carry a factor of `sqrt(t)` or `t`.
 
-The put surface mirrors this, with put delta tending to `-1`, `-0.5` and
-`0` below, at and above the strike. (Put delta at the strike is not yet
-implemented to this requirement; see shoals#106.)
+The put surface mirrors this, with put delta `-1`, `-0.5` and `0` below,
+at and above the strike. Put-call parity differentiated in the spot
+requires `delta_call - delta_put` to be one at every spot and every time
+to expiry, expiry included, which fixes the put cells given the call
+cells.
 
 
 Callers aggregating a sensitivity vector test for finiteness. An equality

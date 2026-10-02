@@ -1,6 +1,6 @@
 module Shoals.Tests.PricingGreeksExpiry
 import Std.Test (assert_close, assert_true)
-import Shoals.Pricing (deltas_call, vegas_call, rhos_call, thetas_call, gammas_call, volgas_call, vannas_call)
+import Shoals.Pricing (deltas_call, deltas_put, vegas_call, rhos_call, thetas_call, gammas_call, volgas_call, vannas_call)
 -- shoals#101. Every exported Greek at t = 0, pinned against the limit measured
 -- by approaching expiry rather than against a transcribed decimal.
 --
@@ -130,4 +130,49 @@ def test_positive_t_path_is_unchanged() -> unit ! { Test } = {
   -- closed form is 0.5, and a 1e-5 tolerance separates them.
   dn = to_list(deltas_call(spots3(), k100(), r5(), v20(), cast(0.0001, f32)))
   assert_close(index(dn, cast(0, i64)), cast(0.5013963, f32), cast(0.00001, f32), "delta at t=1e-4 is the AD value, not the t=0 closed form")
+}
+-- PUT DELTA at t = 0 (shoals#106). The limits mirror the call: -1 below the
+-- strike, -0.5 at it, 0 above. At expiry the put price is max(k - s, 0).
+--
+-- The parity test below is the load-bearing one, and it is stronger than the
+-- three cell assertions. Put-call parity differentiated in the spot gives
+-- delta_call - delta_put = 1 for every spot and every t, so it ties the put
+-- surface to the call surface -- which is independently pinned above and against
+-- `scripts/oracle_greeks_gate.py` -- rather than to a transcribed decimal. It is
+-- also falsifiable on exactly the defect this fixes: with put delta 0.0 at the
+-- strike and call delta 0.5, parity there reads 0.5, not 1.
+def test_put_delta_at_expiry_below_the_strike_is_minus_one() -> unit ! { Test } = {
+  d = to_list(deltas_put(spots3(), k100(), r5(), v20(), zero()))
+  assert_close(index(d, cast(2, i64)), cast(-1.0, f32), tol(), "put delta at t=0, s<k is -1")
+}
+def test_put_delta_at_expiry_at_the_strike_is_minus_one_half() -> unit ! { Test } = {
+  d = to_list(deltas_put(spots3(), k100(), r5(), v20(), zero()))
+  assert_close(index(d, cast(0, i64)), cast(-0.5, f32), tol(), "put delta at t=0, s=k is -0.5, the limit in time")
+}
+def test_put_delta_at_expiry_above_the_strike_is_zero() -> unit ! { Test } = {
+  d = to_list(deltas_put(spots3(), k100(), r5(), v20(), zero()))
+  assert_close(index(d, cast(1, i64)), zero(), tol(), "put delta at t=0, s>k is 0")
+}
+def test_put_call_parity_for_delta_holds_at_expiry() -> unit ! { Test } = {
+  c = to_list(deltas_call(spots3(), k100(), r5(), v20(), zero()))
+  p = to_list(deltas_put(spots3(), k100(), r5(), v20(), zero()))
+  _ = assert_close(sub(index(c, cast(0, i64)), index(p, cast(0, i64))), cast(1.0, f32), tol(), "parity at t=0, s=k -- 0.5 here before shoals#106")
+  _ = assert_close(sub(index(c, cast(1, i64)), index(p, cast(1, i64))), cast(1.0, f32), tol(), "parity at t=0, s>k")
+  assert_close(sub(index(c, cast(2, i64)), index(p, cast(2, i64))), cast(1.0, f32), tol(), "parity at t=0, s<k")
+}
+def test_put_call_parity_for_delta_holds_away_from_expiry() -> unit ! { Test } = {
+  c = to_list(deltas_call(spots3(), k100(), r5(), v20(), cast(1.0, f32)))
+  p = to_list(deltas_put(spots3(), k100(), r5(), v20(), cast(1.0, f32)))
+  _ = assert_close(sub(index(c, cast(0, i64)), index(p, cast(0, i64))), cast(1.0, f32), tol(), "parity at t=1, s=k -- the AD path")
+  assert_close(sub(index(c, cast(2, i64)), index(p, cast(2, i64))), cast(1.0, f32), tol(), "parity at t=1, s<k -- the AD path")
+}
+def test_put_delta_positive_t_path_is_unchanged() -> unit ! { Test } = {
+  p = to_list(deltas_put(spots3(), k100(), r5(), v20(), cast(0.0001, f32)))
+  assert_close(index(p, cast(0, i64)), cast(-0.4986037, f32), cast(0.00001, f32), "put delta at t=1e-4 is the AD value, not the t=0 closed form")
+}
+def test_put_delta_is_not_nan_at_expiry() -> unit ! { Test } = {
+  p = to_list(deltas_put(spots3(), k100(), r5(), v20(), zero()))
+  _ = assert_true(not(is_nan32(index(p, cast(0, i64)))), "put delta at t=0 s=k is not NaN")
+  _ = assert_true(is_finite32(index(p, cast(1, i64))), "put delta at t=0 s>k is finite")
+  assert_true(is_finite32(index(p, cast(2, i64))), "put delta at t=0 s<k is finite")
 }

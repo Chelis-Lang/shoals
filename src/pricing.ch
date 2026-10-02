@@ -393,6 +393,19 @@ def delta_call_at_expiry[n](spots: tensor[n, f32], k: f32) -> tensor[n, f32] = {
   at = mul(cast(eq(spots, kv), f32), const_vec(copy(&above), cast(0.5, f32)))
   add(above, at)
 }
+-- put delta at t = 0: -1 below the strike, 0 above, -0.5 AT it. Same reasoning as
+-- the call: at expiry the price is max(k - s, 0), whose derivative is -1 below
+-- the strike and 0 above, and the limit in time at s = k is -N(0) = -0.5.
+-- Measured approach at s = k = 100: -0.48604 at t=1e-2 and -0.49860 at t=1e-4.
+def delta_put_at_expiry[n](spots: tensor[n, f32], k: f32) -> tensor[n, f32] = {
+  kv = const_vec(copy(spots), k)
+  below = cast(lt(copy(spots), copy(&kv)), f32)
+  at = mul(cast(eq(spots, kv), f32), const_vec(copy(&below), cast(0.5, f32)))
+  -- Subtract from zero rather than negating the sum: `neg` turns the
+  -- above-the-strike cell into -0.0, which compares equal to 0.0 but prints
+  -- asymmetrically beside the call surface's 0.0.
+  sub(const_vec(copy(&below), cast(0.0, f32)), add(below, at))
+}
 -- gamma at t = 0: 0 away from the strike, +inf at it. The divergence is real --
 -- gamma ~ 1/(s*sigma*sqrt(t)) -- so a finite answer here would be a lie.
 -- Measured approach at s = k = 100: 0.199 at t=1e-2, 1.995 at t=1e-4.
@@ -424,15 +437,16 @@ def deltas_call[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) ->
     g64 = vmap(fn (sa: tensor[1, f64], ka: tensor[1, f64], ra: tensor[1, f64], va: tensor[1, f64], ta: tensor[1, f64]) -> grad(fn (x: f64, kk: f64, rr: f64, sg: f64, tt: f64) -> bs_call_f64(x, kk, rr, sg, tt), wrt=x)(tensor_to_scalar(sum(sa, 0)), tensor_to_scalar(sum(ka, 0)), tensor_to_scalar(sum(ra, 0)), tensor_to_scalar(sum(va, 0)), tensor_to_scalar(sum(ta, 0))))(sc, kc, rc, vc, tc)
     cast(g64, f32)
   }
-def deltas_put[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
-  sc = spot_col(copy(spots))
-  kc = const_col(copy(spots), cast(k, f64))
-  rc = const_col(copy(spots), cast(r, f64))
-  vc = const_col(copy(spots), cast(sigma, f64))
-  tc = const_col(spots, cast(t, f64))
-  g64 = vmap(fn (sa: tensor[1, f64], ka: tensor[1, f64], ra: tensor[1, f64], va: tensor[1, f64], ta: tensor[1, f64]) -> grad(fn (x: f64, kk: f64, rr: f64, sg: f64, tt: f64) -> bs_put_f64(x, kk, rr, sg, tt), wrt=x)(tensor_to_scalar(sum(sa, 0)), tensor_to_scalar(sum(ka, 0)), tensor_to_scalar(sum(ra, 0)), tensor_to_scalar(sum(va, 0)), tensor_to_scalar(sum(ta, 0))))(sc, kc, rc, vc, tc)
-  cast(g64, f32)
-}
+def deltas_put[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> tensor[n, f32] =
+  if eq(t, cast(0.0, f32)) then delta_put_at_expiry(spots, k) else {
+    sc = spot_col(copy(spots))
+    kc = const_col(copy(spots), cast(k, f64))
+    rc = const_col(copy(spots), cast(r, f64))
+    vc = const_col(copy(spots), cast(sigma, f64))
+    tc = const_col(spots, cast(t, f64))
+    g64 = vmap(fn (sa: tensor[1, f64], ka: tensor[1, f64], ra: tensor[1, f64], va: tensor[1, f64], ta: tensor[1, f64]) -> grad(fn (x: f64, kk: f64, rr: f64, sg: f64, tt: f64) -> bs_put_f64(x, kk, rr, sg, tt), wrt=x)(tensor_to_scalar(sum(sa, 0)), tensor_to_scalar(sum(ka, 0)), tensor_to_scalar(sum(ra, 0)), tensor_to_scalar(sum(va, 0)), tensor_to_scalar(sum(ta, 0))))(sc, kc, rc, vc, tc)
+    cast(g64, f32)
+  }
 def vegas_call[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
   sc = spot_col(copy(spots))
   kc = const_col(copy(spots), cast(k, f64))
