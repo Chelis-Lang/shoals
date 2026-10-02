@@ -85,11 +85,26 @@ Module: `Shoals.References.Date`.
 
 ```chelis
 def naive_days_between(start: Date, end: Date) -> i64
-def year_fraction_act_360_textbook(start: Date, end: Date) -> f32
-def year_fraction_act_365_textbook(start: Date, end: Date) -> f32
-def year_fraction_thirty_360_textbook(start: Date, end: Date) -> f32
-def year_fraction_act_act_textbook(start: Date, end: Date) -> f32
+def year_fraction_act_360_textbook(start: Date, end: Date) -> f64
+def year_fraction_act_365_textbook(start: Date, end: Date) -> f64
+def year_fraction_thirty_360_textbook(start: Date, end: Date) -> f64
+def year_fraction_act_act_isda_textbook(start: Date, end: Date) -> f64
+def year_fraction_act_act_icma_textbook(
+  start: Date, end: Date, period_start: Date, period_end: Date, frequency: i64
+) -> f64
 ```
 
-Reference year fractions for the four day-count conventions, used to check
+Reference year fractions for the day-count conventions, used to check
 `Shoals.Date.year_fraction`.
+
+The first three keep a deliberately crude 30-day-month count
+(`naive_days_between`), so the properties that use them hold only to a loose
+tolerance. The two ACT/ACT references instead compute an exact
+proleptic-Gregorian day number of their own rather than calling
+`Std.Time.days_between`, so they check `Shoals.Date` against an independently
+derived calendar and hold to floating-point agreement. They also state ISDA
+differently from the subject: the reference counts a whole interior year as
+exactly 1 and divides only the head and tail stubs, where `Shoals.Date` clamps
+every calendar year to the interval and divides each segment. Agreement is
+therefore a real cross-check of the year-boundary handling rather than a
+restatement.

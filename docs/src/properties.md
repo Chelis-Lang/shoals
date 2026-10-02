@@ -91,11 +91,23 @@ Module: `Shoals.Properties.Distributions`.
 Module: `Shoals.Properties.Date`.
 
 - `year_fraction_matches_textbook(start, end, convention)`: each day-count
-  year fraction agrees with its reference.
+  year fraction agrees with its reference. The two ACT/ACT conventions are
+  checked against an exact independent calendar and hold to `1e-9`; the other
+  three are checked against a crude 30-day-month count and keep its loose
+  tolerance.
+- `whole_isda_year_is_exactly_one(year)`: a whole calendar year is exactly one
+  ACT/ACT ISDA year, leap or not. The `days / 365.25` approximation replaced in
+  shoals#87 failed this in both directions.
+- `isda_reverses_under_swap(start, end)`: swapping the interval endpoints
+  negates the ACT/ACT ISDA fraction.
 - `schedule_monotone_increasing(start, end, step_months)`: a generated
   schedule is strictly increasing.
 - `date_roll_following_idempotent_on_weekday(d)`: rolling a weekday forward
-  leaves it unchanged.
+  against a weekend-only calendar leaves it unchanged.
+
+These are driven at concrete inputs from `tests/date.ch`. Nothing else in the
+repository calls the `properties/` surface, so a property with no test beside it
+is compiled and never executed.
 
 ## Tenor properties
 

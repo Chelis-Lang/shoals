@@ -259,6 +259,24 @@ def test_property_icma_matches_independent_calendar() -> unit ! { Test } = {
   settle = date(cast(2004, i64), cast(2, i64), cast(1, i64))
   assert_close(to01_f64(year_fraction_matches_textbook(period_start, settle, convention)), cast(1.0, f64), tight64(), "ACT/ACT ICMA agrees with the independent ordinal reference")
 }
+-- 1899-11-01 to 1900-05-01 is 61 days of 1899 plus 120 days of 1900, both
+-- ordinary years, so 181/365. Two things make this case load-bearing rather
+-- than decorative. It is the only subject-vs-reference comparison here that
+-- reaches a nonzero century term in the reference's ordinal: for every year in
+-- 2000..2099 that term is identically zero, so a reference with the Gregorian
+-- century rule deleted agrees with a correct one everywhere else in this file.
+-- And 1900 is the century non-leap, so a denominator of 366 would also show up.
+def test_act_act_isda_across_a_century_non_leap() -> unit ! { Test } = {
+  start = date(cast(1899, i64), cast(11, i64), cast(1, i64))
+  end = date(cast(1900, i64), cast(5, i64), cast(1, i64))
+  expected = div(cast(181.0, f64), cast(365.0, f64))
+  assert_close(year_fraction(start, end, ActActIsda), expected, tight64(), "1899-11-01..1900-05-01 == 181/365 (1900 is not a leap year)")
+}
+def test_property_isda_matches_independent_calendar_across_a_century() -> unit ! { Test } = {
+  start = date(cast(1899, i64), cast(11, i64), cast(1, i64))
+  end = date(cast(1900, i64), cast(5, i64), cast(1, i64))
+  assert_close(to01_f64(year_fraction_matches_textbook(start, end, ActActIsda)), cast(1.0, f64), tight64(), "subject and independent reference agree where the ordinal's century term is live")
+}
 def test_property_whole_isda_year_non_leap() -> unit ! { Test } = assert_close(to01_f64(whole_isda_year_is_exactly_one(cast(2025, i64))), cast(1.0, f64), tight64(), "2025 is exactly one ISDA year")
 def test_property_whole_isda_year_leap() -> unit ! { Test } = assert_close(to01_f64(whole_isda_year_is_exactly_one(cast(2024, i64))), cast(1.0, f64), tight64(), "2024 is exactly one ISDA year")
 def test_property_whole_isda_year_century_non_leap() -> unit ! { Test } = assert_close(to01_f64(whole_isda_year_is_exactly_one(cast(1900, i64))), cast(1.0, f64), tight64(), "1900 is exactly one ISDA year (century non-leap)")

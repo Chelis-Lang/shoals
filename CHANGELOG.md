@@ -6,7 +6,71 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING: the `Shoals.Date` business-day rolls take a `Calendar` instead of a
+  `weekend_only: bool`, and `year_fraction` returns `f64` instead of `f32`**
+  (shoals#87). `date_roll_following`, `date_roll_preceding`,
+  `date_roll_modified_following` and `add_business_days` now take the
+  `Shoals.HolidayCal.Calendar` they roll against. Pass `weekend_only_calendar()`
+  for the previous behaviour, which it reproduces exactly.
+
+  The flag was replaced rather than repaired in place. Both of its branches were
+  identical at four separate sites, and a boolean that selects between two
+  spellings of the same thing is a surface that can silently ignore a calendar;
+  a `Calendar` parameter cannot.
+
+- **BREAKING: `DayCount`'s `ActAct` is replaced by `ActActIsda` and
+  `ActActIcma`** (shoals#87). `ActActIcma` carries its own
+  `{ period_start, period_end, frequency }`, because ACT/ACT ICMA is not
+  computable from the accrual endpoints alone. Holding them in the variant makes
+  an ICMA request without a coupon period unrepresentable rather than a runtime
+  guard, and keeps `year_fraction`'s arity. A frequency below 1 or a coupon
+  period that does not end after it starts traps.
+
 ### Fixed
+
+- **The `Shoals.Date` business-day rolls never consulted a holiday calendar**
+  (shoals#87, Voyage ledger UB-8). `date_roll_following`, `date_roll_preceding`,
+  `date_roll_modified_following` and `add_business_days` were each written as
+  `if weekend_only then X else X`, so both branches were the same expression and
+  no caller could reach `Shoals.HolidayCal` from this module. The issue names
+  three of the four sites; `add_business_days` is the fourth and carried the same
+  dead flag through an intermediate `flag = weekend_only` binding.
+
+  2025-07-04 is a Friday and a NYC holiday, which is the only shape of input
+  that separates the two behaviours — a weekend holiday would roll correctly by
+  accident. `date_roll_following(2025-07-04, hc_nyc_calendar())` is now
+  Monday 2025-07-07 and was previously unchanged.
+
+- **`year_fraction(..., ActAct)` was `days / 365.25`, not ACT/ACT**
+  (shoals#87, Voyage ledger UB-9). The approximation was wrong in both
+  directions: a whole leap year measured 366/365.25 = 1.00205 and a whole
+  ordinary year 365/365.25 = 0.99932, where ACT/ACT ISDA gives exactly 1.0 for
+  both. On the ISDA 2006 worked example (2003-11-01 to 2004-05-01) it gave
+  0.49829 against the correct 61/365 + 121/366 = 0.49772.
+
+  Both ACT/ACT conventions are checked against an exact proleptic-Gregorian
+  calendar computed independently in `references/date.ch`, which also states
+  ISDA by a different decomposition (whole interior years count as 1, only the
+  head and tail stubs are divided) than the subject's per-year clamp.
+
+  **Every claim above is pinned by a mutation that the suite catches.** Nine
+  injected defects, nine detected: rolls reverting to weekend-only (4 tests
+  fail), `ActActIsda` reverting to days/365.25 (11), ICMA silently routing to
+  ISDA (5), the leap denominator flattened to 365 (7), ICMA dropping its
+  frequency scaling (3), the ISDA year loop losing its final year (3),
+  `add_business_days` ceasing to skip (1), modified-following losing its
+  month check (1), and the reference ordinal losing the Gregorian century rule
+  (1).
+
+  **The last of those initially survived, and closing it is why the suite has a
+  1899/1900 case.** The century term in the reference's ordinal is identically
+  zero for every year in 2000..2099, so a reference with the Gregorian century
+  rule deleted agreed with a correct one at every date the suite then used. Every
+  subject-vs-reference comparison was inside one century block, which made the
+  independent reference unverified outside it. `1899-11-01..1900-05-01` is the
+  case that reaches it, and it also exercises 1900 as the century non-leap.
 
 - **`deltas_put` returned `0.0` at the strike at expiry, where the limit is
   `-0.5`** (shoals#106). The call-side counterpart was fixed in shoals#101; this
