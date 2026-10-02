@@ -165,6 +165,11 @@ def test_put_call_parity_for_delta_holds_at_expiry() -> unit ! { Test } = {
   _ = assert_close(sub(index(c, cast(1, i64)), index(p, cast(1, i64))), cast(1.0, f32), tol(), "parity at t=0, s>k")
   assert_close(sub(index(c, cast(2, i64)), index(p, cast(2, i64))), cast(1.0, f32), tol(), "parity at t=0, s<k")
 }
+-- If you widen this grid: parity holds for every t down to normal f32 range, and
+-- breaks at the strike ONLY for t <= 1e-32, where both deltas collapse to 0.0
+-- through catastrophic cancellation in the shared AD path. Off-strike cells stay
+-- correct there. 1e-32 years is 3e-25 seconds, so no caller reaches it; it is
+-- recorded here rather than tracked, and it is identical on the call side.
 def test_put_call_parity_for_delta_holds_away_from_expiry() -> unit ! { Test } = {
   c = to_list(deltas_call(spots3(), k100(), r5(), v20(), cast(1.0, f32)))
   p = to_list(deltas_put(spots3(), k100(), r5(), v20(), cast(1.0, f32)))
