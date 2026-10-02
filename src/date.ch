@@ -1,16 +1,57 @@
 module Shoals.Date
-import Std.Time (Date, date, try_date, is_leap_year, add_days, days_between, day_of_week, DayOfWeek, Saturday, Sunday)
+import Std.Time (Date, date, try_date, is_leap_year, add_days, days_between, day_of_week, DayOfWeek, Saturday, Sunday, date_lt, date_lte)
+import Shoals.HolidayCal (Calendar, is_business_day, weekend_only_calendar)
 export (DayCount, year_fraction, add_business_days, is_weekend, date_roll_following, date_roll_modified_following, date_roll_preceding, schedule_from_tenor, add_months, days_in_month, schedule_from_tenor_calendar)
+-- `ActActIcma` carries the enclosing coupon period and the coupon frequency
+-- because ACT/ACT ICMA is not computable from (start, end) alone. Holding them
+-- in the variant rather than in an optional parameter makes an ICMA request
+-- without a period unrepresentable instead of a runtime guard.
 type DayCount =
   | Act360
   | Act365
   | ThirtyThreeSixty
-  | ActAct
+  | ActActIsda
+  | ActActIcma { period_start: Date, period_end: Date, frequency: i64 }
 def min_i64(a: i64, b: i64) -> i64 = if lt(a, b) then a else b
-def year_fraction(start: Date, end: Date, convention: DayCount) -> f32 =
+def date_require_positive_period(period_start: Date, period_end: Date) -> i64 = {
+  span = days_between(period_start, period_end)
+  if lt(span, cast(1, i64)) then fail("Shoals.Date: ACT/ACT ICMA coupon period must end after it starts") else span
+}
+def date_require_frequency(n: i64) -> i64 = if lt(n, cast(1, i64)) then fail("Shoals.Date: ACT/ACT ICMA coupon frequency must be >= 1") else n
+-- ACT/ACT ISDA splits the interval at calendar-year boundaries and divides each
+-- segment by the length of the year it falls in, so a leap day is weighted 1/366
+-- and an ordinary day 1/365. A reversed interval returns the negated fraction.
+def isda_fraction(start: Date, end: Date) -> f64 = {
+  forward = date_lte(start, end)
+  lo = if forward then start else end
+  hi = if forward then end else start
+  years = range(lo.year, add(hi.year, cast(1, i64)))
+  total = fold(fn (acc: f64, y: i64) -> {
+    year_begin = date(y, cast(1, i64), cast(1, i64))
+    year_limit = date(add(y, cast(1, i64)), cast(1, i64), cast(1, i64))
+    seg_start = if date_lt(lo, year_begin) then year_begin else lo
+    seg_end = if date_lt(hi, year_limit) then hi else year_limit
+    span = days_between(seg_start, seg_end)
+    if lt(span, cast(1, i64)) then acc else {
+      denom = if is_leap_year(y) then cast(366.0, f64) else cast(365.0, f64)
+      add(acc, div(cast(span, f64), denom))
+    }
+  }, cast(0.0, f64), years)
+  if forward then total else neg(total)
+}
+-- ACT/ACT ICMA measures the accrued days against the full coupon period, scaled
+-- by the number of coupon periods in a year, so a regular full period is exactly
+-- 1/frequency whatever its actual day count.
+def icma_fraction(start: Date, end: Date, period_start: Date, period_end: Date, frequency: i64) -> f64 = {
+  span = date_require_positive_period(period_start, period_end)
+  freq = date_require_frequency(frequency)
+  accrued = days_between(start, end)
+  div(cast(accrued, f64), mul(cast(freq, f64), cast(span, f64)))
+}
+def year_fraction(start: Date, end: Date, convention: DayCount) -> f64 =
   match convention with {
-    | Act360 => div(cast(days_between(start, end), f32), cast(360.0, f32))
-    | Act365 => div(cast(days_between(start, end), f32), cast(365.0, f32))
+    | Act360 => div(cast(days_between(start, end), f64), cast(360.0, f64))
+    | Act365 => div(cast(days_between(start, end), f64), cast(365.0, f64))
     | ThirtyThreeSixty => {
     y1 = start.year
     m1 = start.month
@@ -19,9 +60,10 @@ def year_fraction(start: Date, end: Date, convention: DayCount) -> f32 =
     m2 = end.month
     d2 = min_i64(end.day, cast(30, i64))
     days = add(add(mul(cast(360, i64), sub(y2, y1)), mul(cast(30, i64), sub(m2, m1))), sub(d2, d1))
-    div(cast(days, f32), cast(360.0, f32))
+    div(cast(days, f64), cast(360.0, f64))
   }
-    | ActAct => div(cast(days_between(start, end), f32), cast(365.25, f32))
+    | ActActIsda => isda_fraction(start, end)
+    | ActActIcma { period_start: ps, period_end: pe, frequency: f } => icma_fraction(start, end, ps, pe, f)
   }
 def is_weekend(d: Date) -> bool =
   match day_of_week(d) with {
@@ -29,21 +71,20 @@ def is_weekend(d: Date) -> bool =
     | Sunday => true
     | _ => false
   }
-def add_business_days(d: Date, n: i64, weekend_only: bool) -> Date = {
-  flag = weekend_only
+-- Every roll takes the calendar it rolls against. `weekend_only_calendar()`
+-- reproduces the weekend-only behaviour exactly, so the old `weekend_only: bool`
+-- flag is expressible without giving the surface a way to ignore a calendar.
+def advance_to_business(d: Date, cal: Calendar) -> Date = if is_business_day(cal, d) then d else advance_to_business(add_days(d, cast(1, i64)), cal)
+def retreat_to_business(d: Date, cal: Calendar) -> Date = if is_business_day(cal, d) then d else retreat_to_business(add_days(d, cast(-1, i64)), cal)
+def add_business_days(d: Date, n: i64, cal: Calendar) -> Date = {
   idxs = range(cast(0, i64), n)
-  fold(fn (acc: Date, _i: i64) -> {
-    next = add_days(acc, cast(1, i64))
-    if flag then advance_to_business(next) else advance_to_business(next)
-  }, d, idxs)
+  fold(fn (acc: Date, _i: i64) -> advance_to_business(add_days(acc, cast(1, i64)), cal), d, idxs)
 }
-def advance_to_business(d: Date) -> Date = if is_weekend(d) then advance_to_business(add_days(d, cast(1, i64))) else d
-def retreat_to_business(d: Date) -> Date = if is_weekend(d) then retreat_to_business(add_days(d, cast(-1, i64))) else d
-def date_roll_following(d: Date, weekend_only: bool) -> Date = if weekend_only then advance_to_business(d) else advance_to_business(d)
-def date_roll_preceding(d: Date, weekend_only: bool) -> Date = if weekend_only then retreat_to_business(d) else retreat_to_business(d)
-def date_roll_modified_following(d: Date, weekend_only: bool) -> Date = {
-  rolled = if weekend_only then advance_to_business(d) else advance_to_business(d)
-  if eq(rolled.month, d.month) then rolled else retreat_to_business(d)
+def date_roll_following(d: Date, cal: Calendar) -> Date = advance_to_business(d, cal)
+def date_roll_preceding(d: Date, cal: Calendar) -> Date = retreat_to_business(d, cal)
+def date_roll_modified_following(d: Date, cal: Calendar) -> Date = {
+  rolled = advance_to_business(d, cal)
+  if eq(rolled.month, d.month) then rolled else retreat_to_business(d, cal)
 }
 def schedule_from_tenor(start: Date, end: Date, step_months: i64) -> List[Date] = {
   step_days = mul(step_months, cast(30, i64))
