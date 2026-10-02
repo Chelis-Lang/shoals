@@ -76,13 +76,15 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   800-year span within 400s; the shipped form answers a 200-year and an 800-year
   span in 15s together.
 
-  **Mutation evidence, and a correction to how it was first reported.** The suite
-  detects every one of 18 injected defects at this head, measured as a single run
-  against a single commit with an up-front assertion that each pattern is present,
-  so an unapplied probe aborts the run rather than scoring as a pass. The groups
-  are the nine originally written, the four a red-team review found surviving
-  those nine, the seven aimed at the rewritten ISDA, and the same-year denominator
-  in both directions.
+  **Mutation evidence, and a correction to how it was first reported.** Probes are
+  run as a single campaign against a single commit, with an up-front assertion that
+  each pattern occurs exactly once, so an unapplied probe aborts the run instead of
+  scoring as a pass. Each campaign's own count is what is reported; an earlier
+  version of this entry totalled its groups wrongly (they summed to 22, not the 18
+  claimed) and attributed to this commit a measurement taken at the previous one.
+  No total is restated here for that reason: the probe lists and their heads live
+  in the pull request, where each round's campaign is recorded against the head it
+  actually ran on.
 
   **An earlier version of this entry claimed "nine injected, nine detected".**
   That was true of the nine defects thought to write, which is the weaker
@@ -102,6 +104,13 @@ this project adheres to [Semantic Versioning](https://semver.org/).
     for an ordinary-year accrual. The earlier probe forced it to 365, which the
     leap-year test catches, so it read as coverage: a two-valued function mutated
     in one direction only tests the value that happens to be covered.
+  - **Every ICMA assertion passed `period_start` as the accrual start**, so
+    ignoring the caller's accrual start entirely passed the whole suite. A
+    mid-period accrual separates them: 2004-02-01..2004-05-01 inside a 182-day
+    period is 90/364, where the defect gives 182/364. The accrual *end* axis was
+    pinned because one test varied it; the start axis was constant everywhere,
+    including inside the independent-reference property, whose driver passed
+    `period_start` too, so both sides moved together.
 
   All three share one shape — an axis held constant across every instance of an
   assertion, invisible because each individual assertion is correct. The matrix

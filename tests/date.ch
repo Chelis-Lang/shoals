@@ -177,6 +177,44 @@ def test_act_act_isda_same_year_ordinary_exact() -> unit ! { Test } = {
   expected = div(cast(181.0, f64), cast(365.0, f64))
   assert_close(year_fraction(start, end, ActActIsda), expected, tight64(), "2025-01-01..2025-07-01 is 181 days of an ordinary year == 181/365, not 181/366")
 }
+-- Red-team round 3, F10. THE SAME CLASS AS F7, IN THE LEG THE F7 MATRIX DID NOT
+-- COVER. ICMA's accrual range has two independently varying endpoints, and every
+-- ICMA assertion in this file passed `period_start` as the accrual start. So
+-- replacing `days_between(start, end)` with `days_between(period_start, end)` --
+-- ignoring the caller's accrual start entirely -- passed all 62 tests. The END
+-- axis was pinned, because one test varies it; the START axis was constant
+-- everywhere, including inside the independent-reference property, whose driver
+-- also passed `period_start`, so both sides moved together.
+--
+-- A mid-period accrual is the input that separates them, and it is ordinary
+-- accrued interest between two settlement dates inside a coupon period:
+-- 2004-02-01..2004-05-01 against the 2003-11-01..2004-05-01 period is 90/364,
+-- where the mutant gives 182/364 -- a factor of two.
+--
+-- So the accrual start and end now vary independently of the period bounds:
+-- whole period, prefix, suffix, strict interior, zero-length interior and
+-- reversed interior, across three frequencies.
+def icma_period_start() -> Date = date(cast(2003, i64), cast(11, i64), cast(1, i64))
+def icma_period_end() -> Date = date(cast(2004, i64), cast(5, i64), cast(1, i64))
+def icma_conv(freq: i64) -> DayCount = ActActIcma { period_start: icma_period_start(), period_end: icma_period_end(), frequency: freq }
+def icma_agrees(sy: i64, sm: i64, sd: i64, ey: i64, em: i64, ed: i64, freq: i64) -> bool = year_fraction_matches_textbook(date(sy, sm, sd), date(ey, em, ed), icma_conv(freq))
+def test_icma_matrix_accrual_start_varies() -> unit ! { Test } = matrix_holds([icma_agrees(cast(2003, i64), cast(11, i64), cast(1, i64), cast(2004, i64), cast(5, i64), cast(1, i64), cast(2, i64)), icma_agrees(cast(2003, i64), cast(11, i64), cast(1, i64), cast(2004, i64), cast(2, i64), cast(1, i64), cast(2, i64)), icma_agrees(cast(2004, i64), cast(2, i64), cast(1, i64), cast(2004, i64), cast(5, i64), cast(1, i64), cast(2, i64)), icma_agrees(cast(2003, i64), cast(12, i64), cast(1, i64), cast(2004, i64), cast(3, i64), cast(1, i64), cast(2, i64))], "ICMA accrual: whole period, prefix, SUFFIX (start varies), strict interior")
+def test_icma_matrix_degenerate_and_reversed_accrual() -> unit ! { Test } = matrix_holds([icma_agrees(cast(2004, i64), cast(2, i64), cast(1, i64), cast(2004, i64), cast(2, i64), cast(1, i64), cast(2, i64)), icma_agrees(cast(2004, i64), cast(3, i64), cast(1, i64), cast(2003, i64), cast(12, i64), cast(1, i64), cast(2, i64))], "ICMA accrual: zero-length interior, and reversed interior")
+def test_icma_matrix_frequency_varies() -> unit ! { Test } = matrix_holds([icma_agrees(cast(2003, i64), cast(11, i64), cast(1, i64), cast(2004, i64), cast(5, i64), cast(1, i64), cast(1, i64)), icma_agrees(cast(2004, i64), cast(2, i64), cast(1, i64), cast(2004, i64), cast(5, i64), cast(1, i64), cast(1, i64)), icma_agrees(cast(2004, i64), cast(2, i64), cast(1, i64), cast(2004, i64), cast(5, i64), cast(1, i64), cast(4, i64))], "ICMA frequency 1 and 4, with the accrual start both at and inside the period start")
+-- Exact decimals for the two cases that separate the start axis, stated here
+-- rather than routed through the reference so this and the matrix fail
+-- independently. 2004 is a leap year: Feb 1 -> May 1 is 29+31+30 = 90 days.
+def test_act_act_icma_mid_period_accrual_exact() -> unit ! { Test } = {
+  settle = date(cast(2004, i64), cast(2, i64), cast(1, i64))
+  expected = div(cast(90.0, f64), mul(cast(2.0, f64), cast(182.0, f64)))
+  assert_close(year_fraction(settle, icma_period_end(), icma_conv(cast(2, i64))), expected, tight64(), "accrual 2004-02-01..2004-05-01 inside a 182-day period is 90/364, not 182/364")
+}
+def test_act_act_icma_strict_interior_accrual_exact() -> unit ! { Test } = {
+  from = date(cast(2003, i64), cast(12, i64), cast(1, i64))
+  to = date(cast(2004, i64), cast(3, i64), cast(1, i64))
+  expected = div(cast(91.0, f64), mul(cast(2.0, f64), cast(182.0, f64)))
+  assert_close(year_fraction(from, to, icma_conv(cast(2, i64))), expected, tight64(), "a strictly interior 91-day accrual is 91/364 == 0.25 exactly")
+}
 def test_weekend_saturday() -> unit ! { Test } = {
   d = date(cast(2025, i64), cast(1, i64), cast(4, i64))
   assert_close(to01(is_weekend(d)), cast(1.0, f32), cast(0.001, f32), "2025-01-04 is Saturday")
