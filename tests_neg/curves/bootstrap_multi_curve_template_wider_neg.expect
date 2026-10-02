@@ -1,0 +1,8 @@
+Shoals.Curves.bootstrap_multi_curve: times_template must have one entry per instrument (the declared YieldCurve extent comes from the template)
+
+`times_template` is the only source of the type-level `n` in the result, and
+the body never read it, so the declared extent was whatever the caller passed.
+Two instruments against a three-wide template returned a value declared
+`YieldCurve[3]` carrying two pillars: `rate_at(c, 2.0)` answered 0.043088913 —
+correct for the two real pillars, which is why the defect was silent — while
+the declared third pillar gave `index 2 out of bounds for list of len 2`.

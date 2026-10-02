@@ -261,12 +261,25 @@ def bootstrap_multi(instruments: List[Instrument]) -> (List[f32], List[f32]) = {
     (append(ts_so_far, t_new), append(rs_so_far, r_new))
   }, init, instruments)
 }
-def bootstrap_multi_curve[n](instruments: List[Instrument], times_template: tensor[n, f32]) -> YieldCurve[n] = {
-  out = bootstrap_multi(instruments)
-  times_t = to_tensor(out.0)
-  rates_t = to_tensor(out.1)
-  YieldCurve { kind: Custom { label: "bootstrap-multi" }, times: times_t, rates: rates_t }
-}
+-- `times_template` is the only source of the type-level `n` in the result -- a
+-- list's length is not a type-level value, so the template is what bridges
+-- list-shaped pillars into a tensor-shaped type. It was load-bearing for the
+-- signature and dead in the body: the pillars come from
+-- `bootstrap_multi(instruments)`, whose length is `len(instruments)`, and
+-- nothing related that to the declared extent. A two-instrument bootstrap
+-- against a three-wide template type-checked as `YieldCurve[3]` carrying two
+-- pillars, so a consumer iterating the declared extent trapped on the pillar
+-- that was never there (shoals#113). The caller could satisfy the relationship
+-- but not rely on it. The sibling `bootstrap_grad_full_jacobian` detects the
+-- same mismatch and answers it with a silent NaN tensor; a declared extent that
+-- disagrees with the data has no curve to propagate, so fail loudly instead.
+def bootstrap_multi_curve[n](instruments: List[Instrument], times_template: tensor[n, f32]) -> YieldCurve[n] =
+  if eq(len(to_list(times_template)), len(instruments)) then {
+    out = bootstrap_multi(instruments)
+    times_t = to_tensor(out.0)
+    rates_t = to_tensor(out.1)
+    YieldCurve { kind: Custom { label: "bootstrap-multi" }, times: times_t, rates: rates_t }
+  } else fail("Shoals.Curves.bootstrap_multi_curve: times_template must have one entry per instrument (the declared YieldCurve extent comes from the template)")
 def bootstrap_grad_diagonal(inst: Instrument, times_so_far: List[f32], rates_so_far: List[f32], solved_rate: f32) -> f32 =
   if cur_pillars_aligned(times_so_far, rates_so_far) then match inst with {
     | Deposit { tenor: t, rate: r } => div(cast(1.0, f32), add(cast(1.0, f32), mul(r, t)))

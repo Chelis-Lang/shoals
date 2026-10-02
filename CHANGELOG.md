@@ -8,6 +8,33 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **`bootstrap_multi_curve` never read `times_template`, so the declared
+  `YieldCurve[n]` extent could disagree with the pillar count** (shoals#113).
+  `times_template` is the only source of the type-level `n` -- a list's length
+  is not a type-level value, so the template is what bridges `bootstrap_multi`'s
+  list-shaped pillars into a tensor-shaped type. It was load-bearing for the
+  signature and dead in the body: the pillars come from
+  `bootstrap_multi(instruments)`, whose length is `len(instruments)`, and
+  nothing related that to the declared extent. A caller could satisfy the
+  relationship; nothing enforced it.
+
+  Measured on `83d8cb6`, two instruments against a three-wide template
+  type-checked and returned a value declared `YieldCurve[3]` carrying two
+  pillars: `rate_at(c, 2.0)` answered `0.043088913`, correct for the two real
+  pillars, which is why the defect was silent, while the declared third pillar
+  gave `index 2 out of bounds for list of len 2`. The opposite direction was
+  quieter still and trapped nothing -- three instruments against a two-wide
+  template declared `YieldCurve[2]` over three solved pillars, so reads by time
+  saw a pillar that anything trusting the declared extent could not.
+
+  Both directions are now a runtime `fail` naming
+  `Shoals.Curves.bootstrap_multi_curve`, each with its own negative case. The
+  sibling `bootstrap_grad_full_jacobian` detects the same class of mismatch but
+  answers it with a silent NaN tensor; a declared extent that disagrees with the
+  data has no curve to propagate, so this fails loudly instead. Removing the
+  parameter was the alternative the issue raised and is not taken: with no
+  template there is no `n`, so the result could not be a `YieldCurve[n]` at all.
+
 - **Three exported curve entry points accepted `times_so_far` and
   `rates_so_far` of different lengths and silently read the wrong rate**
   (shoals#78). The earlier pillars arrive as two caller-supplied lists and
