@@ -8,6 +8,49 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **No exported Greek returns `NaN` at expiry** (shoals#101). `gammas_call`,
+  `thetas_call` and `vannas_call` returned `NaN` at `t = 0`, and `deltas_call`
+  returned `0.0` at the strike where the limit is `0.5`.
+
+  Measured by approaching expiry rather than inspecting the endpoint, six of the
+  nine broken cells have finite limits and two are genuine singularities. At
+  `t = 0`: delta is `0`/`0.5`/`1` below/at/above the strike; gamma is `0` off the
+  strike and `+inf` at it; theta is `0` below, `-r*k` above, `-inf` at it; vanna,
+  vega, rho and volga are `0`. The two infinities are the correct answers —
+  gamma grows like `n(d1)/(s*sigma*sqrt(t))` and theta like
+  `-s*sigma*n(d1)/(2*sqrt(t))` — and are now correctly signed rather than `NaN`. Delta at the strike is the
+  limit in time (`d1 -> 0`, so `N(d1) -> N(0)`), not a midpoint convention;
+  measured approach `0.5140` at `t=1e-2`, `0.5014` at `1e-4`, `0.50014` at `1e-6`.
+
+  Two distinct mechanisms, both measured, neither fixable in the price body:
+
+  - **theta, first order in `t`.** The shoals#88 denominator clamp's *untaken*
+    arm is `sigma*sqrt(t)`, whose `t`-derivative is `+inf` at `t = 0`, so
+    chelis#2640 poisons the result even though the constant arm is selected.
+    `grad` of that clamp wrt `t` is `NaN` at `t = 0` and `0.1` at `t = 1`. The
+    clamp remains safe in the `s` and `sigma` directions, which is exactly why
+    delta, vega and rho were already correct. The comment added in shoals#88
+    claimed the clamp was safe outright; that claim is corrected here.
+  - **second-order Greeks.** `d(d1)/ds` is `1e298` once the denominator is
+    floored, and squaring it overflows to `+inf`, which then multiplies an
+    underflowed second-order factor: `0 * inf = NaN`.
+
+  The limits are therefore supplied in closed form in the Greek wrappers, which
+  nothing differentiates, so no adjoint sees the branch. Per-lane selection uses
+  `where` rather than a hand-rolled arithmetic select, because the gamma limit is
+  `+inf` at the strike and an arithmetic select computes `0 * inf = NaN` for
+  every other lane — measured side by side, and pinned by a test that fails if
+  the select is rewritten as arithmetic.
+
+  `t > 0` is untouched: five Greek vectors at `t = 1e-2` and `1e-4` are identical
+  to their pre-change values digit for digit. New normative rule in
+  `spec/shoals_quant_surface.md` §2.10.1. `tests/pricing_greeks_expiry.ch` adds
+  18 tests, including a finiteness predicate that rejects infinity (an `x == x`
+  check does not) and that predicate's own four-case coverage.
+
+
+### Fixed
+
 - **Black-Scholes returned NaN when there was no remaining uncertainty**
   (shoals#88). Both lanes divided by `sigma*sqrt(t)` without a floor.
 

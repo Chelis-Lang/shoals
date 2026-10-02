@@ -89,6 +89,49 @@ call rho, theta, gamma, volga, and vanna; the last three use nested
 derivatives. The [Greeks](greeks.md) chapter documents separate
 finite-difference and analytic checks.
 
+### At expiry
+
+At `t = 0` these return the limit as expiry is approached, and none of them
+returns `NaN`. Two values are infinite, because the quantities themselves
+diverge:
+
+| | `s < k` | `s = k` | `s > k` |
+|---|---|---|---|
+| `deltas_call` | `0` | `0.5` | `1` |
+| `gammas_call` | `0` | `+inf` | `0` |
+| `thetas_call` | `0` | `-inf` | `-r * k` |
+| `vannas_call` | `0` | `0` | `0` |
+| `vegas_call`, `rhos_call`, `volgas_call` | `0` | `0` | `0` |
+
+Each value is the limit of the closed form, and you can check the table from
+here:
+
+- At `t = 0` the price is the payoff `max(s - k, 0)`. Delta is its first
+  derivative, a step; gamma is its second, a spike at the strike and zero
+  elsewhere.
+- Above the strike the price is `s - k * exp(-r * t)`, so `dC/dt` is
+  `r * k * exp(-r * t)` and theta, which is `-dC/dt`, is `-r * k`. Volatility
+  does not enter it.
+- Below the strike the price is zero in a neighbourhood, so every sensitivity
+  there is zero.
+- Delta at the strike is `0.5` because `d1 = (r + sigma^2/2) * sqrt(t) / sigma`
+  tends to zero, so `N(d1)` tends to `N(0)`. It is the limit in time, not a
+  midpoint convention.
+- Vanna is `-n(d1) * d2 / sigma`. At the strike `n(d1)` tends to `n(0)`, which
+  is not zero, but `d2` tends to zero, so vanna does too — it is zero across
+  the whole surface at expiry.
+- Vega, rho and volga each carry a `sqrt(t)` or `t` factor.
+
+Gamma at the strike grows like `n(d1) / (s * sigma * sqrt(t))` and theta like
+`-s * sigma * n(d1) / (2 * sqrt(t))`, where `n` is the standard normal density,
+so both grow without bound as `t` falls to zero. **The infinities represent that
+divergence; they are not values the quantities take.** Gamma at expiry is a Dirac
+delta, which has no value at a point, so `+inf` is a reporting choice — made
+because it keeps the sign and can be tested for, where `NaN` can be neither.
+
+If you aggregate a Greek vector, test for finiteness rather than for `NaN`: a
+`x == x` check is true for an infinity and will pass it through.
+
 ## Monte Carlo call price
 
 ```chelis

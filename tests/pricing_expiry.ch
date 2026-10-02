@@ -56,16 +56,9 @@ def test_vmap_lane_at_expiry() -> unit ! { Test } = {
 --
 --   * They assert NAN-FREEDOM, not finiteness. `nan_free32` is `eq(x, x)`,
 --     which is TRUE for +/-inf -- measured -- so an infinite Greek passes here.
---   * They cover DELTA and VEGA only. Measured post-fix at expiry, those two
---     are clean (`[0,1,0]` and `[0,0,0]`) but gamma is `[inf,NaN,NaN]`, theta
---     is `[NaN,NaN,NaN]` and vanna is `[0.0,NaN,NaN]`. That residue is not a
---     regression -- pre-fix all seven exported Greeks were NaN at every
---     moneyness -- so the fix is neutral-or-better everywhere, but it is not
---     fixed, and this file does not claim it is.
---
--- Also unasserted, and worth knowing before trusting delta at expiry: the ATM
--- value is 0.0 where the one-sided limits are 0 and 1, so the conventional 0.5
--- midpoint is not what comes back.
+--   * They cover DELTA and VEGA only. The whole Greek surface at expiry is
+--     covered by `tests/pricing_greeks_expiry.ch`, which asserts each limit
+--     and distinguishes a signed infinity from a NaN.
 --
 -- The Greek vectors are the f32 surface and take scalar k/r/sigma/t.
 def test_greeks_are_nan_free_at_expiry() -> unit ! { Test } = {

@@ -179,9 +179,20 @@ def n_cdf64(x: f64) -> f64 = {
 -- sqrt(x))` at x = 0 is NaN with no `vmap` anywhere, the untaken arm's value
 -- being a finite 0.0 while its derivative is infinite. This is the derivative
 -- rule the chelis#2640 entry in `docs/UPSTREAM_BUGS.md` states; every Greek and
--- both f32 entry points differentiate this body, so it binds here. This clamp
--- is safe under the same rule because its arms are `den` and a positive
--- constant: finite in value AND in derivative.
+-- both f32 entry points differentiate this body, so it binds here.
+--
+-- THIS CLAMP IS SAFE IN THE s AND sigma DIRECTIONS ONLY, and an earlier revision
+-- of this comment claimed it was safe outright. It is not. The untaken arm is
+-- `den = sigma*sqrt(t)`, whose t-derivative is sigma/(2*sqrt(t)) = +inf at
+-- t = 0, so differentiating wrt t at expiry is exactly the chelis#2640 case.
+-- Measured: `grad` of this clamp wrt t is NaN at t = 0, and 0.1 at t = 1. wrt s
+-- the untaken arm does not depend on s at all, and its sigma-derivative is
+-- sqrt(t) = 0 at t = 0, so both of those directions are finite and clean
+-- -- which is why delta, vega and rho are correct at t = 0 and theta was not.
+-- The t = 0 Greeks are therefore supplied as closed-form limits in the wrappers
+-- rather than by differentiating this body; see the shoals#101 note above
+-- `const_vec`. Do not "fix" that by branching in here: a branch on t inside the
+-- differentiated body reintroduces the same adjoint problem one level up.
 def d1_64(s: f64, k: f64, r: f64, sigma: f64, t: f64) -> f64 = {
   num = add(log(div(s, k)), mul(add(r, mul(cast(0.5, f64), mul(sigma, sigma))), t))
   den = mul(sigma, sqrt(t))
@@ -336,18 +347,83 @@ def put_prices[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> 
 }
 def call_total[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> f32 = tensor_to_scalar(sum(call_prices(spots, k, r, sigma, t), 0))
 def put_total[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> f32 = tensor_to_scalar(sum(put_prices(spots, k, r, sigma, t), 0))
+-- EXPIRY LIMITS FOR THE GREEK VECTORS (shoals#101).
+--
+-- At t = 0 the AD path cannot produce the limits, for two measured reasons, and
+-- neither is fixable by adjusting the price body:
+--
+--   1. `thetas_call` differentiates wrt t, and the shoals#88 denominator clamp's
+--      UNTAKEN arm is `sigma*sqrt(t)`, whose t-derivative is sigma/(2*sqrt(t)) =
+--      +inf at t = 0. chelis#2640 then poisons the result even though the
+--      constant arm is the one selected. Measured: `grad` of that clamp wrt t is
+--      NaN at t = 0 and 0.1 at t = 1. The clamp stays safe for the s and sigma
+--      directions, which is exactly why delta, vega and rho survive at t = 0 --
+--      the untaken arm does not depend on s at all, and its sigma-derivative
+--      is sqrt(t), which is 0 at t = 0 rather than unbounded.
+--   2. The second-order Greeks square a first derivative that the floor has made
+--      enormous: d(d1)/ds = 1/(s*den) is 1e298 with den floored to 1e-300, and
+--      squaring that overflows to +inf, which then multiplies an underflowed
+--      second-order factor. Measured: 0 * inf = NaN.
+--
+-- So the limits are supplied in closed form HERE, in the wrappers, rather than
+-- by differentiating. That is sound because nothing differentiates these
+-- wrappers: the `if` below is an ordinary scalar branch on a parameter, outside
+-- every `grad` and `vmap`, so no adjoint sees it.
+--
+-- Per-lane selection uses `where`, NOT a hand-rolled arithmetic select. This is
+-- the one place on this surface where that distinction decides a value: the
+-- gamma limit is +inf at the strike, and an arithmetic select computes
+-- `0 * inf = NaN` for every OTHER lane. Measured, side by side:
+--   where(...)                      -> [inf, 0.0, 0.0]
+--   mask*inf + (1-mask)*0           -> [inf, NaN, NaN]
+-- `where` is a genuine elementwise select and does not evaluate the unselected
+-- branch into the result. Do not "simplify" it into arithmetic.
+def const_vec[n](template: tensor[n, f32], v: f32) -> tensor[n, f32] = {
+  nn = cast(shape(copy(template), cast(0, i32)), i64)
+  to_tensor(map(fn (i: i64) -> v, range(cast(0, i64), nn)))
+}
+def pricing_inf32() -> f32 = div(cast(1.0, f32), cast(0.0, f32))
+-- delta at t = 0: 1 above the strike, 0 below, and 0.5 AT it. The 0.5 is the
+-- limit in TIME at s = k, not a convention: d1 = (r + sigma^2/2)*sqrt(t)/sigma
+-- tends to 0 there, so N(d1) tends to N(0). Measured approach at s = k = 100:
+-- 0.6368 at t=1, 0.5140 at t=1e-2, 0.5014 at t=1e-4, 0.50014 at t=1e-6.
+def delta_call_at_expiry[n](spots: tensor[n, f32], k: f32) -> tensor[n, f32] = {
+  kv = const_vec(copy(spots), k)
+  above = cast(gt(copy(spots), copy(&kv)), f32)
+  at = mul(cast(eq(spots, kv), f32), const_vec(copy(&above), cast(0.5, f32)))
+  add(above, at)
+}
+-- gamma at t = 0: 0 away from the strike, +inf at it. The divergence is real --
+-- gamma ~ 1/(s*sigma*sqrt(t)) -- so a finite answer here would be a lie.
+-- Measured approach at s = k = 100: 0.199 at t=1e-2, 1.995 at t=1e-4.
+def gamma_call_at_expiry[n](spots: tensor[n, f32], k: f32) -> tensor[n, f32] = {
+  kv = const_vec(copy(spots), k)
+  where(eq(spots, copy(&kv)), const_vec(copy(&kv), pricing_inf32()), const_vec(kv, cast(0.0, f32)))
+}
+-- theta at t = 0: -r*k above the strike (the price is s - k*exp(-rt) there, so
+-- dC/dt = r*k*exp(-rt) and theta = -dC/dt = -r*k), 0 below, and -inf at the
+-- strike. Measured approach: -4.998 at t=1e-2 and -4.99998 at t=1e-4 for
+-- s = 110, k = 100, r = 5% (so -r*k = -5); -42 then -401 at s = k.
+def theta_call_at_expiry[n](spots: tensor[n, f32], k: f32, r: f32) -> tensor[n, f32] = {
+  kv = const_vec(copy(spots), k)
+  itm = const_vec(copy(&kv), neg(mul(r, k)))
+  zero = const_vec(copy(&kv), cast(0.0, f32))
+  off = where(gt(copy(spots), copy(&kv)), itm, zero)
+  where(eq(spots, kv), const_vec(copy(&off), neg(pricing_inf32())), off)
+}
 -- First-order Greek vectors via vmap(grad(price)) through the f64 body. Each lane
 -- differentiates bs_call_f64 wrt one slot with the others passed explicitly (no
 -- capture), so the result is the AD derivative of the displayed price, downcast.
-def deltas_call[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
-  sc = spot_col(copy(spots))
-  kc = const_col(copy(spots), cast(k, f64))
-  rc = const_col(copy(spots), cast(r, f64))
-  vc = const_col(copy(spots), cast(sigma, f64))
-  tc = const_col(spots, cast(t, f64))
-  g64 = vmap(fn (sa: tensor[1, f64], ka: tensor[1, f64], ra: tensor[1, f64], va: tensor[1, f64], ta: tensor[1, f64]) -> grad(fn (x: f64, kk: f64, rr: f64, sg: f64, tt: f64) -> bs_call_f64(x, kk, rr, sg, tt), wrt=x)(tensor_to_scalar(sum(sa, 0)), tensor_to_scalar(sum(ka, 0)), tensor_to_scalar(sum(ra, 0)), tensor_to_scalar(sum(va, 0)), tensor_to_scalar(sum(ta, 0))))(sc, kc, rc, vc, tc)
-  cast(g64, f32)
-}
+def deltas_call[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> tensor[n, f32] =
+  if eq(t, cast(0.0, f32)) then delta_call_at_expiry(spots, k) else {
+    sc = spot_col(copy(spots))
+    kc = const_col(copy(spots), cast(k, f64))
+    rc = const_col(copy(spots), cast(r, f64))
+    vc = const_col(copy(spots), cast(sigma, f64))
+    tc = const_col(spots, cast(t, f64))
+    g64 = vmap(fn (sa: tensor[1, f64], ka: tensor[1, f64], ra: tensor[1, f64], va: tensor[1, f64], ta: tensor[1, f64]) -> grad(fn (x: f64, kk: f64, rr: f64, sg: f64, tt: f64) -> bs_call_f64(x, kk, rr, sg, tt), wrt=x)(tensor_to_scalar(sum(sa, 0)), tensor_to_scalar(sum(ka, 0)), tensor_to_scalar(sum(ra, 0)), tensor_to_scalar(sum(va, 0)), tensor_to_scalar(sum(ta, 0))))(sc, kc, rc, vc, tc)
+    cast(g64, f32)
+  }
 def deltas_put[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
   sc = spot_col(copy(spots))
   kc = const_col(copy(spots), cast(k, f64))
@@ -376,15 +452,16 @@ def rhos_call[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> t
   cast(g64, f32)
 }
 -- theta = -dC/dt: negate the AD time-derivative.
-def thetas_call[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
-  sc = spot_col(copy(spots))
-  kc = const_col(copy(spots), cast(k, f64))
-  rc = const_col(copy(spots), cast(r, f64))
-  vc = const_col(copy(spots), cast(sigma, f64))
-  tc = const_col(spots, cast(t, f64))
-  g64 = vmap(fn (sa: tensor[1, f64], ka: tensor[1, f64], ra: tensor[1, f64], va: tensor[1, f64], ta: tensor[1, f64]) -> grad(fn (ss: f64, kk: f64, rr: f64, sg: f64, x: f64) -> bs_call_f64(ss, kk, rr, sg, x), wrt=x)(tensor_to_scalar(sum(sa, 0)), tensor_to_scalar(sum(ka, 0)), tensor_to_scalar(sum(ra, 0)), tensor_to_scalar(sum(va, 0)), tensor_to_scalar(sum(ta, 0))))(sc, kc, rc, vc, tc)
-  cast(neg(g64), f32)
-}
+def thetas_call[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> tensor[n, f32] =
+  if eq(t, cast(0.0, f32)) then theta_call_at_expiry(spots, k, r) else {
+    sc = spot_col(copy(spots))
+    kc = const_col(copy(spots), cast(k, f64))
+    rc = const_col(copy(spots), cast(r, f64))
+    vc = const_col(copy(spots), cast(sigma, f64))
+    tc = const_col(spots, cast(t, f64))
+    g64 = vmap(fn (sa: tensor[1, f64], ka: tensor[1, f64], ra: tensor[1, f64], va: tensor[1, f64], ta: tensor[1, f64]) -> grad(fn (ss: f64, kk: f64, rr: f64, sg: f64, x: f64) -> bs_call_f64(ss, kk, rr, sg, x), wrt=x)(tensor_to_scalar(sum(sa, 0)), tensor_to_scalar(sum(ka, 0)), tensor_to_scalar(sum(ra, 0)), tensor_to_scalar(sum(va, 0)), tensor_to_scalar(sum(ta, 0))))(sc, kc, rc, vc, tc)
+    cast(neg(g64), f32)
+  }
 -- Second-order Greek vectors via NESTED grad through the same f64 body. Each lane
 -- takes grad(grad(bs_call_f64 ...)) so the result is the AD SECOND derivative of
 -- the displayed price (the one f64 body), downcast -- gamma/volga are the second
@@ -392,15 +469,16 @@ def thetas_call[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) ->
 -- form (no free-var capture across vmap/grad) is kept for the same host-evaluator
 -- reason the first-order Greeks use it.
 -- gamma = d2C/dS2: grad wrt s of (grad wrt s of price).
-def gammas_call[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
-  sc = spot_col(copy(spots))
-  kc = const_col(copy(spots), cast(k, f64))
-  rc = const_col(copy(spots), cast(r, f64))
-  vc = const_col(copy(spots), cast(sigma, f64))
-  tc = const_col(spots, cast(t, f64))
-  g64 = vmap(fn (sa: tensor[1, f64], ka: tensor[1, f64], ra: tensor[1, f64], va: tensor[1, f64], ta: tensor[1, f64]) -> grad(fn (x: f64, kk: f64, rr: f64, sg: f64, tt: f64) -> grad(fn (y: f64, k2: f64, r2: f64, s2: f64, t2: f64) -> bs_call_f64(y, k2, r2, s2, t2), wrt=y)(x, kk, rr, sg, tt), wrt=x)(tensor_to_scalar(sum(sa, 0)), tensor_to_scalar(sum(ka, 0)), tensor_to_scalar(sum(ra, 0)), tensor_to_scalar(sum(va, 0)), tensor_to_scalar(sum(ta, 0))))(sc, kc, rc, vc, tc)
-  cast(g64, f32)
-}
+def gammas_call[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> tensor[n, f32] =
+  if eq(t, cast(0.0, f32)) then gamma_call_at_expiry(spots, k) else {
+    sc = spot_col(copy(spots))
+    kc = const_col(copy(spots), cast(k, f64))
+    rc = const_col(copy(spots), cast(r, f64))
+    vc = const_col(copy(spots), cast(sigma, f64))
+    tc = const_col(spots, cast(t, f64))
+    g64 = vmap(fn (sa: tensor[1, f64], ka: tensor[1, f64], ra: tensor[1, f64], va: tensor[1, f64], ta: tensor[1, f64]) -> grad(fn (x: f64, kk: f64, rr: f64, sg: f64, tt: f64) -> grad(fn (y: f64, k2: f64, r2: f64, s2: f64, t2: f64) -> bs_call_f64(y, k2, r2, s2, t2), wrt=y)(x, kk, rr, sg, tt), wrt=x)(tensor_to_scalar(sum(sa, 0)), tensor_to_scalar(sum(ka, 0)), tensor_to_scalar(sum(ra, 0)), tensor_to_scalar(sum(va, 0)), tensor_to_scalar(sum(ta, 0))))(sc, kc, rc, vc, tc)
+    cast(g64, f32)
+  }
 -- volga (vomma) = d2C/dsigma2: grad wrt sigma of (grad wrt sigma of price).
 def volgas_call[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
   sc = spot_col(copy(spots))
@@ -412,15 +490,16 @@ def volgas_call[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) ->
   cast(g64, f32)
 }
 -- vanna = d2C/dSdsigma: grad wrt sigma of (grad wrt s of price). Cross partial.
-def vannas_call[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
-  sc = spot_col(copy(spots))
-  kc = const_col(copy(spots), cast(k, f64))
-  rc = const_col(copy(spots), cast(r, f64))
-  vc = const_col(copy(spots), cast(sigma, f64))
-  tc = const_col(spots, cast(t, f64))
-  g64 = vmap(fn (sa: tensor[1, f64], ka: tensor[1, f64], ra: tensor[1, f64], va: tensor[1, f64], ta: tensor[1, f64]) -> grad(fn (ss: f64, kk: f64, rr: f64, x: f64, tt: f64) -> grad(fn (y: f64, k2: f64, r2: f64, s2: f64, t2: f64) -> bs_call_f64(y, k2, r2, s2, t2), wrt=y)(ss, kk, rr, x, tt), wrt=x)(tensor_to_scalar(sum(sa, 0)), tensor_to_scalar(sum(ka, 0)), tensor_to_scalar(sum(ra, 0)), tensor_to_scalar(sum(va, 0)), tensor_to_scalar(sum(ta, 0))))(sc, kc, rc, vc, tc)
-  cast(g64, f32)
-}
+def vannas_call[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> tensor[n, f32] =
+  if eq(t, cast(0.0, f32)) then const_vec(spots, cast(0.0, f32)) else {
+    sc = spot_col(copy(spots))
+    kc = const_col(copy(spots), cast(k, f64))
+    rc = const_col(copy(spots), cast(r, f64))
+    vc = const_col(copy(spots), cast(sigma, f64))
+    tc = const_col(spots, cast(t, f64))
+    g64 = vmap(fn (sa: tensor[1, f64], ka: tensor[1, f64], ra: tensor[1, f64], va: tensor[1, f64], ta: tensor[1, f64]) -> grad(fn (ss: f64, kk: f64, rr: f64, x: f64, tt: f64) -> grad(fn (y: f64, k2: f64, r2: f64, s2: f64, t2: f64) -> bs_call_f64(y, k2, r2, s2, t2), wrt=y)(ss, kk, rr, x, tt), wrt=x)(tensor_to_scalar(sum(sa, 0)), tensor_to_scalar(sum(ka, 0)), tensor_to_scalar(sum(ra, 0)), tensor_to_scalar(sum(va, 0)), tensor_to_scalar(sum(ta, 0))))(sc, kc, rc, vc, tc)
+    cast(g64, f32)
+  }
 def mc_call_price[n](template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 ! { Random } = {
   z = normal_sample(template, cast(0.0, f32), cast(1.0, f32))
   half_sigma_sq = mul(cast(0.5, f32), mul(sigma, sigma))

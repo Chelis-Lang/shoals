@@ -273,6 +273,55 @@ challenges are at discontinuities (early exercise, digital payoffs).
 Shoals's API exposes pathwise and likelihood-ratio dispatch
 explicitly (§2.11).
 
+#### 2.10.1 No exported sensitivity returns `NaN`
+
+Every exported Greek vector is defined for every non-negative time to
+expiry, expiry itself included. `NaN` is not an admissible result: it is
+indistinguishable from a computed value, propagates silently through
+every downstream aggregation, and reports nothing about which input was
+degenerate.
+
+Where a sensitivity is bounded, the result is its limit. Where it is
+unbounded, the result is the correctly signed infinity: that is a
+representation of a divergence, not a value the quantity takes, chosen
+because it preserves the sign and is testable where `NaN` is neither. At
+`t = 0`:
+
+| | `s < k` | `s = k` | `s > k` |
+|---|---|---|---|
+| delta | `0` | `0.5` | `1` |
+| gamma | `0` | `+inf` | `0` |
+| theta | `0` | `-inf` | `-r * k` |
+| vanna, vega, rho, volga | `0` | `0` | `0` |
+
+Each cell is the limit of the closed form, and is derivable in one step:
+
+- At `t = 0` the price is the payoff `max(s - k, 0)`, so delta is its
+  first derivative and gamma its second: a step and a Dirac. Gamma is
+  therefore zero away from the strike and divergent at it.
+- Above the strike the price is `s - k * exp(-r * t)`, so
+  `dC/dt = r * k * exp(-r * t)` and theta, being `-dC/dt`, is `-r * k`.
+  The volatility does not appear.
+- Below the strike the price is identically zero in a neighbourhood, so
+  every derivative is zero.
+- Delta at the strike is the limit in time, not a midpoint convention:
+  `d1 = (r + sigma^2 / 2) * sqrt(t) / sigma` tends to zero there, so
+  `N(d1)` tends to `N(0)`. The subgradient of the payoff at its kink is
+  the whole interval from zero to one; the limit is what selects one half.
+- Vanna is `-n(d1) * d2 / sigma`. At the strike `n(d1)` tends to `n(0)`,
+  which is not zero, but `d2` tends to zero, so the product does. Away
+  from the strike `n(d1)` tends to zero. Vanna is therefore zero
+  everywhere at expiry.
+- Vega, rho and volga each carry a factor of `sqrt(t)` or `t`.
+
+The put surface mirrors this, with put delta tending to `-1`, `-0.5` and
+`0` below, at and above the strike. (Put delta at the strike is not yet
+implemented to this requirement; see shoals#106.)
+
+
+Callers aggregating a sensitivity vector test for finiteness. An equality
+test against self admits an infinity and is not a finiteness test.
+
 ### 2.11 `Shoals.Greeks` (new module)
 
 Quant teams need Greeks in specific patterns, not just "AD works". The
