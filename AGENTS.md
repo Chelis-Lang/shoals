@@ -174,13 +174,27 @@ one change set (contract §7):
 7. Run the local gate before pushing: `python3 scripts/run_local_gate.py`
    (the per-PR CI mirror: pins audit + fmt + lint + `chelis reef build` +
    the `tests_neg/`/`tests_blocked/` expect suites + conform audit +
-   contract gate + oracle/release static tests; the origin-relative bump check
+   contract gate + oracle/release static tests + the offline accuracy-floor
+   transcription check; the origin-relative bump check
    remains CI-only). At a pin bump, run it **once with `--full`** to add the
    nightly stages (fast `tests/` suite, heavy `tests-manual/` suite,
-   prove gate, and the chelis#924 cold/warm package-prove latency oracle) —
+   prove gate, the accuracy-floor measurement leg, the AD-Greeks oracle, and
+   the chelis#924 cold/warm package-prove latency oracle) —
    day-to-day pushes rely on nightly CI for those. The latency oracle installs
    the just-built Shoals candidate, requires cold <=20s and warm <=5s, and
    requires byte-identical NDJSON from both completed processes.
+
+   `--full` needs the oracle reference dependency once per environment:
+   `python3 -m pip install -r scripts/requirements-oracle.txt`. The
+   accuracy-floor measurement leg **fails** rather than skips without it
+   (shoals#64), so an absent mpmath cannot be mistaken for a pass.
+
+   **A pin bump is exactly when the measurement leg matters.** It evaluates the
+   compiled kernel through `chelis eval --json`, so a change to that wire
+   format breaks it — schema 2 became schema 3's tagged carrier at chelis
+   0.18.7, and because nothing invoked the oracle then, it sat crashing through
+   three pin bumps (shoals#64). An unrecognised `schema_version` now fails
+   loudly and names the decoder to teach.
 
 ## Phase Spec
 

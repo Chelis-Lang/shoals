@@ -166,6 +166,16 @@ jobs:
       - name: Validate release workflow integrity contracts
         run: python3 scripts/test_release_workflow.py
 
+      # shoals#64: the published erf64/n_cdf64 accuracy floors, checked against
+      # every other place in the tree that states them. Stdlib-only and
+      # offline, so it belongs on the per-PR path even though the MEASUREMENT
+      # leg (which needs mpmath and the pinned toolchain) runs nightly. This
+      # leg proves the carriers agree; nightly proves they are right.
+      - name: Accuracy-floor transcription (shoals#64)
+        run: python3 scripts/oracle_erf64_accuracy.py --transcription
+      - name: Validate the accuracy-floor oracle's own mutations (shoals#64)
+        run: python3 scripts/test_oracle_erf64_accuracy.py
+
   # NOTE: the real-SMT keystone canon self-audit (scripts/prove_gate.py) is NOT
   # on the per-PR path — it is ~8.6 min of real-prover wall (the reef package
   # load alone is multi-minute, and prove_gate has no cheap subset to smoke), so

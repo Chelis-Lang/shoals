@@ -8,6 +8,80 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The `erf64`/`n_cdf64` accuracy oracle read no published file, failed open,
+  ran in no CI job — and was crashing** (shoals#64). The issue named the first
+  three. The fourth was found while fixing them, and it is the reason the other
+  three mattered: `chelis eval --json` replaced schema 2's bare
+  `{"type": "float64", "value": 0.5}` with schema 3's tagged carrier
+  `{"dtype": "f64", "bits": "3fe0..."}` at chelis **0.18.7**, and the oracle
+  read `e["value"]` as a float. On the 0.18.11 pin it evaluated for 90 seconds
+  and then died with `TypeError: cannot create mpf from {'dtype': 'f64', ...}`.
+  It has been dead across three pin bumps, unnoticed, because nothing invoked
+  it. An unrun guard does not merely hide an unknown failure; it rots against
+  the surface it measures. An unrecognised `schema_version` is now a loud,
+  named failure rather than a crash.
+
+  The published figures turned out to be **right**: with the decode repaired,
+  `erf64` measures `3.367545353985726e-16` against a published floor of
+  `3.3675e-16`, and `n_cdf64` `1.9495914774441617e-16` against `1.9495e-16`.
+  Only the guard was broken.
+
+  (Stated without the `>=` marker deliberately: that marker is what the oracle
+  scans for, and a changelog is a historical record — a figure written here as
+  a live floor claim would have to be rewritten whenever the kernel changes.
+  The same convention keeps the derivative residuals in `research/` out of
+  scope.)
+
+  `docs/CHELIS_SURFACE.md`'s accuracy table is now the authoritative
+  publication and the oracle **reads it**, instead of comparing against
+  internal constants of its own. The oracle is split into two legs because
+  they have different prerequisites and so belong in different jobs:
+
+  - `--transcription` — stdlib-only, offline, instant. Parses the floors out of
+    the table and requires every other place in the tracked tree that states
+    one to state the same number. Carriers are **discovered** by `git grep` on
+    a `>=` floor-claim pattern, never listed: a hand-maintained list lets a
+    stale figure survive a repair, and a count rots the moment a carrier is
+    added. All 11 carriers across 8 files are found with no allowlist, because
+    the `>=` does the discriminating — the derivative residuals in `research/`
+    state bounds as "within", a different quantity this oracle must not police.
+  - `--measurement` — needs mpmath and the pinned toolchain, ~3 min. Measures
+    the compiled kernels at 60 dps and requires each published floor to be
+    **true and tight**.
+
+  Tightness, not just floor-ness, is the actual repair. The old check was
+  one-sided (`published <= measured`), which passes `1.0e-30` — that genuinely
+  *is* a floor, and it is the mutation shoals#64 demonstrates. A published
+  figure must now equal the measurement truncated toward zero at its own
+  significant-digit count. Publishing fewer digits stays legal; publishing
+  wrong ones does not.
+
+  Missing mpmath now **fails** instead of printing `SKIP` and exiting 0, and
+  the dependency is declared in `scripts/requirements-oracle.txt`. The
+  offline leg needs none of it, which is what keeps it eligible for the lean
+  per-PR path.
+
+  Wiring, respecting the deliberate per-PR leanness documented in `ci.yml`:
+  the offline leg and its mutation tests join the per-PR `contract-gate` job
+  on the same "offline, no toolchain" grounds as the gates already there; the
+  measurement leg and `scripts/oracle_greeks_gate.py` — unwired for the same
+  reason, though **not** broken, as it already decodes the tagged carrier —
+  run in a new nightly `accuracy` job. Its own job, not extra steps on
+  `tests`, because a red unit suite would otherwise skip them and silently
+  restore the state this issue describes; and it is wired into the nightly
+  `report` job so a failure opens the tracking issue rather than going
+  unwatched. `oracle_greeks_gate.py` passes 15/15 groups and 63 cells on its
+  first run in a gated context. It still skips on a clean box without the
+  toolchain, which is right there, but `SHOALS_ORACLE_REQUIRE_CHELIS=1` (which
+  CI sets) turns that skip into a failure.
+
+  30 mutation tests in `scripts/test_oracle_erf64_accuracy.py`, each of which
+  rewrites a published figure and requires the oracle to turn red — including
+  the exact mutation that shipped. One asserts what the offline leg **cannot**
+  do: rewrite every carrier to the same wrong number and it is green, because
+  it proves the carriers agree, never that they are right. That test exists so
+  nobody later claims the cheap leg is sufficient.
+
 - **`deltas_put` returned `0.0` at the strike at expiry, where the limit is
   `-0.5`** (shoals#106). The call-side counterpart was fixed in shoals#101; this
   is the same defect in its silently-wrong form rather than its `NaN` form, which

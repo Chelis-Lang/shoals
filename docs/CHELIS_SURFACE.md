@@ -221,10 +221,23 @@ stated.
 
 `scripts/oracle_erf64_accuracy.py` computes them, measuring in binary at
 extended precision; `erf64` and `n_cdf64` are exported so the bound can be
-measured from outside the module. The figures below are **transcribed by hand
-from that script's output** and nothing checks the transcription — the script
-compares against its own internal constants, not this file, and runs in no CI
-job (shoals#64). Re-run it and compare after any kernel change.
+measured from outside the module. **The table below is the authoritative
+publication of these figures, and the oracle reads it** — it no longer compares
+against internal constants of its own (shoals#64). Two legs check it:
+
+- Every PR runs the oracle's offline `--transcription` leg, which parses the
+  floors out of this table and requires every other place in the tracked tree
+  that states one of them to state the same number. Carriers are discovered by
+  `git grep`, so adding one needs no registration and a stale one cannot hide.
+- The nightly job runs `--measurement`, which measures the compiled kernels
+  against a 60-dps reference and requires each floor here to be a **true and
+  tight** floor: equal to the measurement truncated toward zero at that
+  figure's own significant-digit count. Publishing fewer digits is allowed;
+  publishing an understated floor (`1.0e-30` is technically a floor) is not.
+
+The division is deliberate — the offline leg proves the carriers agree, never
+that they are right, and only the nightly leg constrains the value. A missing
+`mpmath` now fails the measurement leg instead of skipping it.
 
 | Kernel | Approximation | Worst observed absolute error (a floor) | Method |
 |---|---|---|---|

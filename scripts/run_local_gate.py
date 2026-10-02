@@ -43,6 +43,16 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
   14. ``scripts/test_release_workflow.py`` — static release/toolchain and
       hosted/local matrix integrity contracts.
   15. ``.github/scripts/test_secret_scan.py`` — secret-scan contract tests.
+  16. ``scripts/oracle_erf64_accuracy.py --transcription`` — the published
+      ``erf64``/``n_cdf64`` accuracy floors must be stated identically
+      everywhere the tracked tree states them (shoals#64). Offline, instant,
+      stdlib-only; the MEASUREMENT leg needs the toolchain and runs under
+      ``--full``. This leg proves the carriers agree, never that they are
+      right.
+  17. ``scripts/test_oracle_erf64_accuracy.py`` — mutation tests for that
+      oracle. Each one rewrites a published figure and requires the oracle to
+      turn red, because the oracle shoals#64 describes was green against a
+      tree whose accuracy claim had been rewritten to 1.0e-30.
 
 ``--full`` appends the stages CI runs in ``.github/workflows/nightly.yml``
 (scheduled, NOT per-PR) — run this at least once at a pin bump
@@ -59,13 +69,22 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
       ``modelfit_bfgs_heavy`` pending chelis#408, exactly like hosted nightly;
       an all-directory batch both over-scopes the release gate and hits the
       compiler's whole-suite timeout before completing the reviewed matrix.
-  18. ``scripts/prove_gate.py`` — the keystone canon self-audit against
+  18. ``scripts/oracle_erf64_accuracy.py --measurement`` — measure the
+      compiled ``erf64``/``n_cdf64`` kernels against a 60-dps mpmath reference
+      and require each published floor to be a TRUE and TIGHT floor
+      (shoals#64). ~3 min locally. Needs mpmath:
+      ``python3 -m pip install -r scripts/requirements-oracle.txt``. It FAILS
+      rather than skips when mpmath is absent.
+  19. ``scripts/oracle_greeks_gate.py`` — the AD-Greeks oracle, run with
+      ``SHOALS_ORACLE_REQUIRE_CHELIS=1`` so an unavailable toolchain FAILS
+      instead of silently skipping (shoals#64).
+  20. ``scripts/prove_gate.py`` — the keystone canon self-audit against
       the release binary (real SMT, ~8.6 min; nightly in CI).
-  19. ``scripts/check_package_prove_latency.py`` — the chelis#924 release
+  21. ``scripts/check_package_prove_latency.py`` — the chelis#924 release
       oracle: install the just-built Shoals candidate, then require a cold
       trivial package prove in <=20s and an unchanged warm prove in <=5s with
       byte-identical NDJSON.
-  20. ``scripts/check_release_artifact_determinism.py`` — two fresh isolated
+  22. ``scripts/check_release_artifact_determinism.py`` — two fresh isolated
       registries (mixed-case manual preseed versus clean canonical) must emit
       byte-identical lock, CHB, and archive payloads despite chelis#1002.
 
@@ -226,6 +245,14 @@ def main() -> int:
             "secret scan contract tests",
             ["python3", "-m", "unittest", "discover", "-v", "-s", ".github/scripts", "-p", "test_secret_scan.py"],
         ),
+        (
+            "accuracy-floor transcription (shoals#64)",
+            ["python3", "scripts/oracle_erf64_accuracy.py", "--transcription"],
+        ),
+        (
+            "accuracy-floor oracle mutation tests (shoals#64)",
+            ["python3", "scripts/test_oracle_erf64_accuracy.py"],
+        ),
     ]
     nightly_stages: list[tuple[str, list[str]]] = [
         (
@@ -246,6 +273,15 @@ def main() -> int:
             )
             for stem in NIGHTLY_MANUAL_FILES
         ],
+        (
+            "accuracy-floor measurement (shoals#64)",
+            ["python3", "scripts/oracle_erf64_accuracy.py", "--measurement"],
+        ),
+        (
+            "AD-Greeks oracle gate (shoals#64)",
+            ["/usr/bin/env", "SHOALS_ORACLE_REQUIRE_CHELIS=1",
+             "python3", "scripts/oracle_greeks_gate.py"],
+        ),
         (
             "prove_gate (canon self-audit against the release binary)",
             ["/usr/bin/env", "PROVE_GATE_FUZZ=1",
