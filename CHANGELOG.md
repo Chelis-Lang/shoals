@@ -6,7 +6,115 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING: the `Shoals.Date` business-day rolls take a `Calendar` instead of a
+  `weekend_only: bool`, and `year_fraction` returns `f64` instead of `f32`**
+  (shoals#87). `date_roll_following`, `date_roll_preceding`,
+  `date_roll_modified_following` and `add_business_days` now take the
+  `Shoals.HolidayCal.Calendar` they roll against. Pass `weekend_only_calendar()`
+  for the previous behaviour, which it reproduces exactly.
+
+  The flag was replaced rather than repaired in place. Both of its branches were
+  identical at four separate sites, and a boolean that selects between two
+  spellings of the same thing is a surface that can silently ignore a calendar;
+  a `Calendar` parameter cannot.
+
+- **BREAKING: `DayCount`'s `ActAct` is replaced by `ActActIsda` and
+  `ActActIcma`** (shoals#87). `ActActIcma` carries its own
+  `{ period_start, period_end, frequency }`, because ACT/ACT ICMA is not
+  computable from the accrual endpoints alone. Holding them in the variant makes
+  an ICMA request with *no* coupon period unrepresentable rather than a runtime
+  guard, and keeps `year_fraction`'s arity. A frequency below 1 or a coupon
+  period that does not end after it starts traps.
+
+  It does not make every invalid ICMA request unrepresentable: the accrual
+  endpoints are **not** validated against the coupon period, so an accrual range
+  outside or longer than its period returns a plausible number rather than an
+  error. `docs/src/dates.md` and `docs/src/scope.md` now say so; narrowing the
+  claim was preferred over adding a third guard, which would have been a semantic
+  decision beyond shoals#87.
+
 ### Fixed
+
+- **The `Shoals.Date` business-day rolls never consulted a holiday calendar**
+  (shoals#87, Voyage ledger UB-8). `date_roll_following`, `date_roll_preceding`,
+  `date_roll_modified_following` and `add_business_days` were each written as
+  `if weekend_only then X else X`, so both branches were the same expression and
+  no caller could reach `Shoals.HolidayCal` from this module. The issue names
+  three of the four sites; `add_business_days` is the fourth and carried the same
+  dead flag through an intermediate `flag = weekend_only` binding.
+
+  2025-07-04 is a Friday and a NYC holiday, which is the only shape of input
+  that separates the two behaviours — a weekend holiday would roll correctly by
+  accident. `date_roll_following(2025-07-04, hc_nyc_calendar())` is now
+  Monday 2025-07-07 and was previously unchanged.
+
+- **`year_fraction(..., ActAct)` was `days / 365.25`, not ACT/ACT**
+  (shoals#87, Voyage ledger UB-9). The approximation was wrong in both
+  directions: a whole leap year measured 366/365.25 = 1.00205 and a whole
+  ordinary year 365/365.25 = 0.99932, where ACT/ACT ISDA gives exactly 1.0 for
+  both. On the ISDA 2006 worked example (2003-11-01 to 2004-05-01) it gave
+  0.49829 against the correct 61/365 + 121/366 = 0.49772.
+
+  Both ACT/ACT conventions are checked against an exact proleptic-Gregorian
+  calendar computed independently in `references/date.ch`, which also states ISDA
+  by a different decomposition (a per-calendar-year clamp) than the subject's
+  head/interior/tail form. That cross-check is driven over a matrix of
+  {same-year, multi-year} x {ordinary, leap, century non-leap, quadricentennial}
+  x {one day, degenerate stub, whole year, long span}, because two hand-picked
+  spans left the same-year branch unreached entirely.
+
+  **On cost, stated carefully because earlier drafts of this entry got it wrong
+  in both directions.** `Std.Time.days_before_year` recurses one year at a time
+  from 1970, so a single `days_between` costs O(|year - 1970|) per endpoint and is
+  independent of the span: a ONE-DAY interval at year 2770 measures ~2s, while an
+  eight-hundred-year interval straddling 1970 measures ~1s. The per-calendar-year
+  fold paid that epoch distance once per year of the span, and the product is what
+  made it slow. The shipped form makes a bounded number of those calls whatever
+  the span. Same probe, same machine: the fold took 549s and could not answer an
+  800-year span within 400s; the shipped form answers a 200-year and an 800-year
+  span in 15s together.
+
+  **Mutation evidence, and a correction to how it was first reported.** Probes are
+  run as a single campaign against a single commit, with an up-front assertion that
+  each pattern occurs exactly once, so an unapplied probe aborts the run instead of
+  scoring as a pass. Each campaign's own count is what is reported; an earlier
+  version of this entry totalled its groups wrongly (they summed to 22, not the 18
+  claimed) and attributed to this commit a measurement taken at the previous one.
+  No total is restated here for that reason: the probe lists and their heads live
+  in the pull request, where each round's campaign is recorded against the head it
+  actually ran on.
+
+  **An earlier version of this entry claimed "nine injected, nine detected".**
+  That was true of the nine defects thought to write, which is the weaker
+  statement, and four separate gaps were found afterwards by review rather than
+  by the suite:
+
+  - The reference ordinal's Gregorian century term is identically zero for every
+    year in 2000..2099, and every subject-vs-reference comparison sat inside that
+    block, so deleting the century rule agreed with a correct reference at every
+    date then tested. `1899-11-01..1900-05-01` reaches it and also exercises 1900
+    as the century non-leap.
+  - Four further mutations survived: a one-day calendar-year segment, a negative
+    ICMA frequency, a reversed ICMA coupon period, and `add_business_days` rolling
+    its own start date.
+  - **Every same-year ISDA assertion sat in a leap year**, so forcing the
+    same-year denominator to 366 passed the whole suite while returning 181/366
+    for an ordinary-year accrual. The earlier probe forced it to 365, which the
+    leap-year test catches, so it read as coverage: a two-valued function mutated
+    in one direction only tests the value that happens to be covered.
+  - **Every ICMA assertion passed `period_start` as the accrual start**, so
+    ignoring the caller's accrual start entirely passed the whole suite. A
+    mid-period accrual separates them: 2004-02-01..2004-05-01 inside a 182-day
+    period is 90/364, where the defect gives 182/364. The accrual *end* axis was
+    pinned because one test varied it; the start axis was constant everywhere,
+    including inside the independent-reference property, whose driver passed
+    `period_start` too, so both sides moved together.
+
+  All four share one shape — an axis held constant across every instance of an
+  assertion, invisible because each individual assertion is correct. The matrix
+  above exists to make that axis explicit rather than to add one more case.
 
 - **`bootstrap_multi_curve` never read `times_template`, so the declared
   `YieldCurve[n]` extent could disagree with the pillar count** (shoals#113).

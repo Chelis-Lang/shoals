@@ -85,11 +85,35 @@ Module: `Shoals.References.Date`.
 
 ```chelis
 def naive_days_between(start: Date, end: Date) -> i64
-def year_fraction_act_360_textbook(start: Date, end: Date) -> f32
-def year_fraction_act_365_textbook(start: Date, end: Date) -> f32
-def year_fraction_thirty_360_textbook(start: Date, end: Date) -> f32
-def year_fraction_act_act_textbook(start: Date, end: Date) -> f32
+def year_fraction_act_360_textbook(start: Date, end: Date) -> f64
+def year_fraction_act_365_textbook(start: Date, end: Date) -> f64
+def year_fraction_thirty_360_textbook(start: Date, end: Date) -> f64
+def year_fraction_act_act_isda_textbook(start: Date, end: Date) -> f64
+def year_fraction_act_act_icma_textbook(
+  start: Date, end: Date, period_start: Date, period_end: Date, frequency: i64
+) -> f64
 ```
 
-Reference year fractions for the four day-count conventions, used to check
+Reference year fractions for the day-count conventions, used to check
 `Shoals.Date.year_fraction`.
+
+The first three keep a deliberately crude 30-day-month count
+(`naive_days_between`), so the properties that use them hold only to a loose
+tolerance. The two ACT/ACT references instead compute an exact
+proleptic-Gregorian day number of their own rather than calling
+`Std.Time.days_between`, so they check `Shoals.Date` against an independently
+derived calendar and hold to floating-point agreement. They also state ISDA
+differently from the subject: the reference clamps every calendar year to the
+interval and divides each segment, where `Shoals.Date` counts a whole interior
+year as exactly 1 and divides only the head and tail stubs. Agreement is
+therefore a real cross-check of the year-boundary handling rather than a
+restatement. The subject carries the loop-free form deliberately, and the cost
+model is worth stating because it is counter-intuitive:
+`Std.Time.days_before_year` recurses one year at a time from 1970, so a single
+`days_between` costs O(|year − 1970|) per endpoint and does **not** depend on the
+span at all. A per-calendar-year fold paid that epoch distance once per year of
+the span, and the product is what made it slow. The subject now makes a bounded
+number of those calls whatever the span — O(1) in the span, still linear in how
+far its dates sit from 1970. The reference keeps the loop but pays neither cost
+per iteration, because `civil_ordinal` is closed-form era/yoe/doy arithmetic with
+no recursion; its span is test-sized regardless.
