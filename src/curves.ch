@@ -266,13 +266,22 @@ def bootstrap_multi(instruments: List[Instrument]) -> (List[f32], List[f32]) = {
 -- list-shaped pillars into a tensor-shaped type. It was load-bearing for the
 -- signature and dead in the body: the pillars come from
 -- `bootstrap_multi(instruments)`, whose length is `len(instruments)`, and
--- nothing related that to the declared extent. A two-instrument bootstrap
--- against a three-wide template type-checked as `YieldCurve[3]` carrying two
--- pillars, so a consumer iterating the declared extent trapped on the pillar
--- that was never there (shoals#113). The caller could satisfy the relationship
--- but not rely on it. The sibling `bootstrap_grad_full_jacobian` detects the
--- same mismatch and answers it with a silent NaN tensor; a declared extent that
--- disagrees with the data has no curve to propagate, so fail loudly instead.
+-- nothing related that to the declared extent. A caller could satisfy the
+-- relationship but not rely on it.
+--
+-- A narrower template is the silent direction and the reason this fails rather
+-- than warns: three instruments under a two-wide template declared
+-- `YieldCurve[2]` over three real pillars, so reads by time answered from a
+-- pillar the declared extent says does not exist and nothing ever trapped. A
+-- wider template is the loud one -- two instruments under a three-wide template
+-- type-checked as `YieldCurve[3]` carrying two pillars, correct for every read
+-- of a real pillar and an out-of-bounds trap on the declared third.
+--
+-- Only the template's length is read; its values are not, and the pillar times
+-- are the instrument tenors. The sibling `bootstrap_grad_full_jacobian`
+-- detects the same mismatch and answers it with a silent NaN tensor; a declared
+-- extent that disagrees with the data has no curve to propagate, so fail
+-- loudly instead.
 def bootstrap_multi_curve[n](instruments: List[Instrument], times_template: tensor[n, f32]) -> YieldCurve[n] =
   if eq(len(to_list(times_template)), len(instruments)) then {
     out = bootstrap_multi(instruments)

@@ -18,20 +18,24 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   nothing related that to the declared extent. A caller could satisfy the
   relationship; nothing enforced it.
 
-  Measured on `83d8cb6`, two instruments against a three-wide template
-  type-checked and returned a value declared `YieldCurve[3]` carrying two
-  pillars: `rate_at(c, 2.0)` answered `0.043088913`, correct for the two real
-  pillars, which is why the defect was silent, while the declared third pillar
-  gave `index 2 out of bounds for list of len 2`. The opposite direction was
-  quieter still and trapped nothing -- three instruments against a two-wide
-  template declared `YieldCurve[2]` over three solved pillars, so reads by time
-  saw a pillar that anything trusting the declared extent could not.
+  Measured on `83d8cb6`. The **narrower** direction is the silent one and is the
+  reason this fails rather than warns: three instruments against a two-wide
+  template declared `YieldCurve[2]` over three solved pillars, and nothing
+  trapped -- `rate_at(c, 3.0)` answered `0.046586514` from a pillar the declared
+  extent says does not exist. The **wider** direction at least eventually
+  faults: two instruments against a three-wide template type-checked and
+  returned a value declared `YieldCurve[3]` carrying two pillars, where
+  `rate_at(c, 2.0)` answered `0.043088913` -- correct for the two real pillars
+  -- while the declared third gave `index 2 out of bounds for list of len 2`.
 
   Both directions are now a runtime `fail` naming
-  `Shoals.Curves.bootstrap_multi_curve`, each with its own negative case. The
-  sibling `bootstrap_grad_full_jacobian` detects the same class of mismatch but
-  answers it with a silent NaN tensor; a declared extent that disagrees with the
-  data has no curve to propagate, so this fails loudly instead. Removing the
+  `Shoals.Curves.bootstrap_multi_curve`, each with its own negative case. Only
+  the template's **length** is read; its values are still ignored, and the
+  pillar times remain the instrument tenors, so a right-length template with
+  wrong times is accepted exactly as before (`docs/src/curves.md` states this).
+  The sibling `bootstrap_grad_full_jacobian` detects the same class of mismatch
+  but answers it with a silent NaN tensor; a declared extent that disagrees with
+  the data has no curve to propagate, so this fails loudly instead. Removing the
   parameter was the alternative the issue raised and is not taken: with no
   template there is no `n`, so the result could not be a `YieldCurve[n]` at all.
 
