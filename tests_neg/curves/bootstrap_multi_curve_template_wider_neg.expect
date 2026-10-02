@@ -1,4 +1,4 @@
-Shoals.Curves.bootstrap_multi_curve: times_template must have one entry per instrument (the declared YieldCurve extent comes from the template)
+Shoals.Curves.bootstrap_multi_curve: times_template must have one entry per instrument (the declared YieldCurve extent comes from the template): template has 3 entries for 2 instruments
 
 `times_template` is the only source of the type-level `n` in the result, and
 the body never read it, so the declared extent was whatever the caller passed.

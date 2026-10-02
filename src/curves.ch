@@ -288,7 +288,7 @@ def bootstrap_multi_curve[n](instruments: List[Instrument], times_template: tens
     times_t = to_tensor(out.0)
     rates_t = to_tensor(out.1)
     YieldCurve { kind: Custom { label: "bootstrap-multi" }, times: times_t, rates: rates_t }
-  } else fail("Shoals.Curves.bootstrap_multi_curve: times_template must have one entry per instrument (the declared YieldCurve extent comes from the template)")
+  } else fail(string_concat("Shoals.Curves.bootstrap_multi_curve: times_template must have one entry per instrument (the declared YieldCurve extent comes from the template)", string_concat(": template has ", string_concat(to_string(len(to_list(times_template))), string_concat(" entries for ", string_concat(to_string(len(instruments)), " instruments"))))))
 def bootstrap_grad_diagonal(inst: Instrument, times_so_far: List[f32], rates_so_far: List[f32], solved_rate: f32) -> f32 =
   if cur_pillars_aligned(times_so_far, rates_so_far) then match inst with {
     | Deposit { tenor: t, rate: r } => div(cast(1.0, f32), add(cast(1.0, f32), mul(r, t)))

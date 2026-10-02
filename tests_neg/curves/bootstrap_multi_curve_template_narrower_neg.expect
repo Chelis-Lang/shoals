@@ -1,4 +1,4 @@
-Shoals.Curves.bootstrap_multi_curve: times_template must have one entry per instrument (the declared YieldCurve extent comes from the template)
+Shoals.Curves.bootstrap_multi_curve: times_template must have one entry per instrument (the declared YieldCurve extent comes from the template): template has 2 entries for 3 instruments
 
 The opposite mismatch to the wider template, and the quieter one: nothing traps
 in this direction. Three instruments against a two-wide template returned a

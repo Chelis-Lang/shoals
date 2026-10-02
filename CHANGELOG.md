@@ -29,7 +29,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   -- while the declared third gave `index 2 out of bounds for list of len 2`.
 
   Both directions are now a runtime `fail` naming
-  `Shoals.Curves.bootstrap_multi_curve`, each with its own negative case. Only
+  `Shoals.Curves.bootstrap_multi_curve` and reporting both counts, so the
+  message distinguishes the two directions and each negative case pins its own.
+  Only
   the template's **length** is read; its values are still ignored, and the
   pillar times remain the instrument tenors, so a right-length template with
   wrong times is accepted exactly as before (`docs/src/curves.md` states this).

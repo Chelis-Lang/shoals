@@ -131,7 +131,8 @@ instrument, in list order, and returns the pillar times and rates.
 type-level value, so the template is what supplies the `n` in
 `YieldCurve[n]`, and none of its *values* are read. It must therefore have
 exactly one entry per instrument. A mismatch is a runtime `fail` naming
-`Shoals.Curves.bootstrap_multi_curve`; previously it was accepted and the
+`Shoals.Curves.bootstrap_multi_curve` and reporting both counts (`template has
+3 entries for 2 instruments`); previously it was accepted and the
 returned value declared an extent it did not carry, so a consumer that
 trusted `n` either trapped on a pillar that was never there or silently
 missed one (shoals#113).
