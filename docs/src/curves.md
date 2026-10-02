@@ -127,6 +127,16 @@ def bootstrap_multi_curve[n](instruments: List[Instrument], times_template: tens
 instrument, in list order, and returns the pillar times and rates.
 `bootstrap_multi_curve` wraps the same result as a `YieldCurve`.
 
+`times_template` carries only the result's extent: a list's length is not a
+type-level value, so the template is what supplies the `n` in
+`YieldCurve[n]`, and none of its *values* are read. It must therefore have
+exactly one entry per instrument. A mismatch is a runtime `fail` naming
+`Shoals.Curves.bootstrap_multi_curve` and reporting both counts (`template has
+3 entries for 2 instruments`); previously it was accepted and the
+returned value declared an extent it did not carry, so a consumer that
+trusted `n` either trapped on a pillar that was never there or silently
+missed one (shoals#113).
+
 - A deposit is simple interest: `DF(t) = 1 / (1 + rate * t)`.
 - A zero-coupon price is the discount factor at its tenor.
 - A par swap's fixed leg pays `par_rate / payments_per_year` on each date

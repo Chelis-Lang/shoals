@@ -90,3 +90,26 @@ def test_bootstrap_multi_curve_constructs_yield_curve() -> unit ! { Test } = {
   }
   }
 }
+-- shoals#113: the declared `YieldCurve[n]` extent comes from `times_template`,
+-- and before the guard nothing related it to the pillar count. This is the
+-- must-still-work half, not a reproduction: a matched 3/3 template passes on
+-- base too, and the two `tests_neg/` cases carry the fix. What it pins is that
+-- the extent a caller is handed is the extent the value carries, so every
+-- declared pillar is readable -- the read that failed in the issue was
+-- `index(rates, 2)` on a three-wide template over two instruments, which is a
+-- different configuration from this one.
+def test_bootstrap_multi_curve_declares_the_extent_it_carries() -> unit ! { Test } = {
+  insts = [deposit(cast(1.0, f32), cast(0.04, f32)), deposit(cast(2.0, f32), cast(0.045, f32)), deposit(cast(3.0, f32), cast(0.05, f32))]
+  template = to_tensor([cast(0.0, f32), cast(0.0, f32), cast(0.0, f32)])
+  curve = bootstrap_multi_curve(insts, template)
+  match curve with {
+    | YieldCurve { kind: _, times: ts, rates: rs } => {
+    ts_l = to_list(copy(ts))
+    rs_l = to_list(copy(rs))
+    _ = assert_true(eq(len(ts_l), cast(3, i64)), "pillar times match the declared extent of 3")
+    _ = assert_true(eq(len(rs_l), cast(3, i64)), "pillar rates match the declared extent of 3")
+    _ = assert_close(index(ts_l, cast(2, i64)), cast(3.0, f32), cast(1e-6, f32), "3rd declared time pillar is readable and is the 3y tenor")
+    assert_close(index(rs_l, cast(2, i64)), div(log(add(cast(1.0, f32), mul(cast(0.05, f32), cast(3.0, f32)))), cast(3.0, f32)), cast(1e-6, f32), "3rd declared rate pillar matches the 3y deposit's simple-interest zero")
+  }
+  }
+}
