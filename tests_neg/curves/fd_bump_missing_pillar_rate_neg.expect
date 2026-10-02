@@ -1,0 +1,6 @@
+Shoals.Curves.fd_bump_pillar_rate: times_so_far and rates_so_far must describe the same pillars (equal lengths)
+
+The opposite mismatch. A pillar time with no rate behind it previously indexed
+past the end of the rate list and died as a bare bounds error that named neither
+the function nor the contract it violated. Both directions are the same
+malformed input and must produce the same named diagnostic.
