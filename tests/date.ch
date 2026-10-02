@@ -58,6 +58,22 @@ def test_act_act_isda_is_not_the_365_25_approximation() -> unit ! { Test } = {
   gap = if lt(yf, approximation) then sub(approximation, yf) else sub(yf, approximation)
   assert_close(to01_f64(gt(gap, cast(0.0001, f64))), cast(1.0, f64), tight64(), "ACT/ACT ISDA differs measurably from the days/365.25 approximation it replaced")
 }
+-- Red-team F2/X4. A calendar-year segment of exactly ONE day is the boundary of
+-- the per-year split, and the suite's shortest interval was two days inside a
+-- single year, so a mutation widening the "skip empty segment" guard from
+-- `span < 1` to `span < 2` silently returned 0.0 here and nothing caught it.
+def test_act_act_isda_one_day_segment_at_a_year_boundary() -> unit ! { Test } = {
+  start = date(cast(2024, i64), cast(12, i64), cast(31, i64))
+  end = date(cast(2025, i64), cast(1, i64), cast(1, i64))
+  expected = div(cast(1.0, f64), cast(366.0, f64))
+  assert_close(year_fraction(start, end, ActActIsda), expected, tight64(), "2024-12-31..2025-01-01 is one leap-year day == 1/366")
+}
+def test_act_act_isda_one_day_segment_each_side_of_a_boundary() -> unit ! { Test } = {
+  start = date(cast(2023, i64), cast(12, i64), cast(31, i64))
+  end = date(cast(2024, i64), cast(1, i64), cast(2, i64))
+  expected = add(div(cast(1.0, f64), cast(365.0, f64)), div(cast(1.0, f64), cast(366.0, f64)))
+  assert_close(year_fraction(start, end, ActActIsda), expected, tight64(), "2023-12-31..2024-01-02 is 1/365 + 1/366, one day in each year")
+}
 def test_act_act_isda_whole_non_leap_year_is_one() -> unit ! { Test } = {
   start = date(cast(2025, i64), cast(1, i64), cast(1, i64))
   end = date(cast(2026, i64), cast(1, i64), cast(1, i64))
@@ -183,6 +199,23 @@ def test_add_business_days_skips_a_weekday_holiday() -> unit ! { Test } = {
   landed = add_business_days(thu, cast(1, i64), nyc_cal())
   expected_mon = date(cast(2025, i64), cast(7, i64), cast(7, i64))
   assert_close(same_date(landed, expected_mon), cast(0.0, f32), cast(0.001, f32), "one business day after Thursday July 3 2025 is Monday July 7 on a NYC calendar")
+}
+-- Red-team F2/X2. `add_business_days` was only ever started from a business day,
+-- so a mutation rolling its STARTING date to a business day before stepping
+-- survived. Starting on a holiday must not consume a step: one business day after
+-- July 4 is July 7, the same answer as from July 3, and the two must agree.
+def test_add_business_days_from_a_non_business_start() -> unit ! { Test } = {
+  landed = add_business_days(independence_day(), cast(1, i64), nyc_cal())
+  expected_mon = date(cast(2025, i64), cast(7, i64), cast(7, i64))
+  assert_close(same_date(landed, expected_mon), cast(0.0, f32), cast(0.001, f32), "one business day from Friday July 4 2025 (a NYC holiday) is Monday July 7")
+}
+def test_add_business_days_zero_is_the_identity_even_on_a_holiday() -> unit ! { Test } = {
+  landed = add_business_days(independence_day(), cast(0, i64), nyc_cal())
+  assert_close(same_date(landed, independence_day()), cast(0.0, f32), cast(0.001, f32), "zero business days does not roll, even from a holiday")
+}
+def test_add_business_days_negative_does_not_step_backward() -> unit ! { Test } = {
+  landed = add_business_days(independence_day(), cast(-5, i64), nyc_cal())
+  assert_close(same_date(landed, independence_day()), cast(0.0, f32), cast(0.001, f32), "a negative count does not step backward, as docs/src/scope.md states")
 }
 def test_add_business_days_weekend_only_lands_on_the_holiday() -> unit ! { Test } = {
   thu = date(cast(2025, i64), cast(7, i64), cast(3, i64))

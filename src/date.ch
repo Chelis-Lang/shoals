@@ -18,25 +18,34 @@ def date_require_positive_period(period_start: Date, period_end: Date) -> i64 = 
   if lt(span, cast(1, i64)) then fail("Shoals.Date: ACT/ACT ICMA coupon period must end after it starts") else span
 }
 def date_require_frequency(n: i64) -> i64 = if lt(n, cast(1, i64)) then fail("Shoals.Date: ACT/ACT ICMA coupon frequency must be >= 1") else n
--- ACT/ACT ISDA splits the interval at calendar-year boundaries and divides each
--- segment by the length of the year it falls in, so a leap day is weighted 1/366
--- and an ordinary day 1/365. A reversed interval returns the negated fraction.
+-- ACT/ACT ISDA weights a day by the length of the calendar year it falls in, so
+-- a leap day counts 1/366 and an ordinary day 1/365. Stated the way a textbook
+-- does: a whole interior year is exactly 1, and only the head and tail stubs are
+-- divided. That keeps the cost independent of the span. The formulation matters
+-- here: a per-calendar-year fold costs seconds across a multi-decade tenor, and
+-- the days/365.25 this replaced was O(1), so a loop would have made a public
+-- function slower than the approximation it corrected.
+-- `Shoals.References.Date` carries the per-year-clamp formulation instead, where
+-- the span is always test-sized and the differing shape is what makes the
+-- cross-check worth running. A reversed interval returns the negated fraction.
+def length_of_year(year: i64) -> f64 = if is_leap_year(year) then cast(366.0, f64) else cast(365.0, f64)
 def isda_fraction(start: Date, end: Date) -> f64 = {
   forward = date_lte(start, end)
   lo = if forward then start else end
   hi = if forward then end else start
-  years = range(lo.year, add(hi.year, cast(1, i64)))
-  total = fold(fn (acc: f64, y: i64) -> {
-    year_begin = date(y, cast(1, i64), cast(1, i64))
-    year_limit = date(add(y, cast(1, i64)), cast(1, i64), cast(1, i64))
-    seg_start = if date_lt(lo, year_begin) then year_begin else lo
-    seg_end = if date_lt(hi, year_limit) then hi else year_limit
-    span = days_between(seg_start, seg_end)
-    if lt(span, cast(1, i64)) then acc else {
-      denom = if is_leap_year(y) then cast(366.0, f64) else cast(365.0, f64)
-      add(acc, div(cast(span, f64), denom))
+  span = days_between(lo, hi)
+  total = if lt(span, cast(1, i64)) then cast(0.0, f64) else {
+    y_lo = lo.year
+    y_hi = hi.year
+    if eq(y_lo, y_hi) then div(cast(span, f64), length_of_year(y_lo)) else {
+      head_days = days_between(lo, date(add(y_lo, cast(1, i64)), cast(1, i64), cast(1, i64)))
+      tail_days = days_between(date(y_hi, cast(1, i64), cast(1, i64)), hi)
+      head = div(cast(head_days, f64), length_of_year(y_lo))
+      tail = div(cast(tail_days, f64), length_of_year(y_hi))
+      interior = cast(sub(sub(y_hi, y_lo), cast(1, i64)), f64)
+      add(add(head, interior), tail)
     }
-  }, cast(0.0, f64), years)
+  }
   if forward then total else neg(total)
 }
 -- ACT/ACT ICMA measures the accrued days against the full coupon period, scaled

@@ -24,9 +24,16 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   `ActActIcma`** (shoals#87). `ActActIcma` carries its own
   `{ period_start, period_end, frequency }`, because ACT/ACT ICMA is not
   computable from the accrual endpoints alone. Holding them in the variant makes
-  an ICMA request without a coupon period unrepresentable rather than a runtime
+  an ICMA request with *no* coupon period unrepresentable rather than a runtime
   guard, and keeps `year_fraction`'s arity. A frequency below 1 or a coupon
   period that does not end after it starts traps.
+
+  It does not make every invalid ICMA request unrepresentable: the accrual
+  endpoints are **not** validated against the coupon period, so an accrual range
+  outside or longer than its period returns a plausible number rather than an
+  error. `docs/src/dates.md` and `docs/src/scope.md` now say so; narrowing the
+  claim was preferred over adding a third guard, which would have been a semantic
+  decision beyond shoals#87.
 
 ### Fixed
 

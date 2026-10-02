@@ -103,8 +103,11 @@ tolerance. The two ACT/ACT references instead compute an exact
 proleptic-Gregorian day number of their own rather than calling
 `Std.Time.days_between`, so they check `Shoals.Date` against an independently
 derived calendar and hold to floating-point agreement. They also state ISDA
-differently from the subject: the reference counts a whole interior year as
-exactly 1 and divides only the head and tail stubs, where `Shoals.Date` clamps
-every calendar year to the interval and divides each segment. Agreement is
+differently from the subject: the reference clamps every calendar year to the
+interval and divides each segment, where `Shoals.Date` counts a whole interior
+year as exactly 1 and divides only the head and tail stubs. Agreement is
 therefore a real cross-check of the year-boundary handling rather than a
-restatement.
+restatement. The subject carries the O(1) form deliberately — a per-calendar-year
+fold costs seconds across a multi-decade tenor, and the `days / 365.25` it
+replaced was O(1) — while the reference carries the loop, where the span is
+always test-sized.

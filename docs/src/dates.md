@@ -36,9 +36,17 @@ negated fraction.
 the coupon frequency, so a regular full period is exactly `1/frequency`
 whatever its actual day count. ICMA is not computable from `(start, end)`
 alone, so the convention **carries** the enclosing coupon period and the
-frequency. That is deliberate: it makes an ICMA request without a period
+frequency. That is deliberate: it makes an ICMA request with *no* period
 unrepresentable rather than a runtime error. A frequency below 1, or a coupon
 period that does not end after it starts, traps.
+
+It does **not** make every invalid ICMA request unrepresentable, and the
+difference matters. `year_fraction` validates the coupon period and the
+frequency; it does **not** check that `start` and `end` lie within that period.
+An accrual range outside, or longer than, its stated coupon period returns a
+number — one larger than `1/frequency`, which is nonsense for a single period
+but is not reported as an error. Keeping the accrual inside the period is the
+caller's responsibility.
 
 From `tests/date.ch`:
 
@@ -48,7 +56,7 @@ From `tests/date.ch`:
 start = date(cast(2003, i64), cast(11, i64), cast(1, i64))
 end = date(cast(2004, i64), cast(5, i64), cast(1, i64))
 yf = year_fraction(start, end, ActActIsda)
-// yf == 61/365 + 121/366 == 0.4977243805674078
+// yf == 61/365 + 121/366 == 0.49772438056740775
 
 // A full semi-annual ICMA period is exactly one half.
 convention = ActActIcma { period_start: start, period_end: end, frequency: cast(2, i64) }

@@ -36,24 +36,26 @@ def civil_ordinal(year: i64, month: i64, day: i64) -> i64 = {
 def civil_is_leap(year: i64) -> bool = or(and(eq(mod(year, cast(4, i64)), cast(0, i64)), neq(mod(year, cast(100, i64)), cast(0, i64))), eq(mod(year, cast(400, i64)), cast(0, i64)))
 def civil_year_length(year: i64) -> f64 = if civil_is_leap(year) then cast(366.0, f64) else cast(365.0, f64)
 def civil_ord_of(d: Date) -> i64 = civil_ordinal(d.year, d.month, d.day)
--- ACT/ACT ISDA written the way a textbook states it: a whole interior year
--- counts as exactly 1, and only the head and tail stubs are divided. The subject
--- in `Shoals.Date` instead clamps every calendar year to the interval and divides
--- each segment, so agreement is a real cross-check of the year-boundary handling.
+-- ACT/ACT ISDA by per-calendar-year clamp: every year the interval touches is
+-- intersected with it and divided by that year's own length. `Shoals.Date`
+-- instead counts whole interior years as exactly 1 and divides only the head and
+-- tail stubs, which is O(1) in the span. Agreement is therefore a real
+-- cross-check of the year-boundary handling rather than a restatement, and the
+-- cost of this loop is irrelevant because the reference only runs over
+-- test-sized spans.
 def year_fraction_act_act_isda_textbook(start: Date, end: Date) -> f64 = {
   ord_start = civil_ord_of(start)
   ord_end = civil_ord_of(end)
-  if lt(ord_end, ord_start) then neg(year_fraction_act_act_isda_textbook(end, start)) else if eq(ord_end, ord_start) then cast(0.0, f64) else {
-    y_start = start.year
-    y_end = end.year
-    if eq(y_start, y_end) then div(cast(sub(ord_end, ord_start), f64), civil_year_length(y_start)) else {
-      head_days = sub(civil_ordinal(add(y_start, cast(1, i64)), cast(1, i64), cast(1, i64)), ord_start)
-      tail_days = sub(ord_end, civil_ordinal(y_end, cast(1, i64), cast(1, i64)))
-      head = div(cast(head_days, f64), civil_year_length(y_start))
-      tail = div(cast(tail_days, f64), civil_year_length(y_end))
-      interior = cast(sub(sub(y_end, y_start), cast(1, i64)), f64)
-      add(add(head, interior), tail)
-    }
+  if lt(ord_end, ord_start) then neg(year_fraction_act_act_isda_textbook(end, start)) else {
+    years = range(start.year, add(end.year, cast(1, i64)))
+    fold(fn (acc: f64, y: i64) -> {
+      year_begin = civil_ordinal(y, cast(1, i64), cast(1, i64))
+      year_limit = civil_ordinal(add(y, cast(1, i64)), cast(1, i64), cast(1, i64))
+      seg_start = if lt(ord_start, year_begin) then year_begin else ord_start
+      seg_end = if lt(ord_end, year_limit) then ord_end else year_limit
+      span = sub(seg_end, seg_start)
+      if lt(span, cast(1, i64)) then acc else add(acc, div(cast(span, f64), civil_year_length(y)))
+    }, cast(0.0, f64), years)
   }
 }
 def year_fraction_act_act_icma_textbook(start: Date, end: Date, period_start: Date, period_end: Date, frequency: i64) -> f64 = {
