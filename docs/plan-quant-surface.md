@@ -51,8 +51,12 @@ work packets, suggested agent-team allocation, acceptance criteria
   `chelis fmt --check`, `chelis lint --check`, `chelis reef build`, plus the
   offline gates. The real-chelis `chelis test tests/ --timeout 1200 --jobs
   auto` suite runs NIGHTLY (`.github/workflows/nightly.yml`), not per-PR —
-  it is ~13 min of real-chelis wall. Heavier oracles (multi-curve bootstrap,
-  Heston QE, XVA smoke) run as manual gates at milestone exits via scripts
+  it is far and away the tallest slice of real-chelis wall, and it runs close
+  enough to its own 2400s suite ceiling to cross it. `nightly.yml` states the
+  measured cost, the run-to-run spread and the ceiling at the step, and is the
+  authoritative site for that figure. Heavier oracles (multi-curve
+  bootstrap, Heston QE, XVA smoke) run as manual gates at milestone exits
+  via scripts
   under `scripts/manual_gates/`.
 - **Manual-gate pattern.** Each named gate
   (`phase3l_shoals_oracle_*`) is a python script under

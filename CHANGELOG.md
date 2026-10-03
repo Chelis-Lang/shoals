@@ -556,6 +556,118 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   now document `Instrument`, the swap valuation convention, validation, and
   the loud failures.
 
+- **The nightly `tests/` suite was documented at "~13 min" of hosted wall at
+  four sites, a figure no longer supported by any run** (shoals#80). It traces
+  to PR #32 (`41b8d14`, 2026-07-15), the change that moved the suite off the
+  per-PR path, and was accurate then: the 17 per-PR `chelis test` steps in the
+  fortnight before #32 ran 573–881s, mean 740s (ten `pull_request` and seven
+  `push`-on-`main`; the `pull_request` subset alone is 573–872s, mean 729s).
+  chelis#1391 then made
+  `--batch-mode auto` far slower on this suite, the budget was raised twice to
+  absorb it, and nothing re-measured the figure.
+
+  Measured from the Actions API at the current `=0.18.11` pin — step
+  `started_at`/`completed_at`, which excludes the job's ~60s `reef build`:
+
+  | head | files / tests | `chelis test` step |
+  |---|---|---|
+  | `03c63bb4`, eight dailies 09-23…09-30 | 45 / 391 | 1444, 2131, 1995, 2113, 2037, 1892, 1958, 1986s |
+  | `3a89c041` 10-01 | 45 / 391 | 1982s |
+  | `392c7a42` 10-02 | 48 / 468 | 2168s |
+  | `872da1e9` 10-02 dispatch | 49 / 494 | 1836s |
+| `69e1e59` 10-03 **and** 10-04 (current main) | 49 / 549 | **2400s both times — suite timeout, `384 passed, 1 failed (suite incomplete)`** |
+
+  Eleven completed runs span 1444–2168s, mean 1958s. **Everything is held
+  fixed across those eight consecutive dailies, so run-to-run variance alone
+  is 687s — 35.3% of the mean (1944.5s, sample stdev 217s), and 60% to 89% of
+  the step's own 2400s ceiling from one runner draw.**
+
+  **At today's 549-test suite this step does not complete.** Head `69e1e59`
+  has run twice, 2026-10-03 and 2026-10-04, with no merge between them, and
+  both hit the 2400s timeout at exactly `384 passed, 1 failed (suite
+  incomplete)`. Two runs stopping at the same count is a reproducible overrun,
+  not an unlucky draw, so the present cost is bounded below by 2400s and
+  otherwise unknown — and the mean above is history rather than the current
+  figure. That is the caveat that matters: it averages three suite sizes (391,
+  468 and 494 tests) and **none is the current one**.
+
+  **The ceiling was also already being crossed**, which bounds how much any
+  one change can be blamed for. At the previous `=0.18.10` pin, head
+  `da6a2cd8`, over the same 45 files and 391 tests and against the same 2400s
+  timeout, this step timed out on 2026-09-21
+  (`313 passed, 1 failed (suite incomplete)`) and came within 19s of it on
+  2026-09-22 (2381s). Against a 687s same-head spread, a two-run before/after
+  comparison cannot size any single PR's contribution (shoals#111). What the
+  reproducible overrun *does* establish is that the suite crossed for good
+  somewhere between 494 and 549 tests, so the growth is real; it is
+  attributing a specific number of seconds to a specific PR that the data does
+  not support.
+
+  `.github/workflows/nightly.yml` now carries all of this at the step, and the
+  four comments that used to restate the figure — `ci.yml`, the nightly header
+  and job comments, and `docs/plan-quant-surface.md` — give no figure of their
+  own and point there, as does `scripts/run_local_gate.py`. This entry and
+  `docs/UPSTREAM_BUGS.md` do restate the re-probe numbers, by design, and
+  nothing mechanically ties the spellings together. The correction is not cosmetic: the stale figure is what
+  shoals#80 would weigh "run `tests/` per-PR" against, and it was wrong in
+  the direction that makes doing so look affordable.
+
+- **chelis#1391 was described as OPEN upstream** in `nightly.yml` and
+  `scripts/run_local_gate.py`. It is CLOSED, fixed by chelis#3058
+  (`04612253c`, batching sharded at `MAX_BATCH_FILES = 4`). No release
+  carries the fix — `git tag --contains 04612253c` is empty and the merge
+  postdates `v0.18.12` — so this pin still has the regression, the raised
+  suite budget stands, and the `docs/UPSTREAM_BUGS.md` entry stays in
+  §Actively blocking. The exit condition is now reachable and named: the
+  first pin that carries chelis#3058.
+
+  That closure fires the re-probe trigger the entry sets for itself ("the
+  assigned `chelis#NNN` closing … re-time both batch modes on the same
+  machine"), so the re-probe was run: head `69e1e59`, the `=0.18.11` release
+  binary, the current 49 files and 549 tests, one 10-core machine, both legs
+  back to back —
+
+  | `--batch-mode` | wall | child CPU | cores used | result |
+  |---|---|---|---|---|
+  | `auto` (CI default) | 1113s | 1218s | 1.09 | 549 passed, 0 failed |
+  | `file` | **341s** | 1264s | 3.71 | 549 passed, 0 failed |
+
+  **3.27x the wall for +3.8% CPU.** The CPU parity is what carries the
+  conclusion: identical work, 3.27x the wall, so this is a scheduling outcome
+  and not a workload one. `--batch-mode auto` collapses files into batches,
+  leaving `--jobs` almost no test-file workers to schedule; chelis#3058's own
+  message says the merged unit "ran in one subprocess whatever `--jobs` said:
+  the setting reached only the files that had been demoted out of the batch",
+  and its fix both caps batch size and extends `--jobs` to shard concurrency.
+  The ratio is larger than the 2.12x recorded at 43 files, but that pair
+  differs in file count, test count and compiler release at once and isolates
+  no cause.
+
+  The CPU parity also bounds what the upstream fix will buy here. chelis#3058
+  reports the merged-unit cost as superlinear in unit size, cutting CPU 5.5x
+  as well as wall 23.1x on a 36-file synthetic corpus; this suite shows no
+  such CPU recovery (+3.8%), so at 49 files it is paying the serial cost and
+  not the superlinear one. Expect the benefit in wall clock, not in
+  runner-minutes. Verdict in `docs/UPSTREAM_BUGS.md`: still blocking,
+  narrowing stands, `auto` does not beat `file`.
+
+  **`--batch-mode file` is not taken**, and no hosted figure for it is given
+  here. These are 10-core numbers against a 2-vCPU runner, where the
+  parallelism `file` buys is capped far lower; a projection across that gap
+  would be exactly the kind of unprovenanced number this entry exists to
+  remove. shoals#111 owns measuring it, which one `workflow_dispatch` settles.
+
+  `python3 scripts/audit_workarounds.py` (full mode — AGENTS.md §Pin Bump
+  Checklist step 3, not a CI gate) reports `chelis#1391` **STALE**, exits 1 on
+  unmodified `origin/main`, and still does after this change. That is not
+  oversight: at `scripts/audit_workarounds.py:275-281` a CLOSED active-subject
+  is offered only retire-to-§Archived or a re-cited residue issue, with no
+  waiver path, so the guard has no state for a defect fixed upstream and
+  present in every release this repo can pin — the normal condition of any
+  shell between an upstream merge and a release. Archiving a live narrowing
+  would be the worse error, so the entry stays active and the audit stays red
+  until a pin carries chelis#3058.
+
 ## [0.24.12] - 2026-09-15
 
 Compiler-pin and migration release for Chelis v0.18.10, on Nautilus 0.7.45 and

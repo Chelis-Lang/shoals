@@ -142,6 +142,40 @@ in code that is CLOSED upstream but not sitting in §Archived.
       compilation-unit size. Re-time both batch modes on the same machine and
       require `auto` to beat `file` again before lowering the nightly budget
       back.
+    - **Re-probe 2026-10-04 — trigger fired, verdict STILL BLOCKING.**
+      chelis#1391 is CLOSED upstream, fixed by **chelis#3058**
+      (`04612253c`, batching sharded at `MAX_BATCH_FILES = 4`). **No release
+      carries the fix** (`git tag --contains 04612253c` is empty and the merge
+      postdates `v0.18.12`), so the `=0.18.11` pin still has the regression
+      and the narrowing stands. Re-timed per the trigger at head `69e1e59` on
+      the release binary, the current 49 files and 549 tests, one 10-core
+      machine, both legs back to back: `--batch-mode auto` 1113s wall / 1218s
+      child CPU (1.09 cores), `--batch-mode file` 341s wall / 1264s child CPU
+      (3.71 cores) — **3.27x the wall for +3.8% CPU**, both legs
+      `549 passed, 0 failed`. `auto` does not beat `file`, so the budget does
+      not come back down.
+
+      The CPU parity is the part that carries: identical work, 3.27x the
+      wall, so this is a scheduling outcome. `--batch-mode auto` collapses
+      files into batches, which leaves `--jobs` almost no test-file workers to
+      schedule; chelis#3058's own message says the merged unit "ran in one
+      subprocess whatever `--jobs` said: the setting reached only the files
+      that had been demoted out of the batch". That fix both caps batch size
+      and extends `--jobs` to shard concurrency. The ratio is larger than the
+      2.12x recorded above, but that pair differs in file count, test count
+      and compiler release at once and isolates no cause.
+
+      No hosted measurement of `--batch-mode file` exists, on this suite or
+      any other, and none is projected here: 10-core parallelism does not
+      transfer to a 2-vCPU runner. shoals#111 owns measuring it, which one
+      `workflow_dispatch` settles.
+
+      This entry therefore stays here rather than moving to §Archived, which
+      is why `scripts/audit_workarounds.py` full mode reports it STALE: at
+      `scripts/audit_workarounds.py:275-281` a CLOSED active-subject offers
+      only §Archived or a re-cited residue issue, with no waiver path, so the
+      guard has no state for "fixed upstream, in no release". Retire it at the
+      first pin that carries chelis#3058, after re-timing.
 
 - **Nothing blocks shipping the current proof surface.** The finance proof
   surface ships as documented in `research/proof-infra/report.md`: the economic
