@@ -1,8 +1,9 @@
 module Shoals.TestsNeg.PillarTimesUnsortedZeroFromPar
 import Std.Test (assert_true)
 import Shoals.Curves (bootstrap_zero_from_par, rate_at)
--- Negative: the third exported entry point whose pillars are the caller's
--- `times`. The precondition binds twice over here -- the fold accumulates the
+-- Negative: an exported entry point whose pillars are the caller's `times`
+-- without being named a constructor. The precondition binds twice over here --
+-- the fold accumulates the
 -- fixed leg's present value in traversal order, so an out-of-order time both
 -- discounts against the wrong cumulative PV and leaves the returned curve
 -- unreadable by `rate_at`. It answered 0.019086447 for the reordered pairs.

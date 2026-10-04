@@ -59,8 +59,10 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   `yield_curve_tagged`, `bootstrap_zero_from_par` and
   `curve_basis_from_pillars` now reject pillar times that are not strictly
   increasing, with a runtime `fail` naming the entry point, the first offending
-  index, and both times. A repeated time and a `NaN` time are rejected by the
-  same rule.
+  index, and both times. A repeated time, and a `NaN` time among two or more
+  pillars, are rejected by the same comparison. A single-pillar curve has no
+  pair to compare, so a lone `NaN` time is still accepted — a non-finite-pillar
+  question rather than an ordering one, and outside what this guard reaches.
 
   `rate_at` and `basis_spread_at` read the pillars through
   `Nautilus.Interpolation.linear_interp_sorted`, which brackets a query by

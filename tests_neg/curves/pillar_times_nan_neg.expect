@@ -5,3 +5,12 @@ strictly greater than its predecessor and the same `gt` rejects it. Pinned as
 its own case because that is a consequence of the comparison rather than a
 separate branch: rewriting the predicate as "not less than or equal" would
 preserve all five cases above and silently readmit NaN.
+
+The scope is two or more pillars. `cur_first_unsorted_time` folds over
+`range(1, len(times))`, which is empty at n=1, so a single-pillar curve with a
+`NaN` time is accepted and reads flat (measured: `rate_at` returns 0.05 for
+`yield_curve_from_pillars([NaN], [0.05])`). Every n>=2 position is caught,
+index 0 included -- a leading NaN is reported at index 1, because it is the
+successor comparison that fails. Admitting a lone NaN pillar is a
+non-finite-pillar question, not an ordering one, and is deliberately not fixed
+here.

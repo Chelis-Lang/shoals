@@ -74,8 +74,12 @@ it. Unsorted pillars therefore interpolate over the wrong interval and return a
 wrong rate with no trap and no `NaN`: the same three `(time, rate)` pairs in a
 different order answered `rate_at(curve, 1.5)` as 0.025 instead of 0.035, and
 that wrong rate propagates through `discount_factor` into every discounted
-price (shoals#119). A repeated time and a `NaN` time are rejected by the same
-rule — the requirement is strict ordering, not non-decreasing order.
+price (shoals#119). A repeated time, and a `NaN` time among two or more
+pillars, are rejected by the same comparison — the requirement is strict
+ordering, not non-decreasing order. A single-pillar curve has no pair to
+compare, so a lone `NaN` time is accepted and reads flat; that is a
+non-finite-pillar question rather than an ordering one, and this guard does not
+reach it.
 
 This is the precondition the instrument bootstrap already enforces (below),
 under the same decision not to re-sort: a reordering is a different question
