@@ -41,13 +41,20 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   follow that no minimal read was constructible — only that none was justified.
 
   No basis-swap bootstrap is added here, and none exists (shoals#117).
+
   `tests/curves_basis.ch` gains
   `test_discount_factor_with_basis_responds_to_domestic_curve`, the first test in
-  that file to vary the domestic curve: three of its five tests constructed one
-  and none varied it, so nothing there distinguished a curve that is read from
-  one that is ignored. It is also the only test in the file that fails when
-  `rate_at` stops reading its curve's rates — a comparison against
-  `discount_factor` cannot catch that, because it reads the same `rate_at`.
+  that file to vary the domestic curve. Before this change, three of its five
+  tests constructed a domestic curve and none varied it, so nothing there
+  distinguished a curve that is read from one that is ignored. The new test is
+  also the only one in the file that fails when `rate_at` stops reading its
+  curve's rates — a comparison against `discount_factor` cannot catch that,
+  because it reads the same `rate_at`.
+
+  Removing the function also removed its pass-through test, which held the only
+  `basis_spread_at` assertions at the first and last pillar.
+  `test_basis_spread_at_interpolates` now covers both (t=1 and t=3); without
+  them a mutant returning zero outside the pillar interior escaped the file.
 
 - **BREAKING: the `Shoals.Date` business-day rolls take a `Calendar` instead of a
   `weekend_only: bool`, and `year_fraction` returns `f64` instead of `f32`**

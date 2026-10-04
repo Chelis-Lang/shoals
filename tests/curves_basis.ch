@@ -42,12 +42,16 @@ def test_basis_spread_at_interpolates() -> unit ! { Test } = {
   b_times = to_tensor([cast(1.0, f32), cast(2.0, f32), cast(3.0, f32)])
   b_spreads = to_tensor([cast(0.002, f32), cast(0.006, f32), cast(0.01, f32)])
   basis = curve_basis_from_pillars(b_times, b_spreads)
+  s_first = basis_spread_at(basis, cast(1.0, f32))
+  _ = assert_close(s_first, cast(0.002, f32), cast(1e-7, f32), "first pillar value exact at t=1")
   s_mid = basis_spread_at(basis, cast(1.5, f32))
   _ = assert_close(s_mid, cast(0.004, f32), cast(0.00001, f32), "linear interp midpoint between 1y and 2y pillars")
   s_pillar = basis_spread_at(basis, cast(2.0, f32))
   _ = assert_close(s_pillar, cast(0.006, f32), cast(1e-7, f32), "pillar value exact at t=2")
   s_quarter = basis_spread_at(basis, cast(2.25, f32))
-  assert_close(s_quarter, cast(0.007, f32), cast(0.00001, f32), "linear interp 25% between 2y and 3y pillars")
+  _ = assert_close(s_quarter, cast(0.007, f32), cast(0.00001, f32), "linear interp 25% between 2y and 3y pillars")
+  s_last = basis_spread_at(basis, cast(3.0, f32))
+  assert_close(s_last, cast(0.01, f32), cast(1e-7, f32), "last pillar value exact at t=3")
 }
 def test_discount_factor_with_basis_responds_to_domestic_curve() -> unit ! { Test } = {
   times = to_tensor([cast(1.0, f32), cast(2.0, f32), cast(3.0, f32)])
