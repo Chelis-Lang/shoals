@@ -8,6 +8,31 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **BREAKING: `Shoals.Curves.bootstrap_basis_curve` is replaced by
+  `curve_basis_from_quotes[n](basis_quotes_times, basis_quotes_spreads)`**
+  (shoals#115). The `domestic: YieldCurve[k]` parameter is gone. Callers drop
+  that argument and rename; the returned `CurveBasis[n]` is unchanged.
+
+  The parameter was inert at the value level *and* at the type level: the body
+  never read it, and `k` appeared nowhere in the result, whose `n` comes from
+  the quote tensors. An earlier review kept it so that "callers don't have to
+  switch signatures when the true bootstrap lands", but that is the versionless
+  compatibility fallback the inherited contract tells us not to prefer, and an
+  argument that cannot be used correctly or incorrectly is not a signature
+  worth preserving. The name went with it, because `bootstrap_` claimed a
+  calibration that never ran.
+
+  This deliberately differs from the shape shoals#113 took in the same module.
+  There `times_template` was kept and read, because it was the only source of
+  the declared extent; here nothing type-level depends on `domestic`, so there
+  is no minimal read to add in its place.
+
+  No basis-swap bootstrap is added here, and none exists (shoals#117). `docs/src/curves.md`
+  now says so directly rather than hedging the old name with "despite its
+  name". `tests/curves_basis.ch` also gains the first test in that file to vary
+  the domestic curve at all: every test there held it at one set of rates,
+  which is why an inert domestic parameter went unnoticed.
+
 - **BREAKING: the `Shoals.Date` business-day rolls take a `Calendar` instead of a
   `weekend_only: bool`, and `year_fraction` returns `f64` instead of `f32`**
   (shoals#87). `date_roll_following`, `date_roll_preceding`,

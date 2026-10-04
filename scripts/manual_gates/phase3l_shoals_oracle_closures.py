@@ -4,7 +4,7 @@
 Aggregates the four small-wins closure pieces:
 
 - Cross-currency basis curves (`Shoals.Curves.CurveBasis` +
-  `bootstrap_basis_curve` + `discount_factor_with_basis`).
+  `curve_basis_from_quotes` + `discount_factor_with_basis`).
 - Sobol 1024-D runtime construction (`Shoals.Rng.sobol_dim_runtime`
   + `sobol_point_runtime_at`).
 - International holiday tables (TYO/SYD/FRA/HKG via
