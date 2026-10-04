@@ -38,20 +38,27 @@ def test_basis_triangle_parity() -> unit ! { Test } = {
   total = add(s1, add(s2, s3))
   assert_close(total, cast(0.0, f32), cast(0.0001, f32), "triangle basis sum == 0 (no-arb)")
 }
+-- The pillars are non-collinear (slope 0.011/yr then 0.003/yr) because the
+-- 0.002 / 0.006 / 0.010 fixture this replaced had a constant slope, and a
+-- constant slope makes every claim here unfalsifiable: an implementation that
+-- ignored the curve and evaluated the affine function through the endpoints
+-- satisfied all five assertions -- measured, not assumed: that mutant scores
+-- 5 passed, 0 failed on the old values and fails the midpoint assertion below
+-- (0.0045 against 0.0065) on these. Keep these values distinguishable.
 def test_basis_spread_at_interpolates() -> unit ! { Test } = {
   b_times = to_tensor([cast(1.0, f32), cast(2.0, f32), cast(3.0, f32)])
-  b_spreads = to_tensor([cast(0.002, f32), cast(0.006, f32), cast(0.01, f32)])
+  b_spreads = to_tensor([cast(0.001, f32), cast(0.012, f32), cast(0.015, f32)])
   basis = curve_basis_from_pillars(b_times, b_spreads)
   s_first = basis_spread_at(basis, cast(1.0, f32))
-  _ = assert_close(s_first, cast(0.002, f32), cast(1e-7, f32), "first pillar value exact at t=1")
+  _ = assert_close(s_first, cast(0.001, f32), cast(1e-7, f32), "first pillar value exact at t=1")
   s_mid = basis_spread_at(basis, cast(1.5, f32))
-  _ = assert_close(s_mid, cast(0.004, f32), cast(0.00001, f32), "linear interp midpoint between 1y and 2y pillars")
+  _ = assert_close(s_mid, cast(0.0065, f32), cast(0.00001, f32), "linear interp midpoint between 1y and 2y pillars (the endpoint affine gives 0.0045)")
   s_pillar = basis_spread_at(basis, cast(2.0, f32))
-  _ = assert_close(s_pillar, cast(0.006, f32), cast(1e-7, f32), "pillar value exact at t=2")
+  _ = assert_close(s_pillar, cast(0.012, f32), cast(1e-7, f32), "pillar value exact at t=2")
   s_quarter = basis_spread_at(basis, cast(2.25, f32))
-  _ = assert_close(s_quarter, cast(0.007, f32), cast(0.00001, f32), "linear interp 25% between 2y and 3y pillars")
+  _ = assert_close(s_quarter, cast(0.01275, f32), cast(0.00001, f32), "linear interp 25% between 2y and 3y pillars")
   s_last = basis_spread_at(basis, cast(3.0, f32))
-  assert_close(s_last, cast(0.01, f32), cast(1e-7, f32), "last pillar value exact at t=3")
+  assert_close(s_last, cast(0.015, f32), cast(1e-7, f32), "last pillar value exact at t=3")
 }
 def test_discount_factor_with_basis_responds_to_domestic_curve() -> unit ! { Test } = {
   times = to_tensor([cast(1.0, f32), cast(2.0, f32), cast(3.0, f32)])

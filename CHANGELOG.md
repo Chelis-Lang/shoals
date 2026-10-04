@@ -54,6 +54,49 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **`Shoals.Curves` accepted unsorted pillar times and returned a silently
+  wrong interpolated value** (shoals#119). `yield_curve_from_pillars`,
+  `yield_curve_tagged`, `bootstrap_zero_from_par` and
+  `curve_basis_from_pillars` now reject pillar times that are not strictly
+  increasing, with a runtime `fail` naming the entry point, the first offending
+  index, and both times. A repeated time and a `NaN` time are rejected by the
+  same rule.
+
+  `rate_at` and `basis_spread_at` read the pillars through
+  `Nautilus.Interpolation.linear_interp_sorted`, which brackets a query by
+  traversal order and interpolates across whichever consecutive pair straddles
+  it. Out of order it brackets against the wrong pair and answers confidently:
+  the same three `(time, rate)` pairs reordered gave `rate_at(curve, 1.5)` as
+  0.025 where 0.035 is correct, and `basis_spread_at(basis, 1.5)` as 0.009
+  where 0.011 is correct — no trap, no `NaN`, no diagnostic. `rate_at` is the
+  worse of the two because a mis-ordered `YieldCurve` propagates through
+  `discount_factor` and `discount_factor_with_basis` into every discounted
+  price, rather than staying in one accessor.
+
+  The precondition was not an open question in this module: `bootstrap_multi`
+  already rejected non-increasing instrument tenors, two source comments stated
+  the rule, and `docs/src/curves.md` already recorded the decision not to
+  re-sort. It simply was not enforced on the entry points that take the times
+  directly. Rejecting rather than sorting follows that recorded decision.
+
+  **This is a behaviour change for any caller that was passing unsorted
+  times**: such a call previously returned a curve and now traps. There is no
+  correct result it was producing. The guard covers the four entry points that
+  take pillar times as arguments, so every curve built through them — and every
+  curve the sensitivity shifts derive from one — has readable pillars; a
+  `YieldCurve` or `CurveBasis` record constructed directly from the exported
+  type is still unchecked.
+
+  The issue reports two constructors. `yield_curve_tagged` and
+  `bootstrap_zero_from_par` are the other two exported entry points taking the
+  times directly and had the same defect, measured the same way; both are now
+  guarded and pinned by name. `tests/curves_basis.ch`'s
+  `test_basis_spread_at_interpolates` moves off its collinear
+  0.002 / 0.006 / 0.010 fixture: with a constant slope every bracket the
+  interpolator could pick gives the same answer, so a mutant that ignores the
+  curve and evaluates the affine function through the endpoints scored 5 passed,
+  0 failed against the old values and fails the new ones.
+
 - **The `Shoals.Date` business-day rolls never consulted a holiday calendar**
   (shoals#87, Voyage ledger UB-8). `date_roll_following`, `date_roll_preceding`,
   `date_roll_modified_following` and `add_business_days` were each written as

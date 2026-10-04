@@ -1,0 +1,7 @@
+Shoals.Curves.bootstrap_zero_from_par: pillar times must be strictly increasing: index 2 has time 2.0, which does not exceed time 3.0 at index 1
+
+The fourth exported entry point whose pillars are the caller's `times`, and the
+one where the precondition binds twice: the fold accumulates the fixed leg's
+present value pillar by pillar in traversal order, so an out-of-order time both
+discounts a cash flow against the wrong cumulative PV and leaves the returned
+curve unreadable by `rate_at`. The reordered pairs gave 0.019086447.
