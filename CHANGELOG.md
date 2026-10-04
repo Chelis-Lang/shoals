@@ -13,48 +13,17 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   `curve_basis_from_pillars[n](times, spreads)` — market basis quotes *are*
   those pillars. `CurveBasis[n]` and the rest of the section are unchanged.
 
-  The removed function took a `domestic: YieldCurve[k]` its body never read, and
-  `k` appeared nowhere in the result, whose `n` comes from the quote tensors. The
-  argument was inert at the value level *and* at the type level: it could not be
-  passed correctly or incorrectly. The name compounded it, claiming a calibration
-  that never ran.
-
-  An earlier review decided to keep the parameter, twice over — in Known
-  Limitations ("retained in the signature so a future full bootstrap can drop in
-  without breaking callers") and in a red-team fixup ("so callers don't have to
-  switch signatures when the true bootstrap lands"). The inherited contract
-  decides against both: it prefers the structural design over "a versionless
-  compatibility fallback", and reserving a signature for an unwritten solver is
-  that fallback.
-
-  Nothing replaces it, rather than a renamed wrapper, because a quotes-named
-  constructor would have had the same type and the same body as
-  `curve_basis_from_pillars`: the same operation under a second name, with no
-  behaviour to tell the two apart and no test able to distinguish them. Keeping
-  that name reserved for the future solver would have been the same
-  compatibility fallback a third time.
-
-  This deliberately differs from the shape shoals#113 took in the same module,
-  where `times_template` was kept and read minimally with a loud two-sided
-  failure. There it was the only source of the declared extent, so removing it
-  left no `n` for the result. That rationale is unavailable here. It does not
-  follow that no minimal read was constructible — only that none was justified.
-
-  No basis-swap bootstrap is added here, and none exists (shoals#117).
+  It took a `domestic: YieldCurve[k]` its body never read, and `k` appeared
+  nowhere in the `CurveBasis[n]` result, so the argument could not be passed
+  correctly or incorrectly. Nothing replaces it, because without a basis-swap
+  solve a quotes-named constructor would have had the same type and the same
+  body as `curve_basis_from_pillars`. No basis-swap bootstrap exists
+  (shoals#117); the reasoning for removing rather than renaming is in PR #118.
 
   `tests/curves_basis.ch` gains
-  `test_discount_factor_with_basis_responds_to_domestic_curve`, the first test in
-  that file to vary the domestic curve. Before this change, three of its five
-  tests constructed a domestic curve and none varied it, so nothing there
-  distinguished a curve that is read from one that is ignored. The new test is
-  also the only one in the file that fails when `rate_at` stops reading its
-  curve's rates — a comparison against `discount_factor` cannot catch that,
-  because it reads the same `rate_at`.
-
-  Removing the function also removed its pass-through test, which held the only
-  `basis_spread_at` assertions at the first and last pillar.
-  `test_basis_spread_at_interpolates` now covers both (t=1 and t=3); without
-  them a mutant returning zero outside the pillar interior escaped the file.
+  `test_discount_factor_with_basis_responds_to_domestic_curve`, the first test
+  there to vary the domestic curve, and restores the first- and last-pillar
+  `basis_spread_at` assertions that the removed function's own test had held.
 
 - **BREAKING: the `Shoals.Date` business-day rolls take a `Calendar` instead of a
   `weekend_only: bool`, and `year_fraction` returns `f64` instead of `f32`**
