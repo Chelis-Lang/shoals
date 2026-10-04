@@ -263,8 +263,8 @@ discriminator (OIS / IBOR / SOFR / SONIA / ESTR / Custom), log-linear
 and Nelson-Siegel-Svensson interpolation all landed in the v0.2.0
 slice. Cross-currency basis-curve type (`CurveBasis[n]` +
 `basis_spread_at` + `discount_factor_with_basis`) landed at v0.19.0
-(Milestone K) as a closure; the basis-curve bootstrap is currently
-a pass-through (basis-swap-quote → basis-curve full solve deferred).
+(Milestone K) as a closure; there is no basis-curve bootstrap, and the
+basis-swap-quote → basis-curve full solve is deferred (shoals#117).
 The M2.5 AD-doc-convention lint script remains a follow-up.
 
 **Work packets:**

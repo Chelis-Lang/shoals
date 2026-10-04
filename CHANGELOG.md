@@ -8,6 +8,23 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **BREAKING: `Shoals.Curves.bootstrap_basis_curve` is removed, with no
+  replacement** (shoals#115). Build a basis curve with the existing
+  `curve_basis_from_pillars[n](times, spreads)` — market basis quotes *are*
+  those pillars. `CurveBasis[n]` and the rest of the section are unchanged.
+
+  It took a `domestic: YieldCurve[k]` its body never read, and `k` appeared
+  nowhere in the `CurveBasis[n]` result, so the argument could not be passed
+  correctly or incorrectly. Nothing replaces it, because without a basis-swap
+  solve a quotes-named constructor would have had the same type and the same
+  body as `curve_basis_from_pillars`. No basis-swap bootstrap exists
+  (shoals#117); the reasoning for removing rather than renaming is in PR #118.
+
+  `tests/curves_basis.ch` gains
+  `test_discount_factor_with_basis_responds_to_domestic_curve`, the first test
+  there to vary the domestic curve, and restores the first- and last-pillar
+  `basis_spread_at` assertions that the removed function's own test had held.
+
 - **BREAKING: the `Shoals.Date` business-day rolls take a `Calendar` instead of a
   `weekend_only: bool`, and `year_fraction` returns `f64` instead of `f32`**
   (shoals#87). `date_roll_following`, `date_roll_preceding`,
