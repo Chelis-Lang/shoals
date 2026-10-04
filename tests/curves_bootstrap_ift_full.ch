@@ -122,13 +122,23 @@ def test_instrument_validate_rejects_deposit_rate_below_minus_one() -> unit ! { 
   _ = assert_true(if instrument_validate(worse) then false else true, "deposit with r < -1 is invalid (1+r*t < 0)")
   assert_true(instrument_validate(ok), "deposit with r = -0.5 (mildly negative) is valid")
 }
-def test_full_jacobian_returns_nan_for_invalid_input() -> unit ! { Test } = {
-  bad = [zero_coupon(cast(1.0, f32), cast(0.95, f32)), zero_coupon(cast(-2.0, f32), cast(0.9, f32))]
-  jac = bootstrap_grad_full_jacobian(copy(cbif_template_2()), bad)
+-- Positive counterpart to the three new
+-- `tests_neg/curves/full_jacobian_*_neg.ch` cases (shoals#79). It replaces
+-- `test_full_jacobian_returns_nan_for_invalid_input`, which asserted the
+-- sentinel those cases now reject; this pins that the length-matched,
+-- valid-instrument call the guard has to let through still returns the same
+-- finite Jacobian it did before the guard existed.
+def test_full_jacobian_accepts_matching_template_and_valid_instruments() -> unit ! { Test } = {
+  insts = [zero_coupon(cast(1.0, f32), cast(0.95, f32)), zero_coupon(cast(2.0, f32), cast(0.9, f32))]
+  jac = bootstrap_grad_full_jacobian(copy(cbif_template_2()), insts)
   flat = to_list(reshape(jac, [cast(4, i64)]))
-  v0 = index(flat, cast(0, i64))
-  is_nan = if eq(v0, v0) then false else true
-  assert_true(is_nan, "invalid instrument list yields a sentinel-NaN Jacobian (caller can test eq(v, v))")
+  all_finite = fold(fn (acc: bool, k: i64) -> {
+    v = index(flat, k)
+    if acc then eq(v, v) else false
+  }, true, range(cast(0, i64), cast(4, i64)))
+  _ = assert_true(all_finite, "a two-wide template with two valid instruments returns a finite Jacobian")
+  _ = assert_close(index(flat, cast(0, i64)), neg(div(cast(1.0, f32), mul(cast(1.0, f32), cast(0.95, f32)))), cast(0.001, f32), "J[0, 0] = -1/(t*p) for the 1y zero-coupon pillar")
+  assert_close(index(flat, cast(3, i64)), neg(div(cast(1.0, f32), mul(cast(2.0, f32), cast(0.9, f32)))), cast(0.001, f32), "J[1, 1] = -1/(t*p) for the 2y zero-coupon pillar")
 }
 def test_instrument_validate_zc_price_boundary() -> unit ! { Test } = {
   _ = assert_true(instrument_validate(zero_coupon(cast(1.0, f32), cast(1.0, f32))), "ZC at exactly price=1.0 is accepted (z=0 is in brent bracket)")
@@ -167,4 +177,40 @@ def test_full_jacobian_non_annual_matches_float64_reference() -> unit ! { Test }
     if gt(d, acc) then d else acc
   }, cast(0.0, f32), range(cast(0, i64), cast(16, i64)))
   assert_true(lt(worst, cast(0.0001, f32)), "semiannual/quarterly full IFT Jacobian matches the float64 reference within 1e-4 per entry")
+}
+def test_instrument_validate_rejects_nonfinite_quotes() -> unit ! { Test } = {
+  nan_q = div(cast(0.0, f32), cast(0.0, f32))
+  inf_q = div(cast(1.0, f32), cast(0.0, f32))
+  -- shoals#79: every bound in `instrument_validate` is an ordered comparison,
+  -- and all of them are false against NaN, so each of these was accepted and
+  -- then bootstrapped to a silent NaN pillar. Only the par-swap *tenor* was
+  -- checked, by `cur_whole_periods`' own guard.
+  _ = assert_true(not(instrument_validate(deposit(cast(1.0, f32), nan_q))), "a NaN deposit rate is invalid")
+  _ = assert_true(not(instrument_validate(deposit(nan_q, cast(0.04, f32)))), "a NaN deposit tenor is invalid")
+  _ = assert_true(not(instrument_validate(deposit(cast(1.0, f32), inf_q))), "an infinite deposit rate is invalid")
+  _ = assert_true(not(instrument_validate(zero_coupon(cast(1.0, f32), nan_q))), "a NaN zero-coupon price is invalid")
+  _ = assert_true(not(instrument_validate(zero_coupon(nan_q, cast(0.95, f32)))), "a NaN zero-coupon tenor is invalid")
+  _ = assert_true(not(instrument_validate(zero_coupon(cast(1.0, f32), inf_q))), "an infinite zero-coupon price is invalid")
+  _ = assert_true(not(instrument_validate(cur_par_swap(cast(2.0, f32), nan_q, cast(1, i64)))), "a NaN par-swap rate is invalid")
+  assert_true(not(instrument_validate(cur_par_swap(cast(2.0, f32), inf_q, cast(1, i64)))), "an infinite par-swap rate is invalid")
+}
+def test_instrument_validate_accepts_finite_quotes_at_the_same_shapes() -> unit ! { Test } = {
+  -- The parity side of the rejections above: the finiteness test must not
+  -- reject anything the module accepted before shoals#79.
+  _ = assert_true(instrument_validate(deposit(cast(1.0, f32), cast(0.04, f32))), "a finite deposit is valid")
+  _ = assert_true(instrument_validate(zero_coupon(cast(1.0, f32), cast(0.95, f32))), "a finite zero-coupon is valid")
+  assert_true(instrument_validate(cur_par_swap(cast(2.0, f32), cast(0.045, f32), cast(1, i64))), "a finite par swap is valid")
+}
+def test_instrument_validate_deposit_discount_factor_must_be_positive() -> unit ! { Test } = {
+  -- shoals#79: `rate > -1` is the positive-discount-factor condition only at a
+  -- one-year tenor. `deposit(2.0, -0.6)` gives `1 + rate * tenor = -0.2`, so
+  -- `log(df)` was NaN and the pillar came back NaN with no diagnostic.
+  _ = assert_true(not(instrument_validate(deposit(cast(2.0, f32), neg(cast(0.6, f32))))), "a 2y deposit at -60% implies a negative discount factor and is invalid")
+  _ = assert_true(not(instrument_validate(deposit(cast(2.0, f32), neg(cast(0.5, f32))))), "a 2y deposit at -50% implies a zero discount factor and is invalid")
+  -- Both bounds are kept, so the predicate narrows in both directions and
+  -- widens in neither: the tenor-aware bound alone would newly accept a rate
+  -- below -1 at a tenor under a year.
+  _ = assert_true(not(instrument_validate(deposit(cast(0.5, f32), neg(cast(1.5, f32))))), "a 6m deposit at -150% stays invalid even though 1 + rate * tenor is positive")
+  _ = assert_true(instrument_validate(deposit(cast(2.0, f32), neg(cast(0.4, f32)))), "a 2y deposit at -40% keeps a positive discount factor and is valid")
+  assert_true(instrument_validate(deposit(cast(10.0, f32), cast(0.05, f32))), "a long-dated deposit at a positive rate is valid")
 }

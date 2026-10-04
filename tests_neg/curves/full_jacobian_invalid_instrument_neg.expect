@@ -1,0 +1,8 @@
+Shoals.Curves.bootstrap_multi: invalid instrument (see instrument_validate)
+
+The exact input the deleted positive test used, with the opposite expectation.
+It fails on the *second* instrument's negative tenor. The diagnostic is
+byte-identical whichever instrument is invalid, so this test does not pin
+*which* one failed, and it is not evidence that the guard runs per pillar
+rather than as an up-front sweep -- that follows from the deletion of
+`cur_all_instruments_valid`, which is visible in the diff and in no test.

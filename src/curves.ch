@@ -165,7 +165,12 @@ def deposit_implied_zero(t: f32, simple_rate: f32) -> f32 = {
   div(neg(log(df)), t)
 }
 def zero_coupon_implied_zero(t: f32, price: f32) -> f32 = div(neg(log(price)), t)
-def cur_nan_f32() -> f32 = div(cast(0.0, f32), cast(0.0, f32))
+-- Every ordered comparison against NaN is false, so each bound in
+-- `instrument_validate` below would be "satisfied" by a quote it never
+-- examined, and `brent` cannot bracket a residual that is not a number.
+-- `x - x` is zero exactly for a finite `x` and NaN for NaN or an infinity,
+-- which is the one test that rejects both (shoals#79).
+def cur_finite(x: f32) -> bool = eq(sub(x, x), cast(0.0, f32))
 def cur_period_count(tenor: f32, payments_per_year: i64) -> i64 = cast_trunc(add(mul(tenor, cast(payments_per_year, f32)), cast(0.5, f32)), i64)
 -- Coupon dates k / payments_per_year for k = 1..N; the final date is the
 -- quoted tenor itself so the fixed leg and the maturity discount agree.
@@ -243,14 +248,53 @@ def cur_increasing_pillars_below(times_so_far: List[f32], tenor: f32) -> bool = 
 -- candidate's rate belongs and the answer is silently wrong; a longer time list
 -- indexes past the rates and traps without naming the contract.
 def cur_pillars_aligned(times_so_far: List[f32], rates_so_far: List[f32]) -> bool = eq(len(times_so_far), len(rates_so_far))
+-- The search bracket is this module's choice, not `brent`'s, so when `brent`
+-- cannot return a rate it is this module that says why. Both ways of missing
+-- the bracket used to leave a silent NaN pillar that `instrument_validate`
+-- accepted and `rate_at`, `discount_factor` and the IFT gradients then
+-- propagated, so a price could come back NaN far from the instrument that
+-- caused it (shoals#79), measured on `130d235`:
+--
+--   * a quote whose zero rate lies outside the bracket leaves the residual the
+--     same sign at both endpoints (`par_rate` 10.0 at a 2y pillar: +38.516483
+--     and +8.816857), which `brent` answers with NaN; and
+--   * a residual that is not finite over the bracket (a swap beyond about 177
+--     years, whose `exp(0.5 * tenor)` overflows f32, or caller-supplied earlier
+--     pillars carrying a NaN) exhausts the iteration budget and answers NaN as
+--     well.
+--
+-- `brent` is therefore called first and with the arguments it has always had,
+-- and the endpoints are read only to classify a NaN it has already returned.
+-- An earlier revision checked the endpoints *before* the solve, to name the
+-- condition without entering `brent_rec`'s recursion; a red-team round found
+-- that this reordered `brent`'s own tests and broke a quote that solved on
+-- `130d235`. `brent` accepts an endpoint root before it so much as evaluates
+-- the other endpoint, so `cur_par_swap(200.0, 6.3890557, 1)` -- residual `inf`
+-- at -0.5 and exactly 0.0 at 2.0 -- returned 2.0 there, while the pre-check
+-- rejected it as non-finite and printed `0.0 at 2.0` in a message asserting no
+-- zero rate existed. Classifying after the call cannot make that mistake:
+-- every input for which `brent` returns a finite rate takes the identical path
+-- it took before.
+def cur_bracket_detail(inst: Instrument, f_lo: f32, f_hi: f32) -> string = string_concat(to_string(f_lo), string_concat(" at -0.5 and ", string_concat(to_string(f_hi), string_concat(" at 2.0 (instrument tenor ", string_concat(to_string(instrument_tenor(inst)), string_concat(", quote ", string_concat(to_string(instrument_market_price_or_rate(inst)), ")")))))))
 -- A malformed instrument, or a tenor that does not extend the pillars already
 -- solved, is a structural error with no meaningful rate to propagate: fail
--- loudly rather than guess a schedule, bracket, or ordering.
+-- loudly rather than guess a schedule, bracket, or ordering. A quote the
+-- bracket cannot hold is the same kind of error with a numerical cause, so it
+-- fails the same way and says which cause it was.
 def solve_pillar_rate(inst: Instrument, times_so_far: List[f32], rates_so_far: List[f32]) -> f32 =
-  if instrument_validate(inst) then if cur_increasing_pillars_below(times_so_far, instrument_tenor(inst)) then {
+  if not(instrument_validate(inst)) then fail("Shoals.Curves.bootstrap_multi: invalid instrument (see instrument_validate)") else if not(cur_increasing_pillars_below(times_so_far, instrument_tenor(inst))) then fail("Shoals.Curves.bootstrap_multi: instrument tenors must be strictly increasing") else {
+    lo = cast(-0.5, f32)
+    hi = cast(2.0, f32)
+    tol = cast(1e-7, f32)
+    max_iters = cast(100, i64)
     f_at = fn (z: f32) -> bootstrap_residual_at_pillar(inst, times_so_far, rates_so_far, z)
-    brent(f_at, cast(-0.5, f32), cast(2.0, f32), cast(1e-7, f32), cast(100, i64))
-  } else fail("Shoals.Curves.bootstrap_multi: instrument tenors must be strictly increasing") else fail("Shoals.Curves.bootstrap_multi: invalid instrument (see instrument_validate)")
+    z = brent(f_at, lo, hi, tol, max_iters)
+    if cur_finite(z) then z else {
+      f_lo = f_at(lo)
+      f_hi = f_at(hi)
+      if not(and(cur_finite(f_lo), cur_finite(f_hi))) then fail(string_concat("Shoals.Curves.bootstrap_multi: the repricing residual is not finite over the search bracket [-0.5, 2.0], so the bracket cannot be searched: ", cur_bracket_detail(inst, f_lo, f_hi))) else if gt(mul(f_lo, f_hi), cast(0.0, f32)) then fail(string_concat("Shoals.Curves.bootstrap_multi: no zero rate for this instrument in the search bracket [-0.5, 2.0]: the repricing residual keeps one sign across it, ", cur_bracket_detail(inst, f_lo, f_hi))) else fail(string_concat("Shoals.Curves.bootstrap_multi: the zero-rate solve did not converge in 100 iterations over the bracketed interval [-0.5, 2.0]: ", cur_bracket_detail(inst, f_lo, f_hi)))
+    }
+  }
 def bootstrap_multi(instruments: List[Instrument]) -> (List[f32], List[f32]) = {
   init = ([], [])
   fold(fn (state: (List[f32], List[f32]), inst: Instrument) -> {
@@ -320,7 +364,7 @@ def bootstrap_grad_at_solution(instruments: List[Instrument]) -> List[f32] = {
     grads_so_far = state.2
     r_new = solve_pillar_rate(inst, ts_so_far, rs_so_far)
     t_new = instrument_tenor(inst)
-    g_new = if eq(r_new, r_new) then bootstrap_grad_diagonal(inst, ts_so_far, rs_so_far, r_new) else cur_nan_f32()
+    g_new = bootstrap_grad_diagonal(inst, ts_so_far, rs_so_far, r_new)
     (append(ts_so_far, t_new), append(rs_so_far, r_new), append(grads_so_far, g_new))
   }, init, instruments)
   out.2
@@ -332,13 +376,25 @@ def cur_whole_periods(tenor: f32, payments_per_year: i64) -> bool = {
   within = if lt(diff, cast(0.0, f32)) then lte(neg(diff), cast(0.0001, f32)) else lte(diff, cast(0.0001, f32))
   if gte(n_periods, cast(1, i64)) then within else false
 }
+-- Every numeric field is checked for finiteness first, because the bounds
+-- below are ordered comparisons and a NaN satisfies all of them vacuously: a
+-- NaN deposit rate, zero-coupon price or swap par rate was accepted here and
+-- then bootstrapped to a NaN pillar (shoals#79). Only the swap *tenor* was
+-- already covered.
+--
+-- A deposit keeps its `rate > -1` bound and gains `1 + rate * tenor > 0`, the
+-- condition for its implied discount factor to be positive. The old bound is
+-- the new one only at a one-year tenor, so `deposit(2.0, -0.6)` passed and
+-- then took `log` of a negative discount factor, leaving its residual NaN at
+-- every candidate rate. Both bounds are kept so that this narrows the
+-- predicate in every direction and widens it in none: `1 + rate * tenor > 0`
+-- alone would newly accept a rate below -1 at a short tenor.
 def instrument_validate(inst: Instrument) -> bool =
   match inst with {
-    | Deposit { tenor: t, rate: r } => if lte(t, cast(0.0, f32)) then false else if lte(r, cast(-1.0, f32)) then false else true
-    | ZeroCoupon { tenor: t, price: p } => if lte(t, cast(0.0, f32)) then false else if lte(p, cast(0.0, f32)) then false else if gt(p, cast(1.0, f32)) then false else true
-    | ParSwap { tenor: t, par_rate: _, payments_per_year: f } => if neq(sub(t, t), cast(0.0, f32)) then false else if lte(t, cast(0.0, f32)) then false else if lte(f, cast(0, i64)) then false else cur_whole_periods(t, f)
+    | Deposit { tenor: t, rate: r } => if not(and(cur_finite(t), cur_finite(r))) then false else if lte(t, cast(0.0, f32)) then false else if lte(r, cast(-1.0, f32)) then false else gt(add(cast(1.0, f32), mul(r, t)), cast(0.0, f32))
+    | ZeroCoupon { tenor: t, price: p } => if not(and(cur_finite(t), cur_finite(p))) then false else if lte(t, cast(0.0, f32)) then false else if lte(p, cast(0.0, f32)) then false else lte(p, cast(1.0, f32))
+    | ParSwap { tenor: t, par_rate: r, payments_per_year: f } => if not(and(cur_finite(t), cur_finite(r))) then false else if lte(t, cast(0.0, f32)) then false else if lte(f, cast(0, i64)) then false else cur_whole_periods(t, f)
   }
-def cur_all_instruments_valid(instruments: List[Instrument]) -> bool = fold(fn (acc: bool, inst: Instrument) -> if acc then instrument_validate(inst) else false, true, instruments)
 def cur_l_row_for_pillar(inst: Instrument, t_i: f32, z_i: f32, times_so_far: List[f32], rates_so_far: List[f32]) -> List[f32] =
   match inst with {
     | Deposit { tenor: _, rate: _ } => map(fn (t_k: f32) -> cast(0.0, f32), times_so_far)
@@ -363,14 +419,6 @@ def cur_jacobian_row(diag_i: f32, l_row: List[f32], j_prev_rows: List[List[f32]]
     sub(d_ij, correction)
   }, col_idxs)
 }
-def cur_nan_jacobian[m](paths_template: &tensor[m, f32]) -> tensor[m, m, f32] = {
-  m_len = len(to_list(paths_template))
-  nan_val = div(cast(0.0, f32), cast(0.0, f32))
-  total = mul(m_len, m_len)
-  idxs = range(cast(0, i64), total)
-  flat = map(fn (k: i64) -> nan_val, idxs)
-  reshape(to_tensor(flat), [m_len, m_len])
-}
 def cur_full_jacobian_rows(instruments: List[Instrument], m_len: i64) -> List[List[f32]] = {
   init = ([], [], [], cast(0, i64))
   out = fold(fn (state: (List[f32], List[f32], List[List[f32]], i64), inst: Instrument) -> {
@@ -380,21 +428,37 @@ def cur_full_jacobian_rows(instruments: List[Instrument], m_len: i64) -> List[Li
     i_pos = state.3
     r_new = solve_pillar_rate(inst, ts_so_far, rs_so_far)
     t_new = instrument_tenor(inst)
-    diag_i = if eq(r_new, r_new) then bootstrap_grad_diagonal(inst, ts_so_far, rs_so_far, r_new) else cur_nan_f32()
+    diag_i = bootstrap_grad_diagonal(inst, ts_so_far, rs_so_far, r_new)
     l_row = cur_l_row_for_pillar(inst, t_new, r_new, ts_so_far, rs_so_far)
     row_i = cur_jacobian_row(diag_i, l_row, rows_so_far, m_len, i_pos)
     (append(ts_so_far, t_new), append(rs_so_far, r_new), append(rows_so_far, row_i), add(i_pos, cast(1, i64)))
   }, init, instruments)
   out.2
 }
+-- `paths_template` carries only the result's extent, exactly as
+-- `times_template` does for `bootstrap_multi_curve`, and both mismatch
+-- directions used to be answered with a full matrix of NaN -- nothing
+-- distinguished a structurally invalid call from a Jacobian whose entries were
+-- NaN for a numerical reason (shoals#79). A length mismatch has no numerical
+-- reading at all, so both report their counts and fail, as shoals#113 chose
+-- for the sibling (`3ddd518`). The invalid-instrument arm defers to
+-- `solve_pillar_rate`'s own diagnostic rather than restating it.
+--
+-- This does not make every entry finite. `bootstrap_grad_diagonal`'s own
+-- arithmetic can still produce one that is not: a zero-coupon at a subnormal
+-- tenor gives `neg(div(1.0, mul(t, p)))` = -inf, and `cur_dot_l_j` then turns
+-- that into NaN for a later row. That is unchanged from `130d235` and is the
+-- numerical NaN `docs/src/curves.md` distinguishes from this structural one;
+-- the deleted `eq(r_new, r_new)` branches never guarded it, only the solved
+-- rate.
 def bootstrap_grad_full_jacobian[m](paths_template: &tensor[m, f32], instruments: List[Instrument]) -> tensor[m, m, f32] = {
   m_len = len(to_list(paths_template))
   insts_len = len(instruments)
-  if neq(insts_len, m_len) then cur_nan_jacobian(paths_template) else if cur_all_instruments_valid(instruments) then {
+  if neq(insts_len, m_len) then fail(string_concat("Shoals.Curves.bootstrap_grad_full_jacobian: paths_template must have one entry per instrument (the declared Jacobian extent comes from the template)", string_concat(": template has ", string_concat(to_string(m_len), string_concat(" entries for ", string_concat(to_string(insts_len), " instruments")))))) else {
     rows = cur_full_jacobian_rows(instruments, m_len)
     flat = fold(fn (acc: List[f32], row: List[f32]) -> fold(fn (a: List[f32], v: f32) -> append(a, v), acc, row), [], rows)
     reshape(to_tensor(flat), [m_len, m_len])
-  } else cur_nan_jacobian(paths_template)
+  }
 }
 type CurveBasis[n] =
   | CurveBasis { times: tensor[n, f32], spreads: tensor[n, f32] }

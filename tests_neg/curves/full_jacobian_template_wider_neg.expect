@@ -1,0 +1,6 @@
+Shoals.Curves.bootstrap_grad_full_jacobian: paths_template must have one entry per instrument (the declared Jacobian extent comes from the template): template has 3 entries for 2 instruments
+
+The instance the issue's comment measured on `83d8cb6`: `sum(sum(j, 0), 0)` over
+the returned Jacobian was NaN with no failure or diagnostic. Reproduced on
+`130d235`. The message mirrors shoals#113's resolution for the sibling
+`bootstrap_multi_curve` (`3ddd518`), including reporting both counts.

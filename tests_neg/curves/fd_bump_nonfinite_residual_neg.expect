@@ -1,0 +1,12 @@
+Shoals.Curves.bootstrap_multi: the repricing residual is not finite over the search bracket [-0.5, 2.0], so the bracket cannot be searched: NaN at -0.5 and NaN at 2.0 (instrument tenor 2.0, quote 0.045100003)
+
+The clause is "the bracket cannot be searched", not "there is no root":
+a root may well exist and be unreachable. `cur_par_swap(200.0, 1.0, 1)` is that
+case -- residual `inf` at -0.5 and -0.8434824 at 2.0, with a root near
+`ln 2 = 0.693` that `brent` cannot bisect towards from a non-finite endpoint.
+
+The message names `bootstrap_multi` rather than `fd_bump_pillar_rate` because
+`solve_pillar_rate` is private and every one of its diagnostics names the
+bootstrap operation; that was already so on `130d235` for the two guards it
+carried. The quote shown is the bumped one (`0.045 + 0.0001`), since the bumped
+instrument is the one being solved.

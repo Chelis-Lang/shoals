@@ -1,0 +1,6 @@
+Shoals.Curves.bootstrap_multi: no zero rate for this instrument in the search bracket [-0.5, 2.0]: the repricing residual keeps one sign across it, -4.4318256 at -0.5 and -1.9318256 at 2.0 (instrument tenor 1.0, quote 50.0)
+
+The gradient surface has no bracket logic of its own: it solves each pillar
+through `solve_pillar_rate`, so the guard it hits is the bootstrap's. That is
+why the message names `bootstrap_multi`, and why the deleted positive test
+could observe a NaN *gradient* from a bracket miss in the *rate*.
