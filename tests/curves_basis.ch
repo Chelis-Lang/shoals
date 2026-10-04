@@ -1,6 +1,6 @@
 module Shoals.Tests.CurvesBasis
 import Std.Test (assert_close, assert_true)
-import Shoals.Curves (YieldCurve, yield_curve_from_pillars, discount_factor, CurveBasis, curve_basis_from_pillars, basis_spread_at, discount_factor_with_basis, curve_basis_from_quotes)
+import Shoals.Curves (YieldCurve, yield_curve_from_pillars, discount_factor, CurveBasis, curve_basis_from_pillars, basis_spread_at, discount_factor_with_basis)
 def test_basis_zero_spread_equals_domestic_df() -> unit ! { Test } = {
   dom_times = to_tensor([cast(1.0, f32), cast(2.0, f32), cast(3.0, f32)])
   dom_rates = to_tensor([cast(0.03, f32), cast(0.04, f32), cast(0.045, f32)])
@@ -49,17 +49,6 @@ def test_basis_spread_at_interpolates() -> unit ! { Test } = {
   s_quarter = basis_spread_at(basis, cast(2.25, f32))
   assert_close(s_quarter, cast(0.007, f32), cast(0.00001, f32), "linear interp 25% between 2y and 3y pillars")
 }
-def test_curve_basis_from_quotes_passes_through_quotes() -> unit ! { Test } = {
-  q_times = to_tensor([cast(1.0, f32), cast(2.0, f32), cast(3.0, f32)])
-  q_spreads = to_tensor([cast(0.002, f32), cast(0.004, f32), cast(0.006, f32)])
-  basis = curve_basis_from_quotes(q_times, q_spreads)
-  s1 = basis_spread_at(basis, cast(1.0, f32))
-  s2 = basis_spread_at(basis, cast(2.0, f32))
-  s3 = basis_spread_at(basis, cast(3.0, f32))
-  _ = assert_close(s1, cast(0.002, f32), cast(1e-7, f32), "pass-through quote at 1y")
-  _ = assert_close(s2, cast(0.004, f32), cast(1e-7, f32), "pass-through quote at 2y")
-  assert_close(s3, cast(0.006, f32), cast(1e-7, f32), "pass-through quote at 3y")
-}
 def test_discount_factor_with_basis_responds_to_domestic_curve() -> unit ! { Test } = {
   times = to_tensor([cast(1.0, f32), cast(2.0, f32), cast(3.0, f32)])
   low_rates = to_tensor([cast(0.03, f32), cast(0.04, f32), cast(0.045, f32)])
@@ -67,7 +56,7 @@ def test_discount_factor_with_basis_responds_to_domestic_curve() -> unit ! { Tes
   dom_low = yield_curve_from_pillars(times, low_rates)
   dom_high = yield_curve_from_pillars(times, high_rates)
   b_spreads = to_tensor([cast(0.002, f32), cast(0.004, f32), cast(0.006, f32)])
-  basis = curve_basis_from_quotes(times, b_spreads)
+  basis = curve_basis_from_pillars(times, b_spreads)
   df_low = discount_factor_with_basis(dom_low, basis, cast(1.5, f32))
   df_high = discount_factor_with_basis(dom_high, basis, cast(1.5, f32))
   assert_true(lt(df_high, df_low), "a higher domestic curve must lower the basis-adjusted DF")

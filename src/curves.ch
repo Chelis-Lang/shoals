@@ -1,7 +1,7 @@
 module Shoals.Curves
 import Nautilus.Interpolation (linear_interp_sorted, spline_eval)
 import Nautilus.Roots (brent)
-export (CurveKind, YieldCurve, yield_curve_from_pillars, yield_curve_tagged, curve_kind, ois, ibor, sofr, sonia, estr, custom_curve, rate_at, spline_rate_at, log_linear_rate_at, nss_rate, discount_factor, bootstrap_zero_from_par, parallel_shift, key_rate_shift, twist, butterfly, scale_rates, Instrument, deposit, zero_coupon, cur_par_swap, instrument_tenor, instrument_market_price_or_rate, bootstrap_multi, bootstrap_multi_curve, bootstrap_residual_at_pillar, bootstrap_grad_diagonal, bootstrap_grad_at_solution, fd_bump_pillar_rate, instrument_validate, bootstrap_grad_full_jacobian, CurveBasis, curve_basis_from_pillars, basis_spread_at, discount_factor_with_basis, curve_basis_from_quotes)
+export (CurveKind, YieldCurve, yield_curve_from_pillars, yield_curve_tagged, curve_kind, ois, ibor, sofr, sonia, estr, custom_curve, rate_at, spline_rate_at, log_linear_rate_at, nss_rate, discount_factor, bootstrap_zero_from_par, parallel_shift, key_rate_shift, twist, butterfly, scale_rates, Instrument, deposit, zero_coupon, cur_par_swap, instrument_tenor, instrument_market_price_or_rate, bootstrap_multi, bootstrap_multi_curve, bootstrap_residual_at_pillar, bootstrap_grad_diagonal, bootstrap_grad_at_solution, fd_bump_pillar_rate, instrument_validate, bootstrap_grad_full_jacobian, CurveBasis, curve_basis_from_pillars, basis_spread_at, discount_factor_with_basis)
 type CurveKind =
   | Ois
   | Ibor
@@ -408,4 +408,3 @@ def discount_factor_with_basis[n, m](domestic: YieldCurve[n], basis: CurveBasis[
   s = basis_spread_at(basis, t)
   exp(neg(mul(add(r_dom, s), t)))
 }
-def curve_basis_from_quotes[n](basis_quotes_times: tensor[n, f32], basis_quotes_spreads: tensor[n, f32]) -> CurveBasis[n] = CurveBasis { times: basis_quotes_times, spreads: basis_quotes_spreads }

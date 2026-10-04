@@ -179,15 +179,16 @@ joint; see [Scope and limitations](scope.md).
 ### Basis spreads
 
 `CurveBasis`, `curve_basis_from_pillars`, and `basis_spread_at` represent
-and interpolate a spread curve. `discount_factor_with_basis` applies
-that spread to a supplied domestic zero curve. `curve_basis_from_quotes`
-wraps the supplied basis quote times and spreads; it does not solve a
-joint multi-curve calibration.
+and interpolate a spread curve. `discount_factor_with_basis` applies that
+spread to a supplied domestic zero curve, and is the only function in this
+section that reads a domestic curve.
 
 No function here calibrates a basis curve against a domestic curve
-(shoals#117). Until a basis-swap bootstrap exists, build the spread curve from
-quotes and apply it with `discount_factor_with_basis`, which is the only
-function in this section that reads a domestic curve.
+(shoals#117). Build the spread curve from its pillars with
+`curve_basis_from_pillars` — market basis quotes *are* those pillars — and
+apply it with `discount_factor_with_basis`. There is deliberately no
+separate quotes-to-curve entry point: without a basis-swap solve it would
+be the same operation under a second name.
 
 ## Sensitivity shifts
 
