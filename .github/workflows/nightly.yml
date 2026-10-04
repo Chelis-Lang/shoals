@@ -7,7 +7,8 @@ name: nightly
 #
 #   * DAILY (03:00 UTC) — the gates moved off the per-PR path so they no
 #     longer cost every PR ~17-19 min of real-chelis/real-SMT wall:
-#       - `tests` : the fast deterministic unit suite (tests/, ~13 min).
+#       - `tests` : the fast deterministic unit suite (tests/; its measured
+#                   cost, variance and ceiling are at the step itself).
 #       - `prove` : the keystone canon self-audit (scripts/prove_gate.py,
 #                   real-SMT ~8.6 min).
 #       - `accuracy` : the erf64/n_cdf64 published-floor measurement and the
@@ -48,10 +49,10 @@ env:
 
 jobs:
   # The fast deterministic unit suite (tests/) — moved off the per-PR path.
-  # ~13 min of real-chelis wall on the 2-vCPU runner: the tallest slice of the
-  # old per-PR gate. Runs DAILY (and on workflow_dispatch). This is the
-  # per-PR-derived fast suite; the heavy tests-manual/ suite is the weekly
-  # `heavy` matrix below.
+  # The tallest slice of the old per-PR gate: see the measured cost at the
+  # `chelis test` step below, which is the authoritative figure. Runs DAILY
+  # (and on workflow_dispatch). This is the per-PR-derived fast suite; the
+  # heavy tests-manual/ suite is the weekly `heavy` matrix below.
   tests:
     name: tests (fast unit suite)
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 3 * * *'
@@ -106,15 +107,96 @@ jobs:
       - name: chelis reef build
         run: chelis reef build
 
-      # Budget raised at the 0.18.6 pin to work around chelis#1391, which is
-      # OPEN upstream -- this is a narrowing, not a fix. The default
-      # `--batch-mode auto` path went from 3m01s to 7m54s on the same 43 files,
-      # 371 tests, and one quiet 10-core machine with warm caches, so the old
-      # 1500s/30min budget no longer has headroom on a 2-vCPU hosted runner.
-      # This raises the budget ONLY. `--batch-mode file` measured more than
-      # twice as fast locally (3m44s), but switching it here would change what
-      # CI exercises on evidence taken from different hardware; lower this back
-      # and drop the raise when the upstream regression closes.
+      # Budget raised at the 0.18.6 pin to work around chelis#1391 -- a
+      # narrowing, not a fix. On 43 files and 371 tests on one quiet 10-core
+      # machine with warm caches, `--batch-mode auto` went from 3m01s to
+      # 7m54s, so the old 1500s/30min budget no longer has headroom on a
+      # 2-vCPU hosted runner. This raises the budget ONLY; for the current
+      # batch-mode figures see the re-probe below, which supersedes the
+      # 0.18.6 pair.
+      #
+      # MEASURED COST OF THIS STEP. This is the authoritative figure for this
+      # step's hosted cost; the four comments that used to restate it now give
+      # no figure of their own and point here. CHANGELOG.md and
+      # docs/UPSTREAM_BUGS.md do restate the re-probe numbers below, by
+      # design -- one is a release record, the other the shell contract's §4
+      # surface. Nothing mechanically ties the spellings together.
+      #
+      # At the current `=0.18.11` pin, from the Actions API (step
+      # `started_at`/`completed_at`, which excludes this job's ~60s
+      # `reef build`):
+      #   * head 03c63bb4, 45 files / 391 tests, EIGHT consecutive dailies
+      #     2026-09-23..09-30: 1444, 2131, 1995, 2113, 2037, 1892, 1958,
+      #     1986s. Mean 1944.5s, sample stdev 217s. Everything is held fixed
+      #     across those eight, so RUN-TO-RUN SPREAD ALONE IS 687s, 35.3% of
+      #     the mean -- 60% to 89% of this step's 2400s ceiling from one
+      #     runner draw.
+      #   * then 3a89c041 (45/391) 1982s; 392c7a42 (48/468) 2168s; 872da1e9
+      #     (49/494) 1836s.
+      #   * eleven completed runs at this pin: 1444-2168s, mean 1958s.
+      #
+      # AT TODAY'S 549-TEST SUITE THIS STEP DOES NOT COMPLETE. Head 69e1e59
+      # has run twice, 2026-10-03 and 2026-10-04, with no merge between them,
+      # and both hit the 2400s suite timeout at exactly `384 passed, 1 failed
+      # (suite incomplete)` -- no test asserting wrong (shoals#111). Two runs
+      # stopping at the same count is a reproducible overrun, not an unlucky
+      # runner draw. The current cost is therefore bounded below by 2400s and
+      # is not otherwise known.
+      #
+      # So the mean above is history, not the present cost, and that is the
+      # caveat that matters: it averages three suite sizes (391, 468 and 494
+      # tests) and NONE of them is the current one.
+      #
+      # The ceiling is also not newly tight, which bounds how much any single
+      # change can be blamed for. At the previous `=0.18.10` pin, head
+      # da6a2cd8, over the same 45 files and 391 tests and against the same
+      # 2400s timeout, this step timed out on 2026-09-21 (`313 passed, 1
+      # failed (suite incomplete)`) and came within 19s of it on 2026-09-22
+      # (2381s). Set against a 687s same-head spread, a two-run before/after
+      # comparison cannot size any one PR's contribution. Note what the
+      # reproducible overrun above does and does not license, though: the
+      # suite did cross for good somewhere between 494 and 549 tests, so the
+      # growth is real; it is attributing a specific number of seconds to a
+      # specific PR that the data does not support.
+      #
+      # chelis#1391 is CLOSED upstream, fixed by chelis#3058 (`04612253c`,
+      # batching sharded at MAX_BATCH_FILES = 4). No release carries that fix
+      # yet, so this pin still has the regression: re-measure and lower the
+      # budget at the first pin that carries #3058. That same measurement is
+      # what shoals#80 needs in order to cost running this suite per-PR.
+      #
+      # RE-PROBE, 2026-10-04 at head 69e1e59 on the `=0.18.11` release
+      # binary, the current 49 files and 549 tests, one 10-core machine, both
+      # legs back to back. This is the re-probe `docs/UPSTREAM_BUGS.md`
+      # prescribes for this entry, and `auto` still loses:
+      #   * `--batch-mode auto` : 1113s wall, 1218s child CPU -> 1.09 cores
+      #   * `--batch-mode file` :  341s wall, 1264s child CPU -> 3.71 cores
+      #   * 3.27x the wall for +3.8% CPU; both legs `549 passed, 0 failed`.
+      # The CPU parity is what makes this a scheduling result rather than a
+      # workload one: the same work, 3.27x the wall. `--batch-mode auto`
+      # collapses files into batches, which leaves `--jobs` almost no
+      # test-file workers to schedule; chelis#3058's own message says the
+      # merged unit "ran in one subprocess whatever `--jobs` said: the
+      # setting reached only the files that had been demoted out of the
+      # batch", and its fix both caps batch size and extends `--jobs` to
+      # shard concurrency. The ratio is larger than the 2.12x recorded at 43
+      # files, but that pair differs in file count, test count AND compiler
+      # release, so it does not isolate a cause.
+      #
+      # The CPU parity also bounds what the upstream fix will buy here.
+      # chelis#3058 reports the merged-unit cost as superlinear in unit size,
+      # cutting CPU 5.5x as well as wall 23.1x on a 36-file synthetic corpus.
+      # This suite shows no such CPU recovery (+3.8%), so at 49 files it is
+      # paying the serial cost and not the superlinear one: expect the
+      # benefit in wall clock, not in runner-minutes.
+      #
+      # `--batch-mode file` is therefore the one lever available before a
+      # release, and it is still NOT taken here. These are 10-core numbers
+      # and the runner has 2 vCPU, where the parallelism `file` buys is
+      # capped far lower; no hosted measurement of `file` mode exists, and
+      # this comment deliberately does not project one. Measure it on the
+      # runner -- `workflow_dispatch` settles it in one run -- before
+      # changing what CI exercises (shoals#111).
       - name: chelis test (tests/ fast unit suite)
         timeout-minutes: 45
         run: chelis test tests/ --timeout 1200 --suite-timeout 2400 --jobs auto

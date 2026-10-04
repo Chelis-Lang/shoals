@@ -138,10 +138,13 @@ jobs:
 
       # Per-PR CI is deliberately LEAN and stops at the compile signal
       # (chelis reef build) above. The real-chelis test suites do NOT run on
-      # the per-PR path: BOTH the fast unit suite (tests/, ~13 min of
-      # real-chelis wall on the 2-vCPU runner — the tallest slice of the old
-      # per-PR gate) and the heavy MC / PDE / Fourier / optimization-benchmark
-      # suite (tests-manual/) run in .github/workflows/nightly.yml (scheduled +
+      # the per-PR path: BOTH the fast unit suite (tests/ — the tallest slice
+      # of the old per-PR gate by a wide margin; nightly.yml states its
+      # measured cost, its run-to-run spread and its ceiling at the step,
+      # which is the authoritative site for that figure) and the heavy MC /
+      # PDE /
+      # Fourier / optimization-benchmark suite (tests-manual/) run in
+      # .github/workflows/nightly.yml (scheduled +
       # workflow_dispatch, real toolchain), and the local gate runs them only
       # under `scripts/run_local_gate.py --full` (its default mode mirrors
       # this per-PR job set, minus the CI-only `conform bump-check` — a
