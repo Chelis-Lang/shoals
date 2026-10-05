@@ -1,0 +1,5 @@
+record construction of opaque type `CurveBasis` outside its defining module `Shoals.Curves`
+
+The same route into the basis curve, which a forged record read as 0.009 at
+t=1.5 where 0.011 is correct. `curve_basis_from_pillars` is its only producer,
+so for this type the inductive argument is a single step.

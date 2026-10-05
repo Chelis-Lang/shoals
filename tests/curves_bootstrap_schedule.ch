@@ -1,6 +1,6 @@
 module Shoals.Tests.CurvesBootstrapSchedule
 import Std.Test (assert_close, assert_true)
-import Shoals.Curves (Instrument, YieldCurve, deposit, zero_coupon, cur_par_swap, instrument_validate, bootstrap_multi, bootstrap_multi_curve, discount_factor, yield_curve_from_pillars, yield_curve_tagged)
+import Shoals.Curves (Instrument, YieldCurve, deposit, zero_coupon, cur_par_swap, instrument_validate, bootstrap_multi, bootstrap_multi_curve, discount_factor, yield_curve_from_pillars, curve_pillars)
 -- shoals#75: a par swap's fixed leg is valued over its own coupon schedule
 -- (payments_per_year coupons a year, accrual 1/payments_per_year), with
 -- discount factors at intermediate dates read from the curve being built
@@ -10,17 +10,22 @@ import Shoals.Curves (Instrument, YieldCurve, deposit, zero_coupon, cur_par_swap
 def cbs_abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
 def cbs_gapped_annual() -> List[Instrument] = [deposit(cast(0.5, f32), cast(0.041, f32)), deposit(cast(1.0, f32), cast(0.042, f32)), cur_par_swap(cast(2.0, f32), cast(0.0435, f32), cast(1, i64)), cur_par_swap(cast(5.0, f32), cast(0.0452, f32), cast(1, i64)), cur_par_swap(cast(10.0, f32), cast(0.0468, f32), cast(1, i64))]
 def cbs_semiannual() -> List[Instrument] = [deposit(cast(0.25, f32), cast(0.04, f32)), cur_par_swap(cast(1.0, f32), cast(0.042, f32), cast(2, i64)), cur_par_swap(cast(2.0, f32), cast(0.044, f32), cast(2, i64)), cur_par_swap(cast(3.5, f32), cast(0.045, f32), cast(2, i64))]
-def cbs_swap_pv[n](curve: YieldCurve[n], tenor: f32, par_rate: f32, payments_per_year: i64) -> f32 =
-  match curve with {
-    | YieldCurve { kind: k, times: ts, rates: rs } => {
-    freq_f = cast(payments_per_year, f32)
-    periods = cast_trunc(add(mul(tenor, freq_f), cast(0.5, f32)), i64)
-    ks = range(cast(1, i64), add(periods, cast(1, i64)))
-    df_maturity = discount_factor(yield_curve_tagged(k, copy(ts), copy(rs)), tenor)
-    annuity = fold(fn (acc: f32, i: i64) -> add(acc, discount_factor(yield_curve_from_pillars(copy(ts), copy(rs)), div(cast(i, f32), freq_f))), cast(0.0, f32), ks)
-    add(mul(div(par_rate, freq_f), annuity), df_maturity)
-  }
-  }
+-- Reads the pillars through the exported reader rather than a record pattern:
+-- `YieldCurve` is opaque, so the representation is not visible here. The curve
+-- is rebuilt per discount factor because it is linear and the fold needs it
+-- once per coupon date; the rebuilt curves are untagged, which is immaterial
+-- since `kind` does not reach `rate_at`.
+def cbs_swap_pv[n](curve: YieldCurve[n], tenor: f32, par_rate: f32, payments_per_year: i64) -> f32 = {
+  pillars = curve_pillars(curve)
+  ts = pillars.0
+  rs = pillars.1
+  freq_f = cast(payments_per_year, f32)
+  periods = cast_trunc(add(mul(tenor, freq_f), cast(0.5, f32)), i64)
+  ks = range(cast(1, i64), add(periods, cast(1, i64)))
+  df_maturity = discount_factor(yield_curve_from_pillars(copy(ts), copy(rs)), tenor)
+  annuity = fold(fn (acc: f32, i: i64) -> add(acc, discount_factor(yield_curve_from_pillars(copy(ts), copy(rs)), div(cast(i, f32), freq_f))), cast(0.0, f32), ks)
+  add(mul(div(par_rate, freq_f), annuity), df_maturity)
+}
 def test_gapped_annual_pillars_match_reference() -> unit ! { Test } = {
   rates = bootstrap_multi(cbs_gapped_annual()).1
   tol = cast(5e-6, f32)

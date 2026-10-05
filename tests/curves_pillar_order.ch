@@ -1,6 +1,6 @@
 module Shoals.Tests.CurvesPillarOrder
 import Std.Test (assert_close, assert_eq)
-import Shoals.Curves (CurveKind, YieldCurve, yield_curve_from_pillars, yield_curve_tagged, curve_kind, ois, rate_at, discount_factor, bootstrap_zero_from_par, CurveBasis, curve_basis_from_pillars, basis_spread_at)
+import Shoals.Curves (CurveKind, YieldCurve, yield_curve_from_pillars, yield_curve_tagged, curve_kind, curve_pillars, ois, rate_at, discount_factor, bootstrap_zero_from_par, CurveBasis, curve_basis_from_pillars, basis_pillars, basis_spread_at, parallel_shift)
 -- Positive parity for the four pillar-order guards. The reordered-pillar
 -- rejections live in `tests_neg/curves/pillar_times_*_neg.ch`; this file pins
 -- that the guards admit everything they should and leave the answers alone.
@@ -42,3 +42,34 @@ def test_single_pillar_is_vacuously_increasing() -> unit ! { Test } = assert_clo
 -- and interpolates across it; the paired rejection of a zero gap is
 -- `tests_neg/curves/pillar_times_duplicate_neg.ch`.
 def test_tightly_spaced_pillars_are_accepted() -> unit ! { Test } = assert_close(rate_at(yield_curve_from_pillars(to_tensor([cast(1.0, f32), cast(1.0001, f32)]), to_tensor([cast(0.01, f32), cast(0.09, f32)])), cast(1.00005, f32)), cast(0.04995233, f32), cast(1e-6, f32), "a 1e-4 pillar gap is strictly increasing and interpolates")
+-- Positive parity for the readers opacity makes necessary. The paired
+-- rejections of the record literal and the record pattern are
+-- `tests_neg/curves/opaque_*_neg.ch`.
+def test_pillar_readers_return_what_was_built() -> unit ! { Test } = {
+  pillars = curve_pillars(yield_curve_from_pillars(pillar_times(), pillar_rates()))
+  ts_l = to_list(pillars.0)
+  rs_l = to_list(pillars.1)
+  _ = assert_close(index(ts_l, cast(2, i64)), cast(3.0, f32), cast(1e-7, f32), "last pillar time round-trips through the reader")
+  _ = assert_close(index(rs_l, cast(1, i64)), cast(0.06, f32), cast(1e-7, f32), "interior pillar rate round-trips through the reader")
+  bp = basis_pillars(curve_basis_from_pillars(pillar_times(), pillar_spreads()))
+  _ = assert_close(index(to_list(bp.0), cast(0, i64)), cast(1.0, f32), cast(1e-7, f32), "first basis time round-trips")
+  assert_close(index(to_list(bp.1), cast(2, i64)), cast(0.03, f32), cast(1e-7, f32), "last basis spread round-trips")
+}
+-- Second shape/config case for `basis_pillars` (shell contract §9, which
+-- `conform audit` row 16 routes to a reviewer): a two-pillar basis rather than
+-- the three-pillar one above, so the new verb is exercised at more than one
+-- extent and from more than one literal.
+def test_basis_pillars_at_a_second_extent() -> unit ! { Test } = {
+  bp = basis_pillars(curve_basis_from_pillars(to_tensor([cast(0.5, f32), cast(4.0, f32)]), to_tensor([cast(0.001, f32), cast(0.009, f32)])))
+  _ = assert_close(index(to_list(bp.0), cast(1, i64)), cast(4.0, f32), cast(1e-7, f32), "n=2 basis time round-trips")
+  assert_close(index(to_list(bp.1), cast(0, i64)), cast(0.001, f32), cast(1e-7, f32), "n=2 basis spread round-trips")
+}
+-- A derived curve is still a curve built inside the module, so the reader sees
+-- the shifted rates and the original times. This exercises one instance of the
+-- inductive step the opacity argument rests on; the other four shifts are
+-- covered by `tests/curves_ops.ch`'s value assertions.
+def test_shifted_curve_keeps_its_pillar_times() -> unit ! { Test } = {
+  pillars = curve_pillars(parallel_shift(yield_curve_from_pillars(pillar_times(), pillar_rates()), cast(0.01, f32)))
+  _ = assert_close(index(to_list(pillars.0), cast(1, i64)), cast(2.0, f32), cast(1e-7, f32), "a shift preserves pillar times verbatim")
+  assert_close(index(to_list(pillars.1), cast(1, i64)), cast(0.07, f32), cast(1e-6, f32), "a shift moves the rate by delta")
+}

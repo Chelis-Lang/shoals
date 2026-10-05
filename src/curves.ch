@@ -1,7 +1,7 @@
 module Shoals.Curves
 import Nautilus.Interpolation (linear_interp_sorted, spline_eval)
 import Nautilus.Roots (brent)
-export (CurveKind, YieldCurve, yield_curve_from_pillars, yield_curve_tagged, curve_kind, ois, ibor, sofr, sonia, estr, custom_curve, rate_at, spline_rate_at, log_linear_rate_at, nss_rate, discount_factor, bootstrap_zero_from_par, parallel_shift, key_rate_shift, twist, butterfly, scale_rates, Instrument, deposit, zero_coupon, cur_par_swap, instrument_tenor, instrument_market_price_or_rate, bootstrap_multi, bootstrap_multi_curve, bootstrap_residual_at_pillar, bootstrap_grad_diagonal, bootstrap_grad_at_solution, fd_bump_pillar_rate, instrument_validate, bootstrap_grad_full_jacobian, CurveBasis, curve_basis_from_pillars, basis_spread_at, discount_factor_with_basis)
+export (CurveKind, YieldCurve, yield_curve_from_pillars, yield_curve_tagged, curve_kind, curve_pillars, ois, ibor, sofr, sonia, estr, custom_curve, rate_at, spline_rate_at, log_linear_rate_at, nss_rate, discount_factor, bootstrap_zero_from_par, parallel_shift, key_rate_shift, twist, butterfly, scale_rates, Instrument, deposit, zero_coupon, cur_par_swap, instrument_tenor, instrument_market_price_or_rate, bootstrap_multi, bootstrap_multi_curve, bootstrap_residual_at_pillar, bootstrap_grad_diagonal, bootstrap_grad_at_solution, fd_bump_pillar_rate, instrument_validate, bootstrap_grad_full_jacobian, CurveBasis, curve_basis_from_pillars, basis_pillars, basis_spread_at, discount_factor_with_basis)
 type CurveKind =
   | Ois
   | Ibor
@@ -9,6 +9,26 @@ type CurveKind =
   | Sonia
   | Estr
   | Custom { label: string }
+-- Opaque (`spec/02-surf-syntax.md` P16): constructible and inspectable only
+-- inside this module. That is what makes the pillar-order guarantee a property
+-- of the *type* rather than of four call sites. Every producer below either
+-- runs the strictly-increasing guard on caller-supplied times, or reuses the
+-- times of a curve that already passed it, so by induction no `YieldCurve`
+-- value anywhere can carry unreadable pillars. While the constructors were
+-- guarded but the representation was public, a downstream
+-- `YieldCurve { kind, times, rates }` literal still read 0.025 for reordered
+-- pillars where 0.035 is correct, and the guards could not see it. Record
+-- patterns close with construction because `@opaque` closes both together and
+-- hiding the representation is the point; the ordering rule itself is already
+-- defended by the producer guards, which a field-by-field rebuild must pass
+-- through.
+--
+-- A declared `@invariant` would state the ordering rule as well as its
+-- provenance, but cannot express it at this pin: a `tensor[n, f32]` field is
+-- outside the V1 invariant value class (it admits only fixed-shape numeric
+-- tensors) and `index` is outside the predicate grammar. Opacity plus guarded
+-- producers gives the same closure without it.
+@opaque
 type YieldCurve[n] =
   | YieldCurve { kind: CurveKind, times: tensor[n, f32], rates: tensor[n, f32] }
 def ois() -> CurveKind = Ois
@@ -57,6 +77,16 @@ def yield_curve_tagged[n](kind: CurveKind, times: tensor[n, f32], rates: tensor[
 def curve_kind[n](curve: YieldCurve[n]) -> CurveKind =
   match curve with {
     | YieldCurve { kind: k, times: _, rates: _ } => k
+  }
+-- Opacity removes external record patterns, so the raw pillars need an
+-- exported reader. Both tensors come back together because a caller that
+-- wants one usually wants both. That is the whole reason: auto-borrow handles
+-- reading two single-field readers off one curve without a `copy`, and `copy`
+-- is not available on this type anyway (`copy requires tensor input`), so no
+-- linearity argument favours the tuple.
+def curve_pillars[n](curve: YieldCurve[n]) -> (tensor[n, f32], tensor[n, f32]) =
+  match curve with {
+    | YieldCurve { kind: _, times: ts, rates: rs } => (ts, rs)
   }
 def rate_at[n](curve: YieldCurve[n], t: f32) -> f32 =
   match curve with {
@@ -500,12 +530,18 @@ def bootstrap_grad_full_jacobian[m](paths_template: &tensor[m, f32], instruments
     reshape(to_tensor(flat), [m_len, m_len])
   }
 }
+-- Opaque for the same reason as `YieldCurve`; see that declaration.
+@opaque
 type CurveBasis[n] =
   | CurveBasis { times: tensor[n, f32], spreads: tensor[n, f32] }
 def curve_basis_from_pillars[n](times: tensor[n, f32], spreads: tensor[n, f32]) -> CurveBasis[n] = {
   ts_l = to_list(copy(times))
   if cur_times_strictly_increasing(ts_l) then CurveBasis { times, spreads } else fail(string_concat("Shoals.Curves.curve_basis_from_pillars: pillar times must be strictly increasing", cur_unsorted_time_detail(ts_l)))
 }
+def basis_pillars[n](basis: CurveBasis[n]) -> (tensor[n, f32], tensor[n, f32]) =
+  match basis with {
+    | CurveBasis { times: ts, spreads: ss } => (ts, ss)
+  }
 def basis_spread_at[n](basis: CurveBasis[n], t: f32) -> f32 =
   match basis with {
     | CurveBasis { times: ts, spreads: ss } => linear_interp_sorted(ts, ss, t)

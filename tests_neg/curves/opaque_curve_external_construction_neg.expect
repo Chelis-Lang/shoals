@@ -1,0 +1,17 @@
+record construction of opaque type `YieldCurve` outside its defining module `Shoals.Curves`
+
+The four producer guards run inside `Shoals.Curves`, so they cannot see a
+record literal written anywhere else. While the representation was public this
+compiled, and `rate_at(curve, 1.5)` answered 0.025 for reordered pillars where
+0.035 is correct -- shoals#119's exact wrong number, reached past every guard.
+
+Opacity (`spec/02-surf-syntax.md` P16) is what makes the pillar-order rule a
+property of the type rather than of four call sites: a value can only originate
+from an in-module producer, and every in-module producer either runs the
+strictly-increasing guard on caller-supplied times or reuses the times of a
+curve that already passed it. The diagnostic lists the sanctioned producers,
+which is the set of escape points that argument has to cover -- the five
+sensitivity shifts appear there as `YieldCurve -> YieldCurve`, i.e. as the
+inductive step. The checker verifies only that values originate in-module; that
+each producer guards or passes through guarded times is a reading of the
+source.

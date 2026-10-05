@@ -8,6 +8,62 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **BREAKING: `Shoals.Curves.YieldCurve` and `CurveBasis` are opaque**
+  (shoals#119). They are constructible and inspectable only inside
+  `Shoals.Curves` (`spec/02-surf-syntax.md` P16). Naming either type in a
+  signature or annotation is unchanged, so `c: YieldCurve[3]` still compiles;
+  what no longer compiles outside the module is a record literal
+  (`YieldCurve { kind, times, rates }`) and a record pattern
+  (`match curve with { | YieldCurve { … } }`). Two readers replace the pattern:
+
+  ```chelis
+  def curve_pillars[n](curve: YieldCurve[n]) -> (tensor[n, f32], tensor[n, f32])
+  def basis_pillars[n](basis: CurveBasis[n]) -> (tensor[n, f32], tensor[n, f32])
+  ```
+
+  Both tensors come back together because a caller that wants one usually
+  wants both. There is no linearity reason, measured both ways: auto-borrow
+  reads two single-field readers off one curve with no `copy`, and `copy` does
+  not accept this type at all (`copy requires tensor input`).
+
+  This is what finishes the pillar-order fix below. Guarding the four producers
+  left the rule a property of four call sites rather than of the type: a
+  consumer could write the record itself and `rate_at` still answered 0.025 for
+  reordered pillars where 0.035 is correct, past every guard. With the
+  representation sealed, a value can only come from an in-module producer, and
+  every in-module producer either runs the guard on caller-supplied times or
+  reuses the times of a curve that already passed it — so **every `YieldCurve`
+  and `CurveBasis` value has readable pillars, by induction over the
+  producers.** The compiler's rejection message enumerates those producers,
+  which is the set of escape points the argument has to cover — including a
+  producer returning the type nested in a tuple. The checker verifies only that
+  clause; that each producer guards or passes through guarded times is a reading
+  of the ten construction sites.
+
+  Record patterns close with construction because `@opaque` closes both
+  together and hiding the representation is the point — not because patterns
+  are what defend the ordering rule. A field-by-field rebuild has to go back
+  through a producer: using `curve_pillars` alone it compiles and then fails
+  with `pillar times must be strictly increasing`.
+
+  The rule is enforced by the producers rather than declared as an `@invariant`
+  on the type, which `chelis prove` would otherwise discharge per producer.
+  It is not expressible at this pin at all. The compiler reports three
+  blockers at once for `YieldCurve`: `kind: CurveKind` is multi-variant and
+  both tensor fields have symbolic extents, so all three are outside the V1
+  invariant value class (which admits scalar primitives, *fixed-shape* numeric
+  tensors, or nested single-variant records of those); and `index` is outside
+  the invariant predicate grammar. The grammar blocker is decisive, admitting
+  no indexing at any extent, so pairwise ordering cannot be written even for a
+  fixed-extent single-variant wrapper. Both types therefore carry a permanent
+  advisory `opaque-without-invariant` note, which is expected rather than a gap
+  to close; it does not fail `chelis lint --check`.
+
+  In-tree consumers moved onto `curve_pillars` with every assertion unchanged:
+  `tests/curves_bootstrap.ch` (two sites) and
+  `tests/curves_bootstrap_schedule.ch`'s `cbs_swap_pv`, which was
+  destructuring a curve only to rebuild curves from its fields.
+
 - **BREAKING: `Shoals.Curves` fails instead of returning a `NaN` pillar or an
   all-`NaN` Jacobian** (shoals#79). `bootstrap_multi` returned a `NaN` pillar,
   and `bootstrap_grad_full_jacobian` a full matrix of `NaN`, with nothing in

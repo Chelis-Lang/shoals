@@ -85,10 +85,66 @@ This is the precondition the instrument bootstrap already enforces (below),
 under the same decision not to re-sort: a reordering is a different question
 from the one the caller asked. The guard is on the four entry points that take
 pillar times as arguments — `yield_curve_from_pillars`, `yield_curve_tagged`,
-`bootstrap_zero_from_par`, and `curve_basis_from_pillars`. Every curve built
-through them, and every curve derived from one by the sensitivity shifts below,
-therefore has readable pillars. A `YieldCurve` or `CurveBasis` record a caller
-constructs directly from the exported type is not checked.
+`bootstrap_zero_from_par`, and `curve_basis_from_pillars`.
+
+### The rule belongs to the type, not to the four entry points
+
+`YieldCurve` and `CurveBasis` are **opaque**
+(`spec/02-surf-syntax.md` P16): constructible and inspectable only inside
+`Shoals.Curves`. That is what makes the guarantee total rather than
+best-effort. Guarding four producers is not enough on its own, because a
+consumer could write the record literal itself and reach the same wrong answer
+past every guard:
+
+```text
+record construction of opaque type `YieldCurve` outside its defining module `Shoals.Curves`
+```
+
+With the representation sealed, a value can only originate from an in-module
+producer, and every in-module producer either runs the strictly-increasing
+guard on caller-supplied times, or reuses the times of a curve that already
+passed it — the five sensitivity shifts below, and `bootstrap_multi_curve`,
+whose pillars are instrument tenors the bootstrap already requires to be
+increasing. **So every `YieldCurve` and `CurveBasis` value in existence has
+readable pillars, by induction over the producers.** The compiler checks the
+first clause of that induction and enumerates the escape points it has to
+cover; that every producer guards or passes through guarded times is a reading
+of the ten construction sites, not something the checker verifies. Note also
+that the induction is about ordering alone — it does not make pillar times
+finite, per the single-pillar `NaN` admission above.
+
+Opacity closes record *patterns* as well as construction, because `@opaque`
+closes both together and hiding the representation is the point. It is not what
+defends the ordering rule: a field-by-field rebuild has to go back through a
+producer, and the producer guard rejects it — measured, with
+`curve_pillars` and nothing else, the rebuild compiles and then fails with
+`pillar times must be strictly increasing`. The sanctioned readers are
+`curve_kind`, `rate_at` and friends, and:
+
+```chelis
+def curve_pillars[n](curve: YieldCurve[n]) -> (tensor[n, f32], tensor[n, f32])
+def basis_pillars[n](basis: CurveBasis[n]) -> (tensor[n, f32], tensor[n, f32])
+```
+
+Both tensors come back together because a caller that wants one usually wants
+both. There is no linearity reason: auto-borrow reads two single-field readers
+off one curve without a `copy`, and `copy` does not accept this type at all
+(`copy requires tensor input`). Naming the type in a signature or annotation is
+unaffected — `c: YieldCurve[3]` still compiles outside the module.
+
+The ordering rule is enforced by the producers rather than declared as an
+`@invariant` on the type, which would also have it discharged per producer by
+`chelis prove`. It is **not expressible at this pin at all**, which the
+compiler reports three ways at once for `YieldCurve`: `kind: CurveKind` is a
+multi-variant ADT and both tensor fields have symbolic extents, so all three
+fall outside the V1 invariant value class (scalar primitives, *fixed-shape*
+numeric tensors, or nested single-variant records of those); and `index` is
+outside the invariant predicate grammar. The grammar blocker is the decisive
+one — it admits no indexing at any extent, so pairwise ordering cannot be
+written even for a fixed-extent, single-variant wrapper. The compiler
+accordingly emits a permanent advisory `opaque-without-invariant` note for both
+types, which is expected here rather than a gap to close; it is advisory, and
+`chelis lint --check` exits 0.
 
 ## Interpolation and discount factors
 
