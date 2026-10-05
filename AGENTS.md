@@ -219,11 +219,11 @@ in [`docs/agent-inheritance-exclusions.md`](docs/agent-inheritance-exclusions.md
   Inspect stdout, stderr, and exit status, including exit 1; a holder,
   unresolved path, or uncertain scan means busy. The
   `redteam-exec` shell-local handoff section owns the full procedure.
-- For `.ch` source, follow the pinned compiler's `chelis fmt --check` and
-  `chelis lint --check` and Shoals's executable tests. Chelis language rules
-  live in the compiler repository; Shoals's library scope lives in
-  `spec/shoals_quant_surface.md`. The retained `example-corpus` skill's
-  shell-local block identifies its compiler-only path references.
+- Load the retained `example-corpus` skill before writing any `.ch` source.
+  Follow the pinned compiler's `chelis fmt --check` and `chelis lint --check`
+  and Shoals's executable tests. Chelis language rules live in the compiler
+  repository; Shoals's library scope lives in `spec/shoals_quant_surface.md`.
+  The skill's shell-local block identifies its compiler-only path references.
 
 ## Toolchain
 

@@ -4,9 +4,10 @@ Shoals inherits the complete pinned Chelis root agent contract except for
 the exact headings selected outside the managed block in `AGENTS.md`.
 These exclusions remove instructions that require the *compiler repository's*
 files or issue queue. The Chelis language principles, quality standards,
-red-team protocol, worktree rules, source style, and shared-skill pointers
-remain inherited through filtered sections and toolchain-supported
-shell-local skill blocks.
+worktree rules, and shared-skill pointers remain inherited. Shoals's own
+agent contract and toolchain-supported shell-local skill blocks carry the
+red-team protocol and source-style instructions removed with compiler-only
+sections.
 
 | Excluded root heading | Shoals guidance |
 | --- | --- |
