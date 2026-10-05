@@ -1,0 +1,30 @@
+module Shoals.Tests.KeyedLmm
+import Nautilus.Distributions (normal_sample)
+import Shoals.LiborMarketModel (lmm_path, lmm_step)
+import Std.Test (assert_close, assert_true)
+def forwards0() -> tensor[1, f32] = to_tensor([0.03f32])
+def taus() -> tensor[1, f32] = to_tensor([0.25f32])
+def sigmas() -> tensor[1, f32] = to_tensor([0.2f32])
+def corr() -> tensor[1, 1, f32] = reshape(to_tensor([1.0f32]), [1i64, 1i64])
+def short_paths(rng_key: key) -> tensor[3, f32] = lmm_path(rng_key, to_tensor([0.0f32, 0.0f32, 0.0f32]), forwards0(), taus(), sigmas(), corr(), 1.0f32, 2i64, 0i64)
+def one_path_from_steps(path_key: key) -> f32 = {
+  (step_key_0, tail) = split_key(path_key)
+  (step_key_1, _) = split_key(tail)
+  z0 = normal_sample(step_key_0, to_tensor([0.0f32]), 0.0f32, 1.0f32)
+  z1 = normal_sample(step_key_1, to_tensor([0.0f32]), 0.0f32, 1.0f32)
+  after0 = lmm_step(forwards0(), taus(), sigmas(), corr(), 0.5f32, z0)
+  after1 = lmm_step(after0, taus(), sigmas(), corr(), 0.5f32, z1)
+  index(to_list(after1), 0i64)
+}
+def test_lmm_nested_key_folds_replay_and_route() -> unit ! { Test } = {
+  a = to_list(short_paths(key_from_seed(19i64)))
+  b = to_list(short_paths(key_from_seed(19i64)))
+  (path0, tail0) = split_key(key_from_seed(19i64))
+  (path1, tail1) = split_key(tail0)
+  (path2, _) = split_key(tail1)
+  _ = assert_true(eq(index(a, 0i64), index(b, 0i64)), "nested folds replay first path")
+  _ = assert_true(eq(index(a, 2i64), index(b, 2i64)), "nested folds replay final path")
+  _ = assert_close(index(a, 0i64), one_path_from_steps(path0), 0.00001f32, "path zero uses its first two step keys")
+  _ = assert_close(index(a, 1i64), one_path_from_steps(path1), 0.00001f32, "path one uses its first two step keys")
+  assert_close(index(a, 2i64), one_path_from_steps(path2), 0.00001f32, "path two uses its first two step keys")
+}

@@ -102,7 +102,7 @@ EXPECTED_LOADS = {
     "two_over_sqrt_pi",
 }
 # Exact version, checked against each published compiler during a pin bump.
-WIRE_DAG_SCHEMA_VERSION = 15
+WIRE_DAG_SCHEMA_VERSION = 23
 WIRE_OPS = {
     "add",
     "cast",

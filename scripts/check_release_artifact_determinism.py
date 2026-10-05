@@ -36,7 +36,8 @@ def checked_run(command: list[str], *, cwd: Path, env: dict[str, str]) -> None:
 def copy_candidate(destination: Path) -> Path:
     package = destination / "shoals"
     ignored = shutil.ignore_patterns(
-        ".git", "dist", "__pycache__", ".gate-tmp", "target"
+        ".git", ".venv", "reef.lock", ".reef-write.lock", "dist",
+        "__pycache__", ".gate-tmp", "target",
     )
     shutil.copytree(ROOT, package, ignore=ignored)
     return package

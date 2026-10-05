@@ -9,18 +9,15 @@ entry in the same change set).
 
 ## Current probes
 
-**`special/erf_builtin_absent.ch`** — the f32-only signature on
-`Nautilus.Special`, which is why `Shoals.Pricing` carries its own `erf64`.
-Reports `precision mismatch: expected f32, got f64`: the package `erf`
-resolves and refuses the width. Blocker filed as
-nautilus#59; siblings are nautilus#56
-(the approximation's own bound) and chelis#902 (a canonical `erf` in the
-language). Its sidecar's de-narrowing steps branch on which lands.
+The former `special/canonical_erf_absent.ch` probe passed compilation with
+Chelis 0.18.13, which provides `erf` and `erfc` primitives. It is promoted to
+`tests/canonical_erf.ch`. Shoals's Cody kernel remains in use pending a
+compatible package-chain comparison of numerical and Greek behavior.
 
 This directory was deliberately empty from the chelis 0.18.6 bump until
 2026-09-05. **That emptiness was load-bearing for the chelis#1387 entry**,
 whose re-probe criterion was "row 12 reads `NA` on the unmodified tree" — a
-criterion the probe above invalidates, since row 12 now reads `PASS` whether
+criterion the current probe invalidates, since row 12 now reads `PASS` whether
 or not chelis#1387 is fixed. That entry's trigger has been amended to move
 this directory aside before re-probing; if you add or remove probes here,
 check it still discriminates.

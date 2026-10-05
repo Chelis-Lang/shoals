@@ -12,3 +12,8 @@ __pycache__/
 
 # Claude Code runtime artifacts
 .claude/scheduled_tasks.lock
+
+# Reef atomic-write artifacts
+.reef-write.lock
+.*.reef-tmp-*
+.*.reef-backup-*

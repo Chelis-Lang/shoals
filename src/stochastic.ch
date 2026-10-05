@@ -1,8 +1,8 @@
 module Shoals.Stochastic
 import Nautilus.Distributions (normal_sample, uniform_sample, exponential_sample)
 export (gbm_path, gbm_terminal, gbm_paths_antithetic_terminal_mean, merton_jump_terminal, merton_compensated_drift, correlated_gbm_terminal_2d, cholesky_2x2_lower, heston_qe_step, heston_qe_terminal, heston_qe_paths_terminal, sto_kou_compensator, sto_kou_jump_sample, sto_kou_jump_terminal)
-def gbm_path[n](template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) -> tensor[n, f32] ! { Random } = {
-  z = normal_sample(template, cast(0.0, f32), cast(1.0, f32))
+def gbm_path[n](rng_key: key, template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
+  z = normal_sample(rng_key, template, cast(0.0, f32), cast(1.0, f32))
   n_i = numel(copy(z))
   dt = div(t, cast(n_i, f32))
   sqrt_dt = sqrt(dt)
@@ -13,16 +13,16 @@ def gbm_path[n](template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) 
   log_s0 = log(s0)
   to_tensor(map(fn (lp: f32) -> exp(add(log_s0, lp)), to_list(log_path)))
 }
-def gbm_terminal[n](template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) -> tensor[n, f32] ! { Random } = {
-  z = normal_sample(template, cast(0.0, f32), cast(1.0, f32))
+def gbm_terminal[n](rng_key: key, template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
+  z = normal_sample(rng_key, template, cast(0.0, f32), cast(1.0, f32))
   half_sigma_sq = mul(cast(0.5, f32), mul(sigma, sigma))
   drift = mul(sub(mu, half_sigma_sq), t)
   vol_sqrt_t = mul(sigma, sqrt(t))
   log_s0 = log(s0)
   to_tensor(map(fn (zi: f32) -> exp(add(log_s0, add(drift, mul(vol_sqrt_t, zi)))), to_list(z)))
 }
-def gbm_paths_antithetic_terminal_mean[n](template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) -> f32 ! { Random } = {
-  z = normal_sample(template, cast(0.0, f32), cast(1.0, f32))
+def gbm_paths_antithetic_terminal_mean[n](rng_key: key, template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) -> f32 = {
+  z = normal_sample(rng_key, template, cast(0.0, f32), cast(1.0, f32))
   half_sigma_sq = mul(cast(0.5, f32), mul(sigma, sigma))
   drift = mul(sub(mu, half_sigma_sq), t)
   vol_sqrt_t = mul(sigma, sqrt(t))
@@ -42,9 +42,10 @@ def merton_compensated_drift(mu: f32, sigma: f32, lambda: f32, jump_mean: f32, j
   expected_jump = sub(exp(add(jump_mean, half_jump_vol_sq)), cast(1.0, f32))
   sub(sub(mu, half_sigma_sq), mul(lambda, expected_jump))
 }
-def merton_jump_terminal[n](template: tensor[n, f32], jumps_template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> tensor[n, f32] ! { Random } = {
-  z_diff = normal_sample(template, cast(0.0, f32), cast(1.0, f32))
-  z_jumps = normal_sample(jumps_template, cast(0.0, f32), cast(1.0, f32))
+def merton_jump_terminal[n](rng_key: key, template: tensor[n, f32], jumps_template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> tensor[n, f32] = {
+  (rng_draw_0, rng_draw_1) = split_key(rng_key)
+  z_diff = normal_sample(rng_draw_0, template, cast(0.0, f32), cast(1.0, f32))
+  z_jumps = normal_sample(rng_draw_1, jumps_template, cast(0.0, f32), cast(1.0, f32))
   drift = mul(merton_compensated_drift(mu, sigma, lambda, jump_mean, jump_vol), t)
   vol_sqrt_t = mul(sigma, sqrt(t))
   expected_jumps = mul(lambda, t)
@@ -68,9 +69,10 @@ def cholesky_2x2_lower(sigma_xx: f32, sigma_xy: f32, sigma_yy: f32) -> (f32, f32
   l22 = sqrt(sub(sigma_yy, mul(l21, l21)))
   (l11, l21, l22)
 }
-def correlated_gbm_terminal_2d[n](template_x: tensor[n, f32], template_y: tensor[n, f32], s0_x: f32, s0_y: f32, mu_x: f32, mu_y: f32, sigma_x: f32, sigma_y: f32, rho: f32, t: f32) -> (tensor[n, f32], tensor[n, f32]) ! { Random } = {
-  zx = normal_sample(template_x, cast(0.0, f32), cast(1.0, f32))
-  zy_indep = normal_sample(template_y, cast(0.0, f32), cast(1.0, f32))
+def correlated_gbm_terminal_2d[n](rng_key: key, template_x: tensor[n, f32], template_y: tensor[n, f32], s0_x: f32, s0_y: f32, mu_x: f32, mu_y: f32, sigma_x: f32, sigma_y: f32, rho: f32, t: f32) -> (tensor[n, f32], tensor[n, f32]) = {
+  (rng_draw_0, rng_draw_1) = split_key(rng_key)
+  zx = normal_sample(rng_draw_0, template_x, cast(0.0, f32), cast(1.0, f32))
+  zy_indep = normal_sample(rng_draw_1, template_y, cast(0.0, f32), cast(1.0, f32))
   log_s0_x = log(s0_x)
   log_s0_y = log(s0_y)
   drift_x = mul(sub(mu_x, mul(cast(0.5, f32), mul(sigma_x, sigma_x))), t)
@@ -136,11 +138,13 @@ def heston_qe_step(log_s: f32, v: f32, min_v: f32, mu: f32, kappa: f32, theta: f
   new_min = if lt(v_next_pos, min_v) then v_next_pos else min_v
   (log_s_next, v_next_pos, new_min)
 }
-def heston_qe_terminal(s0: f32, v0: f32, mu: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, t: f32, n_steps: i64) -> (f32, f32, f32) ! { Random } = {
+def heston_qe_terminal(rng_key: key, s0: f32, v0: f32, mu: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, t: f32, n_steps: i64) -> (f32, f32, f32) = {
+  (rng_draw_0, rng_tail_0) = split_key(rng_key)
+  (rng_draw_1, rng_draw_2) = split_key(rng_tail_0)
   template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), n_steps)))
-  z_v_t = normal_sample(copy(template), cast(0.0, f32), cast(1.0, f32))
-  z_ind_t = normal_sample(copy(template), cast(0.0, f32), cast(1.0, f32))
-  u_t = uniform_sample(template, cast(0.0, f32), cast(1.0, f32))
+  z_v_t = normal_sample(rng_draw_0, copy(template), cast(0.0, f32), cast(1.0, f32))
+  z_ind_t = normal_sample(rng_draw_1, copy(template), cast(0.0, f32), cast(1.0, f32))
+  u_t = uniform_sample(rng_draw_2, template, cast(0.0, f32), cast(1.0, f32))
   z_v_l = to_list(z_v_t)
   z_ind_l = to_list(z_ind_t)
   u_l = to_list(u_t)
@@ -159,13 +163,15 @@ def heston_qe_terminal(s0: f32, v0: f32, mu: f32, kappa: f32, theta: f32, sigma:
   }, init_state, idxs)
   (exp(final_state.0), final_state.1, final_state.2)
 }
-def heston_qe_paths_terminal[n](paths_template: tensor[n, f32], s0: f32, v0: f32, mu: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, t: f32, n_steps: i64) -> (tensor[n, f32], tensor[n, f32], tensor[n, f32]) ! { Random } = {
+def heston_qe_paths_terminal[n](rng_key: key, paths_template: tensor[n, f32], s0: f32, v0: f32, mu: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, t: f32, n_steps: i64) -> (tensor[n, f32], tensor[n, f32], tensor[n, f32]) = {
+  (rng_draw_0, rng_tail_0) = split_key(rng_key)
+  (rng_draw_1, rng_draw_2) = split_key(rng_tail_0)
   n_paths = numel(copy(paths_template))
   total = mul(n_paths, n_steps)
   big_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), total)))
-  z_v_t = normal_sample(copy(big_template), cast(0.0, f32), cast(1.0, f32))
-  z_ind_t = normal_sample(copy(big_template), cast(0.0, f32), cast(1.0, f32))
-  u_t = uniform_sample(big_template, cast(0.0, f32), cast(1.0, f32))
+  z_v_t = normal_sample(rng_draw_0, copy(big_template), cast(0.0, f32), cast(1.0, f32))
+  z_ind_t = normal_sample(rng_draw_1, copy(big_template), cast(0.0, f32), cast(1.0, f32))
+  u_t = uniform_sample(rng_draw_2, big_template, cast(0.0, f32), cast(1.0, f32))
   z_v_l = to_list(z_v_t)
   z_ind_l = to_list(z_ind_t)
   u_l = to_list(u_t)
@@ -202,7 +208,10 @@ def sto_kou_compensator(p: f32, eta_up: f32, eta_dn: f32) -> f32 = {
   }
 }
 def sto_kou_jump_sample(p: f32, eta_up: f32, eta_dn: f32, u_branch: f32, e_size: f32) -> f32 = if lt(u_branch, p) then div(e_size, eta_up) else neg(div(e_size, eta_dn))
-def sto_kou_jump_terminal[n](paths_template: tensor[n, f32], jumps_template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> tensor[n, f32] ! { Random } = {
+def sto_kou_jump_terminal[n](rng_key: key, paths_template: tensor[n, f32], jumps_template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> tensor[n, f32] = {
+  (rng_draw_0, rng_tail_0) = split_key(rng_key)
+  (rng_draw_1, rng_tail_1) = split_key(rng_tail_0)
+  (rng_draw_2, rng_draw_3) = split_key(rng_tail_1)
   _ = jumps_template
   n_paths = numel(copy(paths_template))
   expected_jumps_f = mul(lambda_jump, t)
@@ -210,10 +219,10 @@ def sto_kou_jump_terminal[n](paths_template: tensor[n, f32], jumps_template: ten
   n_max = if lt(n_max_raw, cast(1, i64)) then cast(1, i64) else n_max_raw
   total = mul(n_paths, n_max)
   big_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), total)))
-  z_diff = normal_sample(copy(paths_template), cast(0.0, f32), cast(1.0, f32))
-  u_branch_t = uniform_sample(copy(big_template), cast(0.0, f32), cast(1.0, f32))
-  u_thin_t = uniform_sample(copy(big_template), cast(0.0, f32), cast(1.0, f32))
-  e_size_t = exponential_sample(big_template, cast(1.0, f32))
+  z_diff = normal_sample(rng_draw_0, copy(paths_template), cast(0.0, f32), cast(1.0, f32))
+  u_branch_t = uniform_sample(rng_draw_1, copy(big_template), cast(0.0, f32), cast(1.0, f32))
+  u_thin_t = uniform_sample(rng_draw_2, copy(big_template), cast(0.0, f32), cast(1.0, f32))
+  e_size_t = exponential_sample(rng_draw_3, big_template, cast(1.0, f32))
   z_diff_l = to_list(z_diff)
   u_branch_l = to_list(u_branch_t)
   u_thin_l = to_list(u_thin_t)

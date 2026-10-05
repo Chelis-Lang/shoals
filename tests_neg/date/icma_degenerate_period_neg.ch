@@ -1,6 +1,6 @@
 module Shoals.TestsNeg.DateIcmaDegeneratePeriod
 import Std.Test (assert_eq)
-import Std.Time (date)
+import Std.Datetime (date)
 import Shoals.Date (ActActIcma, year_fraction)
 -- A coupon period that ends where it starts has no day count to measure the
 -- accrual against. Admitting it would divide by zero rather than reporting that

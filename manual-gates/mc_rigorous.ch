@@ -5,7 +5,7 @@ import Shoals.Pricing (bs_call_scalar, mc_call_price)
 import Shoals.Stochastic (gbm_terminal)
 def test_mc_call_rigorous() -> unit ! { Test } = {
   template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(100000, i64))))
-  mc_px = with seed(42i64) { mc_call_price(template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32)) }
+  mc_px = mc_call_price(key_from_seed(42i64), template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
   bs_px = bs_call_scalar(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
   diff = sub(mc_px, bs_px)
   abs_diff = if lt(diff, cast(0.0, f32)) then neg(diff) else diff
@@ -15,7 +15,7 @@ def test_mc_call_rigorous() -> unit ! { Test } = {
 }
 def test_gbm_terminal_rigorous() -> unit ! { Test } = {
   template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(100000, i64))))
-  st = with seed(123i64) { gbm_terminal(template, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32)) }
+  st = gbm_terminal(key_from_seed(123i64), template, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
   m = mean_vec(copy(st))
   expected_mean = mul(cast(100.0, f32), exp(mul(cast(0.05, f32), cast(1.0, f32))))
   diff_m = sub(m, expected_mean)

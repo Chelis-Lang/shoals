@@ -56,10 +56,16 @@ Spellings that are hard errors, not style:
   implicit currying, and juxtaposition stays rejected.
 - The unit value is `()`, the unit type is `unit`, and a singleton tuple is
   `(x,)`; that comma is semantic.
-- Effects carry exact casing: `Diff`, `Random`, `Accum`, `IO`, `Test`,
+- Effects carry exact casing: `Diff`, `Accum`, `IO`, `Test`,
   `Resource(...)`.
+- Randomness has no effect and no handler: a draw takes an explicit key,
+  `dropout(key_from_seed(42i64), x, 0.5f32)`. `with seed(...)` and
+  `! { Random }` are the typed `RetiredRandomness` parse error.
 - Non-primary transform arguments are named: `grad(f, wrt=x)`,
   `vmap(f, axis=n)`; axis zero is bare `vmap(f)`.
+- `sum`, `cumsum`, `trace`, and `einsum` over `i8` or `i16` return `i32`
+  (`spec/04` §5.7.1); declare the result as `i32`, pass `accumulator=i64` to
+  `sum` or `einsum`, or narrow it with an explicit `cast`.
 - Pipe stages use first-argument insertion: `x |> f(y)` means `f(x, y)`. Use
   `x |> fn (v) -> f(y, v)` when the piped value belongs in a later position.
 
@@ -96,9 +102,7 @@ Style the formatter does not enforce:
   an exported API or dense signature benefits from clarity, and `copy(x)`
   only when forking ownership for downstream consumption. Existing fixtures
   and migration baselines may keep explicit `copy()` or `drop()` calls when
-  they prove compatibility or preserve baseline evidence;
-  `redundant-linearity-call` is advisory and is not papered over with
-  blocking-rule exceptions.
+  they prove compatibility or preserve baseline evidence.
 - lowered IR carries compiler-inserted `Copy` and `Drop` nodes for implicit
   linearity. If auto-copy/auto-drop produces unexpected IR, treat it as a
   structural blocker and escalate against `spec/design/implicit_linearity.md`
@@ -120,3 +124,15 @@ Style the formatter does not enforce:
   in `spec/02-surf-syntax.md` §0.1 (`desugar(resugar(·))`, formatter
   idempotence, and the semantic retraction). If you change either printer or
   the desugarer, those laws are the oracle.
+<!-- shell-local:begin -->
+
+## Shoals Path Scope
+
+The `spec/02-surf-syntax.md`, `spec/03-deep-syntax.md`,
+`spec/01-nomenclature.md`, and `crates/chelis-lint/` paths above belong to
+the pinned Chelis compiler repository. Read them there when changing
+language semantics; they are not Shoals files. For Shoals `.ch` source, use
+the retained style rules above, `chelis fmt --check`, `chelis lint --check`,
+the executable Shoals tests, and `spec/shoals_quant_surface.md` for
+library scope.
+<!-- shell-local:end -->

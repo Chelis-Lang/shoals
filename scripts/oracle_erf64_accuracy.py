@@ -66,6 +66,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import re
 import struct
@@ -147,7 +148,7 @@ BATCH = 800
 # Reading 3 as 2 is what killed this script for three pin bumps -- it died with
 # `TypeError: cannot create mpf from {'dtype': 'f64', ...}` after 90 seconds of
 # real evaluation, and nothing noticed because nothing invoked it (shoals#64).
-SUPPORTED_EVAL_SCHEMAS = (2, 3)
+SUPPORTED_EVAL_SCHEMAS = (2, 3, 4)
 
 
 # --------------------------------------------------------------------------
@@ -338,15 +339,9 @@ def decode_scalar(entry: dict, schema: int) -> float:
     """One f64 off the eval wire, exactly, for a known schema version."""
     if schema == 2:
         return entry["value"]
-    carrier = entry["value"]
-    dtype = carrier.get("dtype")
-    if dtype != "f64":
-        raise SystemExit(
-            f"FAIL: expected an f64 on the eval wire, got dtype={dtype!r}. "
-            f"These floors are f64 claims; a narrower dtype would silently "
-            f"change what is being measured."
-        )
-    return struct.unpack(">d", bytes.fromhex(carrier["bits"]))[0]
+    if entry.get("type") != "scalar":
+        raise ValueError(f"expected a scalar on the eval wire: {entry!r}")
+    return decode_f64(entry["value"])
 
 
 def evaluate(points: list[float], call: str) -> list[float]:
@@ -366,6 +361,50 @@ def evaluate(points: list[float], call: str) -> list[float]:
             f"wire or evaluator fault, not a wrong published figure."
         )
     return out
+
+
+def decode_f64(value: object) -> float:
+    """Decode only the evaluator's exact tagged f64 bits."""
+    if not isinstance(value, dict):
+        raise ValueError(f"unexpected untagged f64 result: {value!r}")
+    bits = value.get("bits")
+    if (
+        set(value) != {"dtype", "bits"}
+        or value.get("dtype") != "f64"
+        or not isinstance(bits, str)
+        or re.fullmatch(r"[0-9a-fA-F]{16}", bits) is None
+    ):
+        raise ValueError(f"unexpected tagged f64 result: {value!r}")
+    number = struct.unpack(">d", bytes.fromhex(bits))[0]
+    if not math.isfinite(number):
+        raise ValueError(f"non-finite f64 result for finite oracle input: {value!r}")
+    return number
+
+
+def decoder_self_test() -> None:
+    for bits, expected in (
+        ("3ff0000000000000", 1.0),
+        ("bff0000000000000", -1.0),
+        ("0000000000000001", math.ldexp(1.0, -1074)),
+    ):
+        got = decode_f64({"dtype": "f64", "bits": bits})
+        if got != expected:
+            raise ValueError(f"f64 decoder changed {bits}: {got!r}")
+    for bad in (
+        {"dtype": "f32", "bits": "3ff0000000000000"},
+        {"dtype": "f64", "bits": "3ff"},
+        {"dtype": "f64", "bits": "7ff0000000000000"},
+        {"dtype": "f64", "bits": "7ff8000000000000"},
+        0.0,
+        1,
+        False,
+        None,
+    ):
+        try:
+            decode_f64(bad)
+        except ValueError:
+            continue
+        raise ValueError(f"f64 decoder accepted invalid value {bad!r}")
 
 
 def _evaluate_batch(points: list[float], call: str) -> list[float]:

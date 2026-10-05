@@ -1,5 +1,5 @@
 module Shoals.Properties.Date
-import Std.Time (Date, date, date_lt, date_lte)
+import Std.Datetime (Date, date, date_day, date_lt, date_lte)
 import Shoals.Date (DayCount, Act360, Act365, ThirtyThreeSixty, ActActIsda, ActActIcma, year_fraction, schedule_from_tenor, schedule_from_tenor_calendar, date_roll_following, is_weekend, add_months)
 import Shoals.HolidayCal (Calendar, weekend_only_calendar)
 import Shoals.References.Date (year_fraction_act_360_textbook, year_fraction_act_365_textbook, year_fraction_thirty_360_textbook, year_fraction_act_act_isda_textbook, year_fraction_act_act_icma_textbook)
@@ -57,7 +57,7 @@ def schedule_monotone_increasing(start: Date, end: Date, step_months: i64) -> bo
   }
 }
 def date_roll_following_idempotent_on_weekday(d: Date) -> bool = if is_weekend(d) then true else date_eq(date_roll_following(d, weekend_only_calendar()), d)
-def add_months_then_neg_is_identity(d: Date, n: i64) -> bool = if gt(d.day, cast(28, i64)) then true else date_eq(add_months(add_months(d, n), neg(n)), d)
+def add_months_then_neg_is_identity(d: Date, n: i64) -> bool = if gt(date_day(d), cast(28, i64)) then true else date_eq(add_months(add_months(d, n), neg(n)), d)
 def schedule_calendar_monotone_increasing(start: Date, end: Date, step_months: i64) -> bool = {
   dates = schedule_from_tenor_calendar(start, end, step_months)
   n = len(dates)

@@ -1,6 +1,6 @@
 module Shoals.TestsNeg.DateIcmaNegativeFrequency
 import Std.Test (assert_eq)
-import Std.Time (date)
+import Std.Datetime (date)
 import Shoals.Date (ActActIcma, year_fraction)
 -- Red-team F2/X1. The zero-frequency case alone left `lt(n, 1)` indistinguishable
 -- from `eq(n, 0)`: with the guard narrowed to equality a negative frequency

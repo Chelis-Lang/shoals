@@ -1,5 +1,5 @@
 module Shoals.Tenor
-import Std.Time (Date, add_days)
+import Std.Datetime (Date, date_add_days)
 export (TenorUnit, Tenor, tenor, tenor_to_days, tenor_apply, days_per_unit, overnight, tomorrow_next, spot_next, days_n, weeks_n, months_n, years_n, parse_tenor, parse_unit_suffix)
 type TenorUnit =
   | Day
@@ -33,7 +33,7 @@ def tenor_to_days(t: Tenor) -> i64 =
   match t with {
     | Tenor { count: c, unit: u } => mul(c, days_per_unit(u))
   }
-def tenor_apply(t: Tenor, reference: Date) -> Date = add_days(reference, tenor_to_days(t))
+def tenor_apply(t: Tenor, reference: Date) -> Date = date_add_days(reference, tenor_to_days(t))
 def char_at(text: string, idx: i64) -> string = string_slice(text, idx, cast(1, i64))
 def parse_unit_suffix(suffix: string) -> TenorUnit = if eq(suffix, "D") then Day else if eq(suffix, "W") then Week else if eq(suffix, "M") then Month else if eq(suffix, "Y") then Year else fail("Shoals.Tenor.parse_tenor: unknown unit suffix (expected D/W/M/Y)")
 def parse_tenor(text: string) -> Tenor =

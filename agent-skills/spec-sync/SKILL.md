@@ -23,16 +23,21 @@ Use this skill whenever a change affects public language/compiler behavior.
   to `examples/illustrative/`.
 - If the change affects a completion claim, update the phase oracle docs and any current
   phase-status summary in the same change set.
+<!-- shell-local:begin -->
+<!-- shell-local:exclude:begin -->
+<!-- ## Verification -->
+<!-- shell-local:exclude:end -->
 
-## Verification
+## Shoals Verification
 
-Run the pre-push gate after the edits, then require applicable CI checks to pass on
-the pushed candidate before ready-for-review:
+After source and contract edits, run Shoals's gate with the worktree Python
+3.11 environment on PATH:
 
 ```sh
-python3 scripts/gate.py --fast
+PATH="$PWD/.venv/bin:$PATH" python3 scripts/run_local_gate.py
 ```
 
-`python3 scripts/gate.py --local` is optional for troubleshooting or additional local
-validation. It is not a per-PR requirement and does not replace a named acceptance
-oracle or manual gate.
+For a pin bump run it with `--full`. Require applicable hosted checks on the
+exact pushed head and the relevant manual or numerical oracle before claiming
+completion.
+<!-- shell-local:end -->

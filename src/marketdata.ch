@@ -1,5 +1,5 @@
 module Shoals.MarketData
-import Std.Time (Date)
+import Std.Datetime (Date)
 export (Side, Quote, Bar, Snapshot, make_quote, make_bar, make_snapshot, quote_side, quote_value, md_bar_open, md_bar_high, md_bar_low, md_bar_close, md_bar_volume, snapshot_lookup)
 type Side =
   | Bid

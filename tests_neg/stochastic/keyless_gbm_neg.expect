@@ -1,0 +1,2 @@
+function arity mismatch: expected 6 args, got 5
+Assumption: a Shoals stochastic export requires its affine key as the first argument.

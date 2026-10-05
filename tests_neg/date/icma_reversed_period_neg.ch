@@ -1,6 +1,6 @@
 module Shoals.TestsNeg.DateIcmaReversedPeriod
 import Std.Test (assert_eq)
-import Std.Time (date)
+import Std.Datetime (date)
 import Shoals.Date (ActActIcma, year_fraction)
 -- Red-team F2/X3. The empty-period case alone left `lt(span, 1)`
 -- indistinguishable from `eq(span, 0)`: with the guard narrowed to equality a

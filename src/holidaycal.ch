@@ -1,14 +1,14 @@
 module Shoals.HolidayCal
-import Std.Time (Date, date, add_days, day_of_week, DayOfWeek, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday)
+import Std.Datetime (Date, date, date_add_days, date_weekday, date_year, date_month, date_day, Weekday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday)
 export (Calendar, is_holiday, is_business_day, hc_nyc_calendar, hc_ldn_calendar, joint_calendar, weekend_only_calendar, empty_calendar, easter_sunday_gregorian, good_friday, easter_monday, hc_nyc_calendar_year, hc_ldn_calendar_year, hc_nyc_calendar_multi, hc_ldn_calendar_multi, hc_tyo_is_holiday, hc_syd_is_holiday, hc_fra_is_holiday, hc_hkg_is_holiday)
 type Calendar =
   | Calendar { name: string, holidays: List[Date] }
 def empty_calendar(name: string) -> Calendar = Calendar { name, holidays: [] }
 def weekend_only_calendar() -> Calendar = Calendar { name: "weekend", holidays: [] }
-def date_eq(a: Date, b: Date) -> bool = and(eq(a.year, b.year), and(eq(a.month, b.month), eq(a.day, b.day)))
+def date_eq(a: Date, b: Date) -> bool = and(eq(date_year(a), date_year(b)), and(eq(date_month(a), date_month(b)), eq(date_day(a), date_day(b))))
 def list_contains_date(holidays: List[Date], d: Date) -> bool = fold(fn (acc: bool, h: Date) -> or(acc, date_eq(h, d)), false, holidays)
 def is_weekend(d: Date) -> bool =
-  match day_of_week(d) with {
+  match date_weekday(d) with {
     | Saturday => true
     | Sunday => true
     | Monday => false
@@ -39,8 +39,8 @@ def easter_sunday_gregorian(year: i64) -> Date = {
   day_total = add(mod(add(add(h_val, l), sub(cast(114, i64), mul(cast(7, i64), m))), cast(31, i64)), cast(1, i64))
   date(year, month_total, day_total)
 }
-def good_friday(year: i64) -> Date = add_days(easter_sunday_gregorian(year), cast(-2, i64))
-def easter_monday(year: i64) -> Date = add_days(easter_sunday_gregorian(year), cast(1, i64))
+def good_friday(year: i64) -> Date = date_add_days(easter_sunday_gregorian(year), cast(-2, i64))
+def easter_monday(year: i64) -> Date = date_add_days(easter_sunday_gregorian(year), cast(1, i64))
 def hc_nyc_calendar_year(year: i64) -> Calendar = Calendar { name: "nyc", holidays: [date(year, cast(1, i64), cast(1, i64)), date(year, cast(7, i64), cast(4, i64)), date(year, cast(12, i64), cast(25, i64))] }
 def hc_ldn_calendar_year(year: i64) -> Calendar = Calendar { name: "ldn", holidays: [date(year, cast(1, i64), cast(1, i64)), good_friday(year), easter_monday(year), date(year, cast(12, i64), cast(25, i64)), date(year, cast(12, i64), cast(26, i64))] }
 def concat_holidays(years: List[i64], gen: i64 -> List[Date]) -> List[Date] =
@@ -71,7 +71,7 @@ def joint_calendar(left: Calendar, right: Calendar) -> Calendar =
   }
 export (hc_tyo_holidays_year, hc_syd_holidays_year, hc_fra_holidays_year, hc_hkg_holidays_year, hc_tyo_is_holiday, hc_syd_is_holiday, hc_fra_is_holiday, hc_hkg_is_holiday)
 def hc_dow_to_int(d: Date) -> i64 =
-  match day_of_week(d) with {
+  match date_weekday(d) with {
     | Monday => cast(0, i64)
     | Tuesday => cast(1, i64)
     | Wednesday => cast(2, i64)
@@ -84,14 +84,14 @@ def hc_nth_weekday_of_month(year: i64, month: i64, target_dow: i64, n: i64) -> D
   first = date(year, month, cast(1, i64))
   first_dow = hc_dow_to_int(first)
   offset_to_target = mod(add(sub(target_dow, first_dow), cast(7, i64)), cast(7, i64))
-  base = add_days(first, offset_to_target)
-  add_days(base, mul(sub(n, cast(1, i64)), cast(7, i64)))
+  base = date_add_days(first, offset_to_target)
+  date_add_days(base, mul(sub(n, cast(1, i64)), cast(7, i64)))
 }
 def hc_observed_mon_if_weekend(d: Date) -> Date = {
   wd = hc_dow_to_int(d)
-  if eq(wd, cast(5, i64)) then add_days(d, cast(2, i64)) else if eq(wd, cast(6, i64)) then add_days(d, cast(1, i64)) else d
+  if eq(wd, cast(5, i64)) then date_add_days(d, cast(2, i64)) else if eq(wd, cast(6, i64)) then date_add_days(d, cast(1, i64)) else d
 }
-def hc_triple(d: Date) -> (i64, i64, i64) = (d.year, d.month, d.day)
+def hc_triple(d: Date) -> (i64, i64, i64) = (date_year(d), date_month(d), date_day(d))
 def hc_triple_eq(a: (i64, i64, i64), y: i64, m: i64, d: i64) -> bool = and(eq(a.0, y), and(eq(a.1, m), eq(a.2, d)))
 def hc_list_contains_triple(xs: List[(i64, i64, i64)], y: i64, m: i64, d: i64) -> bool = fold(fn (acc: bool, t: (i64, i64, i64)) -> or(acc, hc_triple_eq(t, y, m, d)), false, xs)
 def hc_vernal_equinox_day(year: i64) -> i64 = if eq(year, cast(2025, i64)) then cast(20, i64) else if eq(year, cast(2026, i64)) then cast(20, i64) else if eq(year, cast(2027, i64)) then cast(21, i64) else if eq(year, cast(2028, i64)) then cast(20, i64) else if eq(year, cast(2029, i64)) then cast(20, i64) else if eq(year, cast(2030, i64)) then cast(20, i64) else cast(20, i64)
@@ -133,8 +133,8 @@ def hc_fra_holidays_year(year: i64) -> List[(i64, i64, i64)] = {
   good_fri = hc_triple(good_friday(year))
   east_mon = hc_triple(easter_monday(year))
   labour = (year, cast(5, i64), cast(1, i64))
-  ascension = hc_triple(add_days(easter_sunday_gregorian(year), cast(39, i64)))
-  whit_mon = hc_triple(add_days(easter_sunday_gregorian(year), cast(50, i64)))
+  ascension = hc_triple(date_add_days(easter_sunday_gregorian(year), cast(39, i64)))
+  whit_mon = hc_triple(date_add_days(easter_sunday_gregorian(year), cast(50, i64)))
   unity = (year, cast(10, i64), cast(3, i64))
   christmas = (year, cast(12, i64), cast(25, i64))
   boxing = (year, cast(12, i64), cast(26, i64))
@@ -147,7 +147,7 @@ def hc_buddha_birthday(year: i64) -> (i64, i64, i64) = if eq(year, cast(2025, i6
 def hc_dragon_boat(year: i64) -> (i64, i64, i64) = if eq(year, cast(2025, i64)) then (cast(2025, i64), cast(5, i64), cast(31, i64)) else if eq(year, cast(2026, i64)) then (cast(2026, i64), cast(6, i64), cast(19, i64)) else if eq(year, cast(2027, i64)) then (cast(2027, i64), cast(6, i64), cast(9, i64)) else if eq(year, cast(2028, i64)) then (cast(2028, i64), cast(5, i64), cast(28, i64)) else if eq(year, cast(2029, i64)) then (cast(2029, i64), cast(6, i64), cast(16, i64)) else if eq(year, cast(2030, i64)) then (cast(2030, i64), cast(6, i64), cast(5, i64)) else (year, cast(6, i64), cast(1, i64))
 def hc_mid_autumn_day_after(year: i64) -> (i64, i64, i64) = if eq(year, cast(2025, i64)) then (cast(2025, i64), cast(10, i64), cast(7, i64)) else if eq(year, cast(2026, i64)) then (cast(2026, i64), cast(9, i64), cast(26, i64)) else if eq(year, cast(2027, i64)) then (cast(2027, i64), cast(9, i64), cast(16, i64)) else if eq(year, cast(2028, i64)) then (cast(2028, i64), cast(10, i64), cast(4, i64)) else if eq(year, cast(2029, i64)) then (cast(2029, i64), cast(9, i64), cast(23, i64)) else if eq(year, cast(2030, i64)) then (cast(2030, i64), cast(9, i64), cast(13, i64)) else (year, cast(9, i64), cast(15, i64))
 def hc_chung_yeung(year: i64) -> (i64, i64, i64) = if eq(year, cast(2025, i64)) then (cast(2025, i64), cast(10, i64), cast(29, i64)) else if eq(year, cast(2026, i64)) then (cast(2026, i64), cast(10, i64), cast(18, i64)) else if eq(year, cast(2027, i64)) then (cast(2027, i64), cast(10, i64), cast(8, i64)) else if eq(year, cast(2028, i64)) then (cast(2028, i64), cast(10, i64), cast(26, i64)) else if eq(year, cast(2029, i64)) then (cast(2029, i64), cast(10, i64), cast(16, i64)) else if eq(year, cast(2030, i64)) then (cast(2030, i64), cast(10, i64), cast(5, i64)) else (year, cast(10, i64), cast(1, i64))
-def hc_triple_add_days(t: (i64, i64, i64), n: i64) -> (i64, i64, i64) = hc_triple(add_days(date(t.0, t.1, t.2), n))
+def hc_triple_add_days(t: (i64, i64, i64), n: i64) -> (i64, i64, i64) = hc_triple(date_add_days(date(t.0, t.1, t.2), n))
 def hc_hkg_holidays_year(year: i64) -> List[(i64, i64, i64)] = {
   new_year = (year, cast(1, i64), cast(1, i64))
   lny_1 = hc_lunar_new_year_first(year)

@@ -1,0 +1,2 @@
+key-carrying variable `k` was already consumed
+Assumption: two Shoals stochastic calls cannot consume the same affine key.

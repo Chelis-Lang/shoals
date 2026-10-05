@@ -1,6 +1,6 @@
 module Shoals.Tests.Tenor
 import Std.Test (assert_eq, assert_true)
-import Std.Time (date, days_between)
+import Std.Datetime (date, date_days_until)
 import Shoals.Tenor (Tenor, TenorUnit, Day, Week, Month, Year, Overnight, TomorrowNext, SpotNext, tenor, tenor_to_days, tenor_apply, days_per_unit, overnight, tomorrow_next, spot_next, days_n, weeks_n, months_n, years_n, parse_tenor)
 def test_days_per_unit_day() -> unit ! { Test } = assert_eq(days_per_unit(Day), cast(1, i64), "Day = 1")
 def test_days_per_unit_week() -> unit ! { Test } = assert_eq(days_per_unit(Week), cast(7, i64), "Week = 7")
@@ -15,7 +15,7 @@ def test_thirty_years_to_days() -> unit ! { Test } = assert_eq(tenor_to_days(yea
 def test_tenor_apply_advances_date() -> unit ! { Test } = {
   ref = date(cast(2025, i64), cast(6, i64), cast(15, i64))
   shifted = tenor_apply(months_n(cast(3, i64)), ref)
-  delta = days_between(ref, shifted)
+  delta = date_days_until(ref, shifted)
   assert_eq(delta, cast(90, i64), "tenor_apply advances by 90 days for 3M (alpha)")
 }
 def test_overnight_constructor() -> unit ! { Test } = assert_eq(tenor_to_days(overnight()), cast(1, i64), "overnight() = 1 day")
