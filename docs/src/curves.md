@@ -106,28 +106,45 @@ guard on caller-supplied times, or reuses the times of a curve that already
 passed it — the five sensitivity shifts below, and `bootstrap_multi_curve`,
 whose pillars are instrument tenors the bootstrap already requires to be
 increasing. **So every `YieldCurve` and `CurveBasis` value in existence has
-readable pillars, by induction over the producers.**
+readable pillars, by induction over the producers.** The compiler checks the
+first clause of that induction and enumerates the escape points it has to
+cover; that every producer guards or passes through guarded times is a reading
+of the ten construction sites, not something the checker verifies. Note also
+that the induction is about ordering alone — it does not make pillar times
+finite, per the single-pillar `NaN` admission above.
 
-Opacity also closes record *patterns*, not only construction, because a
-consumer able to destructure a sorted curve can rebuild an unsorted one from
-its fields. The sanctioned readers are `curve_kind`, `rate_at` and friends,
-and:
+Opacity closes record *patterns* as well as construction, because `@opaque`
+closes both together and hiding the representation is the point. It is not what
+defends the ordering rule: a field-by-field rebuild has to go back through a
+producer, and the producer guard rejects it — measured, with
+`curve_pillars` and nothing else, the rebuild compiles and then fails with
+`pillar times must be strictly increasing`. The sanctioned readers are
+`curve_kind`, `rate_at` and friends, and:
 
 ```chelis
 def curve_pillars[n](curve: YieldCurve[n]) -> (tensor[n, f32], tensor[n, f32])
 def basis_pillars[n](basis: CurveBasis[n]) -> (tensor[n, f32], tensor[n, f32])
 ```
 
-Both tensors come back together because the curve is linear, so two
-single-field readers would force a caller wanting the second to copy the curve.
-Naming the type in a signature or annotation is unaffected — `c: YieldCurve[3]`
-still compiles outside the module.
+Both tensors come back together because a caller that wants one usually wants
+both. There is no linearity reason: auto-borrow reads two single-field readers
+off one curve without a `copy`, and `copy` does not accept this type at all
+(`copy requires tensor input`). Naming the type in a signature or annotation is
+unaffected — `c: YieldCurve[3]` still compiles outside the module.
 
 The ordering rule is enforced by the producers rather than declared as an
 `@invariant` on the type, which would also have it discharged per producer by
-`chelis prove`. That is not expressible at this pin: a `tensor[n, f32]` field
-falls outside the V1 invariant value class, which admits only fixed-shape
-numeric tensors, and `index` is outside the invariant predicate grammar.
+`chelis prove`. It is **not expressible at this pin at all**, which the
+compiler reports three ways at once for `YieldCurve`: `kind: CurveKind` is a
+multi-variant ADT and both tensor fields have symbolic extents, so all three
+fall outside the V1 invariant value class (scalar primitives, *fixed-shape*
+numeric tensors, or nested single-variant records of those); and `index` is
+outside the invariant predicate grammar. The grammar blocker is the decisive
+one — it admits no indexing at any extent, so pairwise ordering cannot be
+written even for a fixed-extent, single-variant wrapper. The compiler
+accordingly emits a permanent advisory `opaque-without-invariant` note for both
+types, which is expected here rather than a gap to close; it is advisory, and
+`chelis lint --check` exits 0.
 
 ## Interpolation and discount factors
 
@@ -222,15 +239,56 @@ missed one (shoals#113).
   and flat outside them. A bootstrapped curve therefore reprices each input
   swap through `discount_factor`.
 
-`instrument_validate` rejects a non-positive tenor, a deposit rate at or
-below `-1`, a zero-coupon price outside `(0, 1]`, a non-positive
+`instrument_validate` rejects a non-finite tenor or quote, a non-positive
+tenor, a deposit rate at or below `-1` or whose `1 + rate * tenor` is not
+positive, a zero-coupon price outside `(0, 1]`, a non-positive
 `payments_per_year`, and a swap tenor that is not a whole number of payment
 periods. The bootstrap raises a runtime `fail` naming
 `Shoals.Curves.bootstrap_multi` when an instrument is invalid, or when any
 instrument's tenor does not exceed every earlier pillar (instruments must be
 listed in strictly increasing tenor). It never snaps a schedule or re-sorts
-pillars. A rate the root finder cannot bracket in `[-0.5, 2.0]`, or a `NaN`
-quote, still comes back as `NaN`.
+pillars.
+
+**The instrument bootstrap never returns a sentinel.** Every pillar
+`bootstrap_multi` returns is a finite zero rate; everything else is a `fail`.
+The qualifier is load-bearing and the unqualified sentence is false: the
+`bootstrap_zero_from_par` above still answers a non-positive par price with a
+`NaN` rate, unchanged, and shoals#76 had to narrow exactly this wording once
+before for exactly that reason. The search bracket is
+`[-0.5, 2.0]` and belongs to this module rather than to
+`Nautilus.Roots.brent`, so when `brent` cannot return a rate it is this module
+that says why. The three diagnostics classify that outcome, each reporting the
+repricing residual at both endpoints and the offending instrument's tenor and
+quote:
+
+- a quote whose zero rate lies outside the bracket leaves the residual the
+  same sign at both endpoints, and fails with *no zero rate for this
+  instrument in the search bracket `[-0.5, 2.0]`*;
+- a residual that is not finite at an endpoint fails with *the repricing
+  residual is not finite over the search bracket*. Reachable two ways: a
+  long-dated swap whose `exp(0.5 * tenor)` overflows `f32` — about 177 years
+  and up, which `instrument_validate` does not bound — or, through
+  `fd_bump_pillar_rate` and the gradient entry points, earlier pillars the
+  caller supplied carrying a `NaN`. The clause is *the bracket cannot be
+  searched*, not *there is no root*: a root may exist and be unreachable;
+- a bracketed solve that exhausts its hundred iterations fails with *did not
+  converge*. This is the residual case, reached only when neither of the
+  above holds. No input is known to produce it, and nothing tests it; it
+  exists so that the postcondition below is total.
+
+Those are a total classification, so the postcondition is that
+`bootstrap_multi` returns finite pillars or fails. `brent` is called first and
+with the same arguments it has always had, and the endpoints are read only to
+explain a `NaN` it has already returned — so every quote that solved before
+still solves and returns the same rate.
+
+Previously all three came back as a `NaN` pillar that `instrument_validate`
+accepted and `rate_at`, `discount_factor` and the implicit-function-theorem
+gradients then propagated, so a downstream price could be `NaN` far from the
+instrument that caused it, and callers had to test `eq(z, z)` on every pillar
+(shoals#79). Widening the bracket is a separate question and is not what
+changed: a quote outside it is rejected, not re-solved.
+
 From `tests/curves_bootstrap_schedule.ch`, a gapped annual strip:
 
 ```chelis
@@ -250,6 +308,16 @@ implicit-function-theorem sensitivities of the solved zero rates to the
 instrument quotes, over the same coupon schedule and interpolation. FRAs and
 futures are not instruments here, and the solve is sequential rather than
 joint; see [Scope and limitations](scope.md).
+
+`bootstrap_grad_full_jacobian`'s `paths_template` carries only the result's
+extent, exactly as `times_template` does for `bootstrap_multi_curve`, and must
+likewise have one entry per instrument. Either mismatch direction is a runtime
+`fail` reporting both counts (`template has 3 entries for 2 instruments`);
+both previously returned a full matrix of `NaN`, which nothing distinguished
+from a Jacobian whose entries were `NaN` for a numerical reason (shoals#79).
+An invalid instrument likewise fails, through the bootstrap's own diagnostic,
+rather than being reported as that matrix. Neither function uses a `NaN`
+result as a signal any more.
 
 ### Basis spreads
 

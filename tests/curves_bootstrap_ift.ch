@@ -88,14 +88,6 @@ def test_grad_high_rate_within_bracket() -> unit ! { Test } = {
   _ = assert_close(g0, expected, cast(0.001, f32), "200% deposit lands inside [-0.5, 2.0] brent bracket (implied zero ~110%) and gradient is analytic")
   assert_true(eq(g0, g0), "gradient is finite (not NaN) under high-but-in-bracket stress")
 }
-def test_grad_out_of_bracket_propagates_nan_observably() -> unit ! { Test } = {
-  d = deposit(cast(1.0, f32), cast(50.0, f32))
-  grads = bootstrap_grad_at_solution([d])
-  g0 = index(grads, cast(0, i64))
-  is_nan = if eq(g0, g0) then false else true
-  is_zero = eq(g0, cast(0.0, f32))
-  assert_true(if is_nan then true else is_zero, "deposit r=5000% (implied zero ~log(51)≈3.93 outside [-0.5, 2.0]) returns observably degenerate value (NaN or 0); silent garbage is prevented because the caller can test eq(g, g)")
-}
 def test_grad_pathological_pillar_returns_finite_or_documented() -> unit ! { Test } = {
   -- Duplicate tenors now fail loudly (tests_neg/curves/bootstrap_duplicate_tenor_neg.ch),
   -- so the pathological case here is extreme but valid spacing: 0.01y then 50y.

@@ -1,0 +1,8 @@
+Shoals.Curves.bootstrap_multi: no zero rate for this instrument in the search bracket [-0.5, 2.0]: the repricing residual keeps one sign across it, 38.516483 at -0.5 and 8.816857 at 2.0 (instrument tenor 2.0, quote 10.0)
+
+The first of the issue's two bracket-miss directions. Measured on `130d235`
+this returned `[0.03922057, NaN]` with no failure, and the NaN then propagated
+through `rate_at`, `discount_factor` and the IFT gradients, so a downstream
+price could come back NaN far from the instrument that caused it. The message
+carries both endpoint residuals because they are what proves the bracket could
+not hold a root: same sign, so no sign change to bisect.

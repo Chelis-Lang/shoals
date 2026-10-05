@@ -1,0 +1,7 @@
+Shoals.Curves.bootstrap_multi: invalid instrument (see instrument_validate)
+
+Measured on `130d235`: `bootstrap_multi([deposit(2.0, -0.6)])` returned `[NaN]`
+and `instrument_validate(deposit(2.0, -0.6))` returned `true`. The repair keeps
+the `rate > -1` bound and adds `1 + rate * tenor > 0`, so the predicate narrows
+in both directions and widens in neither -- the tenor-aware bound alone would
+newly accept a rate below -1 at a tenor under a year.

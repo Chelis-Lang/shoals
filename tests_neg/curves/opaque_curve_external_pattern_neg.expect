@@ -1,8 +1,11 @@
 record pattern match on opaque type `YieldCurve` outside its defining module `Shoals.Curves`
 
-Opacity closes the read side too, and that half is not merely tidiness: a
-consumer that can destructure a curve can rebuild an unsorted one field by
-field from a sorted one, which is the construction route again with an extra
-step. `curve_pillars` is the sanctioned reader and returns both pillar tensors
-together; `tests/curves_bootstrap.ch` and `tests/curves_bootstrap_schedule.ch`
-were moved onto it in the same change, with every assertion unchanged.
+Opacity closes the read side too, because `@opaque` closes construction and
+inspection together and hiding the representation is the point. It is *not*
+what defends the pillar order: a field-by-field rebuild has to pass back
+through a producer, and the producer guard rejects it -- using `curve_pillars`
+alone, the rebuild compiles and then fails with `pillar times must be strictly
+increasing`. `curve_pillars` is the sanctioned reader and hands back the same
+two tensors a record pattern bound; `tests/curves_bootstrap.ch` and
+`tests/curves_bootstrap_schedule.ch` were moved onto it in the same change,
+with every assertion unchanged.

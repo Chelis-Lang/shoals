@@ -1,0 +1,8 @@
+Shoals.Curves.bootstrap_multi: invalid instrument (see instrument_validate)
+
+The issue's first reproduction. It is rejected at validation rather than at the
+bracket because a NaN quote is a malformed instrument, not a numerical
+condition of the solve -- and reaching the solve with it is worse than silent:
+the residual is NaN at both endpoints, so `brent` recurses to its iteration
+budget, which aborts the `chelis eval` lane with a stack overflow instead of
+returning the NaN sentinel it returns under `chelis test`.

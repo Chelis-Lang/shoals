@@ -55,9 +55,19 @@ def test_pillar_readers_return_what_was_built() -> unit ! { Test } = {
   _ = assert_close(index(to_list(bp.0), cast(0, i64)), cast(1.0, f32), cast(1e-7, f32), "first basis time round-trips")
   assert_close(index(to_list(bp.1), cast(2, i64)), cast(0.03, f32), cast(1e-7, f32), "last basis spread round-trips")
 }
+-- Second shape/config case for `basis_pillars` (shell contract §9, which
+-- `conform audit` row 16 routes to a reviewer): a two-pillar basis rather than
+-- the three-pillar one above, so the new verb is exercised at more than one
+-- extent and from more than one literal.
+def test_basis_pillars_at_a_second_extent() -> unit ! { Test } = {
+  bp = basis_pillars(curve_basis_from_pillars(to_tensor([cast(0.5, f32), cast(4.0, f32)]), to_tensor([cast(0.001, f32), cast(0.009, f32)])))
+  _ = assert_close(index(to_list(bp.0), cast(1, i64)), cast(4.0, f32), cast(1e-7, f32), "n=2 basis time round-trips")
+  assert_close(index(to_list(bp.1), cast(0, i64)), cast(0.001, f32), cast(1e-7, f32), "n=2 basis spread round-trips")
+}
 -- A derived curve is still a curve built inside the module, so the reader sees
--- the shifted rates and the original times. This is the inductive step the
--- opacity argument rests on, exercised rather than asserted.
+-- the shifted rates and the original times. This exercises one instance of the
+-- inductive step the opacity argument rests on; the other four shifts are
+-- covered by `tests/curves_ops.ch`'s value assertions.
 def test_shifted_curve_keeps_its_pillar_times() -> unit ! { Test } = {
   pillars = curve_pillars(parallel_shift(yield_curve_from_pillars(pillar_times(), pillar_rates()), cast(0.01, f32)))
   _ = assert_close(index(to_list(pillars.0), cast(1, i64)), cast(2.0, f32), cast(1e-7, f32), "a shift preserves pillar times verbatim")

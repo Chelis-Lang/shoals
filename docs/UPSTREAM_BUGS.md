@@ -443,6 +443,47 @@ No parked entries.
 
 ## Archived
 
+- **shoals#79 — `Shoals.Curves` answered a failed bootstrap with a silent `NaN`.**
+  Resolved in this shell by failing loudly at the precondition instead: a quote
+  whose zero rate falls outside the module's `[-0.5, 2.0]` search bracket, a
+  repricing residual that is not finite over it, a non-converged solve, a
+  non-finite tenor or quote, a deposit whose `1 + rate * tenor` is not positive,
+  and a `paths_template` whose length does not match the instrument list all
+  raise a diagnostic carrying the measured values. `tests_neg/curves/` covers
+  nine cases and `tests/curves_bootstrap_ift_full.ch` the positive side. The
+  `did not converge` diagnostic is **not** covered: it is the residual arm of
+  the classification, no input is known to reach it, and claiming coverage for
+  it would be false.
+  Recorded here because §4's narrowing-coverage scanner reads the `shoals#79`
+  and `shoals#113` citations in `src/curves.ch`, and neither is a narrowing:
+  both comments explain a design decision that outlives the fix.
+    - **Nothing is narrowed and nothing is worked around.** The bracket is this
+      module's own choice, not a limit imposed by `Nautilus.Roots.brent`, so
+      stating its precondition is a contract this shell owns. Whether the
+      bracket should be *wider* is a separate question and deliberately
+      untouched: a quote outside it is rejected, not re-solved.
+    - **The `shoals#113` citation is a precedent, not a dependency.** It names
+      the shape that issue's merged resolution chose for the sibling
+      `bootstrap_multi_curve` at `3ddd518` — read the precondition, fail with
+      both measured counts — which this change applies to
+      `bootstrap_grad_full_jacobian`.
+    - **One upstream observation, filed nowhere and not blocking.** Under
+      `chelis eval --file`, a residual that is not finite anywhere makes
+      `brent_rec` recurse to its hundred-iteration budget and the lane aborts
+      with `fatal runtime error: stack overflow` rather than returning the NaN
+      that `chelis test` returns from the same call. Measured at 0.18.11 with
+      `brent(fn (z) -> 0.0/0.0, -0.5, 2.0, 1e-7, 100)`; the same-sign case
+      returns NaN without recursing, so the two differ. **Shoals reaches
+      this**, deliberately: an earlier revision of this change examined the
+      endpoints before calling `brent` and so avoided the recursion, but doing
+      that reordered `brent`'s own endpoint-root acceptance and broke a quote
+      that solved on `130d235` (`cur_par_swap(200.0, 6.3890557, 1)`, a root
+      sitting exactly on an endpoint beside a non-finite one). Preserving the
+      solver's behaviour was worth more than routing around the eval lane, so
+      the classification happens after the call. Owner undetermined: whether
+      the abort is recursion depth or that lane's stack size decides whether it
+      belongs to nautilus or to chelis, and that is unmeasured.
+
 - **shoals#101 — three exported Greeks were `NaN` at expiry and call delta was silently wrong at the strike.** Resolved
   in this shell by supplying the `t = 0` limits in closed form in the Greek
   wrappers; `tests/pricing_greeks_expiry.ch` covers all nine cells and the

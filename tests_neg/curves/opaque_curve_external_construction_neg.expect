@@ -10,5 +10,8 @@ property of the type rather than of four call sites: a value can only originate
 from an in-module producer, and every in-module producer either runs the
 strictly-increasing guard on caller-supplied times or reuses the times of a
 curve that already passed it. The diagnostic lists the sanctioned producers,
-which is also the inductive argument in machine-checked form -- the five
-sensitivity shifts appear there as `YieldCurve -> YieldCurve`.
+which is the set of escape points that argument has to cover -- the five
+sensitivity shifts appear there as `YieldCurve -> YieldCurve`, i.e. as the
+inductive step. The checker verifies only that values originate in-module; that
+each producer guards or passes through guarded times is a reading of the
+source.
