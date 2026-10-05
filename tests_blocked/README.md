@@ -9,6 +9,11 @@ entry in the same change set).
 
 ## Current probes
 
+**`timeseries/rolling_f64_absent.ch`** — Nautilus's current TimeSeries
+surface remains tensor-shaped and f32-only (nautilus#70 / nautilus#85).
+Re-probe it against the next compatible Nautilus release and follow its
+sidecar before retiring Shoals's list-shaped f64 indicator layer.
+
 The former `special/canonical_erf_absent.ch` probe passed compilation with
 Chelis 0.18.13, which provides `erf` and `erfc` primitives. It is promoted to
 `tests/canonical_erf.ch`. Shoals's Cody kernel remains in use pending a
@@ -17,12 +22,12 @@ compatible package-chain comparison of numerical and Greek behavior.
 This directory was deliberately empty from the chelis 0.18.6 bump until
 2026-09-05. **That emptiness was load-bearing for the chelis#1387 entry**,
 whose re-probe criterion was "row 12 reads `NA` on the unmodified tree" — a
-criterion the current probe invalidates, since row 12 now reads `PASS` whether
+criterion the remaining probe invalidates, since row 12 now reads `PASS` whether
 or not chelis#1387 is fixed. That entry's trigger has been amended to move
 this directory aside before re-probing; if you add or remove probes here,
 check it still discriminates.
 
-Shoals also carries two actively-blocking upstream entries that are not
+Shoals also carries two actively-blocking entries that are not
 expressible here: one is a `chelis reef conform audit` row verdict and the
 other is a wall-clock measurement, so `chelis test --expect blocked` cannot
 express either. Both are listed under §cannot-be-probed below.

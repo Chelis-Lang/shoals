@@ -124,8 +124,8 @@ in code that is CLOSED upstream but not sitting in §Archived.
       **Amended 2026-09-05:** `tests_blocked/` is no longer empty, so row 12
       now reads `PASS` on the unmodified tree whether or not this defect is
       fixed, and the old "require row 12 `NA`" criterion can no longer
-      discriminate. Re-probe by moving `tests_blocked/special/` aside and
-      re-running `chelis reef conform audit`: with the directory empty and the
+      discriminate. Re-probe in an isolated copy with every `.ch` probe under
+      `tests_blocked/` temporarily absent, then run `chelis reef conform audit`: with the directory empty and the
       `src/` citations still present, row 12 reads `NA` if fixed and `FAIL` if
       not. Restore the directory afterwards. Then replace this draft path with
       the issue number everywhere it is cited.
