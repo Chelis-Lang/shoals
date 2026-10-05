@@ -57,9 +57,15 @@ PROBE_TO_TEST = {
     "5_pathological_pillar_spacing": [
         "test_grad_pathological_pillar_returns_finite_or_documented",
     ],
+    # shoals#79 removed the out-of-bracket half of this probe from this file.
+    # An implied zero outside [-0.5, 2.0] is now a loud `fail`, which a positive
+    # suite cannot express, so that case lives in
+    # tests_neg/curves/grad_at_solution_quote_above_bracket_neg.ch on the same
+    # input (a 1y deposit at 5000%). Net coverage went up rather than down:
+    # nightly.yml deliberately does not schedule the phase3l_* oracles, while
+    # `chelis test tests_neg/ --expect neg` is a per-PR CI stage.
     "6_brent_bracket_robustness": [
         "test_grad_high_rate_within_bracket",
-        "test_grad_out_of_bracket_propagates_nan_observably",
     ],
 }
 
@@ -135,12 +141,16 @@ def main() -> int:
         ),
         "bracket_robustness_methodology": (
             "Brent solver is bracketed at [-0.5, 2.0] (covering implied zero rates "
-            "up to ~200%). Inputs whose implied zero exceeds the bracket return NaN "
-            "from brent; bootstrap_grad_at_solution explicitly NaN-guards the "
-            "gradient (via eq(r_new, r_new) self-equality test) so a caller can "
-            "detect the failure by testing eq(g_i, g_i). Probe 6 verifies both the "
-            "in-bracket-stress path (deposit r=200%) and the out-of-bracket "
-            "NaN-propagation path (deposit r=5000%)."
+            "up to ~200%). Probe 6 verifies the in-bracket-stress path "
+            "(deposit r=200%), whose gradient is analytic and finite. Since "
+            "shoals#79 an input whose implied zero falls outside the bracket no "
+            "longer returns a NaN gradient for the caller to detect with "
+            "eq(g_i, g_i): solve_pillar_rate classifies brent's NaN and raises a "
+            "diagnostic naming the condition and both endpoint residuals. The "
+            "out-of-bracket case therefore cannot be asserted from a positive "
+            "suite and is covered by "
+            "tests_neg/curves/grad_at_solution_quote_above_bracket_neg.ch on the "
+            "same deposit r=5000% input."
         ),
         "near_collinear_methodology": (
             "Two adjacent zero-coupon pillars at t=1.0 (p=0.95) and t=1.001 (p=0.949) — "

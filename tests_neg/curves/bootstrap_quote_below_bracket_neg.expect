@@ -1,0 +1,6 @@
+Shoals.Curves.bootstrap_multi: no zero rate for this instrument in the search bracket [-0.5, 2.0]: the repricing residual keeps one sign across it, -1.5935564 at -0.5 and -1.8635532 at 2.0 (instrument tenor 2.0, quote -0.9)
+
+The second bracket-miss direction, also `[0.03922057, NaN]` and silent on
+`130d235`. Both residuals are negative here and both positive in the
+above-bracket case, so a one-sided check would pass one of the two; the guard
+tests the product's sign.

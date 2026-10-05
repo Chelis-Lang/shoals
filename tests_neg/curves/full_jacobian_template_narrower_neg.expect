@@ -1,0 +1,6 @@
+Shoals.Curves.bootstrap_grad_full_jacobian: paths_template must have one entry per instrument (the declared Jacobian extent comes from the template): template has 2 entries for 3 instruments
+
+Also an all-NaN matrix with no diagnostic on `130d235`. Unlike
+`bootstrap_multi_curve`, neither direction of this mismatch was the quieter
+one: both returned the same sentinel, so neither could be told from a
+numerically NaN Jacobian.

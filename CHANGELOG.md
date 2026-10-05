@@ -8,6 +8,124 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **BREAKING: `Shoals.Curves` fails instead of returning a `NaN` pillar or an
+  all-`NaN` Jacobian** (shoals#79). `bootstrap_multi` returned a `NaN` pillar,
+  and `bootstrap_grad_full_jacobian` a full matrix of `NaN`, with nothing in
+  either value distinguishing it from a solved one. The `NaN` then propagated
+  through `rate_at`, `discount_factor` and the IFT gradients, so a downstream
+  price could come back `NaN` far from the instrument that caused it, and a
+  caller had to test `eq(z, z)` on every pillar to find out.
+
+  **This is a deliberate contract change rather than the repair of an
+  unintended sentinel, because the old behaviour was documented.**
+  `docs/src/curves.md` said *"A rate the root finder cannot bracket in
+  `[-0.5, 2.0]`, or a `NaN` quote, still comes back as `NaN`"* — a sentence
+  shoals#76 added to narrow a prior, false claim that the bootstrap never
+  returns a sentinel. A caller that tested `eq(z, z)` and handled the `NaN`
+  now gets a trap instead, so this is breaking even though the value it
+  replaces was unusable.
+
+  The case for changing it is in the same paragraph as that disclosure. Three
+  consecutive sentences of it, verbatim:
+
+  > The bootstrap raises a runtime `fail` naming
+  > `Shoals.Curves.bootstrap_multi` when an instrument is invalid, or when any
+  > instrument's tenor does not exceed every earlier pillar (instruments must
+  > be listed in strictly increasing tenor). It never snaps a schedule or
+  > re-sorts pillars. A rate the root finder cannot bracket in `[-0.5, 2.0]`,
+  > or a `NaN` quote, still comes back as `NaN`.
+
+  So malformed input failed loudly and an unsolvable quote returned a
+  sentinel, two sentences apart, about the same function -- and the sentinel
+  was the one case a caller could not see. That inconsistency is the
+  argument; it needs no appeal to the repo contract.
+
+  Both now fail loudly, which is the shape shoals#113 chose for the sibling
+  `bootstrap_multi_curve` (`3ddd518`): read the precondition, and report the
+  measured values that prove it was missed. Five conditions were silent on
+  `130d235` and now carry a diagnostic:
+
+  - a quote whose zero rate lies outside the module's `[-0.5, 2.0]` search
+    bracket. `cur_par_swap(2.0, 10.0, 1)` after a 1y deposit returned
+    `[0.03922057, NaN]`; the residual is `+38.516483` at `-0.5` and `+8.816857`
+    at `2.0`, and both endpoint residuals are now in the message along with the
+    instrument's tenor and quote. `cur_par_swap(2.0, -0.9, 1)` is the same miss
+    with both residuals negative, so the guard tests the product's sign rather
+    than one side.
+  - a repricing residual that is not finite over the bracket. Reachable with a
+    *valid* instrument through `fd_bump_pillar_rate`, whose earlier pillars come
+    from its caller, so this is not dead code.
+  - a bracketed solve that exhausts its hundred iterations. This is the
+    postcondition that lets the gradient surface drop its own `eq(r, r)`
+    sentinel branches: `solve_pillar_rate` returns a finite rate or fails.
+  - a non-finite tenor or quote reaching `instrument_validate`. Its bounds are
+    ordered comparisons and every one of them is false against `NaN`, so a
+    `NaN` deposit rate, zero-coupon price or swap par rate was accepted by a
+    check that never examined it. Only the swap *tenor* was already covered.
+  - a `paths_template` whose length does not match the instrument list, in
+    either direction. Both returned the `NaN` matrix; both now report their
+    counts (`template has 3 entries for 2 instruments`).
+
+  A deposit also now needs `1 + rate * tenor > 0`, the condition for its implied
+  discount factor to be positive. The existing `rate > -1` bound is that
+  condition only at a one-year tenor, so `deposit(2.0, -0.6)` validated and then
+  took `log` of a negative discount factor, leaving its residual `NaN` at every
+  candidate rate. Both bounds are kept, so the predicate narrows in both
+  directions and widens in neither.
+
+  `brent` is called first, with the arguments it has always had, and the
+  endpoint residuals are read only to classify a `NaN` it has already returned.
+  So every input for which `brent` returns a finite rate takes the identical
+  path it took before, and the three diagnostics are a total classification of
+  the cases where it does not.
+
+  **An earlier revision of this change checked the endpoints before the solve**,
+  to name the condition without entering `brent_rec`'s hundred-deep recursion,
+  and a red-team round found that it reordered `brent`'s own tests and broke a
+  quote that worked. `brent` accepts an endpoint root before it so much as
+  evaluates the other endpoint, so `cur_par_swap(200.0, 6.3890557, 1)` — whose
+  residual is `inf` at `-0.5` and exactly `0.0` at `2.0` — returned `2.0` on
+  `130d235` and was rejected by the pre-check as non-finite, with a diagnostic
+  that printed `0.0 at 2.0` while asserting no zero rate existed. Classifying
+  after the call cannot make that mistake. The cost of the lost pre-check is
+  that `Shoals.Curves` now reaches the `chelis eval` lane's stack overflow on a
+  non-finite residual, which `docs/UPSTREAM_BUGS.md` records; preserving the
+  solver's behaviour was worth more.
+
+  That also removed the only measurable cost. The pre-check added two residual
+  evaluations per pillar; this revision adds a single `cur_finite` test on
+  `brent`'s return. Measured on `tests/curves_bootstrap_ift_full.ch` over an
+  identical test set, base and branch interleaved to cancel the load from
+  concurrent package gates on the same machine:
+
+  | | base | branch | delta |
+  |---|---|---|---|
+  | round 1 | 81.55s | 81.66s | +0.11s |
+  | round 2 | 81.99s | 80.54s | -1.45s |
+  | round 3 | 78.65s | 76.67s | -1.98s |
+
+  The sign is not stable, so the honest reading is no measurable delta. For
+  comparison the pre-check revision measured +1.33s, +2.75s and +5.00s on the
+  same harness.
+
+  Two existing tests asserted the sentinel this decides against and are
+  replaced by negative cases: `test_full_jacobian_returns_nan_for_invalid_input`
+  (plus a positive case pinning that the length-matched valid call still returns
+  the same finite Jacobian) and
+  `test_grad_out_of_bracket_propagates_nan_observably`, whose in-bracket parity
+  case `test_grad_high_rate_within_bracket` is unchanged. Nine negative cases
+  and three positive ones are new.
+
+  `scripts/manual_gates/phase3l_shoals_oracle_multi_curve_bootstrap_grad.py`
+  named the second of those tests in `PROBE_TO_TEST` and described the
+  `eq(r_new, r_new)` guard in its report text, so it is updated here too — it
+  went from exit 0 to exit 1 on the deletion, and nothing caught that, because
+  `.github/workflows/nightly.yml` deliberately does not schedule the
+  `phase3l_*` oracles. The out-of-bracket coverage it lost now lives in
+  `tests_neg/`, which *is* a per-PR CI stage, so the case is checked more often
+  than before rather than less.
+
+
 - **BREAKING: `Shoals.Curves.bootstrap_basis_curve` is removed, with no
   replacement** (shoals#115). Build a basis curve with the existing
   `curve_basis_from_pillars[n](times, spreads)` — market basis quotes *are*
