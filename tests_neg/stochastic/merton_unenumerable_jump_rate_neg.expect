@@ -9,3 +9,10 @@ The cap is a cost bound rather than a model bound, and it is the jump MEAN that
 breaches it here: at a zero jump mean the tilt is one, so the same lambda * t =
 1000 would size the table at about 1233 slots, inside the cap. That is why the
 message names the tilted product rather than lambda alone.
+
+Raising the cap does NOT make the fixture pass either, and not for the reason
+one would guess. Measured with the cap at 1e9: the fixture does not answer and
+does not reach its assertion -- it runs until the per-test timeout, 500s in the
+run that established this. So the cap is not merely tidier than attempting the
+table; attempting it is non-terminating in practice at this intensity, which is
+the argument for having a cap at all rather than an advisory.

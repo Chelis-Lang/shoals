@@ -66,6 +66,17 @@ It takes two template tensors of the same length, one for the diffusion draws
 and one for the aggregate jump draws; the uniform count draws are generated
 internally at the same length.
 
+One f32 limit is worth knowing and is not specific to this sampler. The
+compensator subtracts `lambda * t * (w - 1)` with
+`w = exp(jump_mean + 0.5 * jump_vol^2)`, so a large `jump_vol` makes that
+subtraction enormous while the typical jump total stays near
+`jump_vol * sqrt(lambda * t)`. At `lambda = 1`, `jump_vol = 3.2` the
+compensator is `-166.3` and a representable terminal value needs an 18-sigma
+jump draw, so every path reads as `0.0` even though the mean of the model is
+`s0 * exp(mu * t)`. That is the distribution being unrepresentable in f32, not
+a defect in the compensator: the same parameters give `0.0` on every earlier
+release of this function too, with the identical drift.
+
 `merton_sampler_log_jump_moment` returns `log E[exp(J)]` for that aggregate
 log jump `J`, which is what `merton_jump_terminal` subtracts from the log
 drift. Subtracting the sampled law's own exponential moment is what makes the

@@ -58,16 +58,22 @@ def merton_jump_slots(lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> i64
   zero = cast(0.0, f32)
   one = cast(1.0, f32)
   rate = mul(lambda, t)
-  tilt = exp(add(jump_mean, mul(cast(0.5, f32), mul(jump_vol, jump_vol))))
-  tilted = mul(rate, if lt(tilt, one) then one else tilt)
+  log_tilt = add(jump_mean, mul(cast(0.5, f32), mul(jump_vol, jump_vol)))
+  tilt = exp(log_tilt)
+  tilted = if eq(rate, zero) then zero else mul(rate, if lt(tilt, one) then one else tilt)
   raw = add(add(tilted, mul(cast(7.0, f32), sqrt(tilted))), cast(12.0, f32))
-  if not(gte(rate, zero)) then fail("Shoals.Stochastic: merton jump rate lambda * t must be finite and non-negative") else if not(lte(raw, cast(4096.0, f32))) then fail("Shoals.Stochastic: merton jump intensity is too large to enumerate the jump count exactly; lambda * t * exp(jump_mean + 0.5 * jump_vol^2) must leave the slot bound at or below 4096") else cast_trunc(raw, i64)
+  all_finite = eq(add(sub(rate, rate), sub(log_tilt, log_tilt)), zero)
+  if not(all_finite) then fail("Shoals.Stochastic: merton jump parameters must be finite; lambda * t and jump_mean + 0.5 * jump_vol^2 must both be representable") else if not(gte(rate, zero)) then fail("Shoals.Stochastic: merton jump rate lambda * t must be finite and non-negative") else if not(lte(raw, cast(4096.0, f32))) then fail("Shoals.Stochastic: merton jump intensity is too large to enumerate the jump count exactly; lambda * t * exp(jump_mean + 0.5 * jump_vol^2) must leave the slot bound at or below 4096") else cast_trunc(raw, i64)
 }
 -- log P(N = k) for N ~ Poisson(lambda * t), computed in log space on purpose.
 -- The caller multiplies this by exp(k * (jump_mean + 0.5 * jump_vol^2)), which
 -- overflows f32 for large k exactly where the probability underflows, so the
 -- product has to be formed as a single exp of a sum rather than from a
--- materialized pmf value.
+-- materialized pmf value. The SUM of those products needs the same care and is
+-- an easy thing to miss: it is about exp(lambda * t * (w - 1)), which leaves
+-- f32 above 88.72 and underflows below -103.28 while every individual term is
+-- still perfectly representable. merton_jump_count_table therefore reduces it
+-- as a shifted log-sum-exp, never in linear space.
 def merton_jump_log_pmf(k: i64, rate: f32) -> f32 = {
   zero = cast(0.0, f32)
   one = cast(1.0, f32)
@@ -88,10 +94,12 @@ def merton_jump_count_table(lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) 
   log_w = add(jump_mean, mul(cast(0.5, f32), mul(jump_vol, jump_vol)))
   slot_count = merton_jump_slots(lambda, jump_mean, jump_vol, t)
   log_pmf_l = map(fn (k: i64) -> merton_jump_log_pmf(k, rate), range(cast(0, i64), slot_count))
-  tilted = to_tensor(map(fn (lp: (f32, i64)) -> exp(add(lp.0, mul(cast(lp.1, f32), log_w))), zip(log_pmf_l, range(cast(0, i64), slot_count))))
+  log_tilted_l = map(fn (lp: (f32, i64)) -> add(lp.0, mul(cast(lp.1, f32), log_w)), zip(log_pmf_l, range(cast(0, i64), slot_count)))
+  peak = fold(fn (acc: f32, term: f32) -> if gt(term, acc) then term else acc, log(cast(0.0, f32)), log_tilted_l)
+  shifted = to_tensor(map(fn (term: f32) -> exp(sub(term, peak)), log_tilted_l))
   cdf_l = to_list(cumsum(to_tensor(map(fn (lp: f32) -> exp(lp), log_pmf_l)), 0))
   enumerated_mass = index(cdf_l, sub(slot_count, cast(1, i64)))
-  (cdf_l, enumerated_mass, log(div(tensor_to_scalar(sum(tilted, 0)), enumerated_mass)))
+  (cdf_l, enumerated_mass, sub(add(log(tensor_to_scalar(sum(shifted, 0))), peak), log(enumerated_mass)))
 }
 -- log E[exp(J)] for the aggregate log jump J that merton_jump_terminal draws:
 -- J | N ~ Normal(N * jump_mean, N * jump_vol^2) with N the enumerated jump

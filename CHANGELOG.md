@@ -36,10 +36,35 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   2.8e-7 relative across `lambda*t` from 0.3 to 20 and both signs of
   `jump_mean`, which is also the test that proves the slot bound adequate.
 
-  Two inputs are now refused rather than answered: a negative `lambda*t`, which
-  names no Poisson law and previously returned NaN for every path, and an
-  intensity whose slot table would exceed the cap. Both have `tests_neg/`
-  fixtures.
+  The enumerated moment is reduced as a shifted log-sum-exp, not in linear
+  space. Each term `exp(log p_k + k*log w)` is representable wherever the slot
+  bound admits it, but their SUM is about `exp(lambda*t*(w - 1))`, which leaves
+  f32 above 88.72 and underflows below -103.28. A linear reduction therefore
+  returned `+-inf` for a large `jump_mean` or `jump_vol` -- and an infinite
+  compensator makes `exp(drift)` zero or infinite on every path with no
+  diagnostic. Measured before the repair: `lambda=55, jump_mean=1.0` and
+  `lambda=1, jump_vol=3.2` both gave `inf` against closed forms of 97.52571 and
+  166.33543, and `lambda=1000, jump_mean=0.0953` priced every path at `0.0`
+  where it now gives a positive finite value. Neither the slot bound nor the
+  intensity range was the discriminating variable; the jump SIZE is.
+
+  Three inputs are refused rather than answered, each with a `tests_neg/`
+  fixture: a negative `lambda*t`, which names no Poisson law and previously
+  returned NaN for every path; an intensity whose slot table would exceed the
+  cap; and a non-finite `lambda*t` or `jump_mean + 0.5*jump_vol^2`. The last
+  one slipped the two ordering guards, because `exp(-inf)` is zero and the
+  bound takes `max(1, tilt)`, so a non-finite `jump_mean` looked like an
+  ordinary intensity and then produced NaN for every path. It is caught by
+  `sub(x, x) == 0`, which is true exactly for finite `x`, where `gte` and `lte`
+  are both false for NaN and so cannot distinguish it.
+
+  One f32 limit is NOT fixed and is now documented in
+  [`docs/src/stochastic.md`](docs/src/stochastic.md): a large `jump_vol` makes
+  the compensator enormous while the typical jump total does not grow with it,
+  so at `lambda=1, jump_vol=3.2` every path reads as `0.0`. The mean of the
+  model is still `s0*exp(mu*t)`; the distribution is simply below f32's
+  smallest subnormal almost everywhere. The previous implementation returns
+  `0.0` at those parameters too, from the identical drift `-166.33543`.
 
   `merton_compensated_drift` is unchanged.
 

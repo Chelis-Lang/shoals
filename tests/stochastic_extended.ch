@@ -114,6 +114,38 @@ def test_merton_sampler_log_jump_moment_matches_compound_poisson_compensator() -
   _ = assert_true(lt(down, tol), "enumerated jump moment matches the compensator at a negative jump mean")
   assert_true(lt(high, tol), "enumerated jump moment matches the compensator at lambda*t = 20")
 }
+-- The reduction has to survive the f32 EXPONENT range, not just the slot
+-- bound. Every individual term exp(log p_k + k * log w) is representable
+-- wherever the slot bound admits it, but their sum is about
+-- exp(lambda * t * (w - 1)), which leaves f32 above 88.72 and underflows below
+-- -103.28. Summing in linear space therefore returned +-inf here, and an
+-- infinite compensator makes exp(drift) zero or infinite on EVERY path with no
+-- diagnostic. These three points were measured at +-inf before the shifted
+-- log-sum-exp reduction; two sit inside the intensity band the tests above
+-- already covered, so the slot bound and the intensity range were never the
+-- discriminating variable -- the jump SIZE is.
+def test_merton_sampler_log_jump_moment_survives_the_f32_exponent_range() -> unit ! { Test } = {
+  tol = cast(0.00001, f32)
+  one = cast(1.0, f32)
+  wide = merton_rel_gap(merton_sampler_log_jump_moment(one, cast(0.0, f32), cast(3.2, f32), one), merton_closed_log_jump_moment(one, cast(0.0, f32), cast(3.2, f32), one))
+  tall = merton_rel_gap(merton_sampler_log_jump_moment(cast(55.0, f32), one, cast(0.2, f32), one), merton_closed_log_jump_moment(cast(55.0, f32), one, cast(0.2, f32), one))
+  deep = merton_rel_gap(merton_sampler_log_jump_moment(cast(300.0, f32), cast(-0.5, f32), cast(0.0, f32), one), merton_closed_log_jump_moment(cast(300.0, f32), cast(-0.5, f32), cast(0.0, f32), one))
+  _ = assert_true(lt(wide, tol), "jump moment stays finite past the f32 overflow point on a wide jump_vol")
+  _ = assert_true(lt(tall, tol), "jump moment stays finite past the f32 overflow point on a large jump_mean")
+  assert_true(lt(deep, tol), "jump moment stays finite past the f32 UNDERFLOW point on a negative jump_mean")
+}
+-- The consequence the test above protects, asserted on the prices themselves:
+-- at lambda*t = 1000 an infinite compensator silently returned 0.0 for every
+-- path. Terminal values must be strictly positive and finite. This is the
+-- positivity claim test_merton_terminal_positive_paths makes, carried into the
+-- region where it actually failed -- that test only reaches lambda = 0.3.
+def test_merton_terminal_prices_stay_positive_at_high_intensity() -> unit ! { Test } = {
+  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(64, i64))))
+  jumps_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(64, i64))))
+  paths = with seed(7i64) { merton_jump_terminal(template, jumps_template, cast(100.0, f32), cast(0.0, f32), cast(0.0, f32), cast(1000.0, f32), cast(0.0953, f32), cast(0.0, f32), cast(1.0, f32)) }
+  usable = fold(fn (acc: bool, v: f32) -> and(acc, and(gt(v, cast(0.0, f32)), eq(sub(v, v), cast(0.0, f32)))), true, to_list(paths))
+  assert_true(usable, "every Merton terminal value at lambda*t = 1000 is positive and finite")
+}
 -- Negative parity for the oracle above: it must not pass by returning zero.
 -- At zero intensity the moment is exactly zero because the only enumerated
 -- count is zero; at any positive intensity with a negative jump mean it is
