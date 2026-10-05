@@ -228,6 +228,75 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **`Shoals.Dupire.du_cubic_log_moneyness_interp` accepted unsorted grid axes
+  and returned a silently wrong implied vol** (shoals#123). Both axes must now
+  be strictly increasing: the function rejects `strikes` or `times` that are
+  not, with a runtime `fail` naming the entry point, the axis, the first
+  offending index, and both values. A repeated value, and a `NaN` among two or
+  more entries, are rejected by the same comparison. A one-row surface has no
+  time pair to compare, so a lone `NaN` time is still accepted -- a
+  non-finite-axis question rather than an ordering one. The axes are checked in
+  parameter order, so with both out of order the strike axis is reported.
+
+  The time axis is read through `Nautilus.Interpolation.linear_interp_sorted`
+  and the log-moneyness knots through its `spline_eval`; both bracket a query
+  in traversal order. Measured on `444b163` at the `reef.toml` pin, the same
+  data merely reordered in each case:
+
+  | axis reordered | query | before | correct |
+  |---|---|---|---|
+  | `times` `[0.25, 0.5, 0.75]` -> `[0.25, 0.75, 0.5]` | `t=0.375` | 0.2625 | 0.30 |
+  | `strikes` `[80, 90, 100, 110, 120]` -> `[80, 90, 120, 110, 100]` | `k=95` | 0.31237233 | 0.2248057 |
+
+  12.5% and 39% relative error on an implied vol, with no trap, no `NaN` and no
+  diagnostic, feeding `du_local_vol_from_iv_surface` and anything priced off the
+  surface. A `NaN` time was worse than a wrong bracket: the fold found no
+  bracket at all, fell through to its past-the-end branch and returned the last
+  row's level (0.45 for the same query) -- finite and confident, with no `NaN`
+  for a caller to test for.
+
+  **shoals#123 scoped this to `times` and recorded the strike axis as
+  unaffected. That was measured here and is not right**: the strike axis has
+  the same undisclosed precondition through `spline_eval`, and the larger
+  error of the two. Guarding only `times` would have left the bigger silent
+  wrong answer reachable behind a function that now looks defended, so both
+  axes are guarded in this change. `src/xva.ch`'s `linear_interp_sorted` call
+  stays out of scope as the issue asked, on the different and still-correct
+  ground that `docs/src/scope.md` already discloses its precondition to a
+  caller.
+
+  Rejected rather than re-sorted. Re-sorting answers a different question from
+  the one the caller asked, and here it would also have to permute `iv_grid`'s
+  rows and columns to keep them aligned with the axes it moved.
+  `Shoals.Curves` made the same choice (shoals#119).
+
+  No opaque surface type, unlike the `YieldCurve` change above. `@opaque` there
+  closed the record literal and record pattern that a public representation
+  left open; `Shoals.Dupire` declares no type at all, exports no constructor,
+  and takes its three axes as bare tensors, so it has no representation to hide
+  and no bypass route to close. What transfers is the half that did the work in
+  both modules: a guard where the caller's values arrive, which for a
+  bare-tensor signature is the entry point. The module imports
+  `linear_interp_sorted` by name, but a precondition stated in a dependency's
+  identifier is a hint to a reader of `src/dupire.ch`, not a disclosure to a
+  caller of `du_cubic_log_moneyness_interp`.
+
+  Coverage: `tests/dupire_grid_order.ch` is the positive parity file, on a
+  fixture that varies non-linearly in *both* axes, and five rejections live in
+  `tests_neg/dupire/`. Each negative asserts the value the unguarded code
+  returned rather than the trap, so deleting a guard makes the file pass and
+  `--expect neg` flags it; verified by deleting both guards and watching all
+  five flip to `SHOULD-HAVE-FAILED`.
+
+  `tests/dupire.ch`'s `test_cubic_log_moneyness_monotonic_input_preserves_monotonicity`
+  built its grid from the column index alone, which made the surface constant
+  along the time axis -- and a surface flat along an axis interpolates to the
+  same value for every bracket the code could pick on it, so that test was
+  structurally blind to this defect and passed throughout. Its rows are now
+  scaled by a term factor that is 1.0 at the queried maturity, so every
+  expected value is unchanged while reordering the grid times moves its exact
+  assertion by 0.0255, well outside the 0.001 tolerance.
+
 - **`Shoals.Curves` accepted unsorted pillar times and returned a silently
   wrong interpolated value** (shoals#119). `yield_curve_from_pillars`,
   `yield_curve_tagged`, `bootstrap_zero_from_par` and

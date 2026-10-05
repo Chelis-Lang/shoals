@@ -1,0 +1,22 @@
+Shoals.Dupire.du_cubic_log_moneyness_interp: grid times must be strictly increasing: index 2 has time 0.5, which does not exceed time 0.75 at index 1
+
+The time axis is read through `Nautilus.Interpolation.linear_interp_sorted`,
+which folds over the pairs tracking the previous time and takes the first
+bracket straddling the query. Out of order it bracketed (0.25, 0.20) against
+(0.75, 0.45) rather than (0.25, 0.20) against (0.5, 0.40): the query at
+t=0.375 returned 0.2625 where 0.30 is correct. That is a 12.5% relative error
+on an implied vol, with no trap, no NaN and no diagnostic, and it propagates
+through `du_local_vol_from_iv_surface` into anything priced off the surface.
+
+The module imports `linear_interp_sorted` by name, but a precondition stated
+in a dependency's identifier is a hint to a reader of `src/dupire.ch`, not a
+disclosure to a caller of `du_cubic_log_moneyness_interp`, whose signature
+names no ordering rule for either axis.
+
+The fixture's rows are constant in strike and the levels 0.20 / 0.40 / 0.45
+are non-collinear in time on purpose. A surface flat or affine along the time
+axis interpolates to the same value for every bracket the code could pick, so
+it cannot distinguish this defect from correct behaviour -- which is why
+`tests/dupire.ch`'s own grid, built from the column index alone and therefore
+constant in time, passed throughout. The paired positive fixture varies
+non-linearly in both axes.

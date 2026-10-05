@@ -1,0 +1,20 @@
+Shoals.Dupire.du_cubic_log_moneyness_interp: grid times must be strictly increasing: index 1 has time NaN, which does not exceed time 0.25 at index 0
+
+A NaN grid time has no position relative to any other time, so it cannot be
+strictly greater than its predecessor and the same `gt` rejects it. Pinned as
+its own case because that is a consequence of the comparison rather than a
+separate branch: rewriting the predicate as "not less than or equal" would
+preserve every other case here and silently readmit NaN.
+
+The NaN does not reach the answer, which is what earns it a case of its own.
+`linear_interp_sorted` finds no bracket at all, falls through to its
+past-the-end branch and returns the last row's level: the query at t=0.375
+came back 0.45, a finite confident wrong implied vol where 0.30 is correct,
+with no NaN for a caller to test for.
+
+The scope is two or more grid times. `du_first_unsorted` folds over
+`range(1, len(times))`, which is empty at n=1, so a one-row surface with a NaN
+time is accepted and reads flat. A leading NaN is reported at index 1, because
+it is the successor comparison that fails. Admitting a lone NaN time is a
+non-finite-axis question, not an ordering one, and is deliberately not fixed
+here.

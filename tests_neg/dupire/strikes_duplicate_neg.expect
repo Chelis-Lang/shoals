@@ -1,0 +1,14 @@
+Shoals.Dupire.du_cubic_log_moneyness_interp: strikes must be strictly increasing: index 2 has strike 90.0, which does not exceed strike 90.0 at index 1
+
+Strict ordering on the strike axis too. Two knots at one strike carry two
+different implied vols for one option, so no smile reads both, and the segment
+width between them is zero -- which `spline_fit` does not reject: it
+substitutes 1.0 for any gap below 1e-30 and solves a system whose geometry no
+longer matches the knots it was given. This is the negative-parity case for
+the `gt` in the strike guard; a `gte` would accept it and the reordered strike
+case would still be rejected.
+
+The unguarded query at k=95 returned 0.25239202. There is no "correct" value
+to compare that against, because the fixture asks what the implied vol is at a
+strike the grid gives two different answers for; the defect is that the call
+answers at all.
