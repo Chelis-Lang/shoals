@@ -122,7 +122,7 @@ def reef_pins() -> tuple[str, str]:
 def reef_dependency_version(name: str) -> str:
     text = (REPO / "reef.toml").read_text()
     match = re.search(
-        rf"^\s*{re.escape(name)}\s*=\s*\{{[^}}]*\bversion\s*=\s*\"([0-9.]+)\"",
+        rf"^\s*{re.escape(name)}\s*=\s*\{{[^}}]*\bversion\s*=\s*\"=?([0-9.]+)\"",
         text,
         re.M,
     )

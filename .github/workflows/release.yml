@@ -30,9 +30,9 @@ jobs:
           # chelis pin comes from the literal top-level env; re-derive from
           # reef.toml only to assert it has not drifted (reef.toml is truth).
           REEF_CHELIS=$(grep -oP '^compiler\s*=\s*"=\K[0-9]+\.[0-9]+\.[0-9]+' reef.toml)
-          NAUTILUS_VERSION=$(grep -A0 '^nautilus' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-          CORAL_VERSION=$(grep -A0 '^coral' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-          PACKAGE_VERSION=$(grep -oP '^version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' reef.toml | head -1)
+          NAUTILUS_VERSION=$(grep -A0 '^nautilus' reef.toml | grep -oP 'version\s*=\s*"=?\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          CORAL_VERSION=$(grep -A0 '^coral' reef.toml | grep -oP 'version\s*=\s*"=?\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          PACKAGE_VERSION=$(grep -oP '^version\s*=\s*"=?\K[0-9]+\.[0-9]+\.[0-9]+' reef.toml | head -1)
           if [ -z "$REEF_CHELIS" ] || [ -z "$NAUTILUS_VERSION" ] || [ -z "$CORAL_VERSION" ] || [ -z "$PACKAGE_VERSION" ]; then
             echo "Failed to parse one or more versions from reef.toml" >&2
             cat reef.toml >&2
