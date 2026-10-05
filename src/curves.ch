@@ -17,8 +17,43 @@ def sofr() -> CurveKind = Sofr
 def sonia() -> CurveKind = Sonia
 def estr() -> CurveKind = Estr
 def custom_curve(label: string) -> CurveKind = Custom { label }
-def yield_curve_from_pillars[n](times: tensor[n, f32], rates: tensor[n, f32]) -> YieldCurve[n] = YieldCurve { kind: Custom { label: "untagged" }, times, rates }
-def yield_curve_tagged[n](kind: CurveKind, times: tensor[n, f32], rates: tensor[n, f32]) -> YieldCurve[n] = YieldCurve { kind, times, rates }
+-- Pillar times are read through `linear_interp_sorted`, which brackets a query
+-- by traversal order and interpolates across whichever consecutive pair
+-- straddles it. Unsorted pillars therefore interpolate over the wrong interval
+-- and return a confident wrong number: no trap, no NaN, no diagnostic. The
+-- bootstrap path already rejects non-increasing tenors and says so
+-- (`cur_increasing_pillars_below`), so the pillar-order precondition is not an
+-- open question in this module -- it simply was not enforced on the entry
+-- points that take the times directly. Reject rather than re-sort: re-sorting
+-- would answer a different question from the one the caller asked, and
+-- `docs/src/curves.md` already records that decision for the bootstrap ("It
+-- never snaps a schedule or re-sorts pillars").
+--
+-- Index of the first pillar time that does not exceed its predecessor, or -1
+-- when the times are strictly increasing. A NaN time fails every comparison
+-- and so reports as out of order, which is the right answer: it has no
+-- position relative to anything.
+def cur_first_unsorted_time(times: List[f32]) -> i64 = {
+  idxs = range(cast(1, i64), len(times))
+  fold(fn (acc: i64, j: i64) -> if gte(acc, cast(0, i64)) then acc else if gt(index(times, j), index(times, sub(j, cast(1, i64)))) then acc else j, cast(-1, i64), idxs)
+}
+def cur_times_strictly_increasing(times: List[f32]) -> bool = lt(cur_first_unsorted_time(times), cast(0, i64))
+-- The measured-values tail shared by every pillar-order diagnostic; each entry
+-- point supplies only its own `Module.function: rule` prefix. Reached only
+-- when `cur_first_unsorted_time` has returned a real index.
+def cur_unsorted_time_detail(times: List[f32]) -> string = {
+  j = cur_first_unsorted_time(times)
+  i_prev = sub(j, cast(1, i64))
+  string_concat(": index ", string_concat(to_string(j), string_concat(" has time ", string_concat(to_string(index(times, j)), string_concat(", which does not exceed time ", string_concat(to_string(index(times, i_prev)), string_concat(" at index ", to_string(i_prev))))))))
+}
+def yield_curve_from_pillars[n](times: tensor[n, f32], rates: tensor[n, f32]) -> YieldCurve[n] = {
+  ts_l = to_list(copy(times))
+  if cur_times_strictly_increasing(ts_l) then YieldCurve { kind: Custom { label: "untagged" }, times, rates } else fail(string_concat("Shoals.Curves.yield_curve_from_pillars: pillar times must be strictly increasing", cur_unsorted_time_detail(ts_l)))
+}
+def yield_curve_tagged[n](kind: CurveKind, times: tensor[n, f32], rates: tensor[n, f32]) -> YieldCurve[n] = {
+  ts_l = to_list(copy(times))
+  if cur_times_strictly_increasing(ts_l) then YieldCurve { kind, times, rates } else fail(string_concat("Shoals.Curves.yield_curve_tagged: pillar times must be strictly increasing", cur_unsorted_time_detail(ts_l)))
+}
 def curve_kind[n](curve: YieldCurve[n]) -> CurveKind =
   match curve with {
     | YieldCurve { kind: k, times: _, rates: _ } => k
@@ -56,10 +91,15 @@ def discount_factor[n](curve: YieldCurve[n], t: f32) -> f32 = {
   r = rate_at(curve, t)
   exp(neg(mul(r, t)))
 }
+-- The pillars are the caller's `times`, and the returned curve is read through
+-- `rate_at`, so the same ordering precondition applies here. It binds twice
+-- over: the fold accumulates the fixed leg's present value pillar by pillar in
+-- traversal order, so an out-of-order time also discounts a later cash flow
+-- against an earlier cumulative PV.
 def bootstrap_zero_from_par[n](times: tensor[n, f32], par_yields: tensor[n, f32]) -> YieldCurve[n] = {
   ts_l = to_list(copy(times))
   ys_l = to_list(copy(par_yields))
-  pairs = zip(ts_l, ys_l)
+  pairs = if cur_times_strictly_increasing(ts_l) then zip(ts_l, ys_l) else fail(string_concat("Shoals.Curves.bootstrap_zero_from_par: pillar times must be strictly increasing", cur_unsorted_time_detail(ts_l)))
   init = (cast(0.0, f32), [])
   out = fold(fn (state: (f32, List[f32]), entry: (f32, f32)) -> {
     cum_pv = state.0
@@ -398,7 +438,10 @@ def bootstrap_grad_full_jacobian[m](paths_template: &tensor[m, f32], instruments
 }
 type CurveBasis[n] =
   | CurveBasis { times: tensor[n, f32], spreads: tensor[n, f32] }
-def curve_basis_from_pillars[n](times: tensor[n, f32], spreads: tensor[n, f32]) -> CurveBasis[n] = CurveBasis { times, spreads }
+def curve_basis_from_pillars[n](times: tensor[n, f32], spreads: tensor[n, f32]) -> CurveBasis[n] = {
+  ts_l = to_list(copy(times))
+  if cur_times_strictly_increasing(ts_l) then CurveBasis { times, spreads } else fail(string_concat("Shoals.Curves.curve_basis_from_pillars: pillar times must be strictly increasing", cur_unsorted_time_detail(ts_l)))
+}
 def basis_spread_at[n](basis: CurveBasis[n], t: f32) -> f32 =
   match basis with {
     | CurveBasis { times: ts, spreads: ss } => linear_interp_sorted(ts, ss, t)

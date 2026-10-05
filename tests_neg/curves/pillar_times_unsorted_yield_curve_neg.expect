@@ -1,0 +1,9 @@
+Shoals.Curves.yield_curve_from_pillars: pillar times must be strictly increasing: index 2 has time 2.0, which does not exceed time 3.0 at index 1
+
+`rate_at` reads the pillars through `Nautilus.Interpolation.linear_interp_sorted`,
+which folds over the pairs tracking the previous time and takes the first
+bracket straddling the query. Out of order it bracketed (1, 0.01) against
+(3, 0.07) rather than (1, 0.01) against (2, 0.06): `rate_at(curve, 1.5)`
+returned 0.025 where 0.035 is correct, with no trap, no NaN and no diagnostic.
+The same unsorted pillars then propagate through `discount_factor` and
+`discount_factor_with_basis` into every discounted price.

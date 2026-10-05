@@ -57,6 +57,39 @@ curve = yield_curve_from_pillars(
 tagged = yield_curve_tagged(sofr(), to_tensor([cast(1.0, f32)]), to_tensor([cast(0.04, f32)]))
 ```
 
+### Pillar times must be strictly increasing
+
+Both constructors reject pillar times that are not strictly increasing, with a
+runtime `fail` naming the entry point, the first offending index, and both
+times:
+
+```text
+Shoals.Curves.yield_curve_from_pillars: pillar times must be strictly increasing: index 2 has time 2.0, which does not exceed time 3.0 at index 1
+```
+
+`rate_at` reads the pillars through
+`Nautilus.Interpolation.linear_interp_sorted`, which brackets a query by
+traversal order and interpolates across whichever consecutive pair straddles
+it. Unsorted pillars therefore interpolate over the wrong interval and return a
+wrong rate with no trap and no `NaN`: the same three `(time, rate)` pairs in a
+different order answered `rate_at(curve, 1.5)` as 0.025 instead of 0.035, and
+that wrong rate propagates through `discount_factor` into every discounted
+price (shoals#119). A repeated time, and a `NaN` time among two or more
+pillars, are rejected by the same comparison — the requirement is strict
+ordering, not non-decreasing order. A single-pillar curve has no pair to
+compare, so a lone `NaN` time is accepted and reads flat; that is a
+non-finite-pillar question rather than an ordering one, and this guard does not
+reach it.
+
+This is the precondition the instrument bootstrap already enforces (below),
+under the same decision not to re-sort: a reordering is a different question
+from the one the caller asked. The guard is on the four entry points that take
+pillar times as arguments — `yield_curve_from_pillars`, `yield_curve_tagged`,
+`bootstrap_zero_from_par`, and `curve_basis_from_pillars`. Every curve built
+through them, and every curve derived from one by the sensitivity shifts below,
+therefore has readable pillars. A `YieldCurve` or `CurveBasis` record a caller
+constructs directly from the exported type is not checked.
+
 ## Interpolation and discount factors
 
 ```chelis
@@ -98,7 +131,10 @@ def bootstrap_zero_from_par[n](times: tensor[n, f32], par_yields: tensor[n, f32]
 
 `bootstrap_zero_from_par` builds a zero curve from a set of par yields in
 the single-curve case, with one coupon per pillar at integer-year spacing.
-The resulting curve reprices the par bonds to par. From `tests/curves.ch`:
+The resulting curve reprices the par bonds to par. Its `times` are the pillars
+of the curve it returns and carry the strictly-increasing requirement above;
+here it binds twice over, because the present value of the fixed leg is
+accumulated pillar by pillar in the order given. From `tests/curves.ch`:
 
 ```chelis
 times = to_tensor([cast(1.0, f32), cast(2.0, f32)])
@@ -185,7 +221,8 @@ section that reads a domestic curve.
 
 No function here calibrates a basis curve against a domestic curve
 (shoals#117). Build the spread curve from its pillars with
-`curve_basis_from_pillars` — market basis quotes *are* those pillars — and
+`curve_basis_from_pillars` — market basis quotes *are* those pillars, and
+carry the same strictly-increasing requirement as a zero curve's — and
 apply it with `discount_factor_with_basis`. There is deliberately no
 separate quotes-to-curve entry point: without a basis-swap solve it would
 be the same operation under a second name.

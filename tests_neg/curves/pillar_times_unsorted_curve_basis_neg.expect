@@ -1,0 +1,11 @@
+Shoals.Curves.curve_basis_from_pillars: pillar times must be strictly increasing: index 2 has time 2.0, which does not exceed time 3.0 at index 1
+
+`basis_spread_at` has the same reader and the same precondition. Reordering the
+same (time, spread) pairs moved the answer at t=1.5 from 0.011 to 0.009.
+
+The fixture is non-collinear on purpose. With a constant slope every bracket
+the interpolator could choose interpolates to the identical value, so a
+collinear fixture cannot distinguish this defect from correct behaviour no
+matter what the code does -- which is why the module's own
+`test_basis_spread_at_interpolates` (0.002 / 0.006 / 0.010 at 1 / 2 / 3) passed
+throughout. That fixture is non-collinear as of this change.

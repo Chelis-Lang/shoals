@@ -1,0 +1,9 @@
+Shoals.Curves.yield_curve_tagged: pillar times must be strictly increasing: index 2 has time 2.0, which does not exceed time 3.0 at index 1
+
+The tagged constructor differs from `yield_curve_from_pillars` only in the
+`CurveKind` it stores, so it returned the same wrong 0.025 for the same
+reordered pillars. It is named in no issue: the defect was reported against two
+constructors and there are four exported entry points that take the pillar
+times directly. The module has already been through one incomplete enumeration
+of its own entry points (shoals#78, whose two-function list missed
+`bootstrap_grad_diagonal`), which is why this case is pinned by name.
