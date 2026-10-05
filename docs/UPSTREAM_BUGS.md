@@ -562,8 +562,16 @@ No parked entries.
       clamp would take the operand, which is +inf at ax = +inf, so one added
       "for uniformity" REMOVED that branch's totality at the single point
       where it had more than regions 1 and 2. It is deleted, and its absence
-      is unpinned: re-adding it leaves every test green, because the suite
-      claims nothing at +inf.
+      is now PINNED, which it was not before shoals#68: the sentence here used
+      to say re-adding it left every test green because the suite claimed
+      nothing at +inf. `tests/pricing_ncdf_tail.ch` now claims something at
+      +/-inf through `n_cdf64`, and the pin is measured rather than argued --
+      adding an upper clamp at Cody's XBIG makes `grad(n_cdf64)(+inf)` finite
+      where it is NaN today, and
+      `test_grad_at_infinity_is_nan_by_the_finite_domain_contract` fails. That
+      test records the status quo, not a judgement about which behaviour is
+      better; it exists so a future change to these clamps has to decide
+      rather than discover.
     - **Scope of the guarantee:** total over the FINITE f64 domain, not over
       all of f64. An unbounded untaken arm does not poison the selected arm's
       VALUE at this pin (measured); the exposure is its derivative, per the rule

@@ -70,8 +70,28 @@ EXPECTED_NODE_COUNT = 1665
 # raw hash at this schema:
 # 3be34d901db81b1a0b250d6cb6e8b8b934f11c13323206fb1894b50e9fcfab02. Later
 # values at this schema, all with root 859 and 1665 nodes: 9709d1a4... and
-# 904bd65b... (shoals#88), 11db7522... (shoals#102's comment retarget), and the
-# value below (shoals#101's expiry limits).
+# 904bd65b... (shoals#88), 11db7522... (shoals#102's comment retarget),
+# 811f1cda... (shoals#101's expiry limits), and the value below (shoals#68's
+# n_cdf64 repair).
+#
+# shoals#68 re-pin (no compiler change; same published Chelis 0.18.11).
+# `n_cdf64` was respelled onto `erf64_erfc_abs`, `erf64_erfc_abs` now routes
+# |x| == 4 to Cody region 2 and saturates at XBIG = 26.543 rather than 6, and
+# several comments in this file's subject moved. **The lowered graph is
+# IDENTICAL**, measured rather than assumed: lowering `origin/main`'s
+# src/pricing.ch and this one with the same binary gives root 859 and 1665
+# nodes on both, and the full op-kind histogram is byte-identical -- add 63,
+# cast 15, compare 15, copy 372, div 8, drop 805, exp 5, extent_witness 176,
+# load 49, log 2, mul 101, neg 17, sqrt 3, sub 34, with ZERO deltas. That is
+# expected and not a coincidence: this closure does not call `n_cdf64` or
+# `erf64` at all (its erf is the A&S `pricing_wire_erf_f64`), so the only thing
+# that moved is the source spans the raw artifact embeds. The 15 reachable
+# loads still match EXPECTED_LOADS, the copy-elided semantic root is still
+# `sub`, and the root output type is still tensor[n, f64]. Two independent cold
+# lowerings are byte-deterministic. (Re-pinned once more within shoals#68
+# after a red-team round corrected a comment in this file's subject; the
+# re-derivation was repeated and the histogram was again identical with zero
+# deltas, which is the file's expected case for a prose edit.)
 #
 # NOTE for whoever drifts this next: the raw artifact embeds source spans, so
 # editing a COMMENT in src/pricing.ch moves this hash while leaving the graph
@@ -82,7 +102,7 @@ EXPECTED_NODE_COUNT = 1665
 # named loads and op kinds all still match. The node count is checked BEFORE the
 # hash, so a hash-only failure already tells you the count agreed. Confirm that
 # shape, then re-pin; do not go looking for a numerical regression.
-EXPECTED_RAW_SHA256 = "811f1cda0a046bbe5e24c51514e9f266815849e9824184786c0b9d93e32ad546"
+EXPECTED_RAW_SHA256 = "fd9e05bd7811c1f3f99716f9d93513bea587584178d822b8ca5d3a0dc3bd2e9a"
 FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
 EXPECTED_LOADS = {
     "a1",

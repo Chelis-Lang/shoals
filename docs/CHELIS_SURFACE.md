@@ -234,29 +234,129 @@ against internal constants of its own (shoals#64). Two legs check it:
   tight** floor: equal to the measurement truncated toward zero at that
   figure's own significant-digit count. Publishing fewer digits is allowed;
   publishing an understated floor (`1.0e-30` is technically a floor) is not.
+- The same nightly run then measures the **relative** floor over
+  [-37.5, 6.5] — a separate leg, against a separate reference, because it
+  measures a different quantity (shoals#68). It also requires that no probe
+  point return exactly `0.0` where the true value is representable.
 
 The division is deliberate — the offline leg proves the carriers agree, never
-that they are right, and only the nightly leg constrains the value. A missing
-`mpmath` now fails the measurement leg instead of skipping it.
+that they are right, and only the nightly legs constrain the values. A missing
+`mpmath` now fails the measurement legs instead of skipping them.
+
+**Absolute and relative are independent, and shoals#68 is why that sentence is
+here.** The absolute sweep was green, every published figure was true, and
+twelve red-team rounds found nothing, while `n_cdf64` had 1.8% relative error
+at x = -8 and returned exactly `0.0` below about -8.3. Absolute error was never
+affected by that defect, so no amount of grid refinement on the absolute leg
+could have seen it. A new accuracy claim about a new quantity needs a new leg.
 
 | Kernel | Approximation | Worst observed absolute error (a floor) | Method |
 |---|---|---|---|
-| `erf64` | W. J. Cody, Math. Comp. 23 (1969); three ranges split at 0.5 and 4, saturating at 6 | **>= 3.3675e-16** (~1.52 ulp of 1.0) | worst observed at x = ±0.507001975 (`erf` is odd, so the error magnitude is identical at both signs and the oracle may report either; `n_cdf64` below is **not** symmetric and its sign is significant), measured at 60 dps by `scripts/oracle_erf64_accuracy.py`; the error is jagged at ulp scale so any grid reports a floor |
-| `n_cdf64` | `0.5 * (1 - erf64(-x/√2))` | **>= 1.9495e-16** (~0.88 ulp of 1.0) | worst observed at x = -0.7170090691949448, measured at 60 dps by the same oracle. NOT `erf64`'s halved: the argument reduction `-x/√2` and the final `0.5 * (1 - e)` each round. **ABSOLUTE only — see the left-tail limitation below** |
+| `erf64` | W. J. Cody, Math. Comp. 23 (1969); three ranges split at 0.5 and 4, saturating at Cody's XBIG = 26.543 | **>= 3.3675e-16** (~1.52 ulp of 1.0) | worst observed at x = ±0.507001975 (`erf` is odd, so the error magnitude is identical at both signs and the oracle may report either; `n_cdf64` below is **not** symmetric and its sign is significant), measured at 60 dps by `scripts/oracle_erf64_accuracy.py`; the error is jagged at ulp scale so any grid reports a floor |
+| `n_cdf64` | `0.5 * erfc(\|x\|/√2)` for x < 0, `1 - 0.5 * erfc(x/√2)` for x ≥ 0, `0.5 + 0.5 * erf(x/√2)` for \|x/√2\| < 0.5 | **>= 1.9495e-16** (~0.88 ulp of 1.0) | worst observed at x = **+**0.7170090691949448, measured at 60 dps by the same oracle. NOT `erf64`'s halved: the argument reduction `x/√2` and the final combination each round. **This figure did not move in shoals#68.** The argmax flipped sign — it was at −0.7170090691949448, where the repair is now better (1.6720e-16) — and the kernel reaches the same value on the positive mirror. `n_cdf64` is not symmetric, so a one-sided grid reports the wrong figure, and a grid missing one mirror reports an understated one: the first version of this row published 1.8731e-16 for exactly that reason. Like `erf64`'s, this error is jagged at ulp scale, so **any** grid reports a floor and not a maximum: independent review found points above this figure, for example 2.1870e-16 (0.985 ulp) at x = 0.7145750646900001, confirmed by direct evaluation. That does not falsify a `>=` claim, and the `~0.88 ulp` gloss is a property of the governing grid rather than of the kernel. See the relative floor below, which is the binding statement in the left tail |
 
-**`n_cdf64` has no useful RELATIVE accuracy in the left tail.** Both figures above
-are absolute errors, and the oracle that produces them sweeps absolute error over
-±6.5, so it cannot observe this. `erf64_erfc_abs` computes `erfc` to ~1 ulp, but
-`n_cdf64` routes it through `1 - erf64` and `erf64` is itself `1 - erfc`, so the
-two subtractions cancel that precision away as the result approaches zero.
-Measured on the shipped kernel: **2.3e-6 relative at x = -7, 1.8% relative at
-x = -8, and exactly `0.0` below about x = -8.3** where the true value is ~1e-17.
-Do not use `n_cdf64` for deep-tail probabilities. Routing the negative branch
-straight through `erf64_erfc_abs` would keep the relative accuracy; that is
-shoals#68.
+### `n_cdf64`'s relative accuracy in the tails
 
-**The kernel is no longer the limiting factor for the price and the Greeks**
-(the left-tail exception above is `n_cdf64`'s spelling, not the kernel).
+The claim below carries its own kernel name inside the marker, so it needs no
+`Kernel` column — and must not have one, because the absolute table above is
+parsed by matching a row's first cell against a kernel name, and a second such
+row would be read as a duplicate of it. (It was, the first time this table was
+written.) Self-attribution is the point: the absolute family infers which kernel
+a figure belongs to from a ±2-line window, and the oracle's own source records
+both halves of that fragility.
+
+| Claim | Interval | Method |
+|---|---|---|
+| **REL-FLOOR `n_cdf64` >= 4.2025 * (1 + x^2) * 2^-53** | −37.5 ≤ x ≤ 6.5 | worst observed normalised relative error, at x = -0.7170090691949448, over 6183 probe points, measured at 60 dps by `scripts/oracle_erf64_accuracy.py --measurement`. The **raw** relative error over the same sweep peaks at 2.1839e-13 near x = −33.705 (measured 2.183991578472283e-13), which is reported for orientation only: it is **not** a floor, nothing executes it, and it is purely grid-dependent — independent denser sweeps move it upward by more than 8%, and by how much depends on the grid. The normalised claim in the first column is the whole of the contract |
+
+**Why the claim is normalised rather than a single relative number.**
+`n_cdf(x) = 0.5·erfc(x/√2)` and `d ln erfc / d ln u → −(2u² + 1)`, so one unit
+roundoff in the argument reduction `u = x/√2` costs `(1 + x²)` of them in the
+result. The attainable relative error therefore grows with `x²`, and any single
+raw figure would be a property of wherever the grid happened to stop rather
+than of the kernel. `(1 + x²)` is the conditioning of the **identity**, not of
+this implementation, so a different `erfc` is held to the same statistic. A
+worked consequence: at x = −8 the bound is 3.0327e-14, and at x = −20 it is
+1.8709e-13. (The tolerances in `tests/pricing_ncdf_tail.ch` round those **up**,
+to 3.1e-14 and 1.9e-13, which is right for a test tolerance and is not a
+restatement of the bound.)
+
+The `(1 + x²)` model is verified numerically, not only derived: perturbing
+`u` by one unit roundoff at 60 dps and measuring the relative change in
+`erfc(u)` gives a measured-to-model ratio of 0.456 at x = −0.5, 0.949 at −2,
+0.9996 at −8, and 1.000 from −20 outward. The model is exact in the tail and
+about 2× conservative near zero, which is also why the normalised statistic
+peaks near x = 0 rather than in the tail: the divisor is loose where it was
+never derived to be tight, and the kernel's own ~1.5 ulp is what dominates
+there. The peak is not worse accuracy near zero.
+
+**The floor is a floor, and the oracle enforces that it is tight.** It is also
+grid-independent by construction: the relative sweep is a superset of the
+absolute one over the shared interval, because the normalised statistic peaks
+near x = 0 (where the kernel's own ~1.5 ulp dominates and `(1 + x²)` is
+smallest), not in the tail. A tail-weighted grid measured 1.918 on the same
+kernel; publishing that would have been a floor any later refinement falsified.
+
+**What the repair costs, stated because the gain is not free.** The repair is
+measurably **less accurate in the body** than the kernel it replaces, at some
+points by more than an order of magnitude in ulp terms. The effect is confined
+to roughly `|x| ≲ 4.3` and is **absent from both tails**; one worked example,
+at the exact double x = −2.80777, is the old kernel returning
+0.0024942920852058514 — the correctly rounded f64 — against the repair's
+0.0024942920852058493.
+
+**No published figure is violated there**, and that is the claim to rely on,
+because it is the one with an executable guard: the accuracy oracle measures
+the absolute floor and the normalised relative floor over the whole swept
+interval and requires both to hold. Run
+`scripts/oracle_erf64_accuracy.py --measurement` for the current numbers.
+
+No per-point maximum is quoted here on purpose. Three review rounds each
+corrected a quantified cap in this paragraph — the figures are grid-dependent,
+nothing executes them, and a cap stated in prose invites a consumer to budget
+against it. The trade is real and disclosed; its size is a measurement, not a
+contract.
+
+**No silent zeros, inside the published interval.** `n_cdf64` returns a
+non-zero value at every probe point in [−37.5, 6.5] where the true value is
+representable, and the oracle fails if it does not. It saturates to `0.0` below
+x = −37.537 (−26.543·√2, Cody's XBIG). This replaces the pre-shoals#68
+behaviour, which returned exactly `0.0` below about x = −8.3 — the worst symptom
+in that issue, because a returned zero cannot be distinguished from a true zero
+at the call site.
+
+**Below the published interval a residual silent-zero band remains, narrowed
+rather than removed.** The true value stays representable as an f64 subnormal
+down to x ≈ −38.4854 (below which it rounds to zero anyway), while the kernel
+returns `0.0` from −37.537 onward. Measured: x = −37.6 returns `0.0` against a
+true 1.0748e-309, and x = −38.0 against a true 2.8854e-316. So that worst
+symptom is pushed out about 29 units and narrowed to about 0.95 units of x, not
+eliminated. The sentence above is interval-scoped on purpose and is not a claim
+about all of f64; `tests/pricing_ncdf_tail.ch` pins `n_cdf64(-37.6) == 0.0`,
+which is this band and not a true zero.
+
+**This kernel has a successor, and it is one pin away.** Chelis 0.18.13 adds a
+`standard_normal_cdf` builtin: Phi built from a correctly rounded `erfc` **with
+a correction for the rounding of `-x/√2`**, holding ~1.5 ulp at f64 including
+the deep left tail. That correction is exactly what the kernel here does not
+do, which is why the floor above is normalised by `(1 + x²)` at all — at
+x = -37 this kernel's relative error is ~1.1e-13 where the builtin's would be
+~3e-16. Shoals pins `=0.18.11`, where the builtin does not exist (verified
+present in `v0.18.13`, absent in `v0.18.11`), so the kernel below is the answer
+at this pin rather than a competing design. At 0.18.13 `n_cdf64` should
+delegate, and the three arms, the XBIG saturation point and this whole relative
+floor retire together. chelis#902 is the canonical-erf tracker.
+
+**What was wrong before shoals#68, recorded because the repair is only legible
+against it.** `n_cdf64` was spelled `0.5 * (1 - erf64(-x/√2))`, and `erf64` is
+itself `1 - erfc`, so the ~1 ulp `erfc` that shoals#61 bought passed through two
+subtractions from 1 and the cancellation removed exactly the precision just
+computed. Measured on that kernel: 2.3e-6 relative at x = -7, 1.8% at x = -8,
+and exactly `0.0` below about -8.3. Absolute error was unaffected, which is why
+it survived a green oracle and twelve review rounds. `tests/pricing_ncdf_tail.ch`
+pins the repair against those exact old values.
+
+**The kernel is no longer the limiting factor for the price and the Greeks.**
 `bs_call_f64(100, 100, 0.05, 0.2, 1)` returns `10.450583572185565`. Against the
 f64 values of those decimal inputs — the ones the kernel actually receives — the
 exact price is `10.450583572185567346`, whose correctly-rounded f64 is

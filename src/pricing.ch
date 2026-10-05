@@ -6,8 +6,20 @@ export (erf64, n_cdf64, bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_
 -- Greek is the AD derivative of THIS expression, so price and Greek agree.
 --
 -- ACCURACY. `erf64` evaluates W. J. Cody's rational approximation (Math. Comp.
--- 23, 1969): three ranges split at 0.5 and 4, saturating at 6 where erfc
--- underflows f64. Worst observed absolute error >= 3.3675e-16 (~1.52 ulp of
+-- 23, 1969): three ranges split at 0.5 and 4, saturating at Cody's XBIG =
+-- 26.543, where `erfc` reaches the smallest NORMAL f64 (the exact crossing is
+-- 26.54325845). An earlier revision saturated at 6 and said that was where
+-- `erfc` underflows f64; that was wrong by 290 orders of magnitude --
+-- `erfc(6)` is 2.15e-17, and 6 is where `1 - erfc` rounds to 1.0, i.e. where
+-- *erf* saturates. `erf64` cannot tell the difference and is bitwise unchanged
+-- by the correction. The kernel below that consumes `erfc` directly could not
+-- see past x = -8.485 until it was fixed; see shoals#68 and the note above its
+-- definition. (Said that way round on purpose: naming it HERE would put its
+-- name inside `erf64`'s floor-claim attribution window and the oracle's
+-- transcription leg would read `erf64`'s figure as that kernel's -- which it
+-- did, when this paragraph was first written.)
+--
+-- Worst observed absolute `erf64` error >= 3.3675e-16 (~1.52 ulp of
 -- 1.0) at x = 0.507001975, measured at 60 dps by
 -- `scripts/oracle_erf64_accuracy.py`. That is a FLOOR: the error is jagged at
 -- ulp scale, so a grid reports only the worst point it lands on. Re-measure by
@@ -45,9 +57,12 @@ def erf64_core_small(x: f64) -> f64 = {
   xden3 = mul(add(xden2, cast(1282.6165260773723, f64)), y)
   mul(xc, div(add(xnum3, cast(3209.3775891384694, f64)), add(xden3, cast(2844.236833439171, f64))))
 }
--- Cody region 2 (0.5 < |x| < 4): erfc(|x|) = exp(-x^2) * P(|x|)/Q(|x|).
--- The dispatcher routes |x| == 4 to region 3; Cody's CALERF puts it here
--- (`IF (Y .LE. FOUR)`), where it is one ulp better. See this shell's issue 68.
+-- Cody region 2 (0.5 < |x| <= 4): erfc(|x|) = exp(-x^2) * P(|x|)/Q(|x|).
+-- `|x| == 4` belongs HERE, not to region 3, which is why the dispatcher below
+-- spells its test `lte` rather than `lt`: Cody's CALERF dispatches on
+-- `IF (Y .LE. FOUR)` and region 2 is one ulp better at that one point.
+-- Measured: this core gives 1.541725790028002e-08 at 4.0, the correctly
+-- rounded `erfc(4)`; region 3 gives 1.5417257900280017e-08 (shoals#68).
 def erf64_core_erfc_mid(axr: f64) -> f64 = {
   -- Domain clamp. See the note above `erf64` for why every core clamps.
   ax = if lt(cast(4.0, f64), axr) then cast(4.0, f64) else axr
@@ -69,7 +84,7 @@ def erf64_core_erfc_mid(axr: f64) -> f64 = {
   xden7 = mul(add(xden6, cast(3439.3676741437216, f64)), ax)
   mul(exp(neg(mul(ax, ax))), div(add(xnum7, cast(1230.3393547979972, f64)), add(xden7, cast(1230.3393548037495, f64))))
 }
--- Cody region 3 (4 <= |x| < 6): erfc(|x|) = exp(-x^2)/|x| * (1/sqrt(pi) - R(1/x^2)).
+-- Cody region 3 (4 < |x| < 26.543): erfc(|x|) = exp(-x^2)/|x| * (1/sqrt(pi) - R(1/x^2)).
 def erf64_core_erfc_tail(axr: f64) -> f64 = {
   -- LOWER clamp only, and the asymmetry is the point. A clamp is safe only when
   -- its UNTAKEN arm has a finite VALUE *and* a finite DERIVATIVE. The
@@ -117,7 +132,14 @@ def erf64_core_erfc_tail(axr: f64) -> f64 = {
 -- the clamps and dispatcher are themselves `if`s, so +/-inf still poisons a
 -- sibling arm wherever an untaken arm is unbounded. `min`/`max` would remove
 -- the rest but fail at eval under vmap at this pin (chelis#1582).
-def erf64_erfc_abs(ax: f64) -> f64 = if lt(ax, cast(4.0, f64)) then erf64_core_erfc_mid(ax) else if lt(ax, cast(6.0, f64)) then erf64_core_erfc_tail(ax) else cast(0.0, f64)
+-- The saturation point is Cody's XBIG, not `erf`'s. 6 was inherited from
+-- `erf64`'s needs and silently capped `n_cdf64`'s usable left tail at
+-- x = -6*sqrt2 = -8.485, which is where it returned exactly 0.0 (shoals#68).
+-- 26.543 moves that to x = -37.537, below which the true `n_cdf64` is itself
+-- subnormal. `erf64` is unaffected either way: `1 - erfc(ax)` rounds to 1.0 for
+-- every ax >= 6, so no `erf64` value moves. Verified by measurement, not
+-- inferred -- `tests/pricing_ncdf_tail.ch` pins both halves.
+def erf64_erfc_abs(ax: f64) -> f64 = if lte(ax, cast(4.0, f64)) then erf64_core_erfc_mid(ax) else if lt(ax, cast(26.543, f64)) then erf64_core_erfc_tail(ax) else cast(0.0, f64)
 def erf64(x: f64) -> f64 = {
   ax = abs_f64(x)
   y = sub(cast(1.0, f64), erf64_erfc_abs(ax))
@@ -134,17 +156,102 @@ def erf64(x: f64) -> f64 = {
   -- `x` itself for a finite operand, and the saturating 1.0 for a NaN one.
   if eq(x, x) then finite else x
 }
--- ABSOLUTE accuracy only. `erf64_erfc_abs` computes erfc to ~1 ulp, but this
--- spelling routes it through `1 - erf64`, and `erf64` is itself `1 - erfc`, so
--- the two subtractions cancel away the relative precision in the LEFT TAIL.
--- Measured on the shipped kernel: n_cdf64(-7) is 2.3e-6 relative, n_cdf64(-8)
--- is 1.8% relative, and below about -8.3 it returns exactly 0.0 where the true
--- value is ~1e-17. Do not use this for deep-tail probabilities. Routing the
--- negative branch straight through `erf64_erfc_abs` would keep the full
--- relative accuracy; that is this shell's issue 68, deliberately not done here.
+-- RELATIVE accuracy in both tails, which is what shoals#68 was about and what
+-- the previous spelling did not have. `n_cdf64` used to be
+-- `0.5 * (1 - erf64(-x/sqrt2))`, and `erf64` is itself `1 - erfc`, so the ~1 ulp
+-- `erfc` that this shell's issue 61 bought passed through TWO subtractions
+-- from 1 and the cancellation removed exactly the precision just computed.
+-- Measured on that spelling: 2.3e-6 relative at x = -7, 1.8% at x = -8, and
+-- exactly 0.0 below about -8.3 where the true value is ~1e-17. Absolute error
+-- was unaffected and every published figure stayed true, which is why twelve
+-- red-team rounds and an absolute-error oracle all missed it.
+--
+-- `n_cdf(x) = 0.5 * erfc(-x/sqrt2)` is the identity, and the repair is to
+-- evaluate it that way rather than through `erf`. Three arms, and each one
+-- places the subtraction where the RESULT is far from zero:
+--
+--   |u| <  0.5  ->  0.5 + 0.5*erf(u)         result near 0.5; `erf64_erfc_abs`
+--                                            is OUT OF REGION below 0.5 (Cody
+--                                            region 1 is a separate rational),
+--                                            so this arm must exist -- it is
+--                                            not a shortcut for small inputs.
+--   x   <  0    ->  0.5*erfc(|u|)            no subtraction at all. This is the
+--                                            arm shoals#68 asked for.
+--   otherwise   ->  1 - 0.5*erfc(u)          cancellation is in the RIGHT tail,
+--                                            where the result approaches 1 and
+--                                            relative accuracy is unaffected.
+--
+-- SEQUENTIAL SELECTS, not a nested `if`, and `half_erfc` hoisted so both tail
+-- arms share one `erf64_erfc_abs` call. Each `if` is then a two-arm select over
+-- values already computed, which keeps the three arms independently readable
+-- and evaluates `erf64_erfc_abs` once rather than once per arm. Stated as a
+-- preference and not as a workaround: nested `if`s also lower correctly at this
+-- pin, measured through both lanes and `grad`, so no upstream defect is being
+-- cited here.
+--
+-- EVERY ARM IS FINITE FOR EVERY FINITE INPUT, and that is load-bearing rather
+-- than incidental: under `vmap` a scalar `if` lowers to a masked select that
+-- evaluates both arms, so an untaken arm's non-finite value or derivative
+-- reaches the result. `erf64_core_small` clamps into +/-0.5 and
+-- `erf64_erfc_abs` clamps into each core's own region, so the untaken arms here
+-- are bounded polynomials. Checked at the +/-0.7071067811865476 boundary, at
+-- zero, at +/-inf and under NaN, through BOTH the scalar and the vmap lane, and
+-- for the gradient as well as the value -- the adjoint is the half that a
+-- value-only test says is fine when it is not (chelis#2640). The two lanes
+-- agree BITWISE at every one of those points, and no finite input yields a NaN
+-- in either lane or either gradient.
+--
+-- ONE EXCEPTION, and it predates this repair: `grad` at +/-inf is NaN, in this
+-- spelling and in the one it replaced (measured both ways). That is the
+-- documented scope of the guarantee -- total over the FINITE f64 domain, not
+-- over all of f64, because the clamps and the dispatcher are themselves `if`s.
+-- The VALUE at +/-inf is exactly right. `tests/pricing_ncdf_tail.ch` pins it.
+--
+-- THE PUBLISHED CONTRACT, stated here so the oracle's transcription leg
+-- discovers this file as a carrier and a drifting figure cannot hide in one
+-- copy: REL-FLOOR `n_cdf64` >= 4.2025 * (1 + x^2) * 2^-53 over
+-- -37.5 <= x <= 6.5, where `(1 + x^2)` is the conditioning of the argument
+-- reduction `u = x/sqrt2`. The raw relative error is deliberately NOT restated
+-- here: it is grid-dependent, nothing executes it, and a second carrier is one
+-- more place for it to drift. docs/CHELIS_SURFACE.md reports it once, for
+-- orientation, and labels it as not a floor.
+-- Saturates to 0.0 below x = -37.537 (-26.543*sqrt2). No probe point IN the
+-- interval returns a silent zero; below it, for about 0.95 units of x, the
+-- kernel returns 0.0 while the true value is still a representable subnormal
+-- (x = -37.6 -> 1.0748e-309). That band is a narrowed residual of this very
+-- defect, not a harmless cut-off, and docs/CHELIS_SURFACE.md states it. Re-measure with
+-- `scripts/oracle_erf64_accuracy.py --measurement`;
+-- docs/CHELIS_SURFACE.md is the authoritative publication.
+--
+-- THIS KERNEL HAS A SUCCESSOR AND A SHORT LIFETIME, recorded here so the next
+-- pin bump does not re-derive it. Chelis 0.18.13 adds `standard_normal_cdf`, a
+-- builtin Phi built from a correctly rounded `erfc` *with a correction for the
+-- rounding of `-x/sqrt(2)`* -- the same argument reduction whose conditioning
+-- sets the bound above -- and it holds ~1.5 ulp at f64 INCLUDING the deep left
+-- tail. That is roughly `(1 + x^2)` better than this kernel in the far tail,
+-- because correcting the reduction is precisely what this spelling does not do:
+-- at x = -37 the error here is ~1.1e-13 relative and the builtin's would be
+-- ~3e-16. Verified present in v0.18.13 and absent in v0.18.11, which is the pin
+-- this file compiles against, so the repair below is the 0.18.11 answer and not
+-- a competing design. When the pin reaches 0.18.13, `n_cdf64` should delegate
+-- and the three arms, the XBIG saturation point and the published relative
+-- floor all go away together (chelis#902 is the canonical-erf tracker).
+--
+-- NaN PROPAGATES rather than saturating, for the same reason `erf64` guards:
+-- every `lt` against NaN is false, so without the guard a NaN input falls
+-- through to `1 - 0.5*erfc_abs(NaN)` = `1 - 0` and a negative spot prices to a
+-- silent 1.0. This no longer inherits `erf64`'s guard, because it no longer
+-- calls `erf64`. `eq(x, x)` is false only for NaN, and both arms are finite
+-- whenever the input is.
 def n_cdf64(x: f64) -> f64 = {
   inv_sqrt_2 = cast(0.7071067811865476, f64)
-  mul(cast(0.5, f64), sub(cast(1.0, f64), erf64(neg(mul(x, inv_sqrt_2)))))
+  u = mul(x, inv_sqrt_2)
+  au = abs_f64(u)
+  half_erfc = mul(cast(0.5, f64), erf64_erfc_abs(au))
+  tails = if lt(x, cast(0.0, f64)) then half_erfc else sub(cast(1.0, f64), half_erfc)
+  near_zero = add(cast(0.5, f64), mul(cast(0.5, f64), erf64_core_small(u)))
+  finite = if lt(au, cast(0.5, f64)) then near_zero else tails
+  if eq(x, x) then finite else x
 }
 -- DENOMINATOR FLOOR, and why it is a clamp rather than a branch on the price.
 --

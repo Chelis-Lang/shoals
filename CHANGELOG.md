@@ -228,6 +228,61 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **`Shoals.Pricing.n_cdf64` cancelled away `erf64`'s accuracy in the left
+  tail** (shoals#68). It was spelled `0.5 * (1 - erf64(-x/sqrt2))` and `erf64`
+  is itself `1 - erfc`, so the ~1 ulp `erfc` that shoals#61 bought passed
+  through two subtractions from 1 and the cancellation removed exactly the
+  precision just computed. Measured on the old kernel: 2.3e-6 relative error at
+  x = -7, 1.8% at x = -8, and exactly `0.0` below about -8.3, where the true
+  value is ~1e-17. The returned zero was the worst of it, being
+  indistinguishable from a true zero at the call site. **Absolute error was
+  never affected, which is why a green accuracy oracle and twelve red-team
+  rounds all missed it.**
+
+  `n_cdf64` now evaluates the identity `0.5 * erfc(-x/sqrt2)` directly, in
+  three arms chosen so the subtraction always lands where the result is far
+  from zero: `0.5 * erfc(|x|/sqrt2)` for x < 0 (no subtraction at all),
+  `1 - 0.5 * erfc(x/sqrt2)` for x >= 0 (cancellation in the right tail, where
+  the result approaches 1), and `0.5 + 0.5 * erf(x/sqrt2)` for
+  `|x/sqrt2| < 0.5`, which must exist because Cody's region-2 rational is out
+  of region below 0.5. It carries its own `eq(x, x)` NaN guard, since it no
+  longer calls `erf64` and so no longer inherits that one.
+
+  Two changes come with it. `erf64_erfc_abs` now routes `|x| == 4` to Cody
+  region 2, where CALERF puts it (`IF (Y .LE. FOUR)`) and where it is one ulp
+  better: 1.541725790028002e-08 against region 3's 1.5417257900280017e-08. And
+  its saturation point moves from 6 to Cody's XBIG = 26.543, which is where
+  `erfc` actually reaches the smallest normal f64 -- 6 is where `1 - erfc`
+  rounds to 1.0, i.e. where *erf* saturates, and `erf64_erfc_abs` had inherited
+  a constant chosen for a consumer that cannot tell the difference. `erf64` is
+  bitwise unchanged by that (measured: its floor is still 3.3675e-16 at the
+  same argmax), while `n_cdf64`'s usable left tail moves from x = -8.485 to
+  x = -37.537.
+
+  `n_cdf64`'s published **absolute** floor does NOT move: it is still
+  **>= 1.9495e-16**, and an earlier revision of this entry claimed it improved
+  to 1.8731e-16. What moved is the argmax, which flipped sign from
+  −0.7170090691949448 to +0.7170090691949448 — the repair is better on the
+  negative side (1.6720e-16) and reaches the same value on the positive mirror,
+  which the accuracy oracle's grid did not probe. That grid is now symmetric by
+  construction rather than by two appended anchors.
+
+  The repair is also **measurably less accurate in the body**, which is the
+  price of the tail: at some points by more than an order of magnitude in ulp
+  terms, confined to roughly `|x| ≲ 4.3` and absent from both tails. One worked
+  example at the exact double x = −2.80777: the old kernel returns the
+  correctly rounded f64, the repair does not. **No published floor is violated
+  anywhere in the body** — that is the claim with an executable guard behind it,
+  and `docs/CHELIS_SURFACE.md` explains why no per-point maximum is quoted.
+
+  A new **relative** floor is published and measured,
+  normalised by the conditioning of the argument reduction, and the accuracy
+  oracle gains a leg for it plus a check that no probe point returns a silent
+  zero. That leg needed a non-cancelling reference: the existing
+  `(1 + erf(x/sqrt2))/2` returns exactly 0.0 at 60 dps below about x = -20, so
+  an oracle built on it would have reported PASS on the very defect it exists
+  to find.
+
 - **`Shoals.Dupire.du_cubic_log_moneyness_interp` accepted unsorted grid axes
   and returned a silently wrong implied vol** (shoals#123). Both axes must now
   be strictly increasing: the function rejects `strikes` or `times` that are

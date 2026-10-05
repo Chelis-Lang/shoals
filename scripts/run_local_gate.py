@@ -49,7 +49,7 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
       stdlib-only; the MEASUREMENT leg needs the toolchain and runs under
       ``--full``. This leg proves the carriers agree, never that they are
       right.
-  17. ``scripts/test_oracle_erf64_accuracy.py`` — 44 tests over that oracle.
+  17. ``scripts/test_oracle_erf64_accuracy.py`` — 72 tests over that oracle.
       Eleven mutate a published figure in a throwaway git fixture (the
       shoals#64 mutation among them) and require the oracle to turn red; the
       rest pin the measurement verdict branches, the eval-wire decode, the

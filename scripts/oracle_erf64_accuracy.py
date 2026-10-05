@@ -21,11 +21,22 @@ it covered more than it did:
 * The transcription leg proves the carriers AGREE. It cannot prove they are
   right: rewrite every carrier to the same wrong number and this leg is green.
   Only the measurement leg constrains the value itself.
-* The measurement leg proves the published floor is tight for the points it
-  sampled, on the dtype and interval it sampled. It is ABSOLUTE error over
-  +/-6.5 only, so it cannot observe `n_cdf64`'s left-tail RELATIVE blowup
-  (1.8% at x = -8, exactly 0.0 below about -8.3) -- that is shoals#68, and
-  `docs/CHELIS_SURFACE.md` documents it separately.
+* The measurement leg proves each published floor is tight for the points it
+  sampled, on the dtype, interval and QUANTITY it sampled. The absolute floors
+  are swept over +/-6.5; the relative floor is swept over [-37.5, 6.5]. Neither
+  constrains the other, and that independence is the shoals#68 lesson: the
+  absolute sweep was green while `n_cdf64` had 1.8% relative error at x = -8 and
+  returned exactly 0.0 below about -8.3, because absolute error was never
+  affected. A new accuracy claim about a NEW quantity needs a new leg, not a
+  denser grid on an old one.
+
+THE RELATIVE LEG'S REFERENCE MUST NOT CANCEL EITHER, and this is not a
+hypothetical. The absolute leg's `n_cdf64` reference is `(1 + erf(x/sqrt2))/2`,
+which at 60 dps returns EXACTLY 0.0 at x = -20 and x = -37 -- the same
+cancellation the kernel had, in the oracle that is supposed to detect it. The
+relative leg therefore references `erfc(-x/sqrt2)/2`, and `reference_self_test`
+below asserts the two agree where the erf form is still valid. A reference that
+reproduces the defect reports PASS.
 
 MEASURE IN BINARY: the error is `mpf(f64_result) - erf(mpf(exact_f64_input))` at
 extended precision. `chelis eval --json` hands back the exact f64 as hex bits
@@ -54,6 +65,24 @@ check is not enough: shoals#64's own demonstration mutation passes it. So the
 requirement is equality with the measurement truncated toward zero at the
 published figure's OWN significant-digit count. You may publish as few digits as
 you like; the digits you do publish must be the measurement's.
+
+A RELATIVE FLOOR IS NORMALISED BY THE CONDITIONING, not published raw. The
+attainable relative error is not constant across the tail: `n_cdf(x) =
+0.5*erfc(u)` with `u = x/sqrt2`, and `d ln erfc / d ln u ~ -2u^2`, so a
+relative perturbation of one unit roundoff in `u` is amplified by `(1 + x^2)`.
+A single raw figure would therefore be dominated by whichever end of the
+interval the grid happened to reach -- it would move when the interval moved,
+which is not a property of the kernel. The published statistic is
+`max |rel_err| / ((1 + x^2) * 2^-53)`, a dimensionless multiple of the
+conditioning.
+
+It is NOT constant across the sweep, and the published figure is the max rather
+than a typical value: measured, it is about 1.9 in the far tail and 4.2 near
+x = 0, because two error sources trade places -- the kernel's own ~1.5 ulp
+dominates where the result is O(1), and the `(1 + x^2)` amplification dominates
+in the tail, where that divisor is largest. A factor of about 2.2 across the
+interval. `relative_probe_points` takes the superset of both grids for exactly
+this reason; its docstring has the measurement.
 
 Usage:
     oracle_erf64_accuracy.py                  # both legs
@@ -149,6 +178,52 @@ BATCH = 800
 # real evaluation, and nothing noticed because nothing invoked it (shoals#64).
 SUPPORTED_EVAL_SCHEMAS = (2, 3)
 
+# --------------------------------------------------------------------------
+# shoals#68: the RELATIVE claim family
+# --------------------------------------------------------------------------
+# A SEPARATE claim family with its own marker, its own carriers and its own
+# measurement, because it is a different quantity. Folding it into FLOOR_CLAIM
+# was not an option: `parse_published` requires exactly ONE floor claim per
+# kernel row, and `run_transcription` requires every claim attributed to a
+# kernel to equal that one -- a second quantity under the same marker would
+# make the two figures each other's failure.
+#
+# THE MARKER NAMES ITS OWN KERNEL, as `<marker> n_cdf64 >= C * ...`. The
+# absolute
+# family attributes a claim by a markdown first cell or a +/-2 line window,
+# and the docstring above records both halves of that fragility: an unrelated
+# `>=` inequality is read as a claim about these kernels, and a claim spelled
+# any other way is missed. The note there says keying discovery on a window
+# that NAMES the governed kernel is the shape that fixes both. This family is
+# that shape. It does not retrofit the absolute family -- that stays
+# follow-up work -- but a new family had no reason to inherit the defect.
+#
+# No overlap with FLOOR_CLAIM: that pattern requires `e-NN` immediately after
+# the number, and these claims are followed by ` * (1 + x^2) * 2^-53`.
+REL_FLOOR_KERNELS = ("n_cdf64",)
+# The interval the relative claim covers. Its lower end is where `n_cdf64`
+# itself saturates (-26.543*sqrt2, Cody's XBIG), below which the true value is
+# subnormal; the upper end matches the absolute sweep.
+REL_INTERVAL = (-37.5, 6.5)
+# Unit roundoff. The published statistic is a multiple of this times the
+# conditioning, never a raw relative error -- see the docstring.
+REL_UNIT_ROUNDOFF_EXP = -53
+# ASSEMBLED FROM PARTS, and this file never spells it whole. The marker is
+# discovered by `git grep` over the tracked tree, this script is tracked, and
+# the near-miss check below fails any marker that does not parse -- so a literal
+# in a comment or a diagnostic here would fail the guard against itself. The
+# absolute family omits `>=` from its own examples for exactly this reason; the
+# convention is the same one, applied to a marker that is a word rather than an
+# operator. Everything user-facing interpolates REL_FLOOR_MARKER.
+REL_FLOOR_MARKER = "REL-" "FLOOR"
+REL_FLOOR_CLAIM = re.compile(
+    REL_FLOOR_MARKER + r"[ \t]+`?([A-Za-z0-9_]+)`?[ \t]*>=[ \t]*"
+    r"([0-9]+\.[0-9]+)[ \t]*\*[ \t]*\(1 \+ x\^2\)[ \t]*\*[ \t]*2\^-53"
+)
+REL_FLOOR_CLAIM_GREP = REL_FLOOR_MARKER
+REL_FLOOR_SPELLING = (
+    REL_FLOOR_MARKER + " <kernel> >= C.CCCC * (1 + x^2) * 2^-53")
+
 
 # --------------------------------------------------------------------------
 # transcription leg: what the repository publishes, and whether it agrees
@@ -182,6 +257,91 @@ def tracked_text_files() -> list[str]:
             f"{done.stderr[:500]}"
         )
     return [p for p in done.stdout.splitlines() if p]
+
+
+class PublishedRelative:
+    """One kernel's published relative floor, as a multiple of the conditioning.
+
+    `value` is the dimensionless constant C in
+    `rel_err <= C * (1 + x^2) * 2^-53`, and `sig_digits` is the precision the
+    publication claims -- held to exactly the same tight-floor rule as the
+    absolute family.
+    """
+
+    def __init__(self, kernel: str, spelling: str, source: str) -> None:
+        self.kernel = kernel
+        self.spelling = spelling
+        self.source = source
+        self.value = Decimal(spelling)
+        mantissa = spelling.replace(".", "").lstrip("0")
+        self.sig_digits = len(mantissa.rstrip()) or 1
+
+
+def tracked_relative_files() -> list[str]:
+    done = subprocess.run(
+        ["git", "grep", "-l", "-I", "-E", REL_FLOOR_CLAIM_GREP],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=False,
+    )
+    if done.returncode not in (0, 1):
+        raise SystemExit(
+            f"FAIL: git grep for relative floor claims failed "
+            f"(rc={done.returncode})\n{done.stderr[:500]}"
+        )
+    return [q for q in done.stdout.splitlines() if q]
+
+
+def parse_published_relative() -> tuple[dict[str, PublishedRelative], list[str]]:
+    """Read each governed kernel's relative floor out of the authoritative doc.
+
+    Same failure discipline as the absolute family: a missing or unparseable
+    claim is a failure, because a claim that silently vanishes takes its own
+    guard with it. The difference is that the marker is self-attributing, so a
+    malformed one is reported as malformed rather than attributed to whichever
+    kernel happened to be nearby.
+    """
+    errors: list[str] = []
+    doc = REPO_ROOT / ACCURACY_DOC
+    if not doc.is_file():
+        return {}, [f"{ACCURACY_DOC}: the published accuracy table is missing"]
+
+    out: dict[str, PublishedRelative] = {}
+    text = doc.read_text(encoding="utf-8")
+    # A near-miss is worse than an absent claim: it reads as published and
+    # matches nothing, so the kernel silently drops out of the governed set.
+    # Count bare markers and require each to parse.
+    bare = len(re.findall(REL_FLOOR_CLAIM_GREP, text))
+    found = REL_FLOOR_CLAIM.findall(text)
+    if len(found) != bare:
+        errors.append(
+            f"{ACCURACY_DOC}: found {bare} `{REL_FLOOR_MARKER}` marker(s) "
+            f"but only {len(found)} parse as `{REL_FLOOR_SPELLING}`. A marker "
+            f"that does not parse is not a published claim and nothing "
+            f"checks it."
+        )
+    for kernel, spelling in found:
+        if kernel in out:
+            errors.append(
+                f"{ACCURACY_DOC}: `{kernel}` publishes more than one relative "
+                f"floor; there must be exactly one per kernel"
+            )
+            continue
+        out[kernel] = PublishedRelative(
+            kernel, spelling, f"{ACCURACY_DOC} (`{kernel}` relative floor)")
+    for kernel in REL_FLOOR_KERNELS:
+        if kernel not in out:
+            errors.append(
+                f"{ACCURACY_DOC}: no relative floor published for `{kernel}`. "
+                f"shoals#68 is the reason this leg exists; removing the claim "
+                f"removes the only guard on the left tail."
+            )
+    for kernel in out:
+        if kernel not in REL_FLOOR_KERNELS:
+            errors.append(
+                f"{ACCURACY_DOC}: `{kernel}` publishes a relative floor but is "
+                f"not in REL_FLOOR_KERNELS, so nothing measures it. Add it "
+                f"there or drop the claim."
+            )
+    return out, errors
 
 
 def parse_published() -> tuple[dict[str, Published], list[str]]:
@@ -242,7 +402,10 @@ def attributed_kernel(lines: list[str], idx: int) -> str | None:
 
 def run_transcription(verbose: bool = True) -> tuple[int, dict]:
     published, errors = parse_published()
+    published_rel, rel_errors = parse_published_relative()
+    errors.extend(rel_errors)
     carriers: list[dict] = []
+    rel_carriers: list[dict] = []
 
     for rel in tracked_text_files():
         lines = (REPO_ROOT / rel).read_text(encoding="utf-8").splitlines()
@@ -273,21 +436,67 @@ def run_transcription(verbose: bool = True) -> tuple[int, dict]:
                         f"residuals in `research/` stay out of this oracle's scope."
                     )
 
+    # shoals#68's family. Self-attributing, so the loop is a straight equality
+    # check against the authoritative doc rather than a context window.
+    for rel in tracked_relative_files():
+        lines = (REPO_ROOT / rel).read_text(encoding="utf-8").splitlines()
+        for idx, line in enumerate(lines):
+            bare = len(re.findall(REL_FLOOR_CLAIM_GREP, line))
+            parsed = REL_FLOOR_CLAIM.findall(line)
+            if bare != len(parsed):
+                errors.append(
+                    f"{rel}:{idx + 1}: carries a `{REL_FLOOR_MARKER}` "
+                    f"marker that does not parse as `{REL_FLOOR_SPELLING}`. "
+                    f"Spell it exactly, or do not spell it -- an unparseable "
+                    f"marker is checked by nothing."
+                )
+            for kernel, literal in parsed:
+                rel_carriers.append({
+                    "file": rel, "line": idx + 1,
+                    "literal": literal, "kernel": kernel,
+                })
+                pub = published_rel.get(kernel)
+                if pub is None:
+                    errors.append(
+                        f"{rel}:{idx + 1}: states a relative floor for "
+                        f"`{kernel}`, which {ACCURACY_DOC} does not publish"
+                    )
+                elif Decimal(literal) != pub.value:
+                    errors.append(
+                        f"{rel}:{idx + 1}: states `{REL_FLOOR_MARKER} "
+                        f"{kernel} >= {literal} * (1 + x^2) * 2^-53`, but "
+                        f"{pub.source} publishes `{pub.spelling}`"
+                    )
+
     if verbose:
         for kernel in KERNELS:
             pub = published.get(kernel)
             print(f"{kernel:9s} published floor {pub.spelling if pub else '(UNPARSEABLE)'}"
                   f" ({pub.sig_digits if pub else '-'} sig digits)")
+        for kernel in REL_FLOOR_KERNELS:
+            rp = published_rel.get(kernel)
+            print(f"{kernel:9s} published {REL_FLOOR_MARKER} "
+                  f"{rp.spelling if rp else '(UNPARSEABLE)'} * (1 + x^2) * 2^-53"
+                  f" ({rp.sig_digits if rp else '-'} sig digits)")
         print(f"\n{len(carriers)} floor claim(s) discovered in "
               f"{len({c['file'] for c in carriers})} tracked file(s):")
         for c in sorted(carriers, key=lambda c: (c["file"], c["line"])):
             who = c["attributed_kernel"] or "unattributed"
             print(f"  {c['file']}:{c['line']}  >= {c['literal']}  [{who}]")
+        print(f"\n{len(rel_carriers)} relative floor claim(s) discovered in "
+              f"{len({c['file'] for c in rel_carriers})} tracked file(s):")
+        for c in sorted(rel_carriers, key=lambda c: (c["file"], c["line"])):
+            print(f"  {c['file']}:{c['line']}  {REL_FLOOR_MARKER} "
+                  f"{c['kernel']} >= {c['literal']}")
 
     summary = {
         "published": {k: {"spelling": p.spelling, "sig_digits": p.sig_digits}
                        for k, p in published.items()},
+        "published_relative": {
+            k: {"spelling": p.spelling, "sig_digits": p.sig_digits}
+            for k, p in published_rel.items()},
         "carriers": carriers,
+        "relative_carriers": rel_carriers,
         "errors": errors,
     }
     if verbose:
@@ -324,14 +533,148 @@ def probe_points() -> list[float]:
         for k in range(-20, 21):
             pts.add(boundary + k * 2.0**-45)
     # Negatives are not optional. `erf` is odd so its error magnitude mirrors,
-    # but `n_cdf64` is not: `0.5 * (1 - erf64(-x/sqrt2))` rounds differently on
-    # the two sides, and its worst observed point is at x = -0.717. A grid that
+    # but `n_cdf64` is not: it rounds differently on the two sides. A grid that
     # only swept x >= 0 reported a documented floor as overstated when the
     # grid, not the figure, was what was wrong.
-    pts |= {-x for x in tuple(pts)}
-    pts.add(-0.7170090691949448)
+    #
+    # THE TWO ANCHORS ARE ADDED BEFORE THE MIRROR, AND THE ORDER IS THE WHOLE
+    # POINT. They used to be appended AFTER it, which left the grid with
+    # exactly two asymmetric points -- +0.7170090691949448 and
+    # -0.7700537662469848 were the only values in +/-6.5 whose mirror was
+    # absent. That is not a hypothetical gap: shoals#68's repair moved
+    # `n_cdf64`'s argmax onto `+0.7170090691949448`, the grid could not see it,
+    # and the PR published 1.8731e-16 when the kernel reaches 1.9495e-16 there.
+    # A guard whose coverage depends on statement order will eventually be
+    # wrong about whichever point the next kernel change favours, so the fix is
+    # the ordering rather than two more literals.
+    pts.add(0.7170090691949448)
     pts.add(0.7700537662469848)
+    pts |= {-x for x in tuple(pts)}
     return sorted(pts)
+
+
+def relative_probe_points() -> list[float]:
+    """Where to look for a RELATIVE failure, which is nowhere near where an
+    absolute one lives.
+
+    The absolute sweep is dense around x = 0.507 because that is where the
+    worst absolute error is. Relative error is worst where the RESULT is
+    smallest, so this grid is weighted into the left tail and onto every seam a
+    relative blowup can hide behind:
+
+    * a broad sweep over the whole interval the claim covers;
+    * the region-1/region-2 branch boundary at |x/sqrt2| = 0.5, which is where
+      the repaired `n_cdf64` switches spelling;
+    * the region-2/region-3 boundary at |x/sqrt2| = 4 and the saturation point
+      at |x/sqrt2| = 26.543, mapped back into x;
+    * the five points shoals#68 measured by hand, so the issue's own table
+      stays checkable against the shipped kernel; and
+    * EVERY POINT OF THE ABSOLUTE GRID that falls inside the interval.
+
+    That last one is not padding, and it is the reason this function is not
+    simply a tail sweep. The normalised statistic does not peak in the tail: it
+    peaks near x = 0. Two different error sources are in play -- the kernel's
+    own ~1.5 ulp, which dominates where the result is O(1), and the argument
+    reduction's `(1 + x^2)` amplification, which dominates in the tail -- and
+    `(1 + x^2)` is SMALLEST where the first one rules. A tail-weighted grid
+    measured 1.918 while a grid that reached x = -0.717 measured 4.203 on the
+    same kernel. Publishing the first would have been a floor that any later
+    grid refinement falsified, which is the one failure mode a FLOOR is
+    supposed to be immune to. Taking the superset makes the figure a property
+    of the kernel rather than of this function.
+
+    Deliberately NOT symmetric in the tail. `n_cdf64` is not an odd function
+    and the defect was one-sided: the right tail approaches 1, where relative
+    accuracy is free. The dense windows inherited from the absolute grid are
+    symmetric because that grid's argmax is.
+    """
+    import math
+
+    lo, hi = REL_INTERVAL
+    pts: set[float] = {x for x in probe_points() if lo <= x <= hi}
+    for i in range(801):
+        pts.add(lo + (hi - lo) * i / 800)
+    root2 = math.sqrt(2.0)
+    # The seams of the repaired kernel, in x. |u| = 0.5 is where `n_cdf64`
+    # switches between its region-1 and erfc spellings, so it is stepped at
+    # ulp scale rather than at the coarse 2^-48 the far seams use.
+    for k in range(-200, 201):
+        pts.add(0.5 * root2 + k * 2.0**-53)
+        pts.add(-0.5 * root2 + k * 2.0**-53)
+    for u in (4.0, 26.543):
+        for sign in (-1.0, 1.0):
+            xb = sign * u * root2
+            for k in range(-30, 31):
+                pts.add(xb + k * 2.0**-48)
+    for x in (-9.0, -8.5, -8.3, -8.0, -7.0, -6.0, -2.0, -1.0, -0.5, 0.0, 0.5):
+        pts.add(x)
+    return sorted(x for x in pts if lo <= x <= hi)
+
+
+def reference_self_test(mp) -> None:
+    """The relative leg's own reference must not cancel. shoals#68's shape.
+
+    `(1 + erf(x/sqrt2))/2` -- the absolute leg's reference, and the formula the
+    kernel itself used -- returns EXACTLY 0.0 at 60 dps for x = -20 and below,
+    because `erf` there is -1 to within 60 digits. An oracle built on it would
+    compare the kernel's zero against a reference zero and report PASS on the
+    exact defect it exists to find. The relative reference is therefore
+    `erfc(-x/sqrt2)/2`.
+
+    Asserted rather than commented: the erfc form must AGREE with the erf form
+    where the erf form is still valid, and must DISAGREE where it has cancelled.
+    The second half is the one that matters -- it proves this test would notice
+    if someone swapped the reference back.
+    """
+    for x in (-1.0, -4.0, -9.0):
+        via_erf = (1 + mp.erf(mp.mpf(x) / mp.sqrt(2))) / 2
+        via_erfc = reference_ncdf(mp, x)
+        if via_erf == 0 or abs(via_erf - via_erfc) / via_erfc > mp.mpf("1e-40"):
+            raise SystemExit(
+                f"FAIL: the two n_cdf references disagree at x = {x!r} where "
+                f"both should be valid ({via_erf} vs {via_erfc}). One of them "
+                f"is wrong; do not measure anything until that is resolved."
+            )
+    cancelled = (1 + mp.erf(mp.mpf(-20.0) / mp.sqrt(2))) / 2
+    if cancelled != 0:
+        raise SystemExit(
+            "FAIL: `(1 + erf(x/sqrt2))/2` no longer cancels to zero at "
+            "x = -20 at this precision, so this self-test no longer proves the "
+            "relative reference is the non-cancelling one. Re-derive it rather "
+            "than deleting the check."
+        )
+
+
+def reference_ncdf(mp, x: float):
+    """The true normal CDF, spelled so it keeps relative accuracy in the tail."""
+    return mp.erfc(-mp.mpf(x) / mp.sqrt(2)) / 2
+
+
+def conditioning(mp, x: float):
+    """Amplification of the argument reduction `u = x/sqrt2` at x.
+
+    `n_cdf(x) = 0.5*erfc(u)` and `d ln erfc / d ln u -> -(2u^2 + 1)` as u grows,
+    with `u^2 = x^2/2`, so one unit roundoff in `u` costs `(1 + x^2)` of them in
+    the result. This is the quantity the published relative floor is normalised
+    by; it is a property of the IDENTITY, not of this kernel, so a different
+    erfc implementation is held to the same statistic.
+
+    VERIFIED NUMERICALLY, not just derived. Perturbing u by one unit roundoff
+    at 60 dps and measuring the relative change in erfc(u) gives, as a ratio of
+    the measured amplification to this model: 0.456 at x = -0.5, 0.763 at -1,
+    0.949 at -2, 0.994 at -4, 0.9996 at -8, and 1.000 from -20 outward. So the
+    model is exact in the tail and CONSERVATIVE near zero -- it over-states the
+    attainable error by about 2x at x = -0.5.
+
+    That is also the explanation for the statistic's shape, and it is worth
+    having rather than guessing: the normalised figure peaks near x = 0 (4.2)
+    and settles lower in the tail (1.9) because near zero the divisor is too
+    large by that factor AND the kernel's own ~1.5 ulp is what dominates, while
+    in the tail the divisor is exact and the reduction dominates. The peak is
+    not a sign of worse accuracy near zero; it is the normaliser being loose
+    where it was never derived to be tight.
+    """
+    return 1 + mp.mpf(x) ** 2
 
 
 def decode_scalar(entry: dict, schema: int) -> float:
@@ -423,6 +766,153 @@ def worst(points, values, fn, mp):
         if err > top:
             top, at = err, x
     return top, at, nans
+
+
+def relative_worst(points, values, mp, unit):
+    """The relative sweep, as a NAMED SEAM rather than an inline loop.
+
+    This exists for the same reason `worst` does: so a test can stub the sweep
+    and reach `run_relative_measurement`'s VERDICT branches directly. Without
+    the seam there is no cheap way to drive "not a floor", "not tight" or
+    "silent zeros present" under the bare interpreter the per-PR job uses, and
+    a red-team pass on this change found four mutations of those three
+    branches that a 59-test suite did not catch -- the same class, and one
+    literally the same mutation, that `MeasurementEnforcement`'s docstring
+    records being found on the absolute leg in PR #108.
+
+    Returns `(worst_normalised, at, worst_raw, raw_at, nan_count, zeros)`.
+    A point whose TRUE value is zero is skipped (nothing to be relative to); a
+    point where the kernel returned zero and the true value did not is recorded
+    in `zeros` and excluded from both maxima, because its relative error is 1
+    and would otherwise swamp the statistic it is not a member of.
+    """
+    worst, at, nans = mp.mpf(0), points[0], 0
+    worst_raw, raw_at = mp.mpf(0), points[0]
+    zeros: list[float] = []
+    for x, got in zip(points, values):
+        if got is None or got != got:
+            nans += 1
+            continue
+        true = reference_ncdf(mp, x)
+        if true == 0:
+            continue
+        if got == 0.0:
+            zeros.append(x)
+            continue
+        rel = abs(mp.mpf(got) - true) / true
+        if rel > worst_raw:
+            worst_raw, raw_at = rel, x
+        normalised = rel / (conditioning(mp, x) * unit)
+        if normalised > worst:
+            worst, at = normalised, x
+    return worst, at, worst_raw, raw_at, nans, zeros
+
+
+def run_relative_measurement(published_rel: dict[str, PublishedRelative],
+                             mp, verbose: bool = True) -> tuple[int, dict]:
+    """Measure the RELATIVE floor, and the absence of silent zeros. shoals#68.
+
+    Two requirements, and the second is not implied by the first:
+
+    * the published constant C is a true and TIGHT floor of
+      `max |rel_err| / ((1 + x^2) * 2^-53)` over the covered interval, under
+      exactly the same truncate-to-published-precision rule as the absolute
+      family; and
+    * the kernel returns a non-zero value at EVERY probe point where the true
+      value is representable. A silent zero has relative error 1, so it is
+      bounded by the first requirement only if C is large enough to be useless.
+      It is checked separately and exactly, because "returns 0.0 below -8.3"
+      was shoals#68's worst symptom: a zero is indistinguishable from a true
+      zero at the call site.
+    """
+    reference_self_test(mp)
+    points = relative_probe_points()
+    unit = mp.mpf(2) ** REL_UNIT_ROUNDOFF_EXP
+    results: dict[str, dict] = {}
+    errors: list[str] = []
+
+    for name in REL_FLOOR_KERNELS:
+        values = evaluate(points, name)
+        worst, at, worst_raw, raw_at, nans, zeros = relative_worst(
+            points, values, mp, unit)
+        measured = float(worst)
+        record = {
+            "worst_normalised_rel": measured,
+            "at": at,
+            "worst_raw_rel": float(worst_raw),
+            "worst_raw_rel_at": raw_at,
+            "points": len(points),
+            "nan_points": nans,
+            "silent_zero_points": zeros[:20],
+            "silent_zero_count": len(zeros),
+            "interval": list(REL_INTERVAL),
+        }
+        if nans:
+            errors.append(
+                f"{name}: {nans} of {len(points)} relative probe points came "
+                f"back NaN; the sweep is not measuring what it claims to"
+            )
+        if zeros:
+            errors.append(
+                f"{name}: returned exactly 0.0 at {len(zeros)} probe point(s) "
+                f"where the true value is representable, the first at "
+                f"x = {zeros[0]!r} (true {reference_ncdf(mp, zeros[0])}). "
+                f"That is shoals#68's worst symptom and no relative floor "
+                f"bounds it: a zero cannot be told from a true zero at the "
+                f"call site."
+            )
+        pub = published_rel.get(name)
+        if pub is None:
+            errors.append(
+                f"{name}: measured a normalised relative floor of "
+                f"{measured:.6f} but no published claim was parsed, so there "
+                f"is nothing to check it against"
+            )
+        else:
+            truncated = floor_at(measured, pub.sig_digits)
+            record |= {
+                "published_floor": pub.spelling,
+                "published_sig_digits": pub.sig_digits,
+                "measurement_truncated_to_published_precision": str(truncated),
+                "published_is_a_floor": pub.value <= Decimal(measured),
+                "published_is_tight": truncated == pub.value,
+            }
+            if not record["published_is_a_floor"]:
+                errors.append(
+                    f"{name}: published relative floor {pub.spelling} EXCEEDS "
+                    f"the worst normalised value measured, {measured:.6f}. A "
+                    f"floor above every observation is not a floor."
+                )
+            elif not record["published_is_tight"]:
+                errors.append(
+                    f"{name}: published relative floor {pub.spelling} is a "
+                    f"floor but not a TIGHT one. The measurement "
+                    f"{measured:.6f} truncated to {pub.sig_digits} significant "
+                    f"digits is {truncated}. Publish that, or publish fewer "
+                    f"digits."
+                )
+        results[name] = record
+
+    if verbose:
+        for name, r in results.items():
+            print(
+                f"{name:9s} worst relative {r['worst_raw_rel']:.6e} at "
+                f"x = {r['worst_raw_rel_at']!r}; normalised by (1 + x^2)*2^-53 "
+                f"that is {r['worst_normalised_rel']:.6f} at x = {r['at']!r} "
+                f"over {r['points']} points in "
+                f"[{r['interval'][0]}, {r['interval'][1]}]; "
+                f"silent zeros {r['silent_zero_count']}; published floor "
+                f"{r.get('published_floor', '(none)')}"
+            )
+        print()
+        for e in errors:
+            print(f"FAIL: {e}")
+        if not errors:
+            print("PASS: relative measurement -- the published relative floor "
+                  "is a true and tight floor, and no probe point returns a "
+                  "silent zero.")
+
+    return (1 if errors else 0), {"kernels": results, "errors": errors}
 
 
 def run_measurement(published: dict[str, Published], verbose: bool = True
@@ -551,6 +1041,34 @@ def main() -> int:
         m_rc, m_report = run_measurement(published, verbose)
         rc |= m_rc
         report["measurement"] = m_report
+
+        # shoals#68. A separate leg, not a denser grid on the one above: it
+        # measures a different quantity, over a wider interval, against a
+        # different (non-cancelling) reference. Folding it in would have let
+        # the absolute floors' PASS speak for the relative one.
+        if verbose:
+            print("\n== relative measurement leg (shoals#68) ==")
+        try:
+            import mpmath as mp
+        except ImportError:
+            print(
+                "FAIL: oracle_erf64_accuracy -- mpmath is not installed, so "
+                "the published relative floor cannot be measured.",
+                file=sys.stderr)
+            rc |= 1
+            report["relative_measurement"] = {
+                "errors": ["mpmath not installed"]}
+        else:
+            mp.mp.dps = 60
+            published_rel, rel_errors = parse_published_relative()
+            if rel_errors:
+                for e in rel_errors:
+                    print(f"FAIL: {e}", file=sys.stderr)
+                rc |= 1
+            r_rc, r_report = run_relative_measurement(
+                published_rel, mp, verbose)
+            rc |= r_rc
+            report["relative_measurement"] = r_report
 
     if args.json:
         print(json.dumps(report, indent=2, default=str))
