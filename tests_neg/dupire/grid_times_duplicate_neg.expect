@@ -1,0 +1,16 @@
+Shoals.Dupire.du_cubic_log_moneyness_interp: grid times must be strictly increasing: index 2 has time 0.5, which does not exceed time 0.5 at index 1
+
+The rule is strictly increasing, not non-decreasing: two grid times at one
+maturity carry two different implied-vol rows for one date, so no surface
+reads both, and the time interpolator's bracket width there is zero. This is
+the negative-parity case for the `gt` in the guard -- a `gte` would accept it
+and the unsorted and NaN cases would still be rejected.
+
+Unlike the reordered and NaN cases, this one has no wrong answer to measure,
+because it has no right answer to measure it against: the fixture asks for the
+implied vol at a maturity the grid supplies two different rows for. The
+unguarded call returned 0.30, which is what bracketing against the *first* of
+the two tied rows gives; `linear_interp_sorted` takes the first bracket
+straddling the query, so which tied row answers is decided by traversal order
+and the second is unreachable. That is the defect -- not that this particular
+query missed. Pinned for the predicate rather than for a measured error.

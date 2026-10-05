@@ -1,0 +1,25 @@
+Shoals.Dupire.du_cubic_log_moneyness_interp: strikes must be strictly increasing: index 3 has strike 110.0, which does not exceed strike 120.0 at index 2
+
+The strike axis has its own undisclosed ordering precondition, and violating
+it costs more than the time axis does. `strikes` becomes the log-moneyness
+knot vector handed to `Nautilus.Interpolation.spline_eval`, whose natural
+cubic brackets the query in traversal order and whose tridiagonal system is
+built from the knot gaps, so a reordered pair both selects the wrong segment
+and feeds a negative width into the fit. Same (strike, iv) data as
+`tests/dupire_grid_order.ch` with the knots at index 2 and 4 exchanged and the
+grid columns exchanged with them: the query at k=95 returned 0.31237233 where
+0.2248057 is correct, a 39% relative error against the time axis's 12.5%.
+
+Nautilus does not disclose the precondition at the version this repo pins.
+`reef.toml` pins `nautilus = "0.7.46"`, and at `v0.7.46`
+`docs/book/src/other/interpolation.md` documents `linear_interp_sorted`,
+`cubic_hermite` and `linear_interp_uniform` with no `spline_eval` section at
+all. The sentence "fits a natural cubic spline through sorted knots" arrives
+only in `v0.7.47`. Even there it would be a statement to a caller of Nautilus:
+nothing on `du_cubic_log_moneyness_interp` passes it on, and `Shoals.Dupire`
+has no page in `docs/src/` at all.
+
+The guard reports the first violated comparison, which for an exchanged pair
+is the second member of it: 110.0 at index 3 rather than 120.0 at index 2. The
+report names the index whose predecessor comparison failed, not the index that
+was moved.

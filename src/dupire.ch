@@ -51,11 +51,54 @@ def du_extract_row[n_k, n_t](iv_grid: &tensor[n_t, n_k, f32], j: i64, tpl_t: &te
   e_j = la_basis_n_f32(j, du_one_f(), tpl_t)
   einsum("ij,i->j", iv_grid, e_j)
 }
+-- Both grid axes are read by interpolators that bracket a query in traversal
+-- order, so an axis that is out of order interpolates over the wrong interval
+-- and returns a confident wrong implied vol: no trap, no NaN, no diagnostic.
+-- `linear_interp_sorted` does that on the time axis; `spline_eval`'s natural
+-- cubic fit does it on the log-moneyness knots derived from `strikes`, where a
+-- reordered pair also feeds a negative segment width into the tridiagonal
+-- solve. The import list names `linear_interp_sorted`, but a precondition
+-- stated in a dependency's identifier is a hint to a reader of this module,
+-- not a disclosure to a caller of `du_cubic_log_moneyness_interp`, whose own
+-- signature names no ordering rule for either axis.
+--
+-- Reject rather than re-sort. Re-sorting would answer a different question
+-- from the one the caller asked, and here it would also have to permute
+-- `iv_grid`'s rows and columns to keep them aligned with the axes it moved.
+-- The pillar-order guard in `Shoals.Curves` made the same choice.
+--
+-- Index of the first entry that does not exceed its predecessor, or -1 when
+-- the axis is strictly increasing. A NaN entry fails every comparison and so
+-- reports as out of order, which is the right answer: it has no position
+-- relative to anything.
+def du_first_unsorted(xs: List[f32]) -> i64 = {
+  idxs = range(cast(1, i64), len(xs))
+  fold(fn (acc: i64, j: i64) -> if gte(acc, cast(0, i64)) then acc else if gt(index(xs, j), index(xs, sub(j, cast(1, i64)))) then acc else j, cast(-1, i64), idxs)
+}
+def du_strictly_increasing(xs: List[f32]) -> bool = lt(du_first_unsorted(xs), cast(0, i64))
+-- The measured-values tail shared by both axis diagnostics; `noun` is the axis
+-- word, so one helper serves `strike` and `time`. Reached only when
+-- `du_first_unsorted` has returned a real index.
+def du_unsorted_detail(noun: string, xs: List[f32]) -> string = {
+  j = du_first_unsorted(xs)
+  i_prev = sub(j, cast(1, i64))
+  head = string_concat(": index ", string_concat(to_string(j), string_concat(" has ", noun)))
+  mid = string_concat(" ", string_concat(to_string(index(xs, j)), string_concat(", which does not exceed ", noun)))
+  tail = string_concat(" ", string_concat(to_string(index(xs, i_prev)), string_concat(" at index ", to_string(i_prev))))
+  string_concat(head, string_concat(mid, tail))
+}
+-- The axes are validated in parameter order, so when both are out of order the
+-- strike axis is the one reported. The guard is threaded through `forward`
+-- rather than bound on its own, so it is load-bearing on the returned value
+-- and cannot be dropped as a dead binding.
 def du_cubic_log_moneyness_interp[n_k, n_t](strikes: &tensor[n_k, f32], times: &tensor[n_t, f32], iv_grid: &tensor[n_t, n_k, f32], forward: f32, k_query: f32, t_query: f32) -> f32 = {
-  x_query = log(div(k_query, forward))
-  xs = to_tensor(map(fn (kk: f32) -> log(div(kk, forward)), to_list(strikes)))
-  n_t_len = len(to_list(times))
-  tpl_t = to_tensor(map(fn (v: f32) -> du_zero_f(), to_list(times)))
+  ks_l = to_list(strikes)
+  ts_l = to_list(times)
+  forward_checked = if not(du_strictly_increasing(ks_l)) then fail(string_concat("Shoals.Dupire.du_cubic_log_moneyness_interp: strikes must be strictly increasing", du_unsorted_detail("strike", ks_l))) else if not(du_strictly_increasing(ts_l)) then fail(string_concat("Shoals.Dupire.du_cubic_log_moneyness_interp: grid times must be strictly increasing", du_unsorted_detail("time", ts_l))) else forward
+  x_query = log(div(k_query, forward_checked))
+  xs = to_tensor(map(fn (kk: f32) -> log(div(kk, forward_checked)), ks_l))
+  n_t_len = len(ts_l)
+  tpl_t = to_tensor(map(fn (v: f32) -> du_zero_f(), ts_l))
   iv_at_query_per_t = to_tensor(map(fn (j: i64) -> {
     row = du_extract_row(iv_grid, j, copy(tpl_t))
     spline_eval(copy(xs), row, x_query)

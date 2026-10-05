@@ -37,15 +37,26 @@ def test_dupire_at_zero_volvol_equals_input_iv() -> unit ! { Test } = {
   sig_loc = du_local_vol_from_iv_surface(iv_fn, s0, r, q, k_q, t_q, cast(0.5, f32), cast(0.05, f32))
   assert_close(sig_loc, cast(0.2, f32), cast(0.015, f32), "strictly-flat IV surface: Dupire sigma_loc(K,T) equals input IV (consistency check) at OTM (K=95, T=0.75, q=2%)")
 }
+-- The grid is scaled row by row by `term_factor` (0.8 / 1.0 / 1.05, a slope of
+-- 0.8 then 0.2 per unit time) so that the surface is non-linear along the TIME
+-- axis as well as decreasing along the strike axis. Built from `i_col` alone it
+-- was constant in time, and a surface flat along an axis interpolates to the
+-- same value for every bracket the code could pick on that axis -- so this
+-- test could not see a time-bracketing defect at all, and did not see the one
+-- `tests_neg/dupire/grid_times_unsorted_neg.ch` now pins. `term_factor` is
+-- 1.0 at the queried `t_q`, so every expected value below is unchanged, while
+-- reordering the grid times and their rows together now moves `iv_at_grid`
+-- from 0.34 to 0.3145, well outside the 0.001 tolerance.
 def test_cubic_log_moneyness_monotonic_input_preserves_monotonicity() -> unit ! { Test } = {
   strikes = to_tensor(map(fn (i: i64) -> add(cast(80.0, f32), mul(cast(i, f32), cast(10.0, f32))), range(cast(0, i64), cast(5, i64))))
   times = to_tensor(map(fn (i: i64) -> add(cast(0.25, f32), mul(cast(i, f32), cast(0.25, f32))), range(cast(0, i64), cast(3, i64))))
   iv_per_strike = fn (k: f32) -> sub(cast(0.35, f32), mul(cast(0.001, f32), sub(k, cast(80.0, f32))))
   flat_idx = range(cast(0, i64), cast(15, i64))
+  term_factor = fn (r: i64) -> if eq(r, cast(0, i64)) then cast(0.8, f32) else if eq(r, cast(1, i64)) then cast(1.0, f32) else cast(1.05, f32)
   iv_flat = to_tensor(map(fn (idx: i64) -> {
     i_col = mod(idx, cast(5, i64))
     k_at_i = add(cast(80.0, f32), mul(cast(i_col, f32), cast(10.0, f32)))
-    iv_per_strike(k_at_i)
+    mul(term_factor(floor_div(idx, cast(5, i64))), iv_per_strike(k_at_i))
   }, flat_idx))
   iv_grid_2d = reshape(iv_flat, [cast(3, i64), cast(5, i64)])
   forward = cast(100.0, f32)
