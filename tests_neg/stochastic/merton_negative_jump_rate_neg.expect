@@ -1,0 +1,10 @@
+Shoals.Stochastic: merton jump rate lambda * t must be finite and non-negative
+Assumption: a negative jump intensity names no Poisson law. The enumerated
+sampler needs a jump-count distribution over {0, 1, ...}, and lambda * t < 0
+does not define one. Refuse rather than propagate.
+
+Before shoals#98 this input returned NaN for every path, because the aggregate
+log jump was drawn as a Gaussian with variance lambda * t * (jump_vol^2 +
+jump_mean^2) and `sqrt` of a negative variance is NaN. A NaN price is the
+failure mode this repository files bugs about, so the guard is the contract and
+this fixture is its negative-parity case.

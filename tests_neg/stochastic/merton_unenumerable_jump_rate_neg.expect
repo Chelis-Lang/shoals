@@ -1,0 +1,11 @@
+Shoals.Stochastic: merton jump intensity is too large to enumerate the jump count exactly
+Assumption: the enumerated jump-count table is sized on the exponentially
+tilted mean lambda * t * exp(jump_mean + 0.5 * jump_vol^2), because that is
+where the terms of E[exp(J)] peak. A caller asking for an intensity whose
+table would exceed the slot cap gets a refusal naming that quantity, not a
+silently truncated jump law and not a multi-hundred-megabyte allocation.
+
+The cap is a cost bound rather than a model bound, and it is the jump MEAN that
+breaches it here: at a zero jump mean the tilt is one, so the same lambda * t =
+1000 would size the table at about 1233 slots, inside the cap. That is why the
+message names the tilted product rather than lambda alone.

@@ -41,6 +41,7 @@ lognormal theory, both verified in the test suite at twenty thousand draws.
 
 ```chelis
 def merton_compensated_drift(mu: f32, sigma: f32, lambda: f32, jump_mean: f32, jump_vol: f32) -> f32
+def merton_sampler_log_jump_moment(lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> f32
 def merton_jump_terminal[n](rng_key: key, template: tensor[n, f32], jumps_template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> tensor[n, f32]
 ```
 
@@ -56,13 +57,30 @@ d = merton_compensated_drift(cast(0.05, f32), cast(0.2, f32), cast(0.0, f32), ca
 // d == 0.05 - 0.5 * 0.2 * 0.2
 ```
 
-`merton_jump_terminal` approximates the total log jump with one Gaussian
-draw per path rather than sampling a compound-Poisson jump count. It takes
-two template tensors of the same length, one for the diffusion draws and
-one for the jump draws. Terminal prices are positive, but their mean does
-not generally equal `s0 * exp(mu * t)`: the Gaussian approximation changes
-the jump distribution's exponential moment. From
-`tests/stochastic_extended.ch`:
+`merton_jump_terminal` samples that model. It draws the jump count from the
+Poisson law the compensator names, enumerated over a finite slot table, and
+aggregates the resulting lognormal jumps exactly: given `N` jumps the total
+log jump is `Normal(N * jump_mean, N * jump_vol^2)`. Terminal prices are
+positive and their mean is `s0 * exp(mu * t)` for either sign of `jump_mean`.
+It takes two template tensors of the same length, one for the diffusion draws
+and one for the aggregate jump draws; the uniform count draws are generated
+internally at the same length.
+
+`merton_sampler_log_jump_moment` returns `log E[exp(J)]` for that aggregate
+log jump `J`, which is what `merton_jump_terminal` subtracts from the log
+drift. Subtracting the sampled law's own exponential moment is what makes the
+terminal mean exact, rather than subtracting a closed form that has to be kept
+in step with the sampler by hand. It converges to
+`lambda * t * (exp(jump_mean + 0.5 * jump_vol^2) - 1)`, so
+`merton_compensated_drift(mu, sigma, lambda, jump_mean, jump_vol) * t` and
+`(mu - 0.5 * sigma^2) * t - merton_sampler_log_jump_moment(lambda, jump_mean, jump_vol, t)`
+agree to within f32 resolution; `tests/stochastic_extended.ch` pins both that
+agreement and the moment itself against the closed form at five intensities.
+The slot table is sized on `lambda * t * exp(jump_mean + 0.5 * jump_vol^2)`,
+and an intensity whose table would exceed the slot cap is refused rather than
+truncated. A negative `lambda * t` is refused too: it names no Poisson law.
+
+From `tests/stochastic_extended.ch`:
 
 ```chelis
 template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))

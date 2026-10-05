@@ -1,7 +1,7 @@
 module Shoals.Tests.StochasticExtended
 import Std.Test (assert_close, assert_true)
 import Nautilus.Stats (mean_vec, std_vec)
-import Shoals.Stochastic (merton_compensated_drift, merton_jump_terminal, cholesky_2x2_lower, correlated_gbm_terminal_2d)
+import Shoals.Stochastic (merton_compensated_drift, merton_sampler_log_jump_moment, merton_jump_terminal, cholesky_2x2_lower, correlated_gbm_terminal_2d)
 def test_merton_compensated_drift_zero_lambda_equals_gbm() -> unit ! { Test } = {
   d = merton_compensated_drift(cast(0.05, f32), cast(0.2, f32), cast(0.0, f32), cast(-0.1, f32), cast(0.1, f32))
   expected = sub(cast(0.05, f32), mul(cast(0.5, f32), mul(cast(0.2, f32), cast(0.2, f32))))
@@ -56,7 +56,7 @@ def test_merton_terminal_mean_near_s0_exp_mu_t() -> unit ! { Test } = {
   expected = mul(cast(100.0, f32), exp(cast(0.05, f32)))
   rel_err = div(sub(m, expected), expected)
   abs_err = if lt(rel_err, cast(0.0, f32)) then neg(rel_err) else rel_err
-  assert_true(lt(abs_err, cast(0.05, f32)), "Merton terminal mean within 5% of S0*exp(mu*t) for compensated drift")
+  assert_true(lt(abs_err, cast(0.02, f32)), "Merton terminal mean within 2% of S0*exp(mu*t) for compensated drift")
 }
 def test_correlated_gbm_2d_marginals() -> unit ! { Test } = {
   template_x = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
@@ -79,4 +79,144 @@ def test_correlated_gbm_2d_rho_zero_positive_dispersion() -> unit ! { Test } = {
   out = correlated_gbm_terminal_2d(key_from_seed(17i64), template_x, template_y, cast(100.0, f32), cast(100.0, f32), cast(0.0, f32), cast(0.0, f32), cast(0.2, f32), cast(0.2, f32), cast(0.0, f32), cast(1.0, f32))
   s_x = std_vec(out.0, cast(1, i64))
   assert_true(gt(s_x, cast(0.0, f32)), "X has positive dispersion under rho=0")
+}
+-- Helper: |got / want - 1|. Used for the shoals#98 oracles, where every claim
+-- is about a RELATIVE agreement and the quantities span four decades.
+def merton_rel_gap(got: f32, want: f32) -> f32 = {
+  r = div(sub(got, want), want)
+  if lt(r, cast(0.0, f32)) then neg(r) else r
+}
+-- Helper: lambda * t * (exp(jump_mean + 0.5 * jump_vol^2) - 1), the
+-- compound-Poisson jump compensator written out independently of the module so
+-- the oracle below does not check the implementation against itself.
+def merton_closed_log_jump_moment(lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> f32 = {
+  w = exp(add(jump_mean, mul(cast(0.5, f32), mul(jump_vol, jump_vol))))
+  mul(mul(lambda, t), sub(w, cast(1.0, f32)))
+}
+-- shoals#98's zero-noise oracle. merton_jump_terminal subtracts
+-- merton_sampler_log_jump_moment from the log drift, so E[S_t] = s0*exp(mu*t)
+-- holds for whatever law the sampler draws. This test is what proves that law
+-- is the COMPOUND POISSON one the Merton compensator names, rather than any
+-- truncation that happens to be mean-consistent with itself: the enumerated
+-- moment has to equal the closed form at every intensity. It is also the only
+-- check on the slot bound in merton_jump_slots, which is otherwise a free knob.
+def test_merton_sampler_log_jump_moment_matches_compound_poisson_compensator() -> unit ! { Test } = {
+  tol = cast(0.00001, f32)
+  one = cast(1.0, f32)
+  low = merton_rel_gap(merton_sampler_log_jump_moment(cast(0.3, f32), cast(-0.1, f32), cast(0.15, f32), one), merton_closed_log_jump_moment(cast(0.3, f32), cast(-0.1, f32), cast(0.15, f32), one))
+  mid = merton_rel_gap(merton_sampler_log_jump_moment(cast(4.0, f32), cast(0.5, f32), cast(0.2, f32), one), merton_closed_log_jump_moment(cast(4.0, f32), cast(0.5, f32), cast(0.2, f32), one))
+  up = merton_rel_gap(merton_sampler_log_jump_moment(cast(6.0, f32), cast(0.4, f32), cast(0.2, f32), one), merton_closed_log_jump_moment(cast(6.0, f32), cast(0.4, f32), cast(0.2, f32), one))
+  down = merton_rel_gap(merton_sampler_log_jump_moment(cast(6.0, f32), cast(-0.4, f32), cast(0.2, f32), one), merton_closed_log_jump_moment(cast(6.0, f32), cast(-0.4, f32), cast(0.2, f32), one))
+  high = merton_rel_gap(merton_sampler_log_jump_moment(cast(20.0, f32), cast(0.5, f32), cast(0.2, f32), one), merton_closed_log_jump_moment(cast(20.0, f32), cast(0.5, f32), cast(0.2, f32), one))
+  _ = assert_true(lt(low, tol), "enumerated jump moment matches the compensator at lambda*t = 0.3")
+  _ = assert_true(lt(mid, tol), "enumerated jump moment matches the compensator at lambda*t = 4")
+  _ = assert_true(lt(up, tol), "enumerated jump moment matches the compensator at a positive jump mean")
+  _ = assert_true(lt(down, tol), "enumerated jump moment matches the compensator at a negative jump mean")
+  assert_true(lt(high, tol), "enumerated jump moment matches the compensator at lambda*t = 20")
+}
+-- Negative parity for the oracle above: it must not pass by returning zero.
+-- At zero intensity the moment is exactly zero because the only enumerated
+-- count is zero; at any positive intensity with a negative jump mean it is
+-- strictly negative, so a stub that answered zero everywhere fails here.
+def test_merton_sampler_log_jump_moment_vanishes_only_at_zero_intensity() -> unit ! { Test } = {
+  idle = merton_sampler_log_jump_moment(cast(0.0, f32), cast(0.5, f32), cast(0.2, f32), cast(1.0, f32))
+  idle_t = merton_sampler_log_jump_moment(cast(4.0, f32), cast(0.5, f32), cast(0.2, f32), cast(0.0, f32))
+  shrinking = merton_sampler_log_jump_moment(cast(0.3, f32), cast(-0.1, f32), cast(0.15, f32), cast(1.0, f32))
+  growing = merton_sampler_log_jump_moment(cast(4.0, f32), cast(0.5, f32), cast(0.2, f32), cast(1.0, f32))
+  _ = assert_close(idle, cast(0.0, f32), cast(0.0, f32), "zero jump rate gives an exactly zero jump moment")
+  _ = assert_close(idle_t, cast(0.0, f32), cast(0.0, f32), "zero horizon gives an exactly zero jump moment")
+  _ = assert_true(lt(shrinking, cast(0.0, f32)), "a negative jump mean gives a strictly negative jump moment")
+  assert_true(gt(growing, cast(0.0, f32)), "a positive jump mean gives a strictly positive jump moment")
+}
+-- The two exported compensators describe one model. merton_compensated_drift
+-- is the closed-form Merton log drift; the sampler subtracts the enumerated
+-- jump moment instead, because that is exact for the law it draws. This pins
+-- that the substitution is not a change of model: the two log drifts agree.
+def test_merton_compensated_drift_agrees_with_sampler_log_drift() -> unit ! { Test } = {
+  mu = cast(0.05, f32)
+  sigma = cast(0.2, f32)
+  t = cast(1.0, f32)
+  closed = mul(merton_compensated_drift(mu, sigma, cast(4.0, f32), cast(0.5, f32), cast(0.2, f32)), t)
+  sampled = sub(mul(sub(mu, mul(cast(0.5, f32), mul(sigma, sigma))), t), merton_sampler_log_jump_moment(cast(4.0, f32), cast(0.5, f32), cast(0.2, f32), t))
+  assert_true(lt(merton_rel_gap(sampled, closed), cast(0.00001, f32)), "the sampler log drift equals merton_compensated_drift * t")
+}
+-- shoals#98's named parameter point. The pre-fix sampler drew one Gaussian for
+-- the aggregate log jump while the drift compensated a compound Poisson, and
+-- the two have different exponential moments: its exact expectation here is
+-- 0.8623 against the advertised 1.0, a 13.8% shortfall, and it measured
+-- 0.8773 at this seed and size. The sample standard deviation here is 2.708,
+-- so the standard error at twenty thousand draws is 1.9% and the 7% bound is
+-- 3.6 standard errors wide while still excluding the defect by a factor of two.
+def test_merton_terminal_mean_matches_s0_exp_mu_t_at_high_intensity() -> unit ! { Test } = {
+  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
+  jumps_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
+  paths = merton_jump_terminal(key_from_seed(7i64), template, jumps_template, cast(1.0, f32), cast(0.0, f32), cast(0.0, f32), cast(4.0, f32), cast(0.5, f32), cast(0.2, f32), cast(1.0, f32))
+  assert_true(lt(merton_rel_gap(mean_vec(paths), cast(1.0, f32)), cast(0.07, f32)), "Merton terminal mean is s0*exp(mu*t) at lambda=4, jump_mean=0.5, jump_vol=0.2")
+}
+-- Both signs of the jump mean, as shoals#98 asks. The pre-fix bias is signed:
+-- its leading term is -lambda*t*jump_mean*jump_vol^2/2, so a positive jump mean
+-- made the mean 12.4% too LOW here and a negative one made it 10.2% too HIGH.
+-- A single-sign test would have been satisfied by any downward correction.
+def test_merton_terminal_mean_matches_s0_exp_mu_t_with_positive_jump_mean() -> unit ! { Test } = {
+  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
+  jumps_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
+  paths = merton_jump_terminal(key_from_seed(29i64), template, jumps_template, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(6.0, f32), cast(0.4, f32), cast(0.2, f32), cast(1.0, f32))
+  expected = mul(cast(100.0, f32), exp(cast(0.05, f32)))
+  assert_true(lt(merton_rel_gap(mean_vec(paths), expected), cast(0.07, f32)), "Merton terminal mean is s0*exp(mu*t) at a positive jump mean")
+}
+def test_merton_terminal_mean_matches_s0_exp_mu_t_with_negative_jump_mean() -> unit ! { Test } = {
+  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
+  jumps_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
+  paths = merton_jump_terminal(key_from_seed(29i64), template, jumps_template, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(6.0, f32), cast(-0.4, f32), cast(0.2, f32), cast(1.0, f32))
+  expected = mul(cast(100.0, f32), exp(cast(0.05, f32)))
+  assert_true(lt(merton_rel_gap(mean_vec(paths), expected), cast(0.04, f32)), "Merton terminal mean is s0*exp(mu*t) at a negative jump mean")
+}
+-- Zero jump rate, as shoals#98 asks, as a DETERMINISTIC claim rather than a
+-- mean within a band: with no diffusion and no jumps every path is the forward
+-- exactly, whatever the jump-size parameters say. The second leg is its
+-- negative parity -- the same call at a positive rate must spread the paths,
+-- so a sampler that collapsed every path to the forward would fail here.
+def test_merton_terminal_zero_jump_rate_is_the_forward() -> unit ! { Test } = {
+  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(2000, i64))))
+  jumps_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(2000, i64))))
+  idle = merton_jump_terminal(key_from_seed(5i64), template, jumps_template, cast(100.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.0, f32), cast(0.5, f32), cast(0.2, f32), cast(1.0, f32))
+  forward = mul(cast(100.0, f32), exp(cast(0.05, f32)))
+  worst = fold(fn (acc: f32, p: f32) -> {
+    g = merton_rel_gap(p, forward)
+    if gt(g, acc) then g else acc
+  }, cast(0.0, f32), to_list(idle))
+  live_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(2000, i64))))
+  live_jumps = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(2000, i64))))
+  live = merton_jump_terminal(key_from_seed(5i64), live_template, live_jumps, cast(100.0, f32), cast(0.05, f32), cast(0.0, f32), cast(4.0, f32), cast(0.5, f32), cast(0.2, f32), cast(1.0, f32))
+  spread = fold(fn (acc: f32, p: f32) -> {
+    g = merton_rel_gap(p, forward)
+    if gt(g, acc) then g else acc
+  }, cast(0.0, f32), to_list(live))
+  _ = assert_true(lt(worst, cast(0.00001, f32)), "at lambda=0 and sigma=0 every Merton path is exactly s0*exp(mu*t)")
+  assert_true(gt(spread, cast(0.1, f32)), "at lambda=4 the same call does spread the paths")
+}
+-- The jumps are real. With no diffusion and no jump-size dispersion the log
+-- return is the compensator plus an INTEGER multiple of jump_mean, so the
+-- implied jump count is recoverable per path and must come out integral. The
+-- pre-fix sampler put a continuous Gaussian in that slot, so its implied
+-- counts were non-integral with probability one: this is the test that
+-- separates "a compound Poisson jump count" from "a moment-matched Gaussian
+-- aggregate", which the mean tests above cannot do on their own because the
+-- Gaussian aggregate matched the first two moments of the count by design.
+-- The second leg keeps a degenerate always-zero count from passing.
+def test_merton_terminal_draws_integral_jump_counts() -> unit ! { Test } = {
+  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(4000, i64))))
+  jumps_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(4000, i64))))
+  paths = merton_jump_terminal(key_from_seed(21i64), template, jumps_template, cast(1.0, f32), cast(0.0, f32), cast(0.0, f32), cast(4.0, f32), cast(0.5, f32), cast(0.0, f32), cast(1.0, f32))
+  drift = merton_compensated_drift(cast(0.0, f32), cast(0.0, f32), cast(4.0, f32), cast(0.5, f32), cast(0.0, f32))
+  implied = map(fn (p: f32) -> div(sub(log(p), drift), cast(0.5, f32)), to_list(paths))
+  worst = fold(fn (acc: f32, c: f32) -> {
+    rounded = cast(cast_trunc(add(c, cast(0.5, f32)), i64), f32)
+    gap = sub(c, rounded)
+    gap_abs = if lt(gap, cast(0.0, f32)) then neg(gap) else gap
+    if gt(gap_abs, acc) then gap_abs else acc
+  }, cast(0.0, f32), implied)
+  highest = fold(fn (acc: f32, c: f32) -> if gt(c, acc) then c else acc, cast(0.0, f32), implied)
+  _ = assert_true(lt(worst, cast(0.001, f32)), "every implied Merton jump count is an integer")
+  assert_true(gt(highest, cast(3.5, f32)), "the implied jump counts reach at least four jumps")
 }

@@ -8,6 +8,41 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **BREAKING: `Shoals.Stochastic.merton_jump_terminal` samples a compound
+  Poisson jump count** (shoals#98). It previously drew ONE Gaussian for the
+  aggregate log jump, moment-matched in the log to the compound Poisson sum
+  (`mean = lambda*t*jump_mean`, `variance = lambda*t*(jump_vol^2 + jump_mean^2)`),
+  while `merton_compensated_drift` subtracted the compound Poisson compensator
+  `lambda*(exp(jump_mean + 0.5*jump_vol^2) - 1)`. Those are different
+  distributions with different exponential moments, so the advertised
+  `E[S_t] = s0*exp(mu*t)` did not hold: at `s0=1`, `mu=sigma=0`, `lambda=4`,
+  `jump_mean=0.5`, `jump_vol=0.2`, `t=1` the terminal mean measured 0.872715
+  against 1.0 at twenty thousand draws. The bias was signed by `jump_mean`, so
+  it ran 12.1% low at `jump_mean=0.4` and 10.4% high at `jump_mean=-0.4` for
+  `lambda=6`.
+
+  Two independent normals also sum to one normal, so the old sampler produced a
+  LOGNORMAL terminal price with no jump counts and no heavy tails. Anyone
+  pricing jump risk with it was pricing a reparametrized Black-Scholes.
+
+  The sampler now draws `N` from the Poisson law the compensator names,
+  enumerated over a finite slot table, and aggregates the `N` lognormal jumps
+  exactly as `Normal(N*jump_mean, N*jump_vol^2)`. Terminal values for a given
+  seed therefore change. The log drift subtracts the new export
+  `merton_sampler_log_jump_moment(lambda, jump_mean, jump_vol, t)`, the exact
+  `log E[exp(J)]` of the law that was sampled, so the mean identity holds by
+  construction rather than by a closed form standing beside the sampler. That
+  moment agrees with `lambda*t*(exp(jump_mean + 0.5*jump_vol^2) - 1)` to within
+  2.8e-7 relative across `lambda*t` from 0.3 to 20 and both signs of
+  `jump_mean`, which is also the test that proves the slot bound adequate.
+
+  Two inputs are now refused rather than answered: a negative `lambda*t`, which
+  names no Poisson law and previously returned NaN for every path, and an
+  intensity whose slot table would exceed the cap. Both have `tests_neg/`
+  fixtures.
+
+  `merton_compensated_drift` is unchanged.
+
 - **BREAKING: `Shoals.Curves.YieldCurve` and `CurveBasis` are opaque**
   (shoals#119). They are constructible and inspectable only inside
   `Shoals.Curves` (`spec/02-surf-syntax.md` P16). Naming either type in a
