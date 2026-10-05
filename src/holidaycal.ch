@@ -1,51 +1,39 @@
 module Shoals.HolidayCal
 import Std.Datetime (Date, date, date_add_days, date_weekday, date_year, date_month, date_day, Weekday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday)
-import Std.Datetime.Business (BusinessCalendar)
+import Std.Datetime.Business (BusinessCalendar, Weekmask, business_calendar)
 import Shoreleave.UsFederal (us_federal)
 import Shoreleave.EnglandAndWales (england_and_wales)
-export (Calendar, is_holiday, is_business_day, hc_nyc_calendar, hc_ldn_calendar, joint_calendar, weekend_only_calendar, empty_calendar, easter_sunday_gregorian, good_friday, easter_monday, hc_nyc_calendar_year, hc_ldn_calendar_year, hc_nyc_calendar_multi, hc_ldn_calendar_multi, hc_tyo_is_holiday, hc_syd_is_holiday, hc_fra_is_holiday, hc_hkg_is_holiday, hc_us_federal_published, hc_england_wales_published)
+import Shoreleave.JapanBank (japan_bank)
+import Shoreleave.NewSouthWales (new_south_wales)
+import Shoreleave.HongKong (hong_kong)
+import Shoreleave.Target (target)
+import Shoreleave.Nyse (nyse)
+export (Calendar, is_holiday, is_business_day, as_business_calendar, hc_nyc_calendar, hc_ldn_calendar, joint_calendar, weekend_only_calendar, empty_calendar, easter_sunday_gregorian, good_friday, easter_monday, hc_nyc_calendar_year, hc_ldn_calendar_year, hc_nyc_calendar_multi, hc_ldn_calendar_multi, hc_tyo_is_holiday, hc_syd_is_holiday, hc_fra_is_holiday, hc_hkg_is_holiday, hc_us_federal_published, hc_england_wales_published, hc_japan_bank_published, hc_new_south_wales_published, hc_hong_kong_published, hc_target_published, hc_nyse_published)
 def hc_us_federal_published() -> BusinessCalendar = us_federal()
 def hc_england_wales_published() -> BusinessCalendar = england_and_wales()
+def hc_japan_bank_published() -> BusinessCalendar = japan_bank()
+def hc_new_south_wales_published() -> BusinessCalendar = new_south_wales()
+def hc_hong_kong_published() -> BusinessCalendar = hong_kong()
+def hc_target_published() -> BusinessCalendar = target()
+def hc_nyse_published() -> BusinessCalendar = nyse()
 type Calendar =
   | Calendar { name: string, holidays: List[Date] }
 def empty_calendar(name: string) -> Calendar = Calendar { name, holidays: [] }
 def weekend_only_calendar() -> Calendar = Calendar { name: "weekend", holidays: [] }
-def date_eq(a: Date, b: Date) -> bool = and(eq(date_year(a), date_year(b)), and(eq(date_month(a), date_month(b)), eq(date_day(a), date_day(b))))
-def list_contains_date(holidays: List[Date], d: Date) -> bool = fold(fn (acc: bool, h: Date) -> or(acc, date_eq(h, d)), false, holidays)
-def is_weekend(d: Date) -> bool =
-  match date_weekday(d) with {
-    | Saturday => true
-    | Sunday => true
-    | Monday => false
-    | Tuesday => false
-    | Wednesday => false
-    | Thursday => false
-    | Friday => false
+def as_business_calendar(cal: Calendar) -> BusinessCalendar =
+  match cal with {
+    | Calendar { name: _, holidays: hs } => business_calendar(Weekmask { monday: true, tuesday: true, wednesday: true, thursday: true, friday: true, saturday: false, sunday: false }, hs, date(-9999i64, 1i64, 1i64), date(9999i64, 12i64, 31i64))
   }
+def date_eq(a: Date, b: Date) -> bool = eq(a, b)
+def list_contains_date(holidays: List[Date], d: Date) -> bool = fold(fn (acc: bool, h: Date) -> or(acc, date_eq(h, d)), false, holidays)
 def is_holiday(cal: Calendar, d: Date) -> bool =
   match cal with {
     | Calendar { name: _, holidays: hs } => list_contains_date(hs, d)
   }
-def is_business_day(cal: Calendar, d: Date) -> bool = and(not(is_weekend(d)), not(is_holiday(cal, d)))
-def easter_sunday_gregorian(year: i64) -> Date = {
-  a = mod(year, cast(19, i64))
-  b = floor_div(year, cast(100, i64))
-  c = mod(year, cast(100, i64))
-  d = floor_div(b, cast(4, i64))
-  e = mod(b, cast(4, i64))
-  f = floor_div(add(b, cast(8, i64)), cast(25, i64))
-  g = floor_div(sub(add(b, cast(1, i64)), f), cast(3, i64))
-  h_val = mod(add(sub(add(mul(cast(19, i64), a), b), d), sub(cast(15, i64), g)), cast(30, i64))
-  i = floor_div(c, cast(4, i64))
-  k = mod(c, cast(4, i64))
-  l = mod(add(sub(add(cast(32, i64), mul(cast(2, i64), e)), h_val), sub(mul(cast(2, i64), i), k)), cast(7, i64))
-  m = floor_div(add(a, add(mul(cast(11, i64), h_val), mul(cast(22, i64), l))), cast(451, i64))
-  month_total = floor_div(add(add(h_val, l), sub(cast(114, i64), mul(cast(7, i64), m))), cast(31, i64))
-  day_total = add(mod(add(add(h_val, l), sub(cast(114, i64), mul(cast(7, i64), m))), cast(31, i64)), cast(1, i64))
-  date(year, month_total, day_total)
-}
-def good_friday(year: i64) -> Date = date_add_days(easter_sunday_gregorian(year), cast(-2, i64))
-def easter_monday(year: i64) -> Date = date_add_days(easter_sunday_gregorian(year), cast(1, i64))
+def is_business_day(cal: Calendar, d: Date) -> bool = Std.Datetime.Business.is_business_day(as_business_calendar(cal), d)
+def easter_sunday_gregorian(year: i64) -> Date = Std.Datetime.easter_sunday_gregorian(year)
+def good_friday(year: i64) -> Date = date_add_days(easter_sunday_gregorian(year), -2i64)
+def easter_monday(year: i64) -> Date = date_add_days(easter_sunday_gregorian(year), 1i64)
 def hc_nyc_calendar_year(year: i64) -> Calendar = Calendar { name: "nyc", holidays: [date(year, cast(1, i64), cast(1, i64)), date(year, cast(7, i64), cast(4, i64)), date(year, cast(12, i64), cast(25, i64))] }
 def hc_ldn_calendar_year(year: i64) -> Calendar = Calendar { name: "ldn", holidays: [date(year, cast(1, i64), cast(1, i64)), good_friday(year), easter_monday(year), date(year, cast(12, i64), cast(25, i64)), date(year, cast(12, i64), cast(26, i64))] }
 def concat_holidays(years: List[i64], gen: i64 -> List[Date]) -> List[Date] =

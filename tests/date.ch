@@ -284,6 +284,11 @@ def test_add_business_days_from_a_non_business_start() -> unit ! { Test } = {
   expected_mon = date(cast(2025, i64), cast(7, i64), cast(7, i64))
   assert_close(same_date(landed, expected_mon), cast(0.0, f32), cast(0.001, f32), "one business day from Friday July 4 2025 (a NYC holiday) is Monday July 7")
 }
+def test_add_business_days_from_a_holiday_counts_two_later_business_days() -> unit ! { Test } = {
+  landed = add_business_days(independence_day(), 2i64, nyc_cal())
+  expected = date(2025i64, 7i64, 8i64)
+  assert_close(same_date(landed, expected), 0.0f32, 0.001f32, "two business days after a holiday reach Tuesday")
+}
 def test_add_business_days_zero_is_the_identity_even_on_a_holiday() -> unit ! { Test } = {
   landed = add_business_days(independence_day(), cast(0, i64), nyc_cal())
   assert_close(same_date(landed, independence_day()), cast(0.0, f32), cast(0.001, f32), "zero business days does not roll, even from a holiday")
@@ -381,6 +386,13 @@ def test_add_months_negative() -> unit ! { Test } = {
   d2 = add_months(d, cast(-3, i64))
   expected = date(cast(2024, i64), cast(11, i64), cast(15, i64))
   assert_close(same_date(d2, expected), cast(0.0, f32), cast(0.001, f32), "add_months -3 wraps to prior year")
+}
+def test_add_months_large_positive_and_negative_offsets() -> unit ! { Test } = {
+  first = date(2025i64, 1i64, 31i64)
+  later = add_months(first, 1200i64)
+  earlier = add_months(first, -1200i64)
+  _ = assert_close(same_date(later, date(2125i64, 1i64, 31i64)), 0.0f32, 0.001f32, "a large positive offset keeps the civil date")
+  assert_close(same_date(earlier, date(1925i64, 1i64, 31i64)), 0.0f32, 0.001f32, "a large negative offset keeps the civil date")
 }
 def test_schedule_calendar_quarterly() -> unit ! { Test } = {
   start = date(cast(2025, i64), cast(1, i64), cast(15, i64))

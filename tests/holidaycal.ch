@@ -1,8 +1,8 @@
 module Shoals.Tests.HolidayCal
 import Std.Test (assert_true, assert_false, assert_eq)
 import Std.Datetime (date, date_year, date_month, date_day)
-import Std.Datetime.Business (try_is_business_day)
-import Shoals.HolidayCal (Calendar, is_holiday, is_business_day, hc_nyc_calendar, hc_ldn_calendar, joint_calendar, weekend_only_calendar, empty_calendar, easter_sunday_gregorian, good_friday, easter_monday, hc_nyc_calendar_multi, hc_ldn_calendar_multi, hc_us_federal_published, hc_england_wales_published)
+import Std.Datetime.Business (try_is_business_day, business_calendar_holidays)
+import Shoals.HolidayCal (Calendar, is_holiday, is_business_day, as_business_calendar, hc_nyc_calendar, hc_ldn_calendar, joint_calendar, weekend_only_calendar, empty_calendar, easter_sunday_gregorian, good_friday, easter_monday, hc_nyc_calendar_multi, hc_ldn_calendar_multi, hc_us_federal_published, hc_england_wales_published)
 import Shoals.Date (date_roll_following_published, date_roll_preceding_published, date_roll_modified_following_published)
 def test_published_us_federal_closure_roll() -> unit ! { Test } = {
   day = date(2025i64, 12i64, 24i64)
@@ -29,6 +29,18 @@ def test_published_calendar_rejects_outside_horizon() -> unit ! { Test } = {
     | None => assert_true(true, "published calendar has a finite horizon")
     | Some(_) => assert_true(false, "published calendar must reject a date outside its horizon")
   }
+}
+def test_local_calendar_business_adapter_preserves_weekday_holidays() -> unit ! { Test } = {
+  d = date(2025i64, 7i64, 4i64)
+  _ = assert_eq(try_is_business_day(as_business_calendar(hc_nyc_calendar()), d), Some(false), "the local July 4 closure remains non-business")
+  assert_eq(try_is_business_day(as_business_calendar(weekend_only_calendar()), d), Some(true), "a weekend-only calendar leaves July 4 open")
+}
+def test_local_calendar_keeps_explicit_weekend_holiday_membership() -> unit ! { Test } = {
+  saturday = date(2025i64, 7i64, 5i64)
+  cal = Calendar { name: "weekend-listed", holidays: [saturday] }
+  _ = assert_true(is_holiday(cal, saturday), "the local holiday query retains a listed Saturday")
+  _ = assert_eq(business_calendar_holidays(as_business_calendar(cal)), [], "the business calendar normalizes Saturday out of its holiday list")
+  assert_false(is_business_day(cal, saturday), "Saturday stays non-business through the weekmask")
 }
 def test_nyc_new_year_is_holiday() -> unit ! { Test } = {
   cal = hc_nyc_calendar()

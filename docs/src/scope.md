@@ -26,9 +26,14 @@ correlation; its constructors do not check them.
 
 `hc_nyc_calendar()` and `hc_ldn_calendar()` contain 2025 dates. The year and multi-year constructors generate smaller fixed-rule New York and London lists; they are not complete bank-holiday services. Tokyo, Sydney, Frankfurt, and Hong Kong holiday predicates use separate annual rules. Hong Kong's table-backed dates cover 2025–2030; outside that range its predicate returns false. Verify regional observance rules before using a calendar for settlement.
 
-`hc_us_federal_published()` and `hc_england_wales_published()` expose
-Shoreleave's source-backed `BusinessCalendar` values. Their dates and weekmasks
-come from published sources, and queries outside each source horizon fail.
+The `hc_*_published()` constructors expose Shoreleave's source-backed
+`BusinessCalendar` values for US federal, England and Wales, Japan Bank,
+New South Wales, Hong Kong, TARGET, and NYSE. Their dates and weekmasks come
+from published sources, and queries outside each source horizon fail.
+These market calendars have distinct holiday and business-week rules from
+Shoals's annual regional predicates. `as_business_calendar` adapts a local
+Shoals `Calendar` to the core business-day operations across the full date
+range while retaining the local holiday list for `is_holiday`.
 The `*_published` rolls in `Shoals.Date` use that horizon-checked calendar.
 
 ## Simulation, risk, and valuation adjustments

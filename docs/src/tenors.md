@@ -22,8 +22,8 @@ type Tenor =
   | Tenor { count: i64, unit: TenorUnit }
 ```
 
-A `Tenor` is a `count` and a `TenorUnit`. The units include calendar steps
-(day, week, month, year) and the three overnight settlement steps: overnight,
+A `Tenor` is a `count` and a `TenorUnit`. The units include fixed day-count
+steps (day, week, month, year) and the three overnight settlement steps: overnight,
 tomorrow-next, and spot-next.
 
 ## Constructors

@@ -1,7 +1,7 @@
 module Shoals.Date
-import Std.Datetime (Date, date, try_date, is_leap_year, date_add_days, date_days_until, date_weekday, date_year, date_month, date_day, Weekday, Saturday, Sunday, date_lt, date_lte)
-import Std.Datetime.Business (BusinessCalendar, Following, Preceding, ModifiedFollowing, business_day_roll)
-import Shoals.HolidayCal (Calendar, is_business_day, weekend_only_calendar)
+import Std.Datetime (Date, date, try_date, is_leap_year, date_add_days, date_add_months, ClampToMonthEnd, date_days_until, date_weekday, date_year, date_month, date_day, Weekday, Saturday, Sunday, date_lt, date_lte)
+import Std.Datetime.Business (BusinessCalendar, Following, Preceding, ModifiedFollowing, RollStartForward, RejectNonBusinessStart, business_day_roll, business_day_offset)
+import Shoals.HolidayCal (Calendar, as_business_calendar, weekend_only_calendar)
 export (DayCount, year_fraction, add_business_days, is_weekend, date_roll_following, date_roll_modified_following, date_roll_preceding, date_roll_following_published, date_roll_modified_following_published, date_roll_preceding_published, schedule_from_tenor, add_months, days_in_month, schedule_from_tenor_calendar)
 -- `ActActIcma` carries the enclosing coupon period and the coupon frequency
 -- because ACT/ACT ICMA is not computable from (start, end) alone. Holding them
@@ -81,21 +81,16 @@ def is_weekend(d: Date) -> bool =
     | Sunday => true
     | _ => false
   }
--- Every roll takes the calendar it rolls against. `weekend_only_calendar()`
--- reproduces the weekend-only behaviour exactly, so the old `weekend_only: bool`
--- flag is expressible without giving the surface a way to ignore a calendar.
-def advance_to_business(d: Date, cal: Calendar) -> Date = if is_business_day(cal, d) then d else advance_to_business(date_add_days(d, cast(1, i64)), cal)
-def retreat_to_business(d: Date, cal: Calendar) -> Date = if is_business_day(cal, d) then d else retreat_to_business(date_add_days(d, cast(-1, i64)), cal)
-def add_business_days(d: Date, n: i64, cal: Calendar) -> Date = {
-  idxs = range(cast(0, i64), n)
-  fold(fn (acc: Date, _i: i64) -> advance_to_business(date_add_days(acc, cast(1, i64)), cal), d, idxs)
-}
-def date_roll_following(d: Date, cal: Calendar) -> Date = advance_to_business(d, cal)
-def date_roll_preceding(d: Date, cal: Calendar) -> Date = retreat_to_business(d, cal)
-def date_roll_modified_following(d: Date, cal: Calendar) -> Date = {
-  rolled = advance_to_business(d, cal)
-  if eq(date_month(rolled), date_month(d)) then rolled else retreat_to_business(d, cal)
-}
+-- Every roll takes its calendar. `weekend_only_calendar()` applies a
+-- Monday-to-Friday business week without holiday dates.
+def add_business_days(d: Date, n: i64, cal: Calendar) -> Date =
+  if lte(n, 0i64) then d else {
+    core = as_business_calendar(cal)
+    if Std.Datetime.Business.is_business_day(core, d) then business_day_offset(core, d, n, RejectNonBusinessStart) else business_day_offset(core, d, sub(n, 1i64), RollStartForward)
+  }
+def date_roll_following(d: Date, cal: Calendar) -> Date = business_day_roll(as_business_calendar(cal), d, Following)
+def date_roll_preceding(d: Date, cal: Calendar) -> Date = business_day_roll(as_business_calendar(cal), d, Preceding)
+def date_roll_modified_following(d: Date, cal: Calendar) -> Date = business_day_roll(as_business_calendar(cal), d, ModifiedFollowing)
 def date_roll_following_published(d: Date, cal: BusinessCalendar) -> Date = business_day_roll(cal, d, Following)
 def date_roll_preceding_published(d: Date, cal: BusinessCalendar) -> Date = business_day_roll(cal, d, Preceding)
 def date_roll_modified_following_published(d: Date, cal: BusinessCalendar) -> Date = business_day_roll(cal, d, ModifiedFollowing)
@@ -109,17 +104,8 @@ def schedule_from_tenor(start: Date, end: Date, step_months: i64) -> List[Date] 
     append(acc, candidate)
   }, [], idxs)
 }
-def days_in_month(year: i64, month: i64) -> i64 = if or(eq(month, cast(1, i64)), or(eq(month, cast(3, i64)), or(eq(month, cast(5, i64)), or(eq(month, cast(7, i64)), or(eq(month, cast(8, i64)), or(eq(month, cast(10, i64)), eq(month, cast(12, i64)))))))) then cast(31, i64) else if or(eq(month, cast(4, i64)), or(eq(month, cast(6, i64)), or(eq(month, cast(9, i64)), eq(month, cast(11, i64))))) then cast(30, i64) else if is_leap_year(year) then cast(29, i64) else cast(28, i64)
-def normalize_month(year: i64, month: i64) -> (i64, i64) = if lt(month, cast(1, i64)) then normalize_month(sub(year, cast(1, i64)), add(month, cast(12, i64))) else if gt(month, cast(12, i64)) then normalize_month(add(year, cast(1, i64)), sub(month, cast(12, i64))) else (year, month)
-def add_months(d: Date, n: i64) -> Date = {
-  raw_month = add(date_month(d), n)
-  normalized = normalize_month(date_year(d), raw_month)
-  ny = normalized.0
-  nm = normalized.1
-  cap = days_in_month(ny, nm)
-  nd = if gt(date_day(d), cap) then cap else date_day(d)
-  date(ny, nm, nd)
-}
+def days_in_month(year: i64, month: i64) -> i64 = Std.Datetime.days_in_month(year, month)
+def add_months(d: Date, n: i64) -> Date = date_add_months(d, n, ClampToMonthEnd)
 def schedule_from_tenor_calendar(start: Date, end: Date, step_months: i64) -> List[Date] = {
   end_ord = date_days_until(start, end)
   rough = if lt(step_months, cast(1, i64)) then cast(0, i64) else add(floor_div(end_ord, mul(step_months, cast(28, i64))), cast(2, i64))

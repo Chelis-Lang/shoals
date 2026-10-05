@@ -97,6 +97,10 @@ business day only when it is neither a weekend nor a holiday in that calendar.
 retreats to the previous one, and `date_roll_modified_following` rolls forward
 unless that crosses into the next month, in which case it rolls back.
 `add_business_days` steps forward `n` days, skipping non-business days.
+On a non-business start, a positive count begins with the next business day;
+zero and negative counts return the start date. The local `Calendar` rolls
+and offsets use the same `Std.Datetime.Business` operations as published
+calendars through `as_business_calendar`.
 The `*_published` rolls accept Shoreleave calendars and use
 `Std.Datetime.Business` rules, including their finite date horizons.
 
@@ -144,5 +148,7 @@ dates = schedule_from_tenor(
 `schedule_from_tenor` treats a month as 30 days. For month-of-year
 stepping, `add_months` caps the day at the destination month's end, and
 `schedule_from_tenor_calendar` builds a schedule using that operation.
+`days_in_month` rejects a month outside 1–12. `add_months` uses
+`Std.Datetime.date_add_months` with `ClampToMonthEnd`.
 Neither generator rolls its stops against a holiday calendar; compose one of
 the rolls above over the result when settlement dates are needed.
