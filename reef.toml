@@ -11,3 +11,4 @@ resolver = "2"
 chelis-std = { version = "=0.4.0" }
 nautilus = { version = "=0.7.47" }
 coral = { version = "=0.7.44" }
+shoreleave = { version = "=0.1.0" }

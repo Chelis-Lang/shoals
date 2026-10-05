@@ -1,7 +1,8 @@
 module Shoals.Date
 import Std.Datetime (Date, date, try_date, is_leap_year, date_add_days, date_days_until, date_weekday, date_year, date_month, date_day, Weekday, Saturday, Sunday, date_lt, date_lte)
+import Std.Datetime.Business (BusinessCalendar, Following, Preceding, ModifiedFollowing, business_day_roll)
 import Shoals.HolidayCal (Calendar, is_business_day, weekend_only_calendar)
-export (DayCount, year_fraction, add_business_days, is_weekend, date_roll_following, date_roll_modified_following, date_roll_preceding, schedule_from_tenor, add_months, days_in_month, schedule_from_tenor_calendar)
+export (DayCount, year_fraction, add_business_days, is_weekend, date_roll_following, date_roll_modified_following, date_roll_preceding, date_roll_following_published, date_roll_modified_following_published, date_roll_preceding_published, schedule_from_tenor, add_months, days_in_month, schedule_from_tenor_calendar)
 -- `ActActIcma` carries the enclosing coupon period and the coupon frequency
 -- because ACT/ACT ICMA is not computable from (start, end) alone. Holding them
 -- in the variant rather than in an optional parameter makes an ICMA request
@@ -95,6 +96,9 @@ def date_roll_modified_following(d: Date, cal: Calendar) -> Date = {
   rolled = advance_to_business(d, cal)
   if eq(date_month(rolled), date_month(d)) then rolled else retreat_to_business(d, cal)
 }
+def date_roll_following_published(d: Date, cal: BusinessCalendar) -> Date = business_day_roll(cal, d, Following)
+def date_roll_preceding_published(d: Date, cal: BusinessCalendar) -> Date = business_day_roll(cal, d, Preceding)
+def date_roll_modified_following_published(d: Date, cal: BusinessCalendar) -> Date = business_day_roll(cal, d, ModifiedFollowing)
 def schedule_from_tenor(start: Date, end: Date, step_months: i64) -> List[Date] = {
   step_days = mul(step_months, cast(30, i64))
   total = date_days_until(start, end)

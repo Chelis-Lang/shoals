@@ -51,7 +51,11 @@ def versions(package: Path) -> tuple[str, str, dict[str, str]]:
     return (
         info["compiler"].removeprefix("="),
         info["version"],
-        {name: deps[name]["version"] for name in ("nautilus", "coral")},
+        {
+            name: spec["version"]
+            for name, spec in deps.items()
+            if name != "chelis-std"
+        },
     )
 
 

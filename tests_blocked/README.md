@@ -1,6 +1,6 @@
 # tests_blocked/ — upstream-blocker probes
 
-Every `.ch` here is a **minimal reproducer of an open upstream chelis
+Every `.ch` here is a **minimal reproducer of an open compiler or sibling-shell
 bug** that Shoals works around, **EXPECTED TO FAIL** at the current pin,
 run via `chelis test tests_blocked/ --expect blocked` (a pass = FIX-detected:
 execute the de-narrowing instructions in the probe's `.expect` sidecar,
@@ -14,10 +14,9 @@ surface remains tensor-shaped and f32-only (nautilus#70 / nautilus#85).
 Re-probe it against the next compatible Nautilus release and follow its
 sidecar before retiring Shoals's list-shaped f64 indicator layer.
 
-The former `special/canonical_erf_absent.ch` probe passed compilation with
-Chelis 0.18.13, which provides `erf` and `erfc` primitives. It is promoted to
-`tests/canonical_erf.ch`. Shoals's Cody kernel remains in use pending a
-compatible package-chain comparison of numerical and Greek behavior.
+`tests/canonical_erf.ch` checks the available `erf` and `erfc` primitives.
+Shoals's Cody kernel remains in use; any replacement must pass the numerical
+and Greek oracles.
 
 This directory was deliberately empty from the chelis 0.18.6 bump until
 2026-09-05. **That emptiness was load-bearing for the chelis#1387 entry**,

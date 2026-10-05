@@ -4,7 +4,10 @@ Shoals is a quantitative finance library for [Chelis](https://github.com/Chelis-
 
 ## Install and try it
 
-The package version and exact Chelis, Nautilus, Coral, and standard-library pins are in [`reef.toml`](reef.toml). The current release artifacts are available through the Chelis-Lang GitHub repositories. The Chelis compiler repository is private: installing its release toolchain requires repository access and an authenticated [GitHub CLI](https://cli.github.com/). Access to the pinned dependency release assets is also required. See the [Chelis installation guide](https://github.com/Chelis-Lang/chelis/blob/main/docs/book/src/install.md) for supported platforms and setup details.
+The package version and exact Chelis, Nautilus, Coral, Shoreleave, and
+standard-library pins are in [`reef.toml`](reef.toml). Install the pinned
+releases with the [Chelis installation guide](https://github.com/Chelis-Lang/chelis/blob/main/docs/book/src/install.md)
+and an authenticated [GitHub CLI](https://cli.github.com/).
 
 From a Shoals source checkout:
 
@@ -12,14 +15,15 @@ From a Shoals source checkout:
 gh auth login                      # once, if needed
 gh release download --repo Chelis-Lang/chelis --pattern chelisup.sh --output - | sh
 export PATH="$HOME/.chelis/bin:$PATH"
-chelisup install 0.18.11
+chelisup install 0.18.13
+chelis reef install --bootstrap chelis-lang/nautilus@v0.7.47 chelis-lang/coral@v0.7.44 chelis-lang/shoreleave@v0.1.0
 chelis reef build
 chelis test tests/pricing.ch --filter test_bs_call_atm --timeout 120 --suite-timeout 180 --jobs 1
 ```
 
-`chelisup install 0.18.11` installs the compiler pinned by `reef.toml`.
-`chelis reef build` resolves the declared dependencies, fetching missing release
-packages as needed, then checks and builds Shoals. The last command runs the
+`chelisup install 0.18.13` installs the compiler pinned by `reef.toml`.
+The bootstrap command installs the pinned dependency release artifacts in
+dependency order; `chelis reef build` then checks and builds Shoals. The last command runs the
 source test that prices a one-year at-the-money Black-Scholes call at
 approximately 10.4506. Run all commands from the repository root. For the
 pricer and a seeded Monte Carlo example, see

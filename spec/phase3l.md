@@ -12,11 +12,12 @@ same change set.
 ## 3l: Shoals — Finance
 
 **Goal:** A reef package for quantitative finance. Pricing models, risk measures, yield
-curves, stochastic processes, order books. Built entirely on `chelis-std` + `nautilus` +
-`coral`. Contains only finance-specific logic.
+curves, stochastic processes, order books. Built on `chelis-std`, `nautilus`,
+`coral`, and Shoreleave's published business calendars. Contains only
+finance-specific logic.
 
 **Prerequisite:** 3j (nautilus — distributions, optimization, SDE solvers), 3k (coral —
-for loading/manipulating financial data), 3i (Std.Time for dates, Std.Decimal for cash
+for loading/manipulating financial data), 3i (Std.Datetime for dates, Std.Decimal for cash
 amounts).
 
 ### Key Design Decision: Instruments as Dicts, Not Closed ADTs
@@ -48,7 +49,8 @@ the AD-through-instrument-dict story is validated end-to-end.
 |---|---|---|
 | `Shoals.Pricing` | Black-Scholes analytical, Heston semi-analytical, SABR calibration, Monte Carlo engines with variance reduction. Executable Greek coverage currently uses finite-difference checks against textbook references; grad-derived Greeks remain an alpha runtime path until the full pricing body is IR-lowerable under host-runtime `grad`. | `Nautilus.Distributions`, `Nautilus.Sde`, explicit keys, cumsum |
 | `Shoals.Risk` | VaR (parametric, historical, Monte Carlo), CVaR/expected shortfall, stress testing, scenario generation | `Nautilus.Stats`, sort/quantile, explicit keys |
-| `Shoals.Curves` | Yield curve construction (bootstrap from market instruments), interpolation (linear, cubic, Nelson-Siegel), day count conventions (ACT/360, ACT/365, 30/360) | `Nautilus.Interpolation`, `Nautilus.Roots`, `Std.Time` |
+| `Shoals.Curves` | Yield curve construction (bootstrap from market instruments), interpolation (linear, cubic, Nelson-Siegel), day count conventions (ACT/360, ACT/365, 30/360) | `Nautilus.Interpolation`, `Nautilus.Roots`, `Std.Datetime` |
+| `Shoals.HolidayCal` / `Shoals.Date` | Local calendar rules and date arithmetic, plus horizon-checked published US federal and England and Wales calendars | `Std.Datetime.Business`, `Shoreleave.UsFederal`, `Shoreleave.EnglandAndWales` |
 | `Shoals.Stochastic` | SDE models: GBM, Heston, SABR, jump-diffusion. Path generation using cumsum + `Nautilus.Sde`. Variance reduction (antithetic, control variates). | `Nautilus.Sde`, explicit keys, cumsum, einsum |
 | `Shoals.Orderbook` | Limit order book representation (price-priority sorted collections), matching logic, bid/ask spread computation, VWAP | Host-side collections, sort, `Std.Decimal` |
 

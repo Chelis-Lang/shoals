@@ -1,7 +1,35 @@
 module Shoals.Tests.HolidayCal
 import Std.Test (assert_true, assert_false, assert_eq)
 import Std.Datetime (date, date_year, date_month, date_day)
-import Shoals.HolidayCal (Calendar, is_holiday, is_business_day, hc_nyc_calendar, hc_ldn_calendar, joint_calendar, weekend_only_calendar, empty_calendar, easter_sunday_gregorian, good_friday, easter_monday, hc_nyc_calendar_multi, hc_ldn_calendar_multi)
+import Std.Datetime.Business (try_is_business_day)
+import Shoals.HolidayCal (Calendar, is_holiday, is_business_day, hc_nyc_calendar, hc_ldn_calendar, joint_calendar, weekend_only_calendar, empty_calendar, easter_sunday_gregorian, good_friday, easter_monday, hc_nyc_calendar_multi, hc_ldn_calendar_multi, hc_us_federal_published, hc_england_wales_published)
+import Shoals.Date (date_roll_following_published, date_roll_preceding_published, date_roll_modified_following_published)
+def test_published_us_federal_closure_roll() -> unit ! { Test } = {
+  day = date(2025i64, 12i64, 24i64)
+  landed = date_roll_following_published(day, hc_us_federal_published())
+  assert_true(and(eq(date_year(landed), 2025i64), and(eq(date_month(landed), 12i64), eq(date_day(landed), 29i64))), "US federal closure through December 26 rolls to December 29")
+}
+def test_published_england_wales_bank_holiday_roll() -> unit ! { Test } = {
+  day = date(2025i64, 5i64, 5i64)
+  landed = date_roll_following_published(day, hc_england_wales_published())
+  assert_true(and(eq(date_year(landed), 2025i64), and(eq(date_month(landed), 5i64), eq(date_day(landed), 6i64))), "England and Wales bank holiday rolls to May 6")
+}
+def test_published_calendar_preceding_and_modified_following() -> unit ! { Test } = {
+  cal = hc_england_wales_published()
+  may = date(2025i64, 5i64, 5i64)
+  preceding = date_roll_preceding_published(may, cal)
+  august = date(2025i64, 8i64, 31i64)
+  modified = date_roll_modified_following_published(august, cal)
+  _ = assert_true(and(eq(date_month(preceding), 5i64), eq(date_day(preceding), 2i64)), "preceding roll reaches May 2")
+  assert_true(and(eq(date_month(modified), 8i64), eq(date_day(modified), 29i64)), "modified following stays in August")
+}
+def test_published_calendar_rejects_outside_horizon() -> unit ! { Test } = {
+  result = try_is_business_day(hc_us_federal_published(), date(2031i64, 1i64, 2i64))
+  match result with {
+    | None => assert_true(true, "published calendar has a finite horizon")
+    | Some(_) => assert_true(false, "published calendar must reject a date outside its horizon")
+  }
+}
 def test_nyc_new_year_is_holiday() -> unit ! { Test } = {
   cal = hc_nyc_calendar()
   d = date(cast(2025, i64), cast(1, i64), cast(1, i64))

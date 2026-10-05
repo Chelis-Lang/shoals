@@ -59,6 +59,7 @@ compiler = "=0.17.5"
 chelis-std = { version = "0.4.0" }
 nautilus = { version = "0.7.37" }
 coral = { version = "0.7.34" }
+shoreleave = { version = "0.1.0" }
 """
             )
             self.assertEqual(
@@ -66,6 +67,7 @@ coral = { version = "0.7.34" }
                 [
                     "chelis-lang/nautilus@v0.7.37",
                     "chelis-lang/coral@v0.7.34",
+                    "chelis-lang/shoreleave@v0.1.0",
                 ],
             )
 

@@ -554,6 +554,7 @@ def run_measurement(published: dict[str, Published], verbose: bool = True
 
 
 def main() -> int:
+    decoder_self_test()
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--transcription", action="store_true",
                     help="offline leg only: no toolchain, no mpmath")

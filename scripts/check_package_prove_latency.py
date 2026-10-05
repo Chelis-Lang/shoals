@@ -58,8 +58,9 @@ def dependency_releases() -> list[str]:
         manifest = tomllib.load(source)
     dependencies = manifest.get("dependencies", {})
     releases: list[str] = []
-    for name in ("nautilus", "coral"):
-        spec = dependencies.get(name)
+    for name, spec in dependencies.items():
+        if name == "chelis-std":
+            continue
         version = spec.get("version") if isinstance(spec, dict) else None
         if not isinstance(version, str):
             raise RuntimeError(f"reef.toml has no exact {name} dependency version")

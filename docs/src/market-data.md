@@ -4,7 +4,7 @@ Module: `Shoals.MarketData`.
 
 This module provides record types for a single quote, an OHLCV bar, and a
 named snapshot of quotes, with constructors, field accessors, and a
-linear-scan lookup on a snapshot. Dates come from `Std.Time`.
+linear-scan lookup on a snapshot. Dates come from `Std.Datetime`.
 
 ## Quote
 

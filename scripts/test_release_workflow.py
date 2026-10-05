@@ -38,8 +38,10 @@ class ReleaseWorkflowTests(unittest.TestCase):
         combined = "\n".join(path.read_text() for path in paths)
         self.assertNotIn("Chelis-Lang/nautilus", combined)
         self.assertNotIn("Chelis-Lang/coral", combined)
+        self.assertNotIn("Chelis-Lang/shoreleave", combined)
         self.assertIn("chelis-lang/nautilus", combined)
         self.assertIn("chelis-lang/coral", combined)
+        self.assertIn("chelis-lang/shoreleave", combined)
         adversarial = (
             ROOT / "scripts/check_release_artifact_determinism.py"
         ).read_text()

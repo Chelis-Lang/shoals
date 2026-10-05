@@ -193,9 +193,6 @@ holds the measurements behind these rules.
 <!-- ## The Chelis-Lang Repositories -->
 <!-- shell-local:exclude:end -->
 
-The excluded compiler-repository headings and Shoals replacements are recorded
-in [`docs/agent-inheritance-exclusions.md`](docs/agent-inheritance-exclusions.md).
-
 - Shoals is a downstream **shell repo** for the
   [Chelis](https://github.com/Chelis-Lang/chelis) language, for quantitative
   finance: pricing, risk, stochastic models, and related numerical methods.
@@ -228,7 +225,7 @@ in [`docs/agent-inheritance-exclusions.md`](docs/agent-inheritance-exclusions.md
 ## Toolchain
 
 - `reef.toml` is the source of truth for the chelis / nautilus /
-  coral / chelis-std pins and the Shoals package version. The required
+  coral / shoreleave / chelis-std pins and the Shoals package version. The required
   literal compiler workflow pins mirror it and are checked offline.
 - The Shoals package `version` track is independent of the compiler
   pin — don't align them.

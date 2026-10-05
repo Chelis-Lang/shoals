@@ -1,4 +1,4 @@
-tensor precision mismatch: f32 vs f64
+`Nautilus.TimeSeries.ts_ewma_series` argument 1: expected f32, got f64
 
 Blocker: `Nautilus.TimeSeries` is f32-and-tensor-only, so no f64 `List[f64]`
 indicator path can reuse it. Tracked upstream as nautilus#70 (the f32-only

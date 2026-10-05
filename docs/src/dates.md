@@ -6,8 +6,8 @@ This module computes year fractions under the standard day-count
 conventions, detects weekends, rolls a date to a business day under the
 following / modified-following / preceding rules against a holiday
 calendar, and generates a schedule of dates stepped by a number of months.
-The date type itself comes from `Std.Time`, constructed with
-`date(year, month, day)`.
+The opaque date type comes from `Std.Datetime`, constructed with
+`date(year, month, day)`. Its year is limited to -9999 through 9999.
 
 ## Day-count conventions
 
@@ -85,6 +85,9 @@ def date_roll_following(d: Date, cal: Calendar) -> Date
 def date_roll_modified_following(d: Date, cal: Calendar) -> Date
 def date_roll_preceding(d: Date, cal: Calendar) -> Date
 def add_business_days(d: Date, n: i64, cal: Calendar) -> Date
+def date_roll_following_published(d: Date, cal: BusinessCalendar) -> Date
+def date_roll_preceding_published(d: Date, cal: BusinessCalendar) -> Date
+def date_roll_modified_following_published(d: Date, cal: BusinessCalendar) -> Date
 ```
 
 `is_weekend` reports whether a date falls on Saturday or Sunday. Every roll
@@ -94,6 +97,8 @@ business day only when it is neither a weekend nor a holiday in that calendar.
 retreats to the previous one, and `date_roll_modified_following` rolls forward
 unless that crosses into the next month, in which case it rolls back.
 `add_business_days` steps forward `n` days, skipping non-business days.
+The `*_published` rolls accept Shoreleave calendars and use
+`Std.Datetime.Business` rules, including their finite date horizons.
 
 Pass `weekend_only_calendar()` for weekend-only behavior:
 
@@ -110,11 +115,8 @@ date_roll_following(independence_day, weekend_only_calendar())
 // unchanged: a weekend-only calendar does not see it
 ```
 
-These rolls took a `weekend_only: bool` before shoals#87, and both of its
-branches were identical, so no caller could reach a holiday calendar from this
-module. The flag was replaced rather than fixed in place:
-`weekend_only_calendar()` expresses the old behavior exactly, and a `Calendar`
-parameter has no way to be silently ignored.
+`weekend_only_calendar()` selects weekend-only behavior without changing the
+rolling API.
 
 ## Schedule generation
 

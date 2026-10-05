@@ -1,6 +1,11 @@
 module Shoals.HolidayCal
 import Std.Datetime (Date, date, date_add_days, date_weekday, date_year, date_month, date_day, Weekday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday)
-export (Calendar, is_holiday, is_business_day, hc_nyc_calendar, hc_ldn_calendar, joint_calendar, weekend_only_calendar, empty_calendar, easter_sunday_gregorian, good_friday, easter_monday, hc_nyc_calendar_year, hc_ldn_calendar_year, hc_nyc_calendar_multi, hc_ldn_calendar_multi, hc_tyo_is_holiday, hc_syd_is_holiday, hc_fra_is_holiday, hc_hkg_is_holiday)
+import Std.Datetime.Business (BusinessCalendar)
+import Shoreleave.UsFederal (us_federal)
+import Shoreleave.EnglandAndWales (england_and_wales)
+export (Calendar, is_holiday, is_business_day, hc_nyc_calendar, hc_ldn_calendar, joint_calendar, weekend_only_calendar, empty_calendar, easter_sunday_gregorian, good_friday, easter_monday, hc_nyc_calendar_year, hc_ldn_calendar_year, hc_nyc_calendar_multi, hc_ldn_calendar_multi, hc_tyo_is_holiday, hc_syd_is_holiday, hc_fra_is_holiday, hc_hkg_is_holiday, hc_us_federal_published, hc_england_wales_published)
+def hc_us_federal_published() -> BusinessCalendar = us_federal()
+def hc_england_wales_published() -> BusinessCalendar = england_and_wales()
 type Calendar =
   | Calendar { name: string, holidays: List[Date] }
 def empty_calendar(name: string) -> Calendar = Calendar { name, holidays: [] }

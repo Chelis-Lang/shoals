@@ -807,42 +807,18 @@ round-trip witness. `chelis deep`/`surf` are the CLI views; `spec/02`
 
 # Chelis Capability Surface for Shoals
 
-**Candidate compiler pin:** Shoals 0.24.14 / Chelis 0.18.13 /
-chelis-std 0.4.0. Nautilus 0.7.47 and Coral 0.7.44 are the last published
-sibling packages, both built for Chelis 0.18.12. A complete 0.18.13 package
-build awaits Nautilus 0.7.48 and Coral 0.7.45 releases. The prior 0.18.12
-compiler and oracle receipts are recorded in
-[`chelis_0_18_12_migration.md`](chelis_0_18_12_migration.md); they do not
-validate this compiler pin.
+**Package pins:** Shoals 0.24.14 uses Chelis 0.18.13, bundled chelis-std
+0.4.0, and Shoreleave 0.1.0. The declared Nautilus 0.7.47 and Coral 0.7.44
+packages use Chelis 0.18.12; the complete package requires compatible
+published sibling releases.
 
 What the Chelis language and the bundled chelis-std actually provide to the
 quantitative-finance domain this shell touches — numerical methods, pricing,
 Greeks, and the proof surface over them. **Read this before designing around a
 suspected language gap.**
 
-> **Candidate compiler pin:** Shoals 0.24.14; Chelis 0.18.13
-> (chelis-std 0.4.0, bundled). Published Nautilus 0.7.47 and Coral 0.7.44
-> remain at Chelis 0.18.12 pending their next releases.
-> · **Partial refresh:** 2026-10-05
-
-The last accepted package-chain receipts are in
-[`chelis_0_18_11_migration.md`](chelis_0_18_11_migration.md) and the historical
-0.18.11 section of the CNote manifest. The release-specific narrative below is historical
-de-narrowing evidence.
-
-**Published Nautilus input for the candidate bump.** Annotated tag `v0.7.47`
-dereferences to commit `76a66ae921cafeef538e1ff48ea53fdc253c1724`.
-The downloaded `nautilus-0.7.47.chb` is SHA-256
-`cd5c04ecfcd2445b7f7a7e0a997d721f20c85aac4524ae626571c3db96008603`;
-the archive is
-`dfe18e834c2d6e49282afd682e0452e51575c3d1dcefd4db3267098e98bba716`.
-Both match the release sidecar. The archive declares compiler `=0.18.12`;
-its 25 source modules retain the 0.7.46 exported-name sets. Coral 0.7.44's
-published archive declares the same compiler pin and Nautilus 0.7.47;
-its CHB is `5e69584d3e967aef72c6ae18b0204b00b155804876ece8d7feda604c6c0263b3`
-and archive is
-`7cc0ed3ede5ab754615465704ec0f9bd01bb7ccabba10cb50770c6c78c3e3ba5`.
-These are the hashes in the generated Shoals lock.
+Dependency hashes are recorded in the generated `reef.lock` and checked when
+released artifacts are installed.
 
 ## Historical 0.18.6 de-narrowing record
 
@@ -979,8 +955,8 @@ SHA-256 values are
 `a3e04e308eb7d35c34fe4d6075c7e7626c57a6a9957fc6cf9926467b5787ec6c`
 and `fe41f1617b118eb1600d02518319a96780c77195cce4c836ec43776bd69e08b0`.
 
-Rows marked `@pin` carry 0.18.6-chain evidence. `@upstream` remains a
-later capability that is not shipped at this pin. Refresh this table at every pin bump
+Rows marked `@pin` describe capabilities in the pinned toolchain; `@upstream`
+marks capabilities unavailable at this pin. Refresh this table at every pin bump
 (`AGENTS.md` §Pin Bump Checklist). The authoritative depth reference for the
 proof reachability map is
 `research/proof-infra/report.md`; the source-of-truth for the cvc5-lowerable set
@@ -1014,8 +990,8 @@ tiers: **A** (type/dimension/linearity), **B** (SMT via cvc5 over the reals),
 | Arithmetic `+ - * /`, comparisons | `@pin` | Lower to cvc5. Keep `/` out of SMT goals where possible; use multiplied-through polynomial form. |
 | `if/then/else` | `@pin` | Lowers as ITE in `QF_NRA`. |
 | `Option[T]`, `Some`/`None`, `match`; `@opaque` + `@invariant` | `@pin` | Opaque-invariant abstraction is the path from synthetic green to a green a quant recognizes (report §1, §3); producer obligations discharge at SMT. |
-| `Std.Test` (`assert_close`, `assert_eq`) | `@pin` | The executable numeric suites under `tests/` and `tests-manual/`. **Changed at 0.18.6:** `assert_eq_int` / `assert_eq_bool` / `assert_eq_string` / `assert_eq_tensor_int64` are gone with no alias; use the polymorphic `assert_eq[q](actual, expected, label)`. `assert_close` widened from `f32` to `[p_float]` — a loosening, and its tolerance must now share the tensors' dtype in `assert_close_tensor` (unused here). |
-| WireDag lowering (`chelis tide serve` `/lower`) | `@pin` | Schema **15**, exact-only. Shoals pins `bs_call_wire_f64` byte-exactly in `scripts/validate_bs_wire_root.py`: 1665 nodes, entry root 859, raw SHA-256 `811f1cda0a046bbe5e24c51514e9f266815849e9824184786c0b9d93e32ad546` (re-pinned for shoals#101's expiry limits, no compiler change; shoals#88 pinned `11db7522…` at the same root and node count, and the pre-0.18.11 figures were 1522 / 787 / `3be34d90…`). The 0.18.10-to-0.18.11 comparison below was measured on the pre-shoals#88 source and does not compose with the figures above: against 0.18.10 that source gained 14 `Copy` and 14 `Drop` nodes and `cmp_lt` became `compare(comparison=lt)`, with copy-elided dataflow, op parameters, precisions and 15 named loads agreeing. Symbolic dimension names differ, so no shape-equivalence claim is made. |
+| `Std.Test` (`assert_close`, `assert_eq`) | `@pin` | The executable numeric suites under `tests/` and `tests-manual/` use polymorphic `assert_eq[q](actual, expected, label)` and `assert_close[p_float]`. Tensor close tolerances have the tensor's dtype. |
+| WireDag lowering (`chelis tide serve` `/lower`) | `@pin` | Schema **27**, exact-only. `scripts/validate_bs_wire_root.py` checks `bs_call_wire_f64` against 1643 nodes, entry root 848, 15 reachable named loads, and the byte-exact SHA-256 `634fd1368eaf3e20eb6355569ff972676e14f8596554b9e2fe0091397d8d0b67`. It also checks structural validity and two independent cold lowerings. |
 | Front-end check throughput | `@pin` | The compiler surface is available. The 0.18.6 measurements (31.6s for `src/modelfit.ch`, 17.0s dependency-load floor, and a 7m54s batched-suite observation) remain historical measurements, not 0.18.11 performance claims. The pin-bump full gate owns current acceptance. |
 | `count` ([05-OP-29]), direct `sub` / `min_elem` ([05-OP-40]/[05-OP-41]) | `@pin` | Shipped before this pin and available, though Shoals does not currently depend on them. |
 | `stop_gradient` ([05-OP-42]) | `@upstream` | The contract exists, but implementation remains open in chelis#1312; Shoals does not claim it at this pin. Relu's dedicated adjoint is a separate closed issue (chelis#1313). |
@@ -1157,8 +1133,8 @@ chelis#1563 proposes one.
 
 | Capability | Status | Notes |
 |---|---|---|
-| `grad` reverse-mode AD in `eval` / host runtime | `@pin` | The four first-order call Greek outputs evaluate through the real Black–Scholes and normal-CDF body. The 0.18.12 Greek oracle passes 15 groups and 63 cells, including second-order outputs. Reverse-mode; scalar floating result required. |
-| `grad(grad(...))` second order | `@pin` | Gamma/volga/vanna exports use nested `grad` through the displayed Black–Scholes price body. The 0.18.12 raw sampled controls pass at seeds 0, 1, and 2, and all four `tests-manual/greeks_secondorder.ch` cases pass. Keep the scalar kernel's sequential conditional spelling while chelis#2825 remains open. |
+| `grad` reverse-mode AD in `eval` / host runtime | `@pin` | The first-order call Greek exports differentiate the Black–Scholes and normal-CDF body; the result must be a floating scalar. `scripts/oracle_greeks_gate.py` checks their values. |
+| `grad(grad(...))` second order | `@pin` | Gamma, volga, and vanna use nested `grad` through the Black–Scholes price body. The scalar kernel keeps sequential conditionals while chelis#2825 remains open; `tests-manual/greeks_secondorder.ch` and the Greek oracle check the outputs. |
 | `vmap(grad(...))` batched sensitivities | `@pin` | True batched grad over a spot×vol grid, validated vs analytic `N(d1)` (report §5). |
 | Host-lane list-combinator pricing body under `grad` | `@upstream` | The shipped per-spot `to_tensor(map(..., to_list(...)))` body does not lower under `grad` (rank-0 `sum`); identical pure-tensor-lane math differentiates fine. Graduation candidate: a tensor-lane grad-able BS body (ties to shoals#19). |
 

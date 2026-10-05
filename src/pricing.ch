@@ -120,8 +120,8 @@ def erf64_core_erfc_tail(axr: f64) -> f64 = {
 -- This makes each core total over the FINITE f64 domain, not over all of f64:
 -- the clamps and dispatcher are themselves `if`s, so +/-inf still poisons a
 -- sibling arm wherever an untaken arm is unbounded. Imported Std.Scalar
--- `min`/`max` now work in a standalone 0.18.12 Eval/C vmap probe
--- (chelis#1582 closed); changing this kernel awaits the package-chain gate.
+-- Imported `min`/`max` are available (chelis#1582 closed); changing this
+-- kernel awaits the compatible package-chain gate.
 -- Sequential dispatcher for the same nested-grad lowering gap (chelis#2825).
 def erf64_erfc_abs(ax: f64) -> f64 = {
   tail = if lt(ax, cast(6.0, f64)) then erf64_core_erfc_tail(ax) else cast(0.0, f64)

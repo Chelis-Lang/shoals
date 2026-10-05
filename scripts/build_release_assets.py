@@ -20,7 +20,6 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEPENDENCY_ORDER = ("nautilus", "coral")
 CANONICAL_ORG = "chelis-lang"
 
 
@@ -32,8 +31,9 @@ def manifest(package_root: Path) -> dict:
 def dependency_versions(package_root: Path) -> dict[str, str]:
     dependencies = manifest(package_root).get("dependencies", {})
     versions: dict[str, str] = {}
-    for name in DEPENDENCY_ORDER:
-        spec = dependencies.get(name)
+    for name, spec in dependencies.items():
+        if name == "chelis-std":
+            continue
         version = spec.get("version") if isinstance(spec, dict) else None
         if not isinstance(version, str):
             raise RuntimeError(f"reef.toml has no exact {name} dependency version")

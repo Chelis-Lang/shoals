@@ -26,6 +26,11 @@ correlation; its constructors do not check them.
 
 `hc_nyc_calendar()` and `hc_ldn_calendar()` contain 2025 dates. The year and multi-year constructors generate smaller fixed-rule New York and London lists; they are not complete bank-holiday services. Tokyo, Sydney, Frankfurt, and Hong Kong holiday predicates use separate annual rules. Hong Kong's table-backed dates cover 2025–2030; outside that range its predicate returns false. Verify regional observance rules before using a calendar for settlement.
 
+`hc_us_federal_published()` and `hc_england_wales_published()` expose
+Shoreleave's source-backed `BusinessCalendar` values. Their dates and weekmasks
+come from published sources, and queries outside each source horizon fail.
+The `*_published` rolls in `Shoals.Date` use that horizon-checked calendar.
+
 ## Simulation, risk, and valuation adjustments
 
 Random draws require a seed. `Shoals.Stochastic.merton_jump_terminal` uses an aggregate Gaussian approximation to jump totals rather than drawing a compound Poisson process. Its correlated GBM helper covers two assets. `Shoals.Rng` has committed Sobol direction numbers for 32 dimensions; higher runtime dimensions use a fallback sequence up to the exposed limit. These choices matter for convergence studies.
