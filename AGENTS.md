@@ -409,15 +409,6 @@ one change set (contract §7):
    three pin bumps (shoals#64). An unrecognised `schema_version` now fails
    loudly and names the decoder to teach.
 
-   **Known: chelis 0.18.12 emits `schema_version: 4.`** The f64 carrier is
-   byte-identical to schema 3's, but `SUPPORTED_EVAL_SCHEMAS` deliberately does
-   **not** pre-bless 4: blessing a schema nobody has run the oracle against is
-   how you weaken a guard whose entire job is to fail loudly on an unknown
-   wire. Teach `decode_scalar` at the bump, with the 0.18.12 package actually
-   available to verify the whole response shape, and run the measurement leg
-   once as acceptance. Expect the nightly `accuracy` job to be red between the
-   pin bump and that change — which is the designed behaviour, not a surprise.
-
 ## Phase Spec
 
 `spec/phase3l.md` records Shoals' local module scope, test plan, and
@@ -430,9 +421,9 @@ copy of the current monorepo section.
 
 Shared skills live in `agent-skills/`, materialized from the pinned
 toolchain by `chelis reef conform sync` and recorded in `UPSTREAM.toml`.
-The eight shared skills are `redteam-exec`, `spec-sync`, `phase-gate`,
+The nine shared skills are `redteam-exec`, `spec-sync`, `phase-gate`,
 `backend-numerics`, `example-corpus`, `cli-surface`, `packaging-install`,
-and `issue-resolution`. `.claude/skills` and `.codex/skills` are symlinks
+`issue-resolution`, and `chelis-std`. `.claude/skills` and `.codex/skills` are symlinks
 to that directory; both commands directories mirror each other, including
 the `red-team` alias wired to `redteam-exec`.
 
