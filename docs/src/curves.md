@@ -85,10 +85,49 @@ This is the precondition the instrument bootstrap already enforces (below),
 under the same decision not to re-sort: a reordering is a different question
 from the one the caller asked. The guard is on the four entry points that take
 pillar times as arguments — `yield_curve_from_pillars`, `yield_curve_tagged`,
-`bootstrap_zero_from_par`, and `curve_basis_from_pillars`. Every curve built
-through them, and every curve derived from one by the sensitivity shifts below,
-therefore has readable pillars. A `YieldCurve` or `CurveBasis` record a caller
-constructs directly from the exported type is not checked.
+`bootstrap_zero_from_par`, and `curve_basis_from_pillars`.
+
+### The rule belongs to the type, not to the four entry points
+
+`YieldCurve` and `CurveBasis` are **opaque**
+(`spec/02-surf-syntax.md` P16): constructible and inspectable only inside
+`Shoals.Curves`. That is what makes the guarantee total rather than
+best-effort. Guarding four producers is not enough on its own, because a
+consumer could write the record literal itself and reach the same wrong answer
+past every guard:
+
+```text
+record construction of opaque type `YieldCurve` outside its defining module `Shoals.Curves`
+```
+
+With the representation sealed, a value can only originate from an in-module
+producer, and every in-module producer either runs the strictly-increasing
+guard on caller-supplied times, or reuses the times of a curve that already
+passed it — the five sensitivity shifts below, and `bootstrap_multi_curve`,
+whose pillars are instrument tenors the bootstrap already requires to be
+increasing. **So every `YieldCurve` and `CurveBasis` value in existence has
+readable pillars, by induction over the producers.**
+
+Opacity also closes record *patterns*, not only construction, because a
+consumer able to destructure a sorted curve can rebuild an unsorted one from
+its fields. The sanctioned readers are `curve_kind`, `rate_at` and friends,
+and:
+
+```chelis
+def curve_pillars[n](curve: YieldCurve[n]) -> (tensor[n, f32], tensor[n, f32])
+def basis_pillars[n](basis: CurveBasis[n]) -> (tensor[n, f32], tensor[n, f32])
+```
+
+Both tensors come back together because the curve is linear, so two
+single-field readers would force a caller wanting the second to copy the curve.
+Naming the type in a signature or annotation is unaffected — `c: YieldCurve[3]`
+still compiles outside the module.
+
+The ordering rule is enforced by the producers rather than declared as an
+`@invariant` on the type, which would also have it discharged per producer by
+`chelis prove`. That is not expressible at this pin: a `tensor[n, f32]` field
+falls outside the V1 invariant value class, which admits only fixed-shape
+numeric tensors, and `index` is outside the invariant predicate grammar.
 
 ## Interpolation and discount factors
 

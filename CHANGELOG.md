@@ -8,6 +8,49 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **BREAKING: `Shoals.Curves.YieldCurve` and `CurveBasis` are opaque**
+  (shoals#119). They are constructible and inspectable only inside
+  `Shoals.Curves` (`spec/02-surf-syntax.md` P16). Naming either type in a
+  signature or annotation is unchanged, so `c: YieldCurve[3]` still compiles;
+  what no longer compiles outside the module is a record literal
+  (`YieldCurve { kind, times, rates }`) and a record pattern
+  (`match curve with { | YieldCurve { … } }`). Two readers replace the pattern:
+
+  ```chelis
+  def curve_pillars[n](curve: YieldCurve[n]) -> (tensor[n, f32], tensor[n, f32])
+  def basis_pillars[n](basis: CurveBasis[n]) -> (tensor[n, f32], tensor[n, f32])
+  ```
+
+  Both tensors come back together because the curve is linear; two
+  single-field readers would force a caller wanting the second to copy it.
+
+  This is what finishes the pillar-order fix below. Guarding the four producers
+  left the rule a property of four call sites rather than of the type: a
+  consumer could write the record itself and `rate_at` still answered 0.025 for
+  reordered pillars where 0.035 is correct, past every guard. With the
+  representation sealed, a value can only come from an in-module producer, and
+  every in-module producer either runs the guard on caller-supplied times or
+  reuses the times of a curve that already passed it — so **every `YieldCurve`
+  and `CurveBasis` value has readable pillars, by induction over the
+  producers.** The compiler's own rejection message enumerates those producers,
+  which is that argument in machine-checked form.
+
+  Closing record patterns as well as construction is load-bearing rather than
+  tidiness: a consumer that can destructure a sorted curve can rebuild an
+  unsorted one field by field.
+
+  The rule is enforced by the producers rather than declared as an `@invariant`
+  on the type, which `chelis prove` would otherwise discharge per producer.
+  That is not expressible at this pin, for two independent reasons: a
+  `tensor[n, f32]` field is outside the V1 invariant value class, which admits
+  only fixed-shape numeric tensors, and `index` is outside the invariant
+  predicate grammar.
+
+  In-tree consumers moved onto `curve_pillars` with every assertion unchanged:
+  `tests/curves_bootstrap.ch` (two sites) and
+  `tests/curves_bootstrap_schedule.ch`'s `cbs_swap_pv`, which was
+  destructuring a curve only to rebuild curves from its fields.
+
 - **BREAKING: `Shoals.Curves.bootstrap_basis_curve` is removed, with no
   replacement** (shoals#115). Build a basis curve with the existing
   `curve_basis_from_pillars[n](times, spreads)` — market basis quotes *are*

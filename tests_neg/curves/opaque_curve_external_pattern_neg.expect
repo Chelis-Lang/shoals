@@ -1,0 +1,8 @@
+record pattern match on opaque type `YieldCurve` outside its defining module `Shoals.Curves`
+
+Opacity closes the read side too, and that half is not merely tidiness: a
+consumer that can destructure a curve can rebuild an unsorted one field by
+field from a sorted one, which is the construction route again with an extra
+step. `curve_pillars` is the sanctioned reader and returns both pillar tensors
+together; `tests/curves_bootstrap.ch` and `tests/curves_bootstrap_schedule.ch`
+were moved onto it in the same change, with every assertion unchanged.
