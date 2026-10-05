@@ -44,9 +44,9 @@ def test_dupire_at_zero_volvol_equals_input_iv() -> unit ! { Test } = {
 -- same value for every bracket the code could pick on that axis -- so this
 -- test could not see a time-bracketing defect at all, and did not see the one
 -- `tests_neg/dupire/grid_times_unsorted_neg.ch` now pins. `term_factor` is
--- 1.0 at the queried `t_q`, so every expected value below is unchanged;
--- reordering the grid times now moves `iv_at_grid` by 0.0255, well outside the
--- 0.001 tolerance.
+-- 1.0 at the queried `t_q`, so every expected value below is unchanged, while
+-- reordering the grid times and their rows together now moves `iv_at_grid`
+-- from 0.34 to 0.3145, well outside the 0.001 tolerance.
 def test_cubic_log_moneyness_monotonic_input_preserves_monotonicity() -> unit ! { Test } = {
   strikes = to_tensor(map(fn (i: i64) -> add(cast(80.0, f32), mul(cast(i, f32), cast(10.0, f32))), range(cast(0, i64), cast(5, i64))))
   times = to_tensor(map(fn (i: i64) -> add(cast(0.25, f32), mul(cast(i, f32), cast(0.25, f32))), range(cast(0, i64), cast(3, i64))))

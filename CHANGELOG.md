@@ -294,8 +294,10 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   same value for every bracket the code could pick on it, so that test was
   structurally blind to this defect and passed throughout. Its rows are now
   scaled by a term factor that is 1.0 at the queried maturity, so every
-  expected value is unchanged while reordering the grid times moves its exact
-  assertion by 0.0255, well outside the 0.001 tolerance.
+  expected value is unchanged, while reordering the grid times and their rows
+  together moves its exact assertion from 0.34 to 0.3145 -- well outside the
+  0.001 tolerance. (That figure is the times-and-rows permutation; a times-only
+  reordering moves it too, by a different amount per permutation.)
 
 - **`Shoals.Curves` accepted unsorted pillar times and returned a silently
   wrong interpolated value** (shoals#119). `yield_curve_from_pillars`,

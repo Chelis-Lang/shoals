@@ -4,8 +4,8 @@ import Shoals.Dupire (du_cubic_log_moneyness_interp)
 -- Negative: strict ordering on the strike axis too. Two knots at one strike
 -- carry two different implied vols for one option, so no smile reads both, and
 -- the segment width between them is zero -- which `spline_fit` does not
--- reject: it substitutes 1.0 for any gap below 1e-30 and solves a system whose
--- geometry no longer matches the knots. This is the negative-parity case for
+-- reject: at a zero gap every leg of its tridiagonal fit substitutes 1.0 and
+-- solves a system whose geometry no longer matches the knots. This is the negative-parity case for
 -- the `gt` in the strike guard; a `gte` would accept it.
 --
 -- The assertion is the value the unguarded code returned, so removing the
