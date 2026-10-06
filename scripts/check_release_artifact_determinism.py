@@ -48,15 +48,15 @@ def versions(package: Path) -> tuple[str, str, dict[str, str]]:
         reef = tomllib.load(source)
     info = reef["package"]
     deps = reef["dependencies"]
-    return (
-        info["compiler"].removeprefix("="),
-        info["version"],
-        {
-            name: spec["version"]
-            for name, spec in deps.items()
-            if name != "chelis-std"
-        },
-    )
+    versions: dict[str, str] = {}
+    for name, spec in deps.items():
+        if name == "chelis-std":
+            continue
+        version = spec.get("version") if isinstance(spec, dict) else None
+        if not isinstance(version, str) or not version.startswith("=") or not version[1:]:
+            raise RuntimeError(f"reef.toml has no exact {name} dependency version")
+        versions[name] = version[1:]
+    return info["compiler"].removeprefix("="), info["version"], versions
 
 
 def payloads(package: Path, version: str) -> dict[str, bytes]:

@@ -35,9 +35,9 @@ def dependency_versions(package_root: Path) -> dict[str, str]:
         if name == "chelis-std":
             continue
         version = spec.get("version") if isinstance(spec, dict) else None
-        if not isinstance(version, str):
+        if not isinstance(version, str) or not version.startswith("=") or not version[1:]:
             raise RuntimeError(f"reef.toml has no exact {name} dependency version")
-        versions[name] = version
+        versions[name] = version[1:]
     return versions
 
 
@@ -167,6 +167,11 @@ def build(binary: str, package_root: Path) -> None:
                 candidate = package_root / "dist" / f"{name}-{version}.{suffix}"
                 if candidate.is_file():
                     candidate.unlink()
+            checked_run(
+                [binary, "reef", "update", "--offline"],
+                cwd=package_root,
+                env=env,
+            )
             checked_run(
                 [binary, "reef", "build", "--no-auto-fetch", str(package_root)],
                 cwd=package_root,

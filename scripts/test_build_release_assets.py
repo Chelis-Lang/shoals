@@ -56,10 +56,10 @@ name = "shoals"
 version = "0.24.4"
 compiler = "=0.17.5"
 [dependencies]
-chelis-std = { version = "0.4.0" }
-nautilus = { version = "0.7.37" }
-coral = { version = "0.7.34" }
-shoreleave = { version = "0.1.0" }
+chelis-std = { version = "=0.4.0" }
+nautilus = { version = "=0.7.37" }
+coral = { version = "=0.7.34" }
+shoreleave = { version = "=0.1.0" }
 """
             )
             self.assertEqual(
@@ -69,6 +69,14 @@ shoreleave = { version = "0.1.0" }
                     "chelis-lang/coral@v0.7.34",
                     "chelis-lang/shoreleave@v0.1.0",
                 ],
+            )
+            self.assertEqual(
+                DETERMINISM.versions(package),
+                ("0.17.5", "0.24.4", {
+                    "nautilus": "0.7.37",
+                    "coral": "0.7.34",
+                    "shoreleave": "0.1.0",
+                }),
             )
 
     def test_builder_uses_fresh_registry_and_replaces_mixed_case_lock(self) -> None:
@@ -81,8 +89,8 @@ name = "shoals"
 version = "0.24.4"
 compiler = "=0.17.5"
 [dependencies]
-nautilus = { version = "0.7.37" }
-coral = { version = "0.7.34" }
+nautilus = { version = "=0.7.37" }
+coral = { version = "=0.7.34" }
 """
             )
             lock = package / "reef.lock"
@@ -133,7 +141,7 @@ remote_origin = "github://chelis-lang/coral@v0.7.34"
             with mock.patch.dict(BUILDER.os.environ, {"CHELIS_REEF_HOME": "/poison"}):
                 with mock.patch.object(BUILDER.subprocess, "run", side_effect=fake_run):
                     BUILDER.build("/bin/chelis", package)
-            self.assertEqual(len(registry_paths), 3)
+            self.assertEqual(len(registry_paths), 4)
             self.assertEqual(len(set(registry_paths)), 1)
             self.assertNotEqual(registry_paths[0], "/poison")
             self.assertFalse(Path(registry_paths[0]).exists())
@@ -149,8 +157,8 @@ name = "shoals"
 version = "0.24.4"
 compiler = "=0.17.5"
 [dependencies]
-nautilus = { version = "0.7.37" }
-coral = { version = "0.7.34" }
+nautilus = { version = "=0.7.37" }
+coral = { version = "=0.7.34" }
 """
             )
             (package / "dist").mkdir()
@@ -200,9 +208,10 @@ remote_origin = "github://chelis-lang/coral@v0.7.34"
             ],
         )
         self.assertEqual(
-            commands[2],
+            commands[3],
             ["/bin/chelis", "reef", "build", "--no-auto-fetch", str(package)],
         )
+        self.assertEqual(commands[2], ["/bin/chelis", "reef", "update", "--offline"])
 
     def test_lock_validator_preserves_official_hashes(self) -> None:
         lock = tomllib.loads(

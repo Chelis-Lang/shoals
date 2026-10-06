@@ -172,16 +172,13 @@ in code that is CLOSED upstream but not sitting in §Archived.
       `--batch-mode file` comparison on the 2-vCPU runner. Keep the raised
       budget until that issue's suite measurement shows it can be lowered.
 
-- **The last accepted proof surface remains the 0.18.11 chain.** The finance
-  surface there is documented in `research/proof-infra/report.md`: the economic
-  / dynamic-programming properties reach the SMT tier with no transcendental
-  contract; the derivatives structural properties
-  (`properties/composites.ch`: upper bound, put–call parity with reflection,
-  delta ∈ [0,1]) reach SMT as **composites** — structure proven for any `N`
-  satisfying its contract, with that contract separately fuzz-validated on the
-  real `n_cdf`. The real transcendental pricing bodies degrade **honestly** to
-  fuzz (never a false proven — the coupled-subterm goals stay deferred, see
-  chelis#637 below). Both entries above are tooling defects, not semantic ones.
+- **The proof gate checks the pinned finance surface.** Economic and dynamic
+  programming properties reach the SMT tier without a transcendental contract.
+  The structural upper-bound and delta properties use the validated normal-CDF
+  range contract. Put-call parity through the f32 reflection contract is
+  deferred: its fixed tolerance fails validation at this pin (chelis#3116).
+  Direct transcendental pricing properties remain fuzz-validated; coupled
+  subterm proofs remain deferred under chelis#637.
 
 ## Tracking
 
@@ -200,8 +197,8 @@ in code that is CLOSED upstream but not sitting in §Archived.
   tests pin the affected path. Re-probe the issue's scalar/vector reproducer,
   the Greek oracle, and the pricing tests before changing those clamps.
 
-- **nautilus#74 / chelis#902 — Shoals still carries a separate f64 `erf`
-  kernel.** Nautilus 0.7.47 exports `erf[prec: Float]`, so
+- **nautilus#74 / chelis#902 — Shoals uses a separate f64 `erf`
+  kernel.** Nautilus 0.7.48 exports `erf[prec: {f32, f64}]`, so
   nautilus#59's signature barrier is gone. Its A&S rational arm retains
   approximately 1.4e-7 absolute error at f64, while `Shoals.Pricing.erf64`
   uses Cody's approximation with a measured worst-observed floor of
@@ -602,7 +599,7 @@ in code that is CLOSED upstream but not sitting in §Archived.
   floor and involved no compiler change.
 
 - **nautilus#59 — the `Nautilus.Special.erf` f64 signature barrier is
-  resolved.** Nautilus 0.7.47 exports a generic floating signature and
+  resolved.** Nautilus 0.7.48 exports `erf` for f32 and f64, and
   `tests/nautilus_erf_f64.ch` exercises its f64 call. The approximation gap is
   tracked separately by nautilus#74.
 

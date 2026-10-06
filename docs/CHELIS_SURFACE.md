@@ -808,9 +808,13 @@ round-trip witness. `chelis deep`/`surf` are the CLI views; `spec/02`
 # Chelis Capability Surface for Shoals
 
 **Package pins:** Shoals 0.24.14 uses Chelis 0.18.13, bundled chelis-std
-0.4.0, and Shoreleave 0.1.0. The declared Nautilus 0.7.47 and Coral 0.7.44
-packages use Chelis 0.18.12; the complete package requires compatible
-published sibling releases.
+0.4.0, Nautilus 0.7.48, Coral 0.7.45, and Shoreleave 0.1.0.
+
+| Release | Tag commit | Published `.chb` SHA-256 | Published `.tar.zst` SHA-256 |
+|---|---|---|---|
+| Nautilus v0.7.48 | `01b4b8960a9da10f3a81b04974bc1a72ef8b13c4` | `f148456398b210b272386830b252deae3e22763463873e2779574b4cfa53f5d5` | `4461cfcc98ac44bda43e0addf864f5aa4065682b1f92f281df97b64f984ef41a` |
+| Coral v0.7.45 | `8e90bd8b2fa3570c319fb22845bc42a2175e1248` | `da4086d07799c6cbdcca17ff23ed437446b383e90104c04efd718812e68536c0` | `87e82d63e01ce2ddc931dc19306680d4f18ad24fada1ffb883e026c6719d9538` |
+| Shoreleave v0.1.0 | `04c44aea085fff7afdf2f857f682c640b3ee4ea4` | `22ee5a48ea8963beb80b0ee582c2f55dc58c84d6831cc1eff8e3daee4be3d0a2` | `947dd68816cf11fa8ef0c9fcca28c690d3f96e9617875b337bc4745d59d5f7da` |
 
 What the Chelis language and the bundled chelis-std actually provide to the
 quantitative-finance domain this shell touches — numerical methods, pricing,
@@ -973,9 +977,9 @@ tiers: **A** (type/dimension/linearity), **B** (SMT via cvc5 over the reals),
 | SMT prove tier (cvc5) shipped in the **release** tarball | `@pin` | SMT is in the released binary as of chelis 0.11.0 (no from-source `--features smt` build needed at this pin). Tier B lowers to cvc5 over the **reals** (`QF_NRA`, or `QF_NRAT` when a transcendental is present); a green is a real-arithmetic fact, **not** an IEEE-`f32` statement. `arith_model:"real"`. |
 | Transcendentals `exp`, `sqrt`, `sin`, `cos` lower to SMT | `@pin*` | These four **do** lower — cvc5 kinds `EXPONENTIAL`/`SQRT`/`SINE`/`COSINE`, selecting the `QF_NRAT` logic. *`QF_NRAT` is **incomplete**: cvc5 may return `unknown`, which chelis records as `unsupported` (solver capacity) and `--tier auto` degrades **honestly** to fuzz — never a false proven. Keep structural greens transcendental-free by construction where possible (report §3). |
 | Certified-envelope transcendental discharge (`erf`/`normal_cdf`/`exp`/`log`/`sqrt` subterms) | `@pin` | Shipped in 0.16.0 (**chelis#434, now CLOSED**): a soundly-boundable transcendental subterm is abstracted to a fresh variable over its Gappa/Arb-certified envelope hull and the goal discharges as **`proven_modulo_certified_envelope`** (strictly weaker than `proven_modulo_real_arithmetic`, disclosed in the verdict). Fail-closed on unboundable arguments. **Residual:** goals whose truth depends on the *coupling* between abstractions cannot reach an exact proven tier: direct BS/B76 call-price positivity and direct BS spot-monotonicity/delta, vega, rho, and gamma comparisons are observed only at `fuzz_validated`, while the direct intrinsic-lower-bound candidate remains `deferred_invariant` (**chelis#637**, open). See `UPSTREAM_BUGS.md`. |
-| `erf` / bundled `n_cdf` via an abstract-subterm contract | `@pin` | `erf` is not directly cvc5-lowerable, but the bundled normal-CDF **contract** (`0 ≤ N ≤ 1`, reflection `N(-x)=1-N(x)`) is discharged at the SMT tier as an abstract subterm (`chelis-prove/src/contracts.rs`), which is what lets the abstracted derivatives structure prove. The contract is separately fuzz-validated against the real `n_cdf` (max abs err ≈ 2 ulp vs scipy, report §7) — that is an **`f32`** measurement: `research/proof-infra/oracle/compare_ncdf.py` uses `ULP_F32 = 2^-24 ≈ 5.96e-8` and `RESULTS.md` records the max as **1.22e-7 at x=0.75**. It is not a claim about `n_cdf64`, which no longer shares that kernel: `erf64` moved to Cody's approximation (>= 3.3675e-16 observed) while `Nautilus.Special.erf` — the path this row measures — still evaluates A&S 7.1.26. The two are now different approximations, and the ~1.2e-7 figure belongs to the `f32` A&S one. See the accuracy section below. |
+| `normal_cdf` contracts | `@pin` | `Std.Contracts.normal_cdf` calls the pinned `standard_normal_cdf` graph. Its range contract validates at f32 and supports the structural upper-bound and delta invariants. The reflection contract fails its fixed 1e-10 tolerance at f32 (chelis#3116), so Shoals defers the put-call parity invariant that depends on it. |
 | Algebraic `abs`, `min`, `max` lower to SMT | `@pin` | In `CVC5_LOWERABLE`, `QF_NRA` (algebraic, not transcendental). `min`/`max` lower to ITE. |
-| Composite derivatives greens | `@pin` | `properties/composites.ch`: structure proven at Tier B for any `N` satisfying its contract, verdict `proven_modulo_fuzz_validated_contract`. This string is **legitimate here** (a real SMT base resting on a fuzz-validated contract); it was only a false-positive for **pure-fuzz** bases, fixed by chelis#435 (archived). Classify verdicts from `proof_tier`, never the string alone. |
+| Composite derivatives greens | `@pin` | The upper-bound and delta properties in `properties/composites.ch` prove their structure at the SMT tier using the separately validated normal-CDF range contract. Their `proven_modulo_fuzz_validated_contract` verdict is classified from `proof_tier` and qualifiers. The reflection-dependent parity property is deferred under chelis#3116. |
 | Economic / dynamic-programming greens | `@pin` | Markov simplex preservation, Bellman monotonicity/boundedness/contraction, PV/Gordon positivity & monotonicity discharge at SMT with **no** transcendental contract (report §6). Structurally more complete than a derivatives green. |
 | Function-call inlining depth for SMT | `@pin` | Nested calls inline to `MAX_INLINE_DEPTH = 3` (`chelis-prove/src/tier_b_lower.rs`); deeper chains route to Tier C. No shoals goal hits this today; c-note probe `p07` pending (`UPSTREAM_BUGS.md`). |
 | Beacon (large-scale concrete verification) | `@upstream` | `beacon_available=false` in the release binary; gated on `CHELIS_BEACON_BIN`. Shoals now provides the real-pricer `bs_call_wire_f64` tensor root (shoals#19); bounded-domain consumption remains Beacon#74. The 0.18.6 Beacon request envelope moves to schema 2 with a `wire_dag_v6_base64` field, so a Beacon deployment must upgrade in lockstep; there is no one-way read migration as there was for v5. |
@@ -1084,17 +1088,12 @@ the `f64` entry point was no better than the `f32` `Nautilus.Special.erf` whose
 coefficients it copied, and no wider cast could have improved it. A ~4.1e8x
 reduction. That was this shell's issue 61.
 
-**Still hand-rolled, pending a package-chain comparison.** Chelis 0.18.13
-adds correctly rounded `erf` and `erfc` primitives; the former absence probe
-is now the passing `tests/canonical_erf.ch`. Shoals's scalar Cody kernel has
-not yet been replaced because its Greek and expiry behavior has not been
-measured on the compatible Nautilus/Coral release chain. The broader
-special-function request chelis#902 remains open. Nautilus 0.7.47 makes
-`Nautilus.Special.erf` callable at `f64`, as the
-test `tests/nautilus_erf_f64.ch` observes in an isolated Nautilus-only package,
-resolving the nautilus#59 signature barrier. It retains A&S coefficients whose f64
-approximation gap is tracked by nautilus#74. Replacing Shoals's Cody kernel
-with it would discard the measured f64 accuracy.
+Shoals uses its scalar Cody `erf64` kernel for the pricing and Greek paths.
+Chelis 0.18.13 provides correctly rounded `erf` and `erfc` primitives, checked
+by `tests/canonical_erf.ch`. The broader special-function request chelis#902
+remains open. Nautilus 0.7.48 exposes `Nautilus.Special.erf` at f64, checked by
+`tests/nautilus_erf_f64.ch`; its A&S coefficients have the f64 approximation
+gap tracked by nautilus#74. Shoals retains its measured f64 accuracy.
 
 **Not covered here.** `Shoals.Greeks`'s `analytic_delta_call` /
 `analytic_delta_put` use a local `n_cdf` over `Nautilus.Special.erfc`, still the
