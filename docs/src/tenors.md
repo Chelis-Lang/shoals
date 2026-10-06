@@ -108,15 +108,18 @@ the tenor to divide the span exactly and fails otherwise. With
 `end_of_month` true, a month-end anchor and a whole-month tenor keep every
 date on its month end, and the month end decides the day, so `overflow`
 has nothing to decide. Otherwise `overflow` applies only to the dates the
-schedule emits: under `RejectInvalidDay` an emitted date on a nonexistent
-day fails, while a step past the end that would land on one does not.
+schedule emits. The schedule first selects its dates as whole-tenor steps
+from the anchor, locating them by clamping, then applies `overflow` once to
+each selected step. Under `RejectInvalidDay` an emitted date on a nonexistent
+day fails, while a step past the end, or a step a long stub merges away, that
+would land on one does not.
 Whether the tenor divides the span is judged under the same policy, so the
 period from 30 December to 28 February is two regular months when clamped
 and a stub when rejected. A start that is not before the end fails.
 
 `schedule` rolls each date of the unadjusted schedule in `calendar` under
-`roll`. It fails if two dates roll onto the same business day, or if a date
-lies outside the calendar's horizon.
+`roll`. It fails if two dates roll onto the same business day, rather than
+silently dropping one, or if a date lies outside the calendar's horizon.
 
 From `tests/schedule.ch`:
 

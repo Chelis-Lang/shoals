@@ -21,18 +21,24 @@ def month_end_of(d: Date) -> Date = date(date_year(d), date_month(d), days_in_mo
 -- one, so a clamped day of month cannot drift. With `end_of_month` and a
 -- month-end anchor, a whole-month tenor keeps every date on its month end.
 --
--- The caller's overflow policy applies only to dates the schedule emits.
--- Finding where the schedule stops uses clamped dates, which never fail, so
--- a step past the end that lands on a nonexistent day (30 February) cannot
--- fail the call. Under the end-of-month rule the month end is the day, so the
--- overflow policy has nothing to decide.
+-- A schedule is built in two phases. Selection decides which dates are
+-- emitted, as step indices and the explicit start and end, and never applies
+-- the caller's overflow policy: it locates dates by clamping, which cannot
+-- fail. Materialization then applies the policy exactly once to each
+-- selected step, so under `RejectInvalidDay` only an emitted date on a
+-- nonexistent day can fail, never a step past the end or one a long stub
+-- merges away. Under the end-of-month rule the month end is the day, so the
+-- policy has nothing to decide.
+type Selected =
+  | Step { k: i64 }
+  | Boundary { at: Date }
 def located(anchor: Date, p: Period, k: i64, eom: bool) -> Date = {
   base = date_add_period(anchor, period_mul(p, k), ClampToMonthEnd)
   if eom then month_end_of(base) else base
 }
-def emitted(anchor: Date, p: Period, k: i64, eom: bool, overflow: DayOverflow) -> Date = if eom then located(anchor, p, k, true) else date_add_period(anchor, period_mul(p, k), overflow)
 -- Whether anchor plus k tenors is exactly `target` under the caller's policy;
--- a step that does not exist under that policy lands nowhere.
+-- a step that does not exist under that policy lands nowhere. This is a
+-- judgement, not a materialization, so it uses the non-failing form.
 def lands_on(anchor: Date, p: Period, k: i64, eom: bool, overflow: DayOverflow, target: Date) -> bool =
   if eom then same_date(located(anchor, p, k, true), target) else match try_date_add_period(anchor, period_mul(p, k), overflow) with {
     | Some(x) => same_date(x, target)
@@ -59,24 +65,36 @@ def is_none(stub: StubConvention) -> bool =
     | NoStub => true
     | _ => false
   }
-def drop_last(xs: List[Date]) -> List[Date] = map(fn (i: i64) -> index(xs, i), range(0i64, sub(len(xs), 1i64)))
-def drop_first(xs: List[Date]) -> List[Date] = map(fn (i: i64) -> index(xs, i), range(1i64, len(xs)))
-def reversed(xs: List[Date]) -> List[Date] = map(fn (i: i64) -> index(xs, sub(sub(len(xs), 1i64), i)), range(0i64, len(xs)))
+def drop_last(xs: List[Selected]) -> List[Selected] = map(fn (i: i64) -> index(xs, i), range(0i64, sub(len(xs), 1i64)))
+def reversed(xs: List[Selected]) -> List[Selected] = map(fn (i: i64) -> index(xs, sub(sub(len(xs), 1i64), i)), range(0i64, len(xs)))
+def no_stub_failure(start: Date, end: Date) -> string = joined_text(["the tenor does not divide ", date_to_string(start), "..", date_to_string(end), " and the stub convention is NoStub"])
+-- Phase 1: the emitted items in date order. Steps count away from the anchor
+-- (the start for a final stub, the end for an initial one); a long stub drops
+-- the step nearest the far boundary when the tenor does not divide the span.
+def selection(start: Date, end: Date, p: Period, stub: StubConvention, eom: bool, overflow: DayOverflow) -> List[Selected] = {
+  forward = is_final(stub)
+  anchor = if forward then start else end
+  sign = if forward then 1i64 else -1i64
+  count = len(filter(fn (k: i64) -> if forward then date_lt(located(anchor, p, k, eom), end) else date_lt(start, located(anchor, p, neg(k), eom)), range(0i64, step_bound(start, end, p))))
+  regular = lands_on(anchor, p, mul(sign, count), eom, overflow, if forward then end else start)
+  if and(is_none(stub), not(regular)) then fail(schedule_failure(no_stub_failure(start, end))) else {
+    steps = map(fn (k: i64) -> Step { k: mul(sign, k) }, range(0i64, count))
+    kept = if and(is_long(stub), and(not(regular), gte(count, 2i64))) then drop_last(steps) else steps
+    if forward then append(kept, Boundary { at: end }) else concat([Boundary { at: start }], reversed(kept))
+  }
+}
+-- Phase 2: the caller's policy, once per selected step.
+def materialized(anchor: Date, p: Period, eom: bool, overflow: DayOverflow, item: Selected) -> Date =
+  match item with {
+    | Boundary { at: d } => d
+    | Step { k } => if eom then located(anchor, p, k, true) else date_add_period(anchor, period_mul(p, k), overflow)
+  }
 def schedule_unadjusted(start: Date, end: Date, tenor: Tenor, stub: StubConvention, end_of_month: bool, overflow: DayOverflow) -> List[Date] =
   if not(date_lt(start, end)) then fail(schedule_failure(string_concat(string_concat(string_concat("start ", date_to_string(start)), " is not before end "), date_to_string(end)))) else {
     p = tenor_period(tenor)
-    forward = is_final(stub)
-    anchor = if forward then start else end
-    sign = if forward then 1i64 else -1i64
+    anchor = if is_final(stub) then start else end
     eom = and(end_of_month, and(is_month_end(anchor), eq(period_days(p), 0i64)))
-    candidates = map(fn (k: i64) -> located(anchor, p, mul(sign, k), eom), range(0i64, step_bound(start, end, p)))
-    count = len(filter(fn (x: Date) -> if forward then date_lt(x, end) else date_lt(start, x), candidates))
-    inside = map(fn (k: i64) -> emitted(anchor, p, mul(sign, k), eom, overflow), range(0i64, count))
-    regular = lands_on(anchor, p, mul(sign, count), eom, overflow, if forward then end else start)
-    if and(is_none(stub), not(regular)) then fail(schedule_failure(joined_text(["the tenor does not divide ", date_to_string(start), "..", date_to_string(end), " and the stub convention is NoStub"]))) else {
-      merged = if and(is_long(stub), and(not(regular), gte(len(inside), 2i64))) then drop_last(inside) else inside
-      if forward then append(merged, end) else concat([start], reversed(merged))
-    }
+    map(fn (item: Selected) -> materialized(anchor, p, eom, overflow, item), selection(start, end, p, stub, eom, overflow))
   }
 def joined_text(parts: List[string]) -> string = fold(fn (acc: string, part: string) -> string_concat(acc, part), "", parts)
 -- Each date rolled in the calendar. Rolling must keep the dates strictly
