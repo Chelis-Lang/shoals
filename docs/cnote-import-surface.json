@@ -4128,8 +4128,8 @@
     },
     {
       "id": "shoals.inv.bs_vega_nonneg_grad.v1",
-      "reason": "grad-in-property sign invariants (vega/delta/gamma) do NOT lower through a cross-module import of the pricer (prove hangs; economoist docs/issue_drafts/dependency_edges_imports.md) and grad through bs_call_scalar hits the f32/f64 precision-mismatch across the grad boundary (research/proof-infra/report.md sec 5). grad never lowers to SMT (fuzz-only). This surface was not included in the official 0.18.1 direct-positivity probe, so it remains uncharacterized.",
-      "trigger": "resolve the cross-module grad and f32/f64 boundary defects, then demonstrate the inlined equivalent-form grad body and corrupted twin in a dedicated fuzz probe."
+      "reason": "The active AD-vega invariant checks sampled consistency between exported vegas_call and the displayed price, but no accepted sign property with a corrupt sign control binds the exported AD vega at this compiler pin. The separate price-bump vega-sign property does not establish the AD derivative's sign. No expected tier is assigned.",
+      "trigger": "Add a sign property and corrupt control over exported Shoals.Pricing.vegas_call, verify them on the published dependency chain, and record compiler-owned dependencies to the AD output and displayed price."
     },
     {
       "id": "shoals.inv.crr_general_nonneg.v1",
