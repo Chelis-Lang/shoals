@@ -17,7 +17,7 @@
 - [Yield curves](curves.md)
 - [Dates and day counts](dates.md)
 - [Holiday calendars](calendars.md)
-- [Tenors](tenors.md)
+- [Tenors and schedules](tenors.md)
 - [Market data](market-data.md)
 - [Order book](orderbook.md)
 - [Technical indicators](indicators.md)

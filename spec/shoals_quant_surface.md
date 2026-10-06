@@ -98,32 +98,37 @@ single-function discipline.
 
 Date arithmetic, day count, schedule generation:
 
-- **Day-count conventions:** ACT/360, ACT/365, 30/360 variants, ACT/ACT
-  (ISDA, ISMA), Business/252.
-- **Business-day rolling:** following, modified following, preceding,
-  modified preceding, end-of-month.
-- **Schedule generation:** swap schedules, bond coupon schedules,
-  arbitrary tenor-stepped sequences with stub-period handling.
-- **Year-fraction computation:** between two dates under any
-  convention.
+- **Day-count conventions:** ACT/360, ACT/365 Fixed, ACT/ACT ISDA,
+  ACT/ACT ICMA, 30E/360, 30E/360 ISDA, 30/360 US, and BUS/252, each named
+  by its one published definition. A convention's extra inputs (the ICMA
+  reference period and frequency, the 30E/360 ISDA maturity, the 30/360 US
+  end-of-month flag, the BUS/252 business calendar) are required.
+- **Year-fraction computation:** an exact rational between two dates under
+  any convention, with one correctly rounded conversion to `f64` or `f32`.
+- **Business-day rolling** is `Std.Datetime.Business`; Shoals does not wrap
+  it.
 
 Type-system rule: `Date` is `Discrete` (§3.1); the type checker rejects
 `grad(..., wrt=(some_date))`. Date inputs feed into differentiable
-computations through year-fraction conversions; the resulting `f64` is
+computations through year-fraction conversions; the resulting float is
 `Differentiable`.
 
-### 2.4 `Shoals.HolidayCal` (new module)
+### 2.4 Market calendars (Shoreleave)
 
-- **Built-in calendars:** NYC, LDN, TYO, SYD, FRA, HKG, joint
-  calendars (NYC ∩ LDN, etc.).
-- **User-extensible calendar registry:** customer-supplied calendars
-  registered by name; `Shoals.Date` rolling and schedule-generation
-  functions look up calendars by name.
+Shoals carries no holiday tables. Market calendars are
+`Std.Datetime.Business.BusinessCalendar` values from the Shoreleave package
+(US federal, NYSE, SIFMA, England and Wales, Japan Bank, New South Wales,
+Hong Kong, TARGET), each with a finite published horizon. Joint calendars
+compose with `Std.Datetime.Business.business_in_all` and `business_in_any`.
 
-### 2.5 `Shoals.Tenor` (new module)
+### 2.5 `Shoals.Tenor` and `Shoals.Schedule` (new modules)
 
-- **Tenor parsing:** "3M", "1Y", "30Y", "ON" parsed into integer-day
-  shifts relative to a reference date. Standard in IR products.
+- **Tenors** are `Std.Datetime` periods: "3M", "1Y", "30Y" parse to
+  calendar months and years, applied under an explicit `DayOverflow`.
+- **ON, TN, SN** are business-day lag and length pairs, and spot lags
+  count in one calendar and roll in another.
+- **Schedules** step from a fixed anchor by whole tenors, with explicit
+  stub, end-of-month, overflow, calendar, and roll arguments.
 
 ### 2.6 `Shoals.MarketData` (new module)
 

@@ -2,157 +2,107 @@
 
 Module: `Shoals.Date`.
 
-This module computes year fractions under the standard day-count
-conventions, detects weekends, rolls a date to a business day under the
-following / modified-following / preceding rules against a holiday
-calendar, and generates a schedule of dates stepped by a number of months.
-The opaque date type comes from `Std.Datetime`, constructed with
-`date(year, month, day)`. Its year is limited to -9999 through 9999.
+This module computes year fractions under named day-count conventions. A
+year fraction is an exact rational; converting it to a float is a separate,
+correctly rounded step. Dates, calendar arithmetic, and business-day rules
+come from `Std.Datetime` and `Std.Datetime.Business`, and market calendars
+from Shoreleave (see [Holiday calendars](calendars.md)).
 
 ## Day-count conventions
 
 ```chelis
 type DayCount =
-  | Act360
-  | Act365
-  | ThirtyThreeSixty
-  | ActActIsda
-  | ActActIcma { period_start: Date, period_end: Date, frequency: i64 }
+  | ActualOver360
+  | ActualOver365Fixed
+  | ActualActualIsda
+  | ActualActualIcma { reference_start: Date, reference_end: Date, frequency: i64 }
+  | ThirtyEOver360
+  | ThirtyEOver360Isda { maturity: Date }
+  | ThirtyOver360Us { end_of_month: bool }
+  | Business252 { calendar: BusinessCalendar }
 
-def year_fraction(start: Date, end: Date, convention: DayCount) -> f64
+def year_fraction(start: Date, end: Date, convention: DayCount) -> YearFraction
 ```
 
-`year_fraction` returns the year fraction between two dates under the chosen
-convention. `Act360` divides actual days by 360, `Act365` divides by 365, and
-`ThirtyThreeSixty` is the 30/360 bond-basis count.
+Each convention has one published definition, and its name says which.
+Names that libraries use for different rules, such as "ACT/365" or
+"30/360 ISDA", are not conventions here. An input a convention needs beyond
+the two dates is a field of its variant, so the convention cannot be
+requested without it.
 
-`ActActIsda` splits the interval at calendar-year boundaries and divides each
-segment by the length of the year it falls in, so a day in a leap year weighs
-1/366 and a day in an ordinary year 1/365. A whole calendar year is therefore
-exactly 1.0 whether or not it is a leap year. A reversed interval returns the
-negated fraction.
+| Variant | Convention | Definition |
+|---|---|---|
+| `ActualOver360` | ACT/360 | actual days / 360 |
+| `ActualOver365Fixed` | ACT/365 Fixed | actual days / 365 |
+| `ActualActualIsda` | ACT/ACT ISDA (ISDA 2006 §4.16(b)) | the days in each calendar year over that year's length, summed |
+| `ActualActualIcma` | ACT/ACT ICMA (ICMA Rule 251) | accrued days / (frequency × days in the reference coupon period) |
+| `ThirtyEOver360` | 30E/360, the Eurobond basis (ISDA 2006 §4.16(g)) | a day 31 counts as 30 |
+| `ThirtyEOver360Isda` | 30E/360 ISDA (ISDA 2006 §4.16(h)) | a month-end day counts as 30, except an end date on the last day of February that is the maturity |
+| `ThirtyOver360Us` | 30/360 US (SIFMA) | with `end_of_month`, February month-ends count as 30; then a 31 after a 30 or 31 counts 30; then a start 31 counts 30 |
+| `Business252` | BUS/252 | business days of `calendar` in `[start, end)` / 252 |
 
-`ActActIcma` measures accrued days against the full coupon period, scaled by
-the coupon frequency, so a regular full period is exactly `1/frequency`
-whatever its actual day count. ICMA is not computable from `(start, end)`
-alone, so the convention **carries** the enclosing coupon period and the
-frequency. That is deliberate: it makes an ICMA request with *no* period
-unrepresentable rather than a runtime error. A frequency below 1, or a coupon
-period that does not end after it starts, traps.
+Every convention measures a forward accrual. An end before the start fails
+with a domain error rather than returning a negated fraction; equal dates
+give zero. ACT/ACT ICMA fails when the frequency is below 1, when the
+reference period is empty, and when the accrual leaves the reference period,
+since an accrual outside it belongs to a different coupon period. BUS/252
+fails when an accrual date lies outside the calendar's horizon.
 
-It does **not** make every invalid ICMA request unrepresentable, and the
-difference matters. `year_fraction` validates the coupon period and the
-frequency; it does **not** check that `start` and `end` lie within that period.
-An invalid accrual returns a number, not an error. The bound runs one way only:
-a valid accrual at frequency `f` lies in `[0, 1/f]`, so a result **outside** that
-range proves the accrual was invalid — but a result **inside** it certifies
-nothing, because an invalid accrual can land there too. So no assertion on the
-result is a substitute for passing a correct accrual range, and keeping the
-accrual inside the period is the caller's responsibility.
+ACT/ACT AFB is not provided: its treatment of 29 February in a period
+longer than a year is disputed between sources.
 
-Some measured examples, which are illustrations and not an exhaustive list of
-the ways this goes wrong: an accrual lying wholly outside the period and shorter
-than it returns a small positive fraction (0.0852); one longer than the period
-returns a value above `1/frequency` (1.5027); a reversed accrual returns a
-negative; a partial overlap returns a plausible interior value (0.2527); and a
-period whose length contradicts its declared frequency — an annual period
-declared `frequency: 2` — returns 0.5 for a whole calendar year.
-
-From `tests/date.ch`:
+From `tests/date.ch`, with the expected values as exact fractions:
 
 ```chelis
-// The ISDA 2006 worked example: 61 days of a 365-day year
+// ISDA's worked example: 61 days of a 365-day year
 // plus 121 days of a 366-day year.
-start = date(cast(2003, i64), cast(11, i64), cast(1, i64))
-end = date(cast(2004, i64), cast(5, i64), cast(1, i64))
-yf = year_fraction(start, end, ActActIsda)
-// yf == 61/365 + 121/366 == 0.49772438056740775
+f = year_fraction(date(2003i64, 11i64, 1i64), date(2004i64, 5i64, 1i64), ActualActualIsda)
+// year_fraction_numerator(f) == 66491, year_fraction_denominator(f) == 133590
 
-// A full semi-annual ICMA period is exactly one half.
-convention = ActActIcma { period_start: start, period_end: end, frequency: cast(2, i64) }
-half = year_fraction(start, end, convention)  // half == 0.5
+// A full regular semi-annual ICMA period is exactly one half.
+icma = ActualActualIcma { reference_start: date(2003i64, 11i64, 1i64), reference_end: date(2004i64, 5i64, 1i64), frequency: 2i64 }
+half = year_fraction(date(2003i64, 11i64, 1i64), date(2004i64, 5i64, 1i64), icma)  // 1/2
+
+// 1 to 8 July 2025 has four US federal business days: 4/252 = 1/63.
+bus = year_fraction(date(2025i64, 7i64, 1i64), date(2025i64, 7i64, 8i64), Business252 { calendar: us_federal() })
 ```
 
-`year_fraction` returns `f64`. The ACT/ACT conventions are checked against an
-independently derived proleptic-Gregorian calendar in
-`references/date.ch`, not against the subject's own day arithmetic.
-
-## Weekends and business-day rolling
+## Year fractions and float conversion
 
 ```chelis
-def is_weekend(d: Date) -> bool
-def date_roll_following(d: Date, cal: Calendar) -> Date
-def date_roll_modified_following(d: Date, cal: Calendar) -> Date
-def date_roll_preceding(d: Date, cal: Calendar) -> Date
-def add_business_days(d: Date, n: i64, cal: Calendar) -> Date
-def date_roll_following_published(d: Date, cal: BusinessCalendar) -> Date
-def date_roll_preceding_published(d: Date, cal: BusinessCalendar) -> Date
-def date_roll_modified_following_published(d: Date, cal: BusinessCalendar) -> Date
+type YearFraction    // opaque
+
+def year_fraction_numerator(f: YearFraction) -> i64
+def year_fraction_denominator(f: YearFraction) -> i64
+def year_fraction_to_f64(f: YearFraction) -> f64
+def year_fraction_to_f32(f: YearFraction) -> f32
 ```
 
-`is_weekend` reports whether a date falls on Saturday or Sunday. Every roll
-takes the `Shoals.HolidayCal.Calendar` it rolls against and treats a date as a
-business day only when it is neither a weekend nor a holiday in that calendar.
-`date_roll_following` advances to the next business day, `date_roll_preceding`
-retreats to the previous one, and `date_roll_modified_following` rolls forward
-unless that crosses into the next month, in which case it rolls back.
-`add_business_days` moves `n` business days, forward for a positive count
-and backward for a negative one, skipping non-business days. A non-business
-start sits between two business days: a positive count's first step lands on
-the following business day and a negative count's on the preceding one. Zero
-business days returns a business-day start unchanged and moves a
-non-business start to the following business day. The local `Calendar` rolls
-and offsets use the same `Std.Datetime.Business` operations as published
-calendars through `as_business_calendar`, so a start or result outside the
-calendar's coverage fails with a domain error.
-The `*_published` rolls accept Shoreleave calendars and use
-`Std.Datetime.Business` rules, including their finite date horizons.
+A `YearFraction` is a rational in lowest terms with a positive denominator.
+It is opaque, so every value comes from `year_fraction` and is reduced.
 
-Pass `weekend_only_calendar()` for weekend-only behavior:
+`year_fraction_to_f64` returns the f64 nearest the exact fraction. It fails
+when the numerator's magnitude or the denominator exceeds 2^53, where the
+integer-to-float casts would no longer be exact. `year_fraction_to_f32`
+returns the f32 nearest the exact fraction. It rounds the f64 quotient a
+second time, which the comment in `src/date.ch` proves correct whenever the
+denominator is below 2^29 and the magnitude below 2^24, and it fails outside
+those bounds rather than risk a double rounding. Every convention stays
+inside both bounds for ordinary inputs; only an ACT/ACT ICMA frequency in the
+millions reaches them.
 
-```chelis
-sat = date(cast(2025, i64), cast(1, i64), cast(4, i64))
-rolled = date_roll_following(sat, weekend_only_calendar())
-// rolled is Monday 2025-01-06
+## Removed date helpers
 
-// 2025-07-04 is a Friday and a NYC holiday.
-independence_day = date(cast(2025, i64), cast(7, i64), cast(4, i64))
-date_roll_following(independence_day, hc_nyc_calendar())
-// Monday 2025-07-07
-date_roll_following(independence_day, weekend_only_calendar())
-// unchanged: a weekend-only calendar does not see it
-```
+The generic date helpers Shoals used to carry are removed in favour of the
+standard library:
 
-`weekend_only_calendar()` selects weekend-only behavior without changing the
-rolling API.
-
-## Schedule generation
-
-```chelis
-def schedule_from_tenor(start: Date, end: Date, step_months: i64) -> List[Date]
-def days_in_month(year: i64, month: i64) -> i64
-def add_months(d: Date, n: i64) -> Date
-def schedule_from_tenor_calendar(start: Date, end: Date, step_months: i64) -> List[Date]
-```
-
-`schedule_from_tenor` returns a list of dates from `start`, stepped by
-`step_months` months, up to and including the last stop at or before `end`.
-The first entry is the start date and the schedule is strictly increasing.
-From `tests/date.ch`, a quarterly schedule across 2025 has five stops:
-
-```chelis
-dates = schedule_from_tenor(
-  date(cast(2025, i64), cast(1, i64), cast(1, i64)),
-  date(cast(2025, i64), cast(12, i64), cast(31, i64)),
-  cast(3, i64)
-)
-// len(dates) == 5
-```
-
-`schedule_from_tenor` treats a month as 30 days. For month-of-year
-stepping, `add_months` caps the day at the destination month's end, and
-`schedule_from_tenor_calendar` builds a schedule using that operation.
-`days_in_month` rejects a month outside 1–12. `add_months` uses
-`Std.Datetime.date_add_months` with `ClampToMonthEnd`.
-Neither generator rolls its stops against a holiday calendar; compose one of
-the rolls above over the result when settlement dates are needed.
+| Removed | Replacement |
+|---|---|
+| `Act360`, `Act365`, `ThirtyThreeSixty`, `ActActIsda`, `ActActIcma` | `ActualOver360`, `ActualOver365Fixed`, `ThirtyEOver360` (what `ThirtyThreeSixty` computed), `ActualActualIsda`, `ActualActualIcma` |
+| `year_fraction(...) -> f64` | `year_fraction(...) -> YearFraction`, then `year_fraction_to_f64` or `year_fraction_to_f32` |
+| `is_weekend` | `Std.Datetime.date_weekday`, or `Std.Datetime.Business.is_business_day` against a calendar |
+| `date_roll_following`, `date_roll_preceding`, `date_roll_modified_following` and their `*_published` forms | `Std.Datetime.Business.business_day_roll(calendar, d, Following / Preceding / ModifiedFollowing)` |
+| `add_business_days` | `Std.Datetime.Business.business_day_offset(calendar, d, n, start)`, where `start` states what a non-business start date does |
+| `add_months` | `Std.Datetime.date_add_months(d, n, overflow)` with an explicit `DayOverflow` |
+| `days_in_month` | `Std.Datetime.days_in_month` |
+| `schedule_from_tenor`, `schedule_from_tenor_calendar` | `Shoals.Schedule.schedule_unadjusted` and `schedule`; see [Tenors and schedules](tenors.md) |

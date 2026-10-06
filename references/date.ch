@@ -3,9 +3,7 @@ import Std.Datetime (Date, date_year, date_month, date_day)
 export (actual_days_reference, isda_reference, icma_reference)
 -- An exact proleptic-Gregorian day number, computed here rather than taken from
 -- `Std.Datetime.date_days_until`, so the ACT/ACT references below check the subject
--- against an independently derived calendar rather than against itself. The
--- older textbook functions above deliberately keep their crude 30-day-month
--- count; only the ACT/ACT pair needs exactness to be worth comparing.
+-- against an independently derived calendar rather than against itself.
 def civil_ordinal(year: i64, month: i64, day: i64) -> i64 = {
   shifted = if lte(month, cast(2, i64)) then sub(year, cast(1, i64)) else year
   era = floor_div(shifted, cast(400, i64))
