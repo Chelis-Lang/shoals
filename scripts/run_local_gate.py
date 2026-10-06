@@ -62,11 +62,9 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
 (``AGENTS.md`` §Pin Bump Checklist) or before a release tag:
 
   16. ``chelis test tests/ --timeout 1200 --suite-timeout 2400 --jobs auto`` — the fast unit
-      suite (nightly in CI). The suite budget was raised from 1500s at the
-      0.18.6 pin to work around chelis#1391 -- a narrowing, not a fix; keep it
-      byte-aligned with the hosted nightly step. Chelis 0.19.0 includes the
-      chelis#3058 fix; the budget remains until a new measurement establishes
-      safe headroom. The hosted step records the measured cost.
+      suite. Its 2400s budget matches the hosted nightly step while measurements
+      on Chelis 0.19.0 establish safe headroom. This release includes the
+      sharded batching fix in chelis#3058.
   17. The weekly nightly ``heavy`` matrix, one ``tests-manual/<file>.ch`` at
       a time with ``--timeout 1500 --suite-timeout 1650 --jobs 1``. This
       explicitly raises Chelis 0.17.4's separate 600-second whole-suite
