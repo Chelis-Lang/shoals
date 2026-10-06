@@ -1,7 +1,7 @@
 module Shoals.Xva
 import Nautilus.Distributions (gamma_sample, normal_sample, normal_cdf)
 import Nautilus.Interpolation (linear_interp_sorted)
-import Shoals.Cds (HazardCurve, cds_survival_from_hazards)
+import Shoals.Cds (HazardCurve, hazard_curve_from_pillars, hazard_curve_pillars, cds_survival_from_hazards)
 export (survival_probability_constant_hazard, default_probability_in_interval, expected_positive_exposure, expected_negative_exposure, netted_exposure_2_deals, cva_constant_hazard, dva_constant_hazard, discount_factor_constant_rate, fva, kva, xva_cva_wwr_constant_hazard, xva_cva_stochastic_hazard)
 def survival_probability_constant_hazard(hazard: f32, t: f32) -> f32 = exp(neg(mul(hazard, t)))
 def default_probability_in_interval(hazard: f32, t_start: f32, t_end: f32) -> f32 = sub(survival_probability_constant_hazard(hazard, t_start), survival_probability_constant_hazard(hazard, t_end))
@@ -121,8 +121,10 @@ def xva_cva_stochastic_hazard[n, m](time_grid: tensor[m, f32], epe: tensor[m, f3
   epe_l = to_list(epe)
   pairs = zip(ts_l, epe_l)
   lgd = sub(cast(1.0, f32), recovery)
-  match hazards with {
-    | HazardCurve { times: ts_h, hazards: hs_h } => {
+  {
+    pillars = hazard_curve_pillars(hazards)
+    ts_h = pillars.0
+    hs_h = pillars.1
     h_ts_l = to_list(copy(ts_h))
     h_hs_l = to_list(copy(hs_h))
     init = (cast(0.0, f32), cast(0.0, f32))
@@ -131,9 +133,9 @@ def xva_cva_stochastic_hazard[n, m](time_grid: tensor[m, f32], epe: tensor[m, f3
       accum = state.1
       t_i = entry.0
       epe_i = entry.1
-      curve_prev = HazardCurve { times: to_tensor(h_ts_l), hazards: to_tensor(h_hs_l) }
+      curve_prev = hazard_curve_from_pillars(to_tensor(h_ts_l), to_tensor(h_hs_l))
       q_prev = cds_survival_from_hazards(curve_prev, prev_t)
-      curve_now = HazardCurve { times: to_tensor(h_ts_l), hazards: to_tensor(h_hs_l) }
+      curve_now = hazard_curve_from_pillars(to_tensor(h_ts_l), to_tensor(h_hs_l))
       q_now = cds_survival_from_hazards(curve_now, t_i)
       p_default = sub(q_prev, q_now)
       df_i = discount_factor_constant_rate(discount_rate, t_i)
@@ -141,7 +143,6 @@ def xva_cva_stochastic_hazard[n, m](time_grid: tensor[m, f32], epe: tensor[m, f3
       (t_i, add(accum, contribution))
     }, init, pairs)
     out.1
-  }
   }
 }
 def xva_cva_wwr_constant_hazard[n](rng_key: key, time_grid: tensor[n, f32], epe: tensor[n, f32], hazard: f32, recovery: f32, discount_rate: f32, rho: f32, n_paths: i64) -> f32 = {

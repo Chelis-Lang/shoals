@@ -1,0 +1,4 @@
+Shoals.Cds.hazard_curve_from_pillars: pillar times must be strictly increasing: index 2 has time 2.0, which does not exceed time 3.0 at index 1
+
+The same time-hazard pairs in a different traversal order used to return a
+different survival probability because the last pillar contributed zero width.

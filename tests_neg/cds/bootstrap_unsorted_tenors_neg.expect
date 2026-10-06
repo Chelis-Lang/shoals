@@ -1,0 +1,3 @@
+Shoals.Cds.cds_bootstrap_hazards: pillar times must be strictly increasing: index 2 has time 2.0, which does not exceed time 3.0 at index 1
+
+Bootstrap must reject malformed tenor order before entering a root solve.

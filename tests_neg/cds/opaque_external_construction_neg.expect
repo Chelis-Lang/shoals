@@ -1,0 +1,3 @@
+record construction of opaque type `HazardCurve` outside its defining module `Shoals.Cds`
+
+An external literal bypassed the public constructor's validation.

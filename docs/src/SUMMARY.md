@@ -15,6 +15,7 @@
 - [Risk](risk.md)
 - [Extended risk](risk-extended.md)
 - [Yield curves](curves.md)
+- [Credit default swaps](cds.md)
 - [Dates and day counts](dates.md)
 - [Holiday calendars](calendars.md)
 - [Tenors and schedules](tenors.md)

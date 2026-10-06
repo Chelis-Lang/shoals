@@ -1,8 +1,17 @@
 module Shoals.Tests.Cds
 import Std.Test (assert_close, assert_true)
-import Shoals.Cds (HazardCurve, hazard_curve_from_pillars, cds_survival_from_hazards, cds_premium_leg_value, cds_protection_leg_value, cds_pv, cds_bootstrap_hazards)
+import Shoals.Cds (HazardCurve, hazard_curve_from_pillars, hazard_curve_pillars, cds_survival_from_hazards, cds_premium_leg_value, cds_protection_leg_value, cds_pv, cds_bootstrap_hazards)
 def cds_flat_tenors_5() -> tensor[5, f32] = to_tensor([cast(1.0, f32), cast(2.0, f32), cast(3.0, f32), cast(5.0, f32), cast(10.0, f32)])
 def cds_flat_hazards_5(h: f32) -> tensor[5, f32] = to_tensor([h, h, h, h, h])
+-- The values are intentionally nonconstant: reversing the last two pairs
+-- used to drop a pillar's contribution and return 0.73344696 instead.
+def test_sorted_hazard_pillars_preserve_survival_and_reader_values() -> unit ! { Test } = {
+  curve = hazard_curve_from_pillars(to_tensor([1.0f32, 2.0f32, 3.0f32]), to_tensor([0.01f32, 0.05f32, 0.2f32]))
+  pillars = hazard_curve_pillars(curve)
+  _ = assert_close(index(to_list(pillars.0), 2i64), 3.0f32, 1e-7f32, "last pillar time is readable")
+  _ = assert_close(index(to_list(pillars.1), 1i64), 0.05f32, 1e-7f32, "interior hazard is readable")
+  assert_close(cds_survival_from_hazards(hazard_curve_from_pillars(to_tensor([1.0f32, 2.0f32, 3.0f32]), to_tensor([0.01f32, 0.05f32, 0.2f32])), 2.5f32), 0.85214376f32, 1e-6f32, "ordered pillars retain their survival probability")
+}
 def cds_synthetic_spread_for_tenor(tenor: f32, recovery: f32, r: f32, freq: i64, times_l: List[f32], hazards_l: List[f32]) -> f32 = {
   curve_a = hazard_curve_from_pillars(to_tensor(times_l), to_tensor(hazards_l))
   pl = cds_premium_leg_value(cast(1.0, f32), tenor, freq, curve_a, r)
@@ -35,9 +44,7 @@ def test_cds_bootstrap_recovers_constant_hazard() -> unit ! { Test } = {
   spreads_l = cds_build_synthetic_spreads(tenors_l, recovery, r, freq, to_list(copy(tenors)), hazards_l)
   synthetic_spreads = to_tensor(spreads_l)
   recovered = cds_bootstrap_hazards(synthetic_spreads, tenors, recovery, r, freq)
-  recovered_hs = match recovered with {
-    | HazardCurve { times: _, hazards: hs } => hs
-  }
+  recovered_hs = hazard_curve_pillars(recovered).1
   recovered_hs_l = to_list(copy(recovered_hs))
   errors = map(fn (h_rec: f32) -> {
     diff = sub(h_rec, h_true)
@@ -57,9 +64,7 @@ def test_cds_bootstrap_recovers_piecewise_hazard() -> unit ! { Test } = {
   spreads_l = cds_build_synthetic_spreads(tenors_l, recovery, r, freq, to_list(copy(tenors)), true_hs_l)
   synthetic_spreads = to_tensor(spreads_l)
   recovered = cds_bootstrap_hazards(synthetic_spreads, tenors, recovery, r, freq)
-  recovered_hs = match recovered with {
-    | HazardCurve { times: _, hazards: hs } => hs
-  }
+  recovered_hs = hazard_curve_pillars(recovered).1
   recovered_hs_l = to_list(copy(recovered_hs))
   true_hs_l2 = to_list(copy(true_hazards))
   pairs = zip(true_hs_l2, recovered_hs_l)

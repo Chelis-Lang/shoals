@@ -1,0 +1,3 @@
+Shoals.Cds.hazard_curve_from_pillars: pillar times must be strictly increasing: index 1 has time 1.0, which does not exceed time 1.0 at index 0
+
+Equal pillar times cannot define two successive hazard intervals.
