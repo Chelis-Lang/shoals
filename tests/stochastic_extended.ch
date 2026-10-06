@@ -176,9 +176,11 @@ def test_merton_compensated_drift_agrees_with_sampler_log_drift() -> unit ! { Te
 -- the aggregate log jump while the drift compensated a compound Poisson, and
 -- the two have different exponential moments: its exact expectation here is
 -- 0.8623 against the advertised 1.0, a 13.8% shortfall, and it measured
--- 0.8773 at this seed and size. The sample standard deviation here is 2.708,
--- so the standard error at twenty thousand draws is 1.9% and the 7% bound is
--- 3.6 standard errors wide while still excluding the defect by a factor of two.
+-- no sample size reduces. The sample standard deviation here is near 2.6, so
+-- the standard error at twenty thousand draws is under 2% and the 7% bound is
+-- more than three standard errors wide while still excluding the defect by a
+-- factor of two. Per-seed figures are deliberately not quoted: they move with
+-- the sampling API and the pin, and the exact expectation above does not.
 def test_merton_terminal_mean_matches_s0_exp_mu_t_at_high_intensity() -> unit ! { Test } = {
   template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
   jumps_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
@@ -187,8 +189,9 @@ def test_merton_terminal_mean_matches_s0_exp_mu_t_at_high_intensity() -> unit ! 
 }
 -- Both signs of the jump mean, as shoals#98 asks. The pre-fix bias is signed:
 -- its leading term is -lambda*t*jump_mean*jump_vol^2/2, so a positive jump mean
--- made the mean 12.4% too LOW here and a negative one made it 10.2% too HIGH.
--- A single-sign test would have been satisfied by any downward correction.
+-- makes the mean too LOW and a negative one makes it too HIGH, each by about a
+-- tenth. A single-sign test would have been satisfied by any downward
+-- correction, which is why both signs are pinned separately.
 def test_merton_terminal_mean_matches_s0_exp_mu_t_with_positive_jump_mean() -> unit ! { Test } = {
   template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
   jumps_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))

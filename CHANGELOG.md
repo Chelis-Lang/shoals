@@ -16,10 +16,13 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   `lambda*(exp(jump_mean + 0.5*jump_vol^2) - 1)`. Those are different
   distributions with different exponential moments, so the advertised
   `E[S_t] = s0*exp(mu*t)` did not hold: at `s0=1`, `mu=sigma=0`, `lambda=4`,
-  `jump_mean=0.5`, `jump_vol=0.2`, `t=1` the terminal mean measured 0.872715
-  against 1.0 at twenty thousand draws. The bias was signed by `jump_mean`, so
-  it ran 12.1% low at `jump_mean=0.4` and 10.4% high at `jump_mean=-0.4` for
-  `lambda=6`.
+  `jump_mean=0.5`, `jump_vol=0.2`, `t=1` the old sampler's exact expectation is
+  0.862337 against the advertised 1.0 -- a 13.8% shortfall that no sample size
+  reduces. The bias is **signed by `jump_mean`**: its leading term is
+  `-lambda*t*jump_mean*jump_vol^2/2`, so a positive jump mean ran low and a
+  negative one ran high. Per-seed measurements are deliberately not quoted
+  here; they move with the sampling API and the pin, and the exact expectation
+  is the stable statement.
 
   Two independent normals also sum to one normal, so the old sampler produced a
   LOGNORMAL terminal price with no jump counts and no heavy tails. Anyone
@@ -33,8 +36,11 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   `log E[exp(J)]` of the law that was sampled, so the mean identity holds by
   construction rather than by a closed form standing beside the sampler. That
   moment agrees with `lambda*t*(exp(jump_mean + 0.5*jump_vol^2) - 1)` to within
-  2.8e-7 relative across `lambda*t` from 0.3 to 20 and both signs of
-  `jump_mean`, which is also the test that proves the slot bound adequate.
+  the 1e-5 relative tolerance its test asserts, over `lambda*t` from 0.3 to 20
+  and both signs of `jump_mean`; that test is also what proves the slot bound
+  adequate. The agreement is tightest in the middle of that band and loosest at
+  the small-`lambda*t` end, where the enumerated side computes a `log(1 + x)`
+  with `x` near f32 epsilon.
 
   The enumerated moment is reduced as a shifted log-sum-exp, not in linear
   space. Each term `exp(log p_k + k*log w)` is representable wherever the slot

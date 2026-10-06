@@ -82,8 +82,8 @@ moves with the jump count and with `s0`). But `jump_vol = 0` reaches it too,
 through a large negative `jump_mean`: `lambda = 3000, jump_mean = -50` also
 gives `0.0` on every path. And it is reachable well inside ordinary
 parameters — `lambda = 200, jump_vol = 1.0, jump_mean = 0` at `s0 = 100` leaves
-241 of 256 paths at zero under seed 7. That count is seed-dependent; the
-mechanism is not.
+the large majority of paths at zero. The exact count is seed-dependent and is
+not quoted here; the mechanism is not.
 
 This is the distribution being unrepresentable in f32, not a defect in the
 compensator. Every case above gives the identical result on the previous
@@ -98,10 +98,12 @@ in step with the sampler by hand. It converges to
 `lambda * t * (exp(jump_mean + 0.5 * jump_vol^2) - 1)`, so
 `merton_compensated_drift(mu, sigma, lambda, jump_mean, jump_vol) * t` and
 `(mu - 0.5 * sigma^2) * t - merton_sampler_log_jump_moment(lambda, jump_mean, jump_vol, t)`
-agree to within 2.8e-7 relative over `lambda * t` from 0.3 to 20 and both signs
-of `jump_mean`; `tests/stochastic_extended.ch` pins both that agreement and the
-moment itself against the closed form at those intensities and at three more
-that stress the f32 exponent range. Outside that band the two forms diverge:
+agree to within the 1e-5 relative tolerance asserted in
+`tests/stochastic_extended.ch`, over `lambda * t` from 0.3 to 20 and both signs
+of `jump_mean`. That file pins both the agreement and the moment itself against
+the closed form at those intensities and at three more that stress the f32
+exponent range. The agreement is loosest at the small-`lambda * t` end of that
+band, and outside it the two forms diverge further:
 for a very small `lambda * t` the enumerated moment is a `log(1 + x)` with `x`
 below f32 epsilon, and for a very small `jump_mean` it is the CLOSED form that
 loses the digits, to cancellation in `exp(jump_mean) - 1`. The absolute
