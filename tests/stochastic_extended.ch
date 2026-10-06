@@ -1,7 +1,7 @@
 module Shoals.Tests.StochasticExtended
 import Std.Test (assert_close, assert_true)
 import Nautilus.Stats (mean_vec, std_vec)
-import Shoals.Stochastic (merton_compensated_drift, merton_sampler_log_jump_moment, merton_jump_terminal, cholesky_2x2_lower, correlated_gbm_terminal_2d)
+import Shoals.Stochastic (merton_compensated_drift, merton_sampler_log_jump_moment, merton_jump_terminal, cholesky_2x2_lower, correlated_gbm_terminal_2d, sto_kou_compensator, sto_kou_sampler_log_jump_moment, sto_kou_jump_terminal)
 def test_merton_compensated_drift_zero_lambda_equals_gbm() -> unit ! { Test } = {
   d = merton_compensated_drift(cast(0.05, f32), cast(0.2, f32), cast(0.0, f32), cast(-0.1, f32), cast(0.1, f32))
   expected = sub(cast(0.05, f32), mul(cast(0.5, f32), mul(cast(0.2, f32), cast(0.2, f32))))
@@ -80,9 +80,10 @@ def test_correlated_gbm_2d_rho_zero_positive_dispersion() -> unit ! { Test } = {
   s_x = std_vec(out.0, cast(1, i64))
   assert_true(gt(s_x, cast(0.0, f32)), "X has positive dispersion under rho=0")
 }
--- Helper: |got / want - 1|. Used for the shoals#98 oracles, where every claim
--- is about a RELATIVE agreement and the quantities span four decades.
-def merton_rel_gap(got: f32, want: f32) -> f32 = {
+-- Helper: |got / want - 1|. Used for the shoals#98 and shoals#132 oracles,
+-- where every claim is about a RELATIVE agreement and the quantities span four
+-- decades.
+def rel_gap(got: f32, want: f32) -> f32 = {
   r = div(sub(got, want), want)
   if lt(r, cast(0.0, f32)) then neg(r) else r
 }
@@ -103,11 +104,11 @@ def merton_closed_log_jump_moment(lambda: f32, jump_mean: f32, jump_vol: f32, t:
 def test_merton_sampler_log_jump_moment_matches_compound_poisson_compensator() -> unit ! { Test } = {
   tol = cast(0.00001, f32)
   one = cast(1.0, f32)
-  low = merton_rel_gap(merton_sampler_log_jump_moment(cast(0.3, f32), cast(-0.1, f32), cast(0.15, f32), one), merton_closed_log_jump_moment(cast(0.3, f32), cast(-0.1, f32), cast(0.15, f32), one))
-  mid = merton_rel_gap(merton_sampler_log_jump_moment(cast(4.0, f32), cast(0.5, f32), cast(0.2, f32), one), merton_closed_log_jump_moment(cast(4.0, f32), cast(0.5, f32), cast(0.2, f32), one))
-  up = merton_rel_gap(merton_sampler_log_jump_moment(cast(6.0, f32), cast(0.4, f32), cast(0.2, f32), one), merton_closed_log_jump_moment(cast(6.0, f32), cast(0.4, f32), cast(0.2, f32), one))
-  down = merton_rel_gap(merton_sampler_log_jump_moment(cast(6.0, f32), cast(-0.4, f32), cast(0.2, f32), one), merton_closed_log_jump_moment(cast(6.0, f32), cast(-0.4, f32), cast(0.2, f32), one))
-  high = merton_rel_gap(merton_sampler_log_jump_moment(cast(20.0, f32), cast(0.5, f32), cast(0.2, f32), one), merton_closed_log_jump_moment(cast(20.0, f32), cast(0.5, f32), cast(0.2, f32), one))
+  low = rel_gap(merton_sampler_log_jump_moment(cast(0.3, f32), cast(-0.1, f32), cast(0.15, f32), one), merton_closed_log_jump_moment(cast(0.3, f32), cast(-0.1, f32), cast(0.15, f32), one))
+  mid = rel_gap(merton_sampler_log_jump_moment(cast(4.0, f32), cast(0.5, f32), cast(0.2, f32), one), merton_closed_log_jump_moment(cast(4.0, f32), cast(0.5, f32), cast(0.2, f32), one))
+  up = rel_gap(merton_sampler_log_jump_moment(cast(6.0, f32), cast(0.4, f32), cast(0.2, f32), one), merton_closed_log_jump_moment(cast(6.0, f32), cast(0.4, f32), cast(0.2, f32), one))
+  down = rel_gap(merton_sampler_log_jump_moment(cast(6.0, f32), cast(-0.4, f32), cast(0.2, f32), one), merton_closed_log_jump_moment(cast(6.0, f32), cast(-0.4, f32), cast(0.2, f32), one))
+  high = rel_gap(merton_sampler_log_jump_moment(cast(20.0, f32), cast(0.5, f32), cast(0.2, f32), one), merton_closed_log_jump_moment(cast(20.0, f32), cast(0.5, f32), cast(0.2, f32), one))
   _ = assert_true(lt(low, tol), "enumerated jump moment matches the compensator at lambda*t = 0.3")
   _ = assert_true(lt(mid, tol), "enumerated jump moment matches the compensator at lambda*t = 4")
   _ = assert_true(lt(up, tol), "enumerated jump moment matches the compensator at a positive jump mean")
@@ -127,9 +128,9 @@ def test_merton_sampler_log_jump_moment_matches_compound_poisson_compensator() -
 def test_merton_sampler_log_jump_moment_survives_the_f32_exponent_range() -> unit ! { Test } = {
   tol = cast(0.00001, f32)
   one = cast(1.0, f32)
-  wide = merton_rel_gap(merton_sampler_log_jump_moment(one, cast(0.0, f32), cast(3.2, f32), one), merton_closed_log_jump_moment(one, cast(0.0, f32), cast(3.2, f32), one))
-  tall = merton_rel_gap(merton_sampler_log_jump_moment(cast(55.0, f32), one, cast(0.2, f32), one), merton_closed_log_jump_moment(cast(55.0, f32), one, cast(0.2, f32), one))
-  deep = merton_rel_gap(merton_sampler_log_jump_moment(cast(300.0, f32), cast(-0.5, f32), cast(0.0, f32), one), merton_closed_log_jump_moment(cast(300.0, f32), cast(-0.5, f32), cast(0.0, f32), one))
+  wide = rel_gap(merton_sampler_log_jump_moment(one, cast(0.0, f32), cast(3.2, f32), one), merton_closed_log_jump_moment(one, cast(0.0, f32), cast(3.2, f32), one))
+  tall = rel_gap(merton_sampler_log_jump_moment(cast(55.0, f32), one, cast(0.2, f32), one), merton_closed_log_jump_moment(cast(55.0, f32), one, cast(0.2, f32), one))
+  deep = rel_gap(merton_sampler_log_jump_moment(cast(300.0, f32), cast(-0.5, f32), cast(0.0, f32), one), merton_closed_log_jump_moment(cast(300.0, f32), cast(-0.5, f32), cast(0.0, f32), one))
   _ = assert_true(lt(wide, tol), "jump moment stays finite past the f32 overflow point on a wide jump_vol")
   _ = assert_true(lt(tall, tol), "jump moment stays finite past the f32 overflow point on a large jump_mean")
   assert_true(lt(deep, tol), "jump moment stays finite past the f32 UNDERFLOW point on a negative jump_mean")
@@ -170,7 +171,7 @@ def test_merton_compensated_drift_agrees_with_sampler_log_drift() -> unit ! { Te
   t = cast(1.0, f32)
   closed = mul(merton_compensated_drift(mu, sigma, cast(4.0, f32), cast(0.5, f32), cast(0.2, f32)), t)
   sampled = sub(mul(sub(mu, mul(cast(0.5, f32), mul(sigma, sigma))), t), merton_sampler_log_jump_moment(cast(4.0, f32), cast(0.5, f32), cast(0.2, f32), t))
-  assert_true(lt(merton_rel_gap(sampled, closed), cast(0.00001, f32)), "the sampler log drift equals merton_compensated_drift * t")
+  assert_true(lt(rel_gap(sampled, closed), cast(0.00001, f32)), "the sampler log drift equals merton_compensated_drift * t")
 }
 -- shoals#98's named parameter point. The pre-fix sampler drew one Gaussian for
 -- the aggregate log jump while the drift compensated a compound Poisson, and
@@ -185,7 +186,7 @@ def test_merton_terminal_mean_matches_s0_exp_mu_t_at_high_intensity() -> unit ! 
   template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
   jumps_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
   paths = merton_jump_terminal(key_from_seed(7i64), template, jumps_template, cast(1.0, f32), cast(0.0, f32), cast(0.0, f32), cast(4.0, f32), cast(0.5, f32), cast(0.2, f32), cast(1.0, f32))
-  assert_true(lt(merton_rel_gap(mean_vec(paths), cast(1.0, f32)), cast(0.07, f32)), "Merton terminal mean is s0*exp(mu*t) at lambda=4, jump_mean=0.5, jump_vol=0.2")
+  assert_true(lt(rel_gap(mean_vec(paths), cast(1.0, f32)), cast(0.07, f32)), "Merton terminal mean is s0*exp(mu*t) at lambda=4, jump_mean=0.5, jump_vol=0.2")
 }
 -- Both signs of the jump mean, as shoals#98 asks. The pre-fix bias is signed:
 -- its leading term is -lambda*t*jump_mean*jump_vol^2/2, so a positive jump mean
@@ -197,14 +198,14 @@ def test_merton_terminal_mean_matches_s0_exp_mu_t_with_positive_jump_mean() -> u
   jumps_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
   paths = merton_jump_terminal(key_from_seed(29i64), template, jumps_template, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(6.0, f32), cast(0.4, f32), cast(0.2, f32), cast(1.0, f32))
   expected = mul(cast(100.0, f32), exp(cast(0.05, f32)))
-  assert_true(lt(merton_rel_gap(mean_vec(paths), expected), cast(0.07, f32)), "Merton terminal mean is s0*exp(mu*t) at a positive jump mean")
+  assert_true(lt(rel_gap(mean_vec(paths), expected), cast(0.07, f32)), "Merton terminal mean is s0*exp(mu*t) at a positive jump mean")
 }
 def test_merton_terminal_mean_matches_s0_exp_mu_t_with_negative_jump_mean() -> unit ! { Test } = {
   template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
   jumps_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
   paths = merton_jump_terminal(key_from_seed(29i64), template, jumps_template, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(6.0, f32), cast(-0.4, f32), cast(0.2, f32), cast(1.0, f32))
   expected = mul(cast(100.0, f32), exp(cast(0.05, f32)))
-  assert_true(lt(merton_rel_gap(mean_vec(paths), expected), cast(0.04, f32)), "Merton terminal mean is s0*exp(mu*t) at a negative jump mean")
+  assert_true(lt(rel_gap(mean_vec(paths), expected), cast(0.04, f32)), "Merton terminal mean is s0*exp(mu*t) at a negative jump mean")
 }
 -- Zero jump rate, as shoals#98 asks, as a DETERMINISTIC claim rather than a
 -- mean within a band: with no diffusion and no jumps every path is the forward
@@ -217,14 +218,14 @@ def test_merton_terminal_zero_jump_rate_is_the_forward() -> unit ! { Test } = {
   idle = merton_jump_terminal(key_from_seed(5i64), template, jumps_template, cast(100.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.0, f32), cast(0.5, f32), cast(0.2, f32), cast(1.0, f32))
   forward = mul(cast(100.0, f32), exp(cast(0.05, f32)))
   worst = fold(fn (acc: f32, p: f32) -> {
-    g = merton_rel_gap(p, forward)
+    g = rel_gap(p, forward)
     if gt(g, acc) then g else acc
   }, cast(0.0, f32), to_list(idle))
   live_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(2000, i64))))
   live_jumps = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(2000, i64))))
   live = merton_jump_terminal(key_from_seed(5i64), live_template, live_jumps, cast(100.0, f32), cast(0.05, f32), cast(0.0, f32), cast(4.0, f32), cast(0.5, f32), cast(0.2, f32), cast(1.0, f32))
   spread = fold(fn (acc: f32, p: f32) -> {
-    g = merton_rel_gap(p, forward)
+    g = rel_gap(p, forward)
     if gt(g, acc) then g else acc
   }, cast(0.0, f32), to_list(live))
   _ = assert_true(lt(worst, cast(0.00001, f32)), "at lambda=0 and sigma=0 every Merton path is exactly s0*exp(mu*t)")
@@ -254,4 +255,204 @@ def test_merton_terminal_draws_integral_jump_counts() -> unit ! { Test } = {
   highest = fold(fn (acc: f32, c: f32) -> if gt(c, acc) then c else acc, cast(0.0, f32), implied)
   _ = assert_true(lt(worst, cast(0.001, f32)), "every implied Merton jump count is an integer")
   assert_true(gt(highest, cast(3.5, f32)), "the implied jump counts reach at least four jumps")
+}
+-- Helper: lambda_jump * t * zeta, the compound-Poisson Kou compensator. Kou's
+-- jump multiplier is w = E[exp(Y)] = 1 + zeta, and for a Poisson count
+-- E[w^N] = exp(rate * (w - 1)), so this closed form is EXACTLY the log moment
+-- an untruncated Poisson count realizes. It is written out here, from
+-- sto_kou_compensator alone, so the oracle below does not check the
+-- enumerated table against itself.
+def sto_kou_closed_log_jump_moment(lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> f32 = mul(mul(lambda_jump, t), sto_kou_compensator(p, eta_up, eta_dn))
+-- Helper: the log moment the PRE-shoals#132 sampler actually realized. It
+-- thinned a fixed budget n_max = trunc(5 * rate + 1) at q = rate / n_max, so
+-- its jump count was Binomial(n_max, q) and its exact exponential moment was
+-- (1 + q * zeta)^n_max -- not exp(rate * zeta), which is what its drift
+-- subtracted. This reconstruction is the defect, kept executable so the
+-- oracles above it are provably not vacuous.
+def sto_kou_thinned_log_jump_moment(lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> f32 = {
+  rate = mul(lambda_jump, t)
+  n_max_raw = cast_trunc(add(mul(rate, cast(5.0, f32)), cast(1.0, f32)), i64)
+  n_max = if lt(n_max_raw, cast(1, i64)) then cast(1, i64) else n_max_raw
+  n_max_f = cast(n_max, f32)
+  q = div(rate, n_max_f)
+  mul(n_max_f, log(add(cast(1.0, f32), mul(q, sto_kou_compensator(p, eta_up, eta_dn)))))
+}
+-- shoals#132's zero-noise oracle, and the reason the fix is structural rather
+-- than a tolerance. sto_kou_jump_terminal subtracts
+-- sto_kou_sampler_log_jump_moment from the log drift, so E[S_t] = s0*exp(mu*t)
+-- holds for whatever count law the sampler draws. This test is what proves
+-- that law is the COMPOUND POISSON one, because for a Poisson count the log
+-- moment is rate * zeta exactly and for no other count law on {0, 1, ...} with
+-- the same mean is it.
+--
+-- The five points are chosen to vary the two things that can hide a count-law
+-- defect. BOTH SIGNS of zeta appear (point two is negative, mostly-downward
+-- jumps), because a sampler whose error scaled with |zeta| would pass a
+-- positive-only sweep. And the rate spans 0.05 to 10, because the pre-#132
+-- defect was rate-dependent in BOTH directions: its slot budget collapsed to
+-- one jump below rate 0.2 and its count variance deficit grew toward 20% as
+-- the rate rose. A single mid-range point would have been the constant axis
+-- every assertion here passed.
+def test_kou_sampler_log_jump_moment_matches_compound_poisson_compensator() -> unit ! { Test } = {
+  one = cast(1.0, f32)
+  capped = rel_gap(sto_kou_sampler_log_jump_moment(cast(0.19, f32), one, cast(1.5, f32), cast(3.0, f32), one), sto_kou_closed_log_jump_moment(cast(0.19, f32), one, cast(1.5, f32), cast(3.0, f32), one))
+  down = rel_gap(sto_kou_sampler_log_jump_moment(one, cast(0.4, f32), cast(10.0, f32), cast(5.0, f32), one), sto_kou_closed_log_jump_moment(one, cast(0.4, f32), cast(10.0, f32), cast(5.0, f32), one))
+  mid = rel_gap(sto_kou_sampler_log_jump_moment(cast(10.0, f32), cast(0.5, f32), cast(3.0, f32), cast(3.0, f32), one), sto_kou_closed_log_jump_moment(cast(10.0, f32), cast(0.5, f32), cast(3.0, f32), cast(3.0, f32), one))
+  wide = rel_gap(sto_kou_sampler_log_jump_moment(cast(10.0, f32), cast(0.5, f32), cast(2.0, f32), cast(2.0, f32), one), sto_kou_closed_log_jump_moment(cast(10.0, f32), cast(0.5, f32), cast(2.0, f32), cast(2.0, f32), one))
+  tol = cast(0.00001, f32)
+  _ = assert_true(lt(capped, tol), "Kou sampler log moment is lambda*t*zeta at lambda*t=0.19, below the pre-#132 one-slot cap")
+  _ = assert_true(lt(down, tol), "Kou sampler log moment is lambda*t*zeta at a NEGATIVE zeta")
+  _ = assert_true(lt(mid, tol), "Kou sampler log moment is lambda*t*zeta at lambda*t=10, zeta=0.125")
+  assert_true(lt(wide, tol), "Kou sampler log moment is lambda*t*zeta at lambda*t=10, zeta=1/3")
+}
+-- Non-vacuity for the oracle above, and the shoals#132 regression pin. The
+-- agreement asserted there is only evidence if the quantity it rejects is far
+-- away, so this test measures the distance to the moment the THINNED sampler
+-- realized and requires it to be large. Measured gaps at these two points:
+-- 15.2% at lambda*t=0.19 and 3.1% at lambda*t=10 with zeta=1/3, against a
+-- 1e-5 agreement tolerance above -- four and three orders of separation.
+--
+-- These are the same two points the issue quantifies as terminal-mean errors
+-- of -5.6% and -9.9%. A reviewer should read this test as the statement that
+-- reverting src/stochastic.ch to the thinned count turns the oracle above red,
+-- rather than merely as a second inequality.
+def test_kou_sampler_log_jump_moment_rejects_the_thinned_count_moment() -> unit ! { Test } = {
+  one = cast(1.0, f32)
+  capped = rel_gap(sto_kou_sampler_log_jump_moment(cast(0.19, f32), one, cast(1.5, f32), cast(3.0, f32), one), sto_kou_thinned_log_jump_moment(cast(0.19, f32), one, cast(1.5, f32), cast(3.0, f32), one))
+  wide = rel_gap(sto_kou_sampler_log_jump_moment(cast(10.0, f32), cast(0.5, f32), cast(2.0, f32), cast(2.0, f32), one), sto_kou_thinned_log_jump_moment(cast(10.0, f32), cast(0.5, f32), cast(2.0, f32), cast(2.0, f32), one))
+  _ = assert_true(gt(capped, cast(0.1, f32)), "the Kou sampler moment is far from the thinned-count moment at lambda*t=0.19")
+  assert_true(gt(wide, cast(0.025, f32)), "the Kou sampler moment is far from the thinned-count moment at lambda*t=10, zeta=1/3")
+}
+-- The same identity at a rate small enough that f32 cannot express it
+-- RELATIVELY, which is why it is a separate test rather than a sixth point
+-- above. At lambda*t = 0.05 the moment is 0.002083, and the table forms it as
+-- log(sum of tilted terms) where that sum is 1.002085 -- a log evaluated just
+-- above one. Half an f32 eps at 1.0 is 5.96e-8, so the ABSOLUTE error floor
+-- there is 5.96e-8 and the best achievable RELATIVE error is 2.9e-5, three
+-- times the 1e-5 tolerance above. Measured gap: 4.84e-8 absolute, 2.33e-5
+-- relative -- i.e. the table is correct to the last f32 bit and a relative
+-- assertion would have read that as a model error.
+--
+-- The absolute norm is the right one here rather than a convenient one. The
+-- sampler subtracts this number from a LOG drift, so 5e-8 of log-space offset
+-- is a 5e-6 percent error in the price. A reviewer should read the tolerance
+-- as the f32 floor it is, and a future reader tempted to tighten it to a
+-- relative claim should expect this test to turn red for arithmetic reasons.
+def test_kou_sampler_log_jump_moment_holds_at_a_rate_below_f32_relative_resolution() -> unit ! { Test } = {
+  one = cast(1.0, f32)
+  got = sto_kou_sampler_log_jump_moment(cast(0.05, f32), cast(0.5, f32), cast(5.0, f32), cast(5.0, f32), one)
+  want = sto_kou_closed_log_jump_moment(cast(0.05, f32), cast(0.5, f32), cast(5.0, f32), cast(5.0, f32), one)
+  assert_close(got, want, cast(2e-7, f32), "Kou sampler log moment is lambda*t*zeta to the f32 floor at lambda*t=0.05")
+}
+-- shoals#132 leg 1, measured on the SAMPLER rather than on the moment
+-- function, because the two can disagree: a correct table read by a sampler
+-- that still thins is exactly the bug this fixes, and the oracles above cannot
+-- see it.
+--
+-- The statistic is the no-jump FRACTION, and the parameter point makes it a
+-- complete argument rather than a suggestive one. With sigma = 0 every path
+-- with no jump lands exactly on s0 * exp(-moment), and with p = 1 every jump
+-- is strictly positive, so N = 0 is directly observable. At lambda*t = 0.19
+-- the pre-#132 slot budget was exactly ONE slot, and ANY count law capped at
+-- one jump with the right mean has P(N = 0) = 1 - 0.19 = 0.81 identically,
+-- while Poisson has exp(-0.19) = 0.826959. The two predictions are 0.017
+-- apart and the standard error at 20000 draws is 0.0027, so this one bounded
+-- Bernoulli statistic separates them at over six standard errors. Measured
+-- here: 0.82725 before rounding, 0.1 SE from Poisson and 6.2 SE from the cap.
+--
+-- Both legs are asserted deliberately. The first alone would pass for a
+-- sampler that drew too FEW jumps; the second alone would pass for one that
+-- drew far too many.
+def test_kou_terminal_count_law_is_poisson_below_the_old_slot_cap() -> unit ! { Test } = {
+  one = cast(1.0, f32)
+  zero = cast(0.0, f32)
+  n = cast(20000, i64)
+  template = to_tensor(map(fn (i: i64) -> zero, range(cast(0, i64), n)))
+  jumps_template = to_tensor(map(fn (i: i64) -> zero, range(cast(0, i64), n)))
+  lambda_jump = cast(0.19, f32)
+  eta_up = cast(1.5, f32)
+  eta_dn = cast(3.0, f32)
+  no_jump = exp(neg(sto_kou_sampler_log_jump_moment(lambda_jump, one, eta_up, eta_dn, one)))
+  thresh = mul(no_jump, cast(1.0000001, f32))
+  paths = sto_kou_jump_terminal(key_from_seed(31i64), template, jumps_template, one, zero, zero, lambda_jump, one, eta_up, eta_dn, one)
+  hits = fold(fn (acc: f32, s: f32) -> if lte(s, thresh) then add(acc, one) else acc, zero, to_list(paths))
+  frac = div(hits, cast(n, f32))
+  poisson = exp(neg(cast(0.19, f32)))
+  capped = sub(one, cast(0.19, f32))
+  _ = assert_true(lt(rel_gap(frac, poisson), cast(0.01, f32)), "the Kou no-jump fraction at lambda*t=0.19 matches the Poisson exp(-0.19)")
+  assert_true(gt(sub(frac, capped), cast(0.008, f32)), "the Kou no-jump fraction at lambda*t=0.19 rejects the one-slot cap's 1-0.19")
+}
+-- A terminal-mean check on the sampler, at the ONLY kind of parameter point
+-- where one is statistically meaningful -- and a standing note that leg 2 of
+-- shoals#132 deliberately has no Monte-Carlo oracle.
+--
+-- E[S_t^2] is finite only for eta_up > 2, because the second moment integral
+-- of the up-jump leg is eta_up / (eta_up - 2). Every parameter point at which
+-- the pre-#132 bias was MATERIAL fails that condition or comes near it: at
+-- eta_up = 2 and lambda*t = 10, the issue's -9.9% case, the terminal second
+-- moment is INFINITE. Measured there at 4000 paths: sample sd 31.9, standard
+-- error 0.50. An estimator with a 50% standard error cannot adjudicate a 10%
+-- bias, so a terminal-mean test at that point would be a coin flip dressed as
+-- an oracle -- and it would be a coin flip whose tolerance someone would
+-- eventually widen rather than delete.
+--
+-- Leg 2's real oracle is therefore the DETERMINISTIC moment identity in the
+-- two tests above, which is exact and needs no samples. This test covers what
+-- those cannot: that the sampler actually subtracts the moment it computes.
+-- Its discriminating power against shoals#132 itself is nil by construction
+-- (at lambda*t = 0.19 with eta = 5 the thinned and Poisson moments differ by
+-- 1e-5 in log space), and that is stated here so it is not mistaken for a
+-- regression pin. The regression pin for the sampler is the no-jump fraction
+-- test above.
+--
+-- Tolerance from measurement, not from taste: SE is 0.0021 at 4000 paths, and
+-- two seeds give |mean - 1| of 1.24 and 0.61 standard errors. 0.012 is about
+-- 5.5 SE.
+def test_kou_terminal_mean_matches_s0_exp_mu_t() -> unit ! { Test } = {
+  zero = cast(0.0, f32)
+  one = cast(1.0, f32)
+  n = cast(4000, i64)
+  template = to_tensor(map(fn (i: i64) -> zero, range(cast(0, i64), n)))
+  jumps_template = to_tensor(map(fn (i: i64) -> zero, range(cast(0, i64), n)))
+  paths = sto_kou_jump_terminal(key_from_seed(7i64), template, jumps_template, one, zero, zero, cast(0.19, f32), cast(0.5, f32), cast(5.0, f32), cast(5.0, f32), one)
+  assert_true(lt(rel_gap(mean_vec(paths), one), cast(0.012, f32)), "Kou terminal mean is s0*exp(mu*t) at lambda*t=0.19, eta=5")
+}
+-- The compensator must vanish exactly at a zero intensity and at a zero
+-- horizon, and NOWHERE else. A sampler that silently drew no jumps at all
+-- would satisfy every mean identity above, so the two non-zero legs are the
+-- ones that keep a degenerate always-zero count from passing. This mirrors
+-- the shoals#98 test of the same shape for Merton.
+def test_kou_sampler_log_jump_moment_vanishes_only_at_zero_intensity() -> unit ! { Test } = {
+  zero = cast(0.0, f32)
+  one = cast(1.0, f32)
+  idle = sto_kou_sampler_log_jump_moment(zero, cast(0.5, f32), cast(2.0, f32), cast(2.0, f32), one)
+  idle_t = sto_kou_sampler_log_jump_moment(cast(10.0, f32), cast(0.5, f32), cast(2.0, f32), cast(2.0, f32), zero)
+  growing = sto_kou_sampler_log_jump_moment(cast(10.0, f32), cast(0.5, f32), cast(2.0, f32), cast(2.0, f32), one)
+  shrinking = sto_kou_sampler_log_jump_moment(one, cast(0.4, f32), cast(10.0, f32), cast(5.0, f32), one)
+  _ = assert_close(idle, zero, cast(1e-7, f32), "a zero Kou intensity needs no compensation")
+  _ = assert_close(idle_t, zero, cast(1e-7, f32), "a zero horizon needs no compensation")
+  _ = assert_true(gt(growing, cast(0.01, f32)), "a positive zeta compensates downward by a measurable amount")
+  assert_true(lt(shrinking, cast(-0.01, f32)), "a negative zeta compensates upward by a measurable amount")
+}
+-- A zero jump intensity must reduce the Kou sampler to plain GBM exactly, not
+-- approximately: the enumerated count law puts all its mass on N = 0, so the
+-- log moment is zero and the drift is the GBM drift. With sigma = 0 that makes
+-- every path identical and equal to the closed form, which is a tighter claim
+-- than the Monte-Carlo version in tests-manual/stochastic_kou_heavy.ch and
+-- costs 32 paths.
+def test_kou_zero_intensity_is_exactly_gbm() -> unit ! { Test } = {
+  zero = cast(0.0, f32)
+  one = cast(1.0, f32)
+  n = cast(32, i64)
+  template = to_tensor(map(fn (i: i64) -> zero, range(cast(0, i64), n)))
+  jumps_template = to_tensor(map(fn (i: i64) -> zero, range(cast(0, i64), n)))
+  mu = cast(0.05, f32)
+  t = cast(2.0, f32)
+  paths = sto_kou_jump_terminal(key_from_seed(5i64), template, jumps_template, cast(100.0, f32), mu, zero, zero, cast(0.5, f32), cast(3.0, f32), cast(3.0, f32), t)
+  want = mul(cast(100.0, f32), exp(mul(mu, t)))
+  worst = fold(fn (acc: f32, s: f32) -> {
+    g = rel_gap(s, want)
+    if gt(g, acc) then g else acc
+  }, zero, to_list(paths))
+  assert_true(lt(worst, cast(1e-6, f32)), "a zero Kou intensity gives every path s0*exp(mu*t) exactly")
 }

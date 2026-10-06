@@ -1,7 +1,7 @@
 module Shoals.Stochastic
 import Nautilus.Distributions (normal_sample, uniform_sample, exponential_sample)
 import Nautilus.Special (log_gamma)
-export (gbm_path, gbm_terminal, gbm_paths_antithetic_terminal_mean, merton_jump_terminal, merton_compensated_drift, merton_sampler_log_jump_moment, correlated_gbm_terminal_2d, cholesky_2x2_lower, heston_qe_step, heston_qe_terminal, heston_qe_paths_terminal, sto_kou_compensator, sto_kou_jump_sample, sto_kou_jump_terminal)
+export (gbm_path, gbm_terminal, gbm_paths_antithetic_terminal_mean, merton_jump_terminal, merton_compensated_drift, merton_sampler_log_jump_moment, correlated_gbm_terminal_2d, cholesky_2x2_lower, heston_qe_step, heston_qe_terminal, heston_qe_paths_terminal, sto_kou_compensator, sto_kou_jump_sample, sto_kou_sampler_log_jump_moment, sto_kou_jump_terminal)
 def gbm_path[n](rng_key: key, template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
   z = normal_sample(rng_key, template, cast(0.0, f32), cast(1.0, f32))
   n_i = numel(copy(z))
@@ -43,44 +43,61 @@ def merton_compensated_drift(mu: f32, sigma: f32, lambda: f32, jump_mean: f32, j
   expected_jump = sub(exp(add(jump_mean, half_jump_vol_sq)), cast(1.0, f32))
   sub(sub(mu, half_sigma_sq), mul(lambda, expected_jump))
 }
--- Number of Poisson jump counts the sampler enumerates, i.e. the support
--- {0, ..., slots - 1} of merton_jump_count_table. The bound is sized on the
--- EXPONENTIALLY TILTED mean lambda * t * exp(jump_mean + 0.5 * jump_vol^2)
--- rather than on lambda * t, because the quantity that has to converge is
--- E[exp(jump_mean + 0.5 * jump_vol^2)^N], whose terms peak at that tilted
--- mean. Seven standard deviations plus twelve absolute slots put the truncated
--- Poisson tail below 1e-10 across the admitted intensity range, which is three
--- orders below f32 resolution. The bound is a cost knob, not a correctness
--- one -- the renormalization below makes the mean identity hold at any slot
+-- Shared jump-count machinery for the two compound Poisson samplers in this
+-- module. Both draw a jump count N over an enumerated slot table, and both
+-- compensate the log drift with log E[exp(J)] = log E[w^N] for a per-model
+-- jump multiplier w = E[exp(Y)]. Only w and the guard diagnostics differ.
+-- Keeping the table in ONE place is the point rather than a tidiness
+-- preference: both samplers have shipped the same defect -- a drift
+-- compensating a law the sampler did not draw -- and a second copy of this
+-- arithmetic is a second chance to desync. The fixtures under
+-- tests_neg/stochastic/ and the oracles in tests/stochastic_extended.ch carry
+-- the issue numbers for both.
+--
+-- The slot bound for a rate and a log jump multiplier. Sized on the
+-- EXPONENTIALLY TILTED mean rate * w rather than on rate, because the quantity
+-- that has to converge is E[w^N], whose terms peak at that tilted mean. Seven
+-- standard deviations plus twelve absolute slots put the truncated Poisson tail
+-- below 1e-10 across the admitted intensity range, which is three orders below
+-- f32 resolution. The bound is a cost knob, not a correctness one -- the
+-- renormalization in count_table makes the mean identity hold at any slot
 -- count -- and the moment tests in tests/stochastic_extended.ch are what prove
 -- it adequate at the parameter points they name.
-def merton_jump_slots(lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> i64 = {
+def count_slot_bound(rate: f32, log_w: f32) -> f32 = {
   zero = cast(0.0, f32)
   one = cast(1.0, f32)
-  rate = mul(lambda, t)
-  log_tilt = add(jump_mean, mul(cast(0.5, f32), mul(jump_vol, jump_vol)))
-  tilt = exp(log_tilt)
+  tilt = exp(log_w)
   tilted = if eq(rate, zero) then zero else mul(rate, if lt(tilt, one) then one else tilt)
-  raw = add(add(tilted, mul(cast(7.0, f32), sqrt(tilted))), cast(12.0, f32))
-  all_finite = eq(add(sub(rate, rate), sub(log_tilt, log_tilt)), zero)
-  if not(all_finite) then fail("Shoals.Stochastic: merton jump parameters must be finite; lambda * t and jump_mean + 0.5 * jump_vol^2 must both be representable") else if not(gte(rate, zero)) then fail("Shoals.Stochastic: merton jump rate lambda * t must be finite and non-negative") else if not(lte(raw, cast(4096.0, f32))) then fail("Shoals.Stochastic: merton jump intensity is too large to enumerate the jump count exactly; lambda * t * exp(jump_mean + 0.5 * jump_vol^2) must leave the slot bound at or below 4096") else cast_trunc(raw, i64)
+  add(add(tilted, mul(cast(7.0, f32), sqrt(tilted))), cast(12.0, f32))
 }
--- log P(N = k) for N ~ Poisson(lambda * t), computed in log space on purpose.
--- The caller multiplies this by exp(k * (jump_mean + 0.5 * jump_vol^2)), which
--- overflows f32 for large k exactly where the probability underflows, so the
--- product has to be formed as a single exp of a sum rather than from a
--- materialized pmf value. The SUM of those products needs the same care and is
--- an easy thing to miss: it is about exp(lambda * t * (w - 1)), which leaves
--- f32 above 88.72 and underflows below -103.28 while every individual term is
--- still perfectly representable. merton_jump_count_table therefore reduces it
--- as a shifted log-sum-exp, never in linear space.
-def merton_jump_log_pmf(k: i64, rate: f32) -> f32 = {
+-- The largest slot table either sampler will materialize per call. A cost
+-- bound, not a model bound; the fixtures under tests_neg/stochastic/ record
+-- that attempting the table past it is non-terminating in practice.
+def count_slot_cap() -> f32 = cast(4096.0, f32)
+-- True exactly when both table parameters are finite. `sub(x, x) == 0` is the
+-- instrument on purpose, and an ordering comparison is the wrong one: both
+-- `gte(nan, 0.0)` and `lte(nan, 4096.0)` are false, so a NaN parameter slips
+-- past a lower bound and trips an upper one while naming the wrong cause.
+-- tests_neg/stochastic/merton_nonfinite_jump_mean_neg records the measurement
+-- that established this, and its Kou counterpart reaches the same guard by a
+-- different route: a divergent E[exp(Y)] rather than a non-finite input.
+def count_params_finite(rate: f32, log_w: f32) -> bool = eq(add(sub(rate, rate), sub(log_w, log_w)), cast(0.0, f32))
+-- log P(N = k) for N ~ Poisson(rate), computed in log space on purpose.
+-- The caller multiplies this by w^k, which overflows f32 for large k exactly
+-- where the probability underflows, so the product has to be formed as a
+-- single exp of a sum rather than from a materialized pmf value. The SUM of
+-- those products needs the same care and is an easy thing to miss: it is about
+-- exp(rate * (w - 1)), which leaves f32 above 88.72 and underflows below
+-- -103.28 while every individual term is still perfectly representable.
+-- count_table therefore reduces it as a shifted log-sum-exp, never in
+-- linear space.
+def count_log_pmf(k: i64, rate: f32) -> f32 = {
   zero = cast(0.0, f32)
   one = cast(1.0, f32)
   kf = cast(k, f32)
   if eq(rate, zero) then if eq(kf, zero) then zero else log(zero) else sub(sub(mul(kf, log(rate)), rate), log_gamma(add(kf, one)))
 }
--- The jump-count law the sampler draws from, as one table so that the sampler
+-- The jump-count law a sampler draws from, as one table so that the sampler
 -- and the compensator cannot read different numbers. The triple is
 -- (cumulative count distribution over the enumerated slots, the mass those
 -- slots carry, log E[exp(J)] for the aggregate log jump J). The enumerated
@@ -88,12 +105,9 @@ def merton_jump_log_pmf(k: i64, rate: f32) -> f32 = {
 -- the log moment divide by it, so each describes the same renormalized law
 -- bit for bit. That is the invariant this module owes its callers: the drift
 -- compensates the distribution that was sampled, not a closed form standing
--- beside it. The tests that pin it are named in the moment function below.
-def merton_jump_count_table(lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> (List[f32], f32, f32) = {
-  rate = mul(lambda, t)
-  log_w = add(jump_mean, mul(cast(0.5, f32), mul(jump_vol, jump_vol)))
-  slot_count = merton_jump_slots(lambda, jump_mean, jump_vol, t)
-  log_pmf_l = map(fn (k: i64) -> merton_jump_log_pmf(k, rate), range(cast(0, i64), slot_count))
+-- beside it. The tests that pin it are named in the moment functions below.
+def count_table(rate: f32, log_w: f32, slot_count: i64) -> (List[f32], f32, f32) = {
+  log_pmf_l = map(fn (k: i64) -> count_log_pmf(k, rate), range(cast(0, i64), slot_count))
   log_tilted_l = map(fn (lp: (f32, i64)) -> add(lp.0, mul(cast(lp.1, f32), log_w)), zip(log_pmf_l, range(cast(0, i64), slot_count)))
   peak = fold(fn (acc: f32, term: f32) -> if gt(term, acc) then term else acc, log(cast(0.0, f32)), log_tilted_l)
   shifted = to_tensor(map(fn (term: f32) -> exp(sub(term, peak)), log_tilted_l))
@@ -101,6 +115,22 @@ def merton_jump_count_table(lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) 
   enumerated_mass = index(cdf_l, sub(slot_count, cast(1, i64)))
   (cdf_l, enumerated_mass, sub(add(log(tensor_to_scalar(sum(shifted, 0))), peak), log(enumerated_mass)))
 }
+-- Number of Poisson jump counts the MERTON sampler enumerates, i.e. the
+-- support {0, ..., slots - 1} of merton_count_table. The bound arithmetic
+-- is count_slot_bound's; what lives here is Merton's jump multiplier
+-- w = exp(jump_mean + 0.5 * jump_vol^2) and Merton's three diagnostics, whose
+-- exact text is pinned by the fixtures under tests_neg/stochastic/.
+def merton_jump_slots(lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> i64 = {
+  zero = cast(0.0, f32)
+  rate = mul(lambda, t)
+  log_tilt = add(jump_mean, mul(cast(0.5, f32), mul(jump_vol, jump_vol)))
+  raw = count_slot_bound(rate, log_tilt)
+  if not(count_params_finite(rate, log_tilt)) then fail("Shoals.Stochastic: merton jump parameters must be finite; lambda * t and jump_mean + 0.5 * jump_vol^2 must both be representable") else if not(gte(rate, zero)) then fail("Shoals.Stochastic: merton jump rate lambda * t must be finite and non-negative") else if not(lte(raw, count_slot_cap())) then fail("Shoals.Stochastic: merton jump intensity is too large to enumerate the jump count exactly; lambda * t * exp(jump_mean + 0.5 * jump_vol^2) must leave the slot bound at or below 4096") else cast_trunc(raw, i64)
+}
+-- Merton's jump-count table: count_table at Merton's rate and jump
+-- multiplier. J | N ~ Normal(N * jump_mean, N * jump_vol^2), so
+-- w = exp(jump_mean + 0.5 * jump_vol^2).
+def merton_count_table(lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> (List[f32], f32, f32) = count_table(mul(lambda, t), add(jump_mean, mul(cast(0.5, f32), mul(jump_vol, jump_vol))), merton_jump_slots(lambda, jump_mean, jump_vol, t))
 -- log E[exp(J)] for the aggregate log jump J that merton_jump_terminal draws:
 -- J | N ~ Normal(N * jump_mean, N * jump_vol^2) with N the enumerated jump
 -- count, so E[exp(J)] = E[w^N] with w = exp(jump_mean + 0.5 * jump_vol^2).
@@ -109,7 +139,7 @@ def merton_jump_count_table(lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) 
 -- closed form that can desync from the sampler. It converges to
 -- merton_compensated_drift's jump term, lambda * t * (w - 1), and
 -- tests/stochastic_extended.ch pins that agreement.
-def merton_sampler_log_jump_moment(lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> f32 = merton_jump_count_table(lambda, jump_mean, jump_vol, t).2
+def merton_sampler_log_jump_moment(lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> f32 = merton_count_table(lambda, jump_mean, jump_vol, t).2
 -- Merton jump-diffusion terminal values. The aggregate log jump is drawn as a
 -- genuine compound Poisson sum: one uniform picks the jump count N from the
 -- enumerated Poisson law, and the N lognormal jumps are aggregated exactly as
@@ -127,7 +157,7 @@ def merton_jump_terminal[n](rng_key: key, template: tensor[n, f32], jumps_templa
   z_jumps = normal_sample(rng_draw_1, jumps_template, zero, one)
   counts_template = to_tensor(map(fn (i: i64) -> zero, range(cast(0, i64), n_paths)))
   u_counts = uniform_sample(rng_draw_2, counts_template, zero, one)
-  counts = merton_jump_count_table(lambda, jump_mean, jump_vol, t)
+  counts = merton_count_table(lambda, jump_mean, jump_vol, t)
   enumerated_mass = counts.1
   cdf_norm = to_tensor(map(fn (c: f32) -> div(c, enumerated_mass), counts.0))
   one_i = cast(1, i64)
@@ -294,45 +324,106 @@ def sto_kou_compensator(p: f32, eta_up: f32, eta_dn: f32) -> f32 = {
   }
 }
 def sto_kou_jump_sample(p: f32, eta_up: f32, eta_dn: f32, u_branch: f32, e_size: f32) -> f32 = if lt(u_branch, p) then div(e_size, eta_up) else neg(div(e_size, eta_dn))
+-- Number of Poisson jump counts the KOU sampler enumerates. Kou's jump
+-- multiplier is w = E[exp(Y)] = 1 + sto_kou_compensator(p, eta_up, eta_dn),
+-- so log_w is the log of that compensated multiplier rather than a Gaussian
+-- log moment. That one substitution is the entire Kou/Merton difference in the
+-- count machinery; the jump SIZE law is where the two models really diverge.
+--
+-- Kou's eta_up > 1 requirement arrives here as a NON-FINITE log_w rather than
+-- as its own guard: eta_up <= 1 makes E[exp(Y)] divergent, sto_kou_compensator
+-- returns its NaN sentinel, and count_params_finite rejects it. This sampler
+-- previously multiplied that NaN straight into its drift and returned NaN for
+-- every terminal value -- a wrong answer dressed as an answer, which is the
+-- failure mode this repository files bugs about. See
+-- tests_neg/stochastic/kou_divergent_jump_multiplier_neg.expect.
+def sto_kou_jump_slots(lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> i64 = {
+  zero = cast(0.0, f32)
+  rate = mul(lambda_jump, t)
+  log_w = log(add(cast(1.0, f32), sto_kou_compensator(p, eta_up, eta_dn)))
+  raw = count_slot_bound(rate, log_w)
+  if not(count_params_finite(rate, log_w)) then fail("Shoals.Stochastic: kou jump parameters must be finite; lambda_jump * t must be representable and the jump multiplier 1 + sto_kou_compensator(p, eta_up, eta_dn) must be finite and positive, which requires eta_up > 1") else if not(gte(rate, zero)) then fail("Shoals.Stochastic: kou jump rate lambda_jump * t must be finite and non-negative") else if not(lte(raw, count_slot_cap())) then fail("Shoals.Stochastic: kou jump intensity is too large to enumerate the jump count exactly; lambda_jump * t * (1 + sto_kou_compensator(p, eta_up, eta_dn)) must leave the slot bound at or below 4096") else cast_trunc(raw, i64)
+}
+-- Kou's jump-count table: count_table at Kou's rate and jump multiplier.
+def sto_kou_count_table(lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> (List[f32], f32, f32) = count_table(mul(lambda_jump, t), log(add(cast(1.0, f32), sto_kou_compensator(p, eta_up, eta_dn))), sto_kou_jump_slots(lambda_jump, p, eta_up, eta_dn, t))
+-- log E[exp(J)] for the aggregate log jump J that sto_kou_jump_terminal draws:
+-- J is the sum of N iid double-exponential jumps with N the enumerated jump
+-- count, so E[exp(J)] = E[w^N] with w = 1 + sto_kou_compensator(...).
+-- sto_kou_jump_terminal subtracts exactly this number from the log drift,
+-- which is why its terminal mean is s0 * exp(mu * t) by construction rather
+-- than by a closed form standing beside the sampler.
+--
+-- For an UNTRUNCATED Poisson count this equals lambda_jump * t * zeta exactly,
+-- because E[w^N] = exp(rate * (w - 1)) and zeta = w - 1. That identity is why
+-- the thinned-count defect was a SAMPLER defect and not a compensator one: the
+-- closed form was always correct for a Poisson count, and the previous sampler
+-- drew a Binomial(n_max, rate / n_max) count instead. What this function adds
+-- over the closed form is the enumeration correction, so the mean identity
+-- survives truncation at any slot count. tests/stochastic_extended.ch pins
+-- both legs:
+-- agreement with lambda_jump * t * zeta where the Poisson law is enumerated
+-- essentially completely, and disagreement with the thinned-count moment
+-- log(1 + q * zeta) * n_max that the previous sampler actually realized.
+def sto_kou_sampler_log_jump_moment(lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> f32 = sto_kou_count_table(lambda_jump, p, eta_up, eta_dn, t).2
+-- Kou jump-diffusion terminal values. The aggregate log jump is a genuine
+-- compound Poisson sum: one uniform picks the jump count N from the enumerated
+-- Poisson law, and the first N of the per-path pre-drawn double-exponential
+-- jumps are added. The log drift subtracts sto_kou_sampler_log_jump_moment for
+-- that same law, so the terminal mean is s0 * exp(mu * t).
+--
+-- The count was previously drawn by thinning a fixed slot budget
+-- n_max = trunc(5 * lambda_jump * t + 1) at probability rate / n_max, which is
+-- Binomial(n_max, rate / n_max) and not Poisson(rate). Two consequences, both
+-- now pinned by tests: below rate = 0.2 the budget was exactly ONE slot, so a
+-- second jump was impossible where Poisson puts up to 1.5e-2 of its mass; and
+-- the count variance was rate * (1 - rate / n_max) rather than rate at EVERY
+-- parameter, a deficit the slot budget's 5x ratio bounds at 20% and does not
+-- shrink away. The slot array survives as the jump-size budget. What changed
+-- is that the count law is now the law the drift compensates.
 def sto_kou_jump_terminal[n](rng_key: key, paths_template: tensor[n, f32], jumps_template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> tensor[n, f32] = {
+  zero = cast(0.0, f32)
+  one = cast(1.0, f32)
   (rng_draw_0, rng_tail_0) = split_key(rng_key)
   (rng_draw_1, rng_tail_1) = split_key(rng_tail_0)
   (rng_draw_2, rng_draw_3) = split_key(rng_tail_1)
   _ = jumps_template
   n_paths = numel(copy(paths_template))
-  expected_jumps_f = mul(lambda_jump, t)
-  n_max_raw = cast_trunc(add(mul(expected_jumps_f, cast(5.0, f32)), cast(1.0, f32)), i64)
-  n_max = if lt(n_max_raw, cast(1, i64)) then cast(1, i64) else n_max_raw
-  total = mul(n_paths, n_max)
-  big_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), total)))
-  z_diff = normal_sample(rng_draw_0, copy(paths_template), cast(0.0, f32), cast(1.0, f32))
-  u_branch_t = uniform_sample(rng_draw_1, copy(big_template), cast(0.0, f32), cast(1.0, f32))
-  u_thin_t = uniform_sample(rng_draw_2, copy(big_template), cast(0.0, f32), cast(1.0, f32))
-  e_size_t = exponential_sample(rng_draw_3, big_template, cast(1.0, f32))
+  counts = sto_kou_count_table(lambda_jump, p, eta_up, eta_dn, t)
+  enumerated_mass = counts.1
+  cdf_norm = to_tensor(map(fn (c: f32) -> div(c, enumerated_mass), counts.0))
+  one_i = cast(1, i64)
+  slot_count = shape(cdf_norm, cast(0, i32))
+  total = mul(n_paths, slot_count)
+  big_template = to_tensor(map(fn (i: i64) -> zero, range(cast(0, i64), total)))
+  counts_template = to_tensor(map(fn (i: i64) -> zero, range(cast(0, i64), n_paths)))
+  z_diff = normal_sample(rng_draw_0, copy(paths_template), zero, one)
+  u_branch_t = uniform_sample(rng_draw_1, copy(big_template), zero, one)
+  u_counts = uniform_sample(rng_draw_2, counts_template, zero, one)
+  e_size_t = exponential_sample(rng_draw_3, big_template, one)
+  path_extent = shape(u_counts, cast(0, i32))
+  u_grid = expand(reshape(u_counts, [path_extent, one_i]), 1, slot_count)
+  cdf_grid = expand(reshape(cdf_norm, [one_i, slot_count]), 0, path_extent)
+  n_jumps_t = sum(cast(gt(u_grid, cdf_grid), f32), 1)
   z_diff_l = to_list(z_diff)
   u_branch_l = to_list(u_branch_t)
-  u_thin_l = to_list(u_thin_t)
   e_size_l = to_list(e_size_t)
-  n_max_f = cast(n_max, f32)
-  thin_prob = div(expected_jumps_f, n_max_f)
-  zeta = sto_kou_compensator(p, eta_up, eta_dn)
-  half_sigma_sq = mul(cast(0.5, f32), mul(sigma, sigma))
-  drift = mul(sub(sub(mu, half_sigma_sq), mul(lambda_jump, zeta)), t)
+  n_jumps_l = to_list(n_jumps_t)
+  drift = sub(mul(sub(mu, mul(cast(0.5, f32), mul(sigma, sigma))), t), counts.2)
   vol_sqrt_t = mul(sigma, sqrt(t))
   log_s0 = log(s0)
   path_idxs = range(cast(0, i64), n_paths)
   to_tensor(map(fn (path_i: i64) -> {
-    base = mul(path_i, n_max)
-    slot_idxs = range(cast(0, i64), n_max)
+    base = mul(path_i, slot_count)
+    n_jumps = index(n_jumps_l, path_i)
+    slot_idxs = range(cast(0, i64), slot_count)
     jump_sum = fold(fn (acc: f32, j: i64) -> {
       k = add(base, j)
       u_b = index(u_branch_l, k)
-      u_t = index(u_thin_l, k)
       e_s = index(e_size_l, k)
       jump_val = sto_kou_jump_sample(p, eta_up, eta_dn, u_b, e_s)
-      contrib = if lt(u_t, thin_prob) then jump_val else cast(0.0, f32)
+      contrib = if lt(cast(j, f32), n_jumps) then jump_val else zero
       add(acc, contrib)
-    }, cast(0.0, f32), slot_idxs)
+    }, zero, slot_idxs)
     z_i = index(z_diff_l, path_i)
     log_diffuse = add(drift, mul(vol_sqrt_t, z_i))
     exp(add(log_s0, add(log_diffuse, jump_sum)))

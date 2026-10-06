@@ -1,0 +1,30 @@
+Shoals.Stochastic: kou jump intensity is too large to enumerate the jump count exactly
+Assumption: the enumerated jump-count table is sized on the exponentially
+tilted mean lambda_jump * t * (1 + sto_kou_compensator(p, eta_up, eta_dn)),
+because that is where the terms of E[w^N] peak. A caller asking for an
+intensity whose table would exceed the slot cap gets a refusal naming that
+quantity, not a silently truncated jump law.
+
+The cap is a cost bound rather than a model bound, and it is the jump
+MULTIPLIER that breaches it here, not the intensity: eta_up = 1.1 tilts by 11,
+so lambda_jump * t = 400 wants about 4876 slots. At eta_up = 10 the same
+intensity tilts to 444 and sizes the table at about 604 slots, inside the cap.
+That is why the message names the tilted product rather than lambda_jump
+alone. Kou pays the cap harder than Merton does: Merton aggregates its N jumps
+in closed form, so a slot costs one table entry, while Kou's jump sizes have
+no such form and every slot is also a per-path draw and a fold step.
+
+Removing the cap does NOT make the fixture pass, and the reason is NOT the one
+the Merton fixture records. Measured on this pin with the cap clause deleted:
+the fixture terminates in about 137s and fails on its ASSERTION, not on a
+timeout. The 4876-slot table is reachable at eight paths -- what defeats the
+assertion is that a compensated process at zeta = 10 and lambda_jump * t = 400
+subtracts about 4000 from the log drift, so every terminal value underflows
+f32 to exactly zero and `mean_vec(paths) > 0` is false. `--expect neg` sees
+the assertion message rather than the required diagnostic, so the file fails
+as WRONG-DIAGNOSTIC either way.
+
+That difference from Merton is recorded rather than smoothed over, because it
+changes what the cap is for here. For Merton the cap is the only thing
+standing between a caller and a non-terminating run. For Kou at THIS point it
+is the thing standing between a caller and a confidently returned zero.

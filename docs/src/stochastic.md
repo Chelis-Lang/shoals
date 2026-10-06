@@ -152,7 +152,45 @@ out = correlated_gbm_terminal_2d(key_from_seed(13i64), template_x, template_y, c
 
 `heston_qe_step`, `heston_qe_terminal`, and `heston_qe_paths_terminal`
 implement a quadratic-exponential Heston step and keyed terminal draws.
-`sto_kou_compensator`, `sto_kou_jump_sample`, and `sto_kou_jump_terminal`
-provide double-exponential jump calculations and keyed terminal draws.
 These are model-specific approximations; use the corresponding source
 tests and [Scope and limitations](scope.md) to check parameter assumptions.
+
+## Kou jump-diffusion
+
+```chelis
+def sto_kou_compensator(p: f32, eta_up: f32, eta_dn: f32) -> f32
+def sto_kou_jump_sample(p: f32, eta_up: f32, eta_dn: f32, u_branch: f32, e_size: f32) -> f32
+def sto_kou_sampler_log_jump_moment(lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> f32
+def sto_kou_jump_terminal[n](rng_key: key, paths_template: tensor[n, f32], jumps_template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> tensor[n, f32]
+```
+
+The jump size `Y` is double-exponential: upward with probability `p` and
+magnitude `Exp(eta_up)`, downward otherwise with magnitude `Exp(eta_dn)`.
+`sto_kou_compensator` returns `zeta = E[exp(Y)] - 1`, which exists only for
+`eta_up > 1`; below that the up-jump moment integral diverges and the function
+returns a NaN sentinel.
+
+`sto_kou_jump_terminal` samples the model. It draws the jump count `N` from an
+enumerated Poisson law over a finite slot table, then adds the first `N` of
+that path's pre-drawn double-exponential jumps, so the aggregate log jump is a
+genuine compound Poisson sum. The table is sized on the exponentially tilted
+mean `lambda_jump * t * (1 + zeta)`, and an intensity whose table would exceed
+the slot cap is refused rather than silently truncated.
+
+`sto_kou_sampler_log_jump_moment` returns `log E[exp(J)]` for that aggregate
+log jump, which is exactly what `sto_kou_jump_terminal` subtracts from the log
+drift. The terminal mean is therefore `s0 * exp(mu * t)` by construction. For
+an untruncated Poisson count that moment equals `lambda_jump * t * zeta`
+exactly, because `E[w^N] = exp(rate * (w - 1))` with `w = 1 + zeta`; the
+function adds the enumeration correction so the identity survives truncation.
+
+Two cautions, both load-bearing:
+
+- The mean identity is exact, but `E[S_t^2]` is finite only for `eta_up > 2`.
+  At `eta_up = 2` the terminal second moment diverges, so a Monte-Carlo
+  terminal mean has no usable standard error there. Verify a drift against
+  `sto_kou_sampler_log_jump_moment` rather than against a sample mean.
+- Kou pays the slot bound harder than Merton does. Merton aggregates its `N`
+  jumps in closed form as a single Gaussian, so a slot costs one table entry.
+  Kou's jump sizes have no such form, so every slot is also a per-path draw
+  and a fold step.

@@ -1,0 +1,20 @@
+Shoals.Stochastic: kou jump rate lambda_jump * t must be finite and non-negative
+Assumption: a negative jump intensity names no Poisson law. The enumerated
+sampler needs a jump-count distribution over {0, 1, ...}, and
+lambda_jump * t < 0 does not define one. Refuse rather than propagate.
+
+Before shoals#132 this input was accepted silently, and that is worse than the
+Merton case it mirrors. Merton's pre-#98 sampler at least produced NaN, which
+is visible. Kou's thinned sampler produced a PLAUSIBLE number: thin_prob was
+negative, `u < thin_prob` was false for every uniform draw, so no jump was
+ever placed, and the sampler returned a jump-free GBM path whose drift had
+been compensated for a negative jump contribution. A wrong price that looks
+like a price is the failure mode this repository files bugs about.
+
+Deleting this guard clause does NOT make the fixture pass. Measured on this
+pin: it then fails with the SLOT CAP diagnostic instead, because a negative
+tilted mean makes `sqrt(tilted)` NaN and `not(lte(nan, 4096.0))` is true. So
+`--expect neg` sees the wrong text and the file fails as WRONG-DIAGNOSTIC.
+This is also why the guard order is finiteness, then rate, then cap: an
+ordering comparison cannot reject NaN, so finiteness has to be established
+first or each later guard reports a cause it did not establish.
