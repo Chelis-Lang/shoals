@@ -66,16 +66,29 @@ It takes two template tensors of the same length, one for the diffusion draws
 and one for the aggregate jump draws; the uniform count draws are generated
 internally at the same length.
 
-One f32 limit is worth knowing and is not specific to this sampler. The
-compensator subtracts `lambda * t * (w - 1)` with
-`w = exp(jump_mean + 0.5 * jump_vol^2)`, so a large `jump_vol` makes that
-subtraction enormous while the typical jump total stays near
-`jump_vol * sqrt(lambda * t)`. At `lambda = 1`, `jump_vol = 3.2` the
-compensator is `-166.3` and a representable terminal value needs an 18-sigma
-jump draw, so every path reads as `0.0` even though the mean of the model is
-`s0 * exp(mu * t)`. That is the distribution being unrepresentable in f32, not
-a defect in the compensator: the same parameters give `0.0` on every earlier
-release of this function too, with the identical drift.
+One f32 limit is worth knowing and is not specific to this sampler. The mean
+log offset of a compensated path is `lambda * t * (jump_mean + 1 - w)` with
+`w = exp(jump_mean + 0.5 * jump_vol^2)`, and by Jensen that is at most zero for
+every parameter — so the failure mode is one-sided. Whenever the gap is large
+enough the whole terminal distribution sits below f32's smallest subnormal and
+every path reads as `0.0`, even though the mean of the model is still
+`s0 * exp(mu * t)`.
+
+Either factor can open that gap, so it is the Jensen gap to watch and not any
+one parameter. A large `jump_vol` does it: at `lambda = 1`, `jump_vol = 3.2`
+the compensator is `-166.3`, and for the modal one-jump path at `s0 = 100` a
+representable terminal value needs about an 18-sigma jump draw (that figure
+moves with the jump count and with `s0`). But `jump_vol = 0` reaches it too,
+through a large negative `jump_mean`: `lambda = 3000, jump_mean = -50` also
+gives `0.0` on every path. And it is reachable well inside ordinary
+parameters — `lambda = 200, jump_vol = 1.0, jump_mean = 0` at `s0 = 100` leaves
+241 of 256 paths at zero under seed 7. That count is seed-dependent; the
+mechanism is not.
+
+This is the distribution being unrepresentable in f32, not a defect in the
+compensator. Every case above gives the identical result on the previous
+implementation, from the identical drift, and the drift expression it comes
+from is unchanged since Shoals 0.4.0.
 
 `merton_sampler_log_jump_moment` returns `log E[exp(J)]` for that aggregate
 log jump `J`, which is what `merton_jump_terminal` subtracts from the log
@@ -85,8 +98,14 @@ in step with the sampler by hand. It converges to
 `lambda * t * (exp(jump_mean + 0.5 * jump_vol^2) - 1)`, so
 `merton_compensated_drift(mu, sigma, lambda, jump_mean, jump_vol) * t` and
 `(mu - 0.5 * sigma^2) * t - merton_sampler_log_jump_moment(lambda, jump_mean, jump_vol, t)`
-agree to within f32 resolution; `tests/stochastic_extended.ch` pins both that
-agreement and the moment itself against the closed form at five intensities.
+agree to within 2.8e-7 relative over `lambda * t` from 0.3 to 20 and both signs
+of `jump_mean`; `tests/stochastic_extended.ch` pins both that agreement and the
+moment itself against the closed form at those intensities and at three more
+that stress the f32 exponent range. Outside that band the two forms diverge:
+for a very small `lambda * t` the enumerated moment is a `log(1 + x)` with `x`
+below f32 epsilon, and for a very small `jump_mean` it is the CLOSED form that
+loses the digits, to cancellation in `exp(jump_mean) - 1`. The absolute
+log-drift difference stays small either way.
 The slot table is sized on `lambda * t * exp(jump_mean + 0.5 * jump_vol^2)`,
 and an intensity whose table would exceed the slot cap is refused rather than
 truncated. A negative `lambda * t` is refused too: it names no Poisson law.
