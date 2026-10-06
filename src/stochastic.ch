@@ -2,10 +2,48 @@ module Shoals.Stochastic
 import Nautilus.Distributions (normal_sample, uniform_sample, exponential_sample)
 import Nautilus.Special (log_gamma)
 export (gbm_path, gbm_terminal, gbm_paths_antithetic_terminal_mean, merton_jump_terminal, merton_compensated_drift, merton_sampler_log_jump_moment, correlated_gbm_terminal_2d, cholesky_2x2_lower, heston_qe_step, heston_qe_terminal, heston_qe_paths_terminal, sto_kou_compensator, sto_kou_jump_sample, sto_kou_sampler_log_jump_moment, sto_kou_jump_terminal)
+-- Every path sampler in this module turns its time horizon into `sqrt(t)` and
+-- into a log drift proportional to t, so a horizon that is not finite and
+-- non-negative yields NaN for every path with no diagnostic. That is a
+-- precondition of the DIFFUSION, which is why it is checked here and not in
+-- merton_jump_slots or sto_kou_jump_slots: those guard `lambda * t` as a
+-- Poisson rate, and `0.0 * -1.0` is `-0.0`, whose sign bit is set but which
+-- compares `>= 0.0` as true in IEEE 754. A jump-count guard therefore cannot
+-- see a negative horizon at lambda = 0, and it should not have to -- at
+-- lambda = 0 there is no Poisson law to be negative, and the NaN comes from
+-- `sqrt(t)` on the diffusion side regardless of the jump parameters.
+--
+-- The general lesson of shoals#139 is to guard the INPUT, not a derived
+-- product: `lambda * t` destroys the sign information the guard needs, while
+-- `gte(t, 0.0)` rejects `t = -1` cleanly. Within this module the two
+-- `gte(rate, zero)` clauses are the only guards keying on a product's sign,
+-- and with the horizon checked upstream the only remaining routes to a
+-- `-0.0` rate are a zero horizon or a zero lambda, both of which have the
+-- correct zero-jump answer.
+--
+-- `-0.0` stays ADMITTED, deliberately: `gte(-0.0, 0.0)` is true, `sqrt(-0.0)`
+-- is `-0.0`, and the terminal value is s0 to within the log/exp round trip.
+-- A zero horizon is a legitimate input, and refusing it would narrow the
+-- surface for a sign bit that changes no answer.
+--
+-- Non-finiteness uses this module's `sub(x, x) == 0` idiom rather than an
+-- ordering comparison, for count_params_finite's reason: `gte(nan, 0.0)` is
+-- false, so a NaN horizon would otherwise report the negative-horizon cause.
+-- `+inf` is refused on a measured ground and not for tidiness: the log drift
+-- and `sigma * sqrt(t)` are then both `+inf`, so `drift + vol_sqrt_t * z` is
+-- `inf - inf` = NaN for every negative draw. The fixtures under
+-- tests_neg/stochastic/ pin both diagnostics.
+def horizon_finite(t: f32) -> bool = eq(sub(t, t), cast(0.0, f32))
+-- The checked horizon, RETURNED rather than asserted, so that every caller has
+-- to consume the value. A `_ = check(t)` binding would be dead and could be
+-- eliminated before it reached the evaluated graph; threading the return value
+-- is what puts the guard in the dataflow of every sampler below.
+def checked_horizon(t: f32) -> f32 = if not(horizon_finite(t)) then fail("Shoals.Stochastic: the time horizon must be finite; a non-finite horizon makes the log drift and sigma * sqrt(t) non-finite, so every path value would be NaN") else if not(gte(t, cast(0.0, f32))) then fail("Shoals.Stochastic: the time horizon must be non-negative; sqrt of a negative horizon is NaN, so every path value would be NaN") else t
 def gbm_path[n](rng_key: key, template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
   z = normal_sample(rng_key, template, cast(0.0, f32), cast(1.0, f32))
   n_i = numel(copy(z))
-  dt = div(t, cast(n_i, f32))
+  t_ok = checked_horizon(t)
+  dt = div(t_ok, cast(n_i, f32))
   sqrt_dt = sqrt(dt)
   half_sigma_sq = mul(cast(0.5, f32), mul(sigma, sigma))
   drift = mul(sub(mu, half_sigma_sq), dt)
@@ -16,17 +54,19 @@ def gbm_path[n](rng_key: key, template: tensor[n, f32], s0: f32, mu: f32, sigma:
 }
 def gbm_terminal[n](rng_key: key, template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
   z = normal_sample(rng_key, template, cast(0.0, f32), cast(1.0, f32))
+  t_ok = checked_horizon(t)
   half_sigma_sq = mul(cast(0.5, f32), mul(sigma, sigma))
-  drift = mul(sub(mu, half_sigma_sq), t)
-  vol_sqrt_t = mul(sigma, sqrt(t))
+  drift = mul(sub(mu, half_sigma_sq), t_ok)
+  vol_sqrt_t = mul(sigma, sqrt(t_ok))
   log_s0 = log(s0)
   to_tensor(map(fn (zi: f32) -> exp(add(log_s0, add(drift, mul(vol_sqrt_t, zi)))), to_list(z)))
 }
 def gbm_paths_antithetic_terminal_mean[n](rng_key: key, template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) -> f32 = {
   z = normal_sample(rng_key, template, cast(0.0, f32), cast(1.0, f32))
+  t_ok = checked_horizon(t)
   half_sigma_sq = mul(cast(0.5, f32), mul(sigma, sigma))
-  drift = mul(sub(mu, half_sigma_sq), t)
-  vol_sqrt_t = mul(sigma, sqrt(t))
+  drift = mul(sub(mu, half_sigma_sq), t_ok)
+  vol_sqrt_t = mul(sigma, sqrt(t_ok))
   log_s0 = log(s0)
   zs = to_list(z)
   pairs = to_tensor(map(fn (zi: f32) -> {
@@ -150,6 +190,7 @@ def merton_sampler_log_jump_moment(lambda: f32, jump_mean: f32, jump_vol: f32, t
 def merton_jump_terminal[n](rng_key: key, template: tensor[n, f32], jumps_template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> tensor[n, f32] = {
   zero = cast(0.0, f32)
   one = cast(1.0, f32)
+  t_ok = checked_horizon(t)
   (rng_draw_0, rng_tail_0) = split_key(rng_key)
   (rng_draw_1, rng_draw_2) = split_key(rng_tail_0)
   n_paths = numel(copy(template))
@@ -157,7 +198,7 @@ def merton_jump_terminal[n](rng_key: key, template: tensor[n, f32], jumps_templa
   z_jumps = normal_sample(rng_draw_1, jumps_template, zero, one)
   counts_template = to_tensor(map(fn (i: i64) -> zero, range(cast(0, i64), n_paths)))
   u_counts = uniform_sample(rng_draw_2, counts_template, zero, one)
-  counts = merton_count_table(lambda, jump_mean, jump_vol, t)
+  counts = merton_count_table(lambda, jump_mean, jump_vol, t_ok)
   enumerated_mass = counts.1
   cdf_norm = to_tensor(map(fn (c: f32) -> div(c, enumerated_mass), counts.0))
   one_i = cast(1, i64)
@@ -167,8 +208,8 @@ def merton_jump_terminal[n](rng_key: key, template: tensor[n, f32], jumps_templa
   cdf_grid = expand(reshape(cdf_norm, [one_i, slot_extent]), 0, path_extent)
   n_jumps_t = sum(cast(gt(u_grid, cdf_grid), f32), 1)
   half_sigma_sq = mul(cast(0.5, f32), mul(sigma, sigma))
-  drift = sub(mul(sub(mu, half_sigma_sq), t), counts.2)
-  vol_sqrt_t = mul(sigma, sqrt(t))
+  drift = sub(mul(sub(mu, half_sigma_sq), t_ok), counts.2)
+  vol_sqrt_t = mul(sigma, sqrt(t_ok))
   log_s0 = log(s0)
   draws = zip(zip(to_list(z_diff), to_list(z_jumps)), to_list(n_jumps_t))
   to_tensor(map(fn (entry: ((f32, f32), f32)) -> {
@@ -186,15 +227,16 @@ def cholesky_2x2_lower(sigma_xx: f32, sigma_xy: f32, sigma_yy: f32) -> (f32, f32
   (l11, l21, l22)
 }
 def correlated_gbm_terminal_2d[n](rng_key: key, template_x: tensor[n, f32], template_y: tensor[n, f32], s0_x: f32, s0_y: f32, mu_x: f32, mu_y: f32, sigma_x: f32, sigma_y: f32, rho: f32, t: f32) -> (tensor[n, f32], tensor[n, f32]) = {
+  t_ok = checked_horizon(t)
   (rng_draw_0, rng_draw_1) = split_key(rng_key)
   zx = normal_sample(rng_draw_0, template_x, cast(0.0, f32), cast(1.0, f32))
   zy_indep = normal_sample(rng_draw_1, template_y, cast(0.0, f32), cast(1.0, f32))
   log_s0_x = log(s0_x)
   log_s0_y = log(s0_y)
-  drift_x = mul(sub(mu_x, mul(cast(0.5, f32), mul(sigma_x, sigma_x))), t)
-  drift_y = mul(sub(mu_y, mul(cast(0.5, f32), mul(sigma_y, sigma_y))), t)
-  vol_x_sqrt_t = mul(sigma_x, sqrt(t))
-  vol_y_sqrt_t = mul(sigma_y, sqrt(t))
+  drift_x = mul(sub(mu_x, mul(cast(0.5, f32), mul(sigma_x, sigma_x))), t_ok)
+  drift_y = mul(sub(mu_y, mul(cast(0.5, f32), mul(sigma_y, sigma_y))), t_ok)
+  vol_x_sqrt_t = mul(sigma_x, sqrt(t_ok))
+  vol_y_sqrt_t = mul(sigma_y, sqrt(t_ok))
   one_minus_rho_sq = sub(cast(1.0, f32), mul(rho, rho))
   sqrt_one_minus_rho_sq = if lt(one_minus_rho_sq, cast(0.0, f32)) then cast(0.0, f32) else sqrt(one_minus_rho_sq)
   zx_l = to_list(zx)
@@ -213,7 +255,8 @@ def heston_qe_step(log_s: f32, v: f32, min_v: f32, mu: f32, kappa: f32, theta: f
   half = cast(0.5, f32)
   psi_c = cast(1.5, f32)
   zero = cast(0.0, f32)
-  e_kdt = exp(neg(mul(kappa, dt)))
+  dt_ok = checked_horizon(dt)
+  e_kdt = exp(neg(mul(kappa, dt_ok)))
   one_minus_e = sub(one, e_kdt)
   m = add(theta, mul(sub(v, theta), e_kdt))
   sigma_sq = mul(sigma, sigma)
@@ -250,7 +293,7 @@ def heston_qe_step(log_s: f32, v: f32, min_v: f32, mu: f32, kappa: f32, theta: f
   sqrt_one_minus_rho_sq = if lt(one_minus_rho_sq, zero) then zero else sqrt(one_minus_rho_sq)
   z1 = add(mul(rho, z_v), mul(sqrt_one_minus_rho_sq, z_indep))
   v_pos = if lt(v, zero) then zero else v
-  log_s_next = add(log_s, add(mul(sub(mu, mul(half, v_pos)), dt), mul(sqrt(mul(v_pos, dt)), z1)))
+  log_s_next = add(log_s, add(mul(sub(mu, mul(half, v_pos)), dt_ok), mul(sqrt(mul(v_pos, dt_ok)), z1)))
   new_min = if lt(v_next_pos, min_v) then v_next_pos else min_v
   (log_s_next, v_next_pos, new_min)
 }
@@ -264,7 +307,7 @@ def heston_qe_terminal(rng_key: key, s0: f32, v0: f32, mu: f32, kappa: f32, thet
   z_v_l = to_list(z_v_t)
   z_ind_l = to_list(z_ind_t)
   u_l = to_list(u_t)
-  dt = div(t, cast(n_steps, f32))
+  dt = div(checked_horizon(t), cast(n_steps, f32))
   log_s0 = log(s0)
   init_state = (log_s0, v0, v0)
   idxs = range(cast(0, i64), n_steps)
@@ -291,7 +334,7 @@ def heston_qe_paths_terminal[n](rng_key: key, paths_template: tensor[n, f32], s0
   z_v_l = to_list(z_v_t)
   z_ind_l = to_list(z_ind_t)
   u_l = to_list(u_t)
-  dt = div(t, cast(n_steps, f32))
+  dt = div(checked_horizon(t), cast(n_steps, f32))
   log_s0 = log(s0)
   path_idxs = range(cast(0, i64), n_paths)
   results = map(fn (p: i64) -> {
@@ -383,12 +426,13 @@ def sto_kou_sampler_log_jump_moment(lambda_jump: f32, p: f32, eta_up: f32, eta_d
 def sto_kou_jump_terminal[n](rng_key: key, paths_template: tensor[n, f32], jumps_template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> tensor[n, f32] = {
   zero = cast(0.0, f32)
   one = cast(1.0, f32)
+  t_ok = checked_horizon(t)
   (rng_draw_0, rng_tail_0) = split_key(rng_key)
   (rng_draw_1, rng_tail_1) = split_key(rng_tail_0)
   (rng_draw_2, rng_draw_3) = split_key(rng_tail_1)
   _ = jumps_template
   n_paths = numel(copy(paths_template))
-  counts = sto_kou_count_table(lambda_jump, p, eta_up, eta_dn, t)
+  counts = sto_kou_count_table(lambda_jump, p, eta_up, eta_dn, t_ok)
   enumerated_mass = counts.1
   cdf_norm = to_tensor(map(fn (c: f32) -> div(c, enumerated_mass), counts.0))
   one_i = cast(1, i64)
@@ -408,8 +452,8 @@ def sto_kou_jump_terminal[n](rng_key: key, paths_template: tensor[n, f32], jumps
   u_branch_l = to_list(u_branch_t)
   e_size_l = to_list(e_size_t)
   n_jumps_l = to_list(n_jumps_t)
-  drift = sub(mul(sub(mu, mul(cast(0.5, f32), mul(sigma, sigma))), t), counts.2)
-  vol_sqrt_t = mul(sigma, sqrt(t))
+  drift = sub(mul(sub(mu, mul(cast(0.5, f32), mul(sigma, sigma))), t_ok), counts.2)
+  vol_sqrt_t = mul(sigma, sqrt(t_ok))
   log_s0 = log(s0)
   path_idxs = range(cast(0, i64), n_paths)
   to_tensor(map(fn (path_i: i64) -> {
