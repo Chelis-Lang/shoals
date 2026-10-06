@@ -1,8 +1,10 @@
 module Shoals.Tests.Schedule
 import Std.Test (assert_eq)
-import Std.Datetime (Date, date, ClampToMonthEnd)
+import Std.Datetime (Date, date, ClampToMonthEnd, RejectInvalidDay)
 import Std.Datetime.Business (Unadjusted, Following)
 import Shoreleave.UsFederal (us_federal)
+-- `us_federal` is the US federal government calendar, used here as a calendar
+-- with known closures; it is not a USD settlement calendar.
 import Shoals.Tenor (tenor_months, tenor_years)
 import Shoals.Schedule (NoStub, ShortInitial, LongInitial, ShortFinal, LongFinal, schedule, schedule_unadjusted)
 import Shoals.Properties.Tenor (schedule_is_increasing_and_bounded)
@@ -34,4 +36,18 @@ def test_adjusted_schedule_rolls_each_date() -> unit ! { Test } = {
 def test_property_schedule_is_increasing_and_bounded() -> unit ! { Test } = {
   _ = assert_eq(schedule_is_increasing_and_bounded(d(2025i64, 1i64, 31i64), d(2030i64, 3i64, 15i64), 1i64), true, "monthly with a final stub")
   assert_eq(schedule_is_increasing_and_bounded(d(2024i64, 2i64, 29i64), d(2054i64, 2i64, 28i64), 6i64), true, "semi-annual over 30 years")
+}
+-- RejectInvalidDay applies only to the dates a schedule emits. Locating the
+-- end must not step onto a nonexistent day such as 30 February and fail.
+def test_reject_ignores_a_step_past_the_end() -> unit ! { Test } = assert_eq(schedule_unadjusted(d(2025i64, 12i64, 30i64), d(2026i64, 1i64, 30i64), tenor_months(1i64), NoStub, false, RejectInvalidDay), [d(2025i64, 12i64, 30i64), d(2026i64, 1i64, 30i64)], "one regular period; 30 February is never emitted")
+def test_reject_short_final_from_the_30th() -> unit ! { Test } = assert_eq(schedule_unadjusted(d(2025i64, 10i64, 30i64), d(2026i64, 1i64, 30i64), tenor_months(1i64), ShortFinal, false, RejectInvalidDay), [d(2025i64, 10i64, 30i64), d(2025i64, 11i64, 30i64), d(2025i64, 12i64, 30i64), d(2026i64, 1i64, 30i64)], "every emitted date exists")
+-- Under the end-of-month rule the month end is the day, so the overflow
+-- policy has nothing to reject.
+def test_reject_with_end_of_month() -> unit ! { Test } = assert_eq(schedule_unadjusted(d(2025i64, 1i64, 31i64), d(2025i64, 4i64, 30i64), tenor_months(1i64), NoStub, true, RejectInvalidDay), [d(2025i64, 1i64, 31i64), d(2025i64, 2i64, 28i64), d(2025i64, 3i64, 31i64), d(2025i64, 4i64, 30i64)], "EOM month ends")
+-- Regularity follows the caller's policy: 30 December plus two months is 28
+-- February when clamped and does not exist when rejected, so the period to 28
+-- February is regular under one policy and a stub under the other.
+def test_regularity_follows_the_overflow_policy() -> unit ! { Test } = {
+  _ = assert_eq(schedule_unadjusted(d(2025i64, 12i64, 30i64), d(2026i64, 2i64, 28i64), tenor_months(1i64), LongFinal, false, ClampToMonthEnd), [d(2025i64, 12i64, 30i64), d(2026i64, 1i64, 30i64), d(2026i64, 2i64, 28i64)], "clamped: two regular periods")
+  assert_eq(schedule_unadjusted(d(2025i64, 12i64, 30i64), d(2026i64, 2i64, 28i64), tenor_months(1i64), LongFinal, false, RejectInvalidDay), [d(2025i64, 12i64, 30i64), d(2026i64, 2i64, 28i64)], "rejected: one long final stub")
 }

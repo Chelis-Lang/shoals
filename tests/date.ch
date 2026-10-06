@@ -2,6 +2,8 @@ module Shoals.Tests.Date
 import Std.Test (assert_eq, assert_true)
 import Std.Datetime (Date, date)
 import Shoreleave.UsFederal (us_federal)
+-- `us_federal` is the US federal government calendar, used here as a calendar
+-- with known closures; it is not a USD settlement calendar.
 import Shoals.Date (DayCount, ActualOver360, ActualOver365Fixed, ActualActualIsda, ActualActualIcma, ThirtyEOver360, ThirtyEOver360Isda, ThirtyOver360Us, Business252, YearFraction, year_fraction, year_fraction_numerator, year_fraction_denominator, year_fraction_to_f64, year_fraction_to_f32)
 import Shoals.Properties.Date (actual_matches_reference, isda_matches_reference, icma_matches_reference, whole_isda_year_is_exactly_one, additive_under_isda)
 -- Every expected value is an exact rational in lowest terms. The ACT/ACT

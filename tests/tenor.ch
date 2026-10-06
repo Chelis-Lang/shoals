@@ -3,6 +3,8 @@ import Std.Test (assert_eq, assert_true)
 import Std.Datetime (Date, date, period, ClampToMonthEnd, RejectInvalidDay)
 import Std.Datetime.Business (Following, ModifiedFollowing, RejectNonBusinessStart, RollStartForward)
 import Shoreleave.UsFederal (us_federal)
+-- `us_federal` is the US federal government calendar, used here as a calendar
+-- with known closures; it is not a USD settlement calendar.
 import Shoreleave.JapanBank (japan_bank)
 import Shoals.Tenor (Tenor, tenor_days, tenor_weeks, tenor_months, tenor_years, tenor_period, tenor_apply, parse_tenor, try_parse_tenor, overnight, tomorrow_next, spot_next, business_day_tenor_dates, two_calendar_lag, lagged_date)
 def d(y: i64, m: i64, day: i64) -> Date = date(y, m, day)

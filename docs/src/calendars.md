@@ -22,7 +22,7 @@ rolled = business_day_roll(us_federal(), date(2025i64, 7i64, 4i64), Following)
 
 | Market | Shoreleave calendar | Module | Published horizon |
 |---|---|---|---|
-| New York bank and settlement | `us_federal()` | `Shoreleave.UsFederal` | 2021–2030 |
+| US federal government holidays and closures | `us_federal()` | `Shoreleave.UsFederal` | 2021–2030 |
 | New York Stock Exchange | `nyse()` | `Shoreleave.Nyse` | 2026–2028 |
 | US bond market | `sifma()` | `Shoreleave.Sifma` | 2026–2027 |
 | London | `england_and_wales()` | `Shoreleave.EnglandAndWales` | 2019–2028 |
@@ -44,6 +44,13 @@ bank holiday. Hong Kong has a Monday-to-Saturday business week. There is no
 Frankfurt exchange calendar: TARGET is the euro settlement calendar and stays
 open on German public holidays such as 3 October.
 
+Shoreleave 0.1.0 has no Federal Reserve or USD settlement calendar.
+`us_federal()` is the federal government's calendar: the legal holidays plus
+executive-order closures of federal agencies, such as 24 and 26 December
+2025, when the Federal Reserve Banks and Fedwire stayed open. `sifma()` and
+`nyse()` are not substitutes either; both close on Good Friday, for example.
+A Federal Reserve calendar is tracked in Chelis-Lang/shoreleave#7.
+
 ## Replacing the removed `Shoals.HolidayCal`
 
 `Shoals.HolidayCal` held fixed local holiday lists and rules with known gaps,
@@ -53,7 +60,7 @@ is removed, and each old calendar maps to a Shoreleave calendar:
 
 | Removed | Replacement |
 |---|---|
-| `hc_nyc_calendar`, `hc_nyc_calendar_year`, `hc_nyc_calendar_multi` | `us_federal()` for bank and settlement dates, `nyse()` for the exchange, `sifma()` for bonds |
+| `hc_nyc_calendar`, `hc_nyc_calendar_year`, `hc_nyc_calendar_multi` | `us_federal()` for US federal government holidays and closures, `nyse()` for the exchange, `sifma()` for bonds; there is no USD settlement calendar (Chelis-Lang/shoreleave#7) |
 | `hc_ldn_calendar`, `hc_ldn_calendar_year`, `hc_ldn_calendar_multi` | `england_and_wales()` |
 | `hc_tyo_is_holiday`, `hc_tyo_holidays_year` | `japan_bank()` |
 | `hc_syd_is_holiday`, `hc_syd_holidays_year` | `new_south_wales()` |

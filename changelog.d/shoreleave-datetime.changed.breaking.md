@@ -1,14 +1,17 @@
 Shoals completes its cut-over to Std.Datetime and Shoreleave (shoals#104,
-stage S6 of chelis#2858). Generic date arithmetic and business-day rules now
+stage S6 of chelis#2858). ACT/ACT AFB, whose definition is disputed, is
+omitted. Generic date arithmetic and business-day rules now
 come from `Std.Datetime` and `Std.Datetime.Business`, market calendars from
 Shoreleave, and Shoals keeps only the finance layer: exact day counts,
 tenors, and schedules.
 
 Breaking: `Shoals.HolidayCal` is removed with its fixed local lists. Use the
 Shoreleave calendar for the market: `hc_nyc_*` becomes
-`Shoreleave.UsFederal.us_federal` for bank and settlement dates,
-`Shoreleave.Nyse.nyse` for the exchange, or `Shoreleave.Sifma.sifma` for
-bonds; `hc_ldn_*` becomes `Shoreleave.EnglandAndWales.england_and_wales`;
+`Shoreleave.UsFederal.us_federal` for US federal government holidays and
+closures, `Shoreleave.Nyse.nyse` for the exchange, or
+`Shoreleave.Sifma.sifma` for bonds. Shoreleave 0.1.0 has no Federal Reserve
+or USD settlement calendar, and none of the three substitutes for one
+(Chelis-Lang/shoreleave#7); `hc_ldn_*` becomes `Shoreleave.EnglandAndWales.england_and_wales`;
 `hc_tyo_*` becomes `Shoreleave.JapanBank.japan_bank`; `hc_syd_*` becomes
 `Shoreleave.NewSouthWales.new_south_wales`; `hc_hkg_*` becomes
 `Shoreleave.HongKong.hong_kong`; and `hc_fra_*` becomes

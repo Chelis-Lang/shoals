@@ -80,6 +80,10 @@ year-end closures move the count to 6 January 2026, where a US count reaches
 2 January. A negative lag fails, and so does a date outside either
 calendar's horizon.
 
+The examples use `us_federal()`, the US federal government calendar, as a
+calendar with known closures; it is not a USD settlement calendar (see
+[Holiday calendars](calendars.md)).
+
 ## Schedules
 
 ```chelis
@@ -102,7 +106,13 @@ initial stub at `end`. A short stub keeps the irregular period on its own; a
 long stub merges it into the neighbouring regular period. `NoStub` requires
 the tenor to divide the span exactly and fails otherwise. With
 `end_of_month` true, a month-end anchor and a whole-month tenor keep every
-date on its month end. A start that is not before the end fails.
+date on its month end, and the month end decides the day, so `overflow`
+has nothing to decide. Otherwise `overflow` applies only to the dates the
+schedule emits: under `RejectInvalidDay` an emitted date on a nonexistent
+day fails, while a step past the end that would land on one does not.
+Whether the tenor divides the span is judged under the same policy, so the
+period from 30 December to 28 February is two regular months when clamped
+and a stub when rejected. A start that is not before the end fails.
 
 `schedule` rolls each date of the unadjusted schedule in `calendar` under
 `roll`. It fails if two dates roll onto the same business day, or if a date
