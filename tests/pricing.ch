@@ -79,7 +79,7 @@ def test_bs_call_f64_vector_matches_scalar_desk_rows() -> unit ! { Test } = {
 def constant_3(v: f64) -> tensor[3, f64] = to_tensor([v, v, v])
 def constant_1(v: f64) -> tensor[1, f64] = to_tensor([v])
 -- These rows were written to lock STRUCTURAL AGREEMENT, when both sides
--- evaluated one kernel and agreed exactly. `bs_call_f64` now evaluates Cody
+-- evaluated one kernel and agreed exactly. `bs_call_f64` evaluates Chelis's builtin
 -- while `bs_call_wire_f64` still evaluates A&S from caller-supplied
 -- coefficients, so they pass on ~19-78% headroom and would survive a real
 -- divergence: a smoke test until the wire path migrates.

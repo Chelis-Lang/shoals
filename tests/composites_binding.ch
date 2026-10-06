@@ -7,11 +7,9 @@ import Std.Contracts (normal_cdf)
 --
 -- The composites in Shoals.Properties.Composites are PROVEN about
 -- `Std.Contracts.normal_cdf` -- the certified f32 Abramowitz-Stegun normal CDF.
--- The shipped pricer `bs_call_scalar` does NOT call that f32 symbol, and since
--- shoals#61 it does not evaluate the same approximation either:
--- `Shoals.Pricing.erf64`/`n_cdf64` evaluate W. J. Cody's rational approximation
--- in f64 and downcast, because the Greeks need f64 precision and the
--- single-body correctness invariant forbids a second CDF path.
+-- The shipped pricer `bs_call_scalar` does not call that f32 symbol. Its
+-- `n_cdf64` evaluates Chelis's `standard_normal_cdf` in f64 and downcasts;
+-- the Greeks differentiate that same f64 price body.
 --
 -- So the binding is MEASURED AGREEMENT, not identity of model. Before shoals#61
 -- the two sides were the same A&S coefficients at two widths and this comment
@@ -25,17 +23,9 @@ import Std.Contracts (normal_cdf)
 -- This file is the fast CI smoke: a handful of representative cells (ATM, deep
 -- OTM/ITM, high-vol, short maturity). The full 405-cell grid sweep lives in
 -- `tests-manual/composites_binding_heavy.ch` (nightly), where the measured max
--- abs diff was 2.67e-5, measured under the old A&S `erf64` and not re-measured
--- since shoals#61; the grid still passes its 1e-4 bound. The smoke cells here
--- measure worst 7.63e-6 (deep ITM / short maturity), re-measured under Cody and
--- unchanged, so the asserted f32 bound is 5e-5 -- ~6.5x over the worst measured
--- gap. Every measured gap is an exact f32 ulp multiple of its own cell's price:
--- 7.63e-6 is 1 ulp at the deep-ITM price and 4 ulp at the short-maturity one,
--- and the ATM and high-vol cells are 3 and 1. Do NOT read that as the
--- approximations being interchangeable here: at PRICE level, at THIS file's ATM
--- cell, Cody and A&S differ by 8.157e-6 -- larger than the gap itself. That is
--- one point, not a bound; the gap grows with spot and maturity. The ~1.4e-7 A&S
--- figure is an erf-level bound and does not convert into these units.
+-- abs diff was 2.67e-5 in an earlier measurement; the grid retains its 1e-4
+-- bound. The smoke cells retain a 5e-5 f32 bound and compare the current
+-- native-CDF pricer to the certified f32 contract CDF at representative points.
 def d1_f32(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = {
   num = add(log(div(s, k)), mul(add(r, mul(cast(0.5, f32), mul(sigma, sigma))), t))
   div(num, mul(sigma, sqrt(t)))
@@ -48,7 +38,7 @@ def bs_call_contract(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = {
   disc = exp(neg(mul(r, t)))
   sub(mul(s, nd1), mul(k, mul(disc, nd2)))
 }
--- One cell of the binding: shipped f64-erf pricer == contract-CDF BS within 5e-5.
+-- One cell of the binding: shipped f64-CDF pricer == contract-CDF BS within 5e-5.
 def test_binding_atm() -> unit ! { Test } = {
   shipped = bs_call_scalar(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
   contract = bs_call_contract(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))

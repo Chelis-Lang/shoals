@@ -995,7 +995,7 @@ tiers: **A** (type/dimension/linearity), **B** (SMT via cvc5 over the reals),
 | `if/then/else` | `@pin` | Lowers as ITE in `QF_NRA`. |
 | `Option[T]`, `Some`/`None`, `match`; `@opaque` + `@invariant` | `@pin` | Opaque-invariant abstraction is the path from synthetic green to a green a quant recognizes (report §1, §3); producer obligations discharge at SMT. |
 | `Std.Test` (`assert_close`, `assert_eq`) | `@pin` | The executable numeric suites under `tests/` and `tests-manual/` use polymorphic `assert_eq[q](actual, expected, label)` and `assert_close[p_float]`. Tensor close tolerances have the tensor's dtype. |
-| WireDag lowering (`chelis tide serve` `/lower`) | `@pin` | Schema **27**, exact-only. `scripts/validate_bs_wire_root.py` checks `bs_call_wire_f64` against 1643 nodes, entry root 848, 15 reachable named loads, and the byte-exact SHA-256 `634fd1368eaf3e20eb6355569ff972676e14f8596554b9e2fe0091397d8d0b67`. It also checks structural validity and two independent cold lowerings. |
+| WireDag lowering (`chelis tide serve` `/lower`) | `@pin` | Schema **27**, exact-only. `scripts/validate_bs_wire_root.py` checks `bs_call_wire_f64` against 1643 nodes, entry root 848, 15 reachable named loads, and the byte-exact SHA-256 `572716064aa636c28898df249dc6cda783fbdc75fbcb0bc72aee962f7fb88520`. It also checks structural validity and two independent cold lowerings. |
 | Front-end check throughput | `@pin` | The compiler surface is available. The 0.18.6 measurements (31.6s for `src/modelfit.ch`, 17.0s dependency-load floor, and a 7m54s batched-suite observation) remain historical measurements, not 0.18.11 performance claims. The pin-bump full gate owns current acceptance. |
 | `count` ([05-OP-29]), direct `sub` / `min_elem` ([05-OP-40]/[05-OP-41]) | `@pin` | Shipped before this pin and available, though Shoals does not currently depend on them. |
 | `stop_gradient` ([05-OP-42]) | `@upstream` | The contract exists, but implementation remains open in chelis#1312; Shoals does not claim it at this pin. Relu's dedicated adjoint is a separate closed issue (chelis#1313). |
@@ -1034,99 +1034,31 @@ that they are right, and only the nightly leg constrains the value. A missing
 
 | Kernel | Approximation | Worst observed absolute error (a floor) | Method |
 |---|---|---|---|
-| `erf64` | W. J. Cody, Math. Comp. 23 (1969); three ranges split at 0.5 and 4, saturating at 6 | **>= 3.3675e-16** (~1.52 ulp of 1.0) | worst observed at x = ±0.507001975 (`erf` is odd, so the error magnitude is identical at both signs and the oracle may report either; `n_cdf64` below is **not** symmetric and its sign is significant), measured at 60 dps by `scripts/oracle_erf64_accuracy.py`; the error is jagged at ulp scale so any grid reports a floor |
-| `n_cdf64` | `0.5 * (1 - erf64(-x/√2))` | **>= 1.9495e-16** (~0.88 ulp of 1.0) | worst observed at x = -0.7170090691949448, measured at 60 dps by the same oracle. NOT `erf64`'s halved: the argument reduction `-x/√2` and the final `0.5 * (1 - e)` each round. **ABSOLUTE only — see the left-tail limitation below** |
+| `erf64` | Chelis's correctly rounded `erf` builtin | **>= 5.5177e-17** (~0.25 ulp of 1.0) | worst observed at x = -1.25 over 531 compiled samples at 60 dps |
+| `n_cdf64` | Chelis's `standard_normal_cdf` graph over correctly rounded `erfc` | **>= 7.7516e-17** (~0.35 ulp of 1.0) | worst observed near x = 1.0 over the same compiled samples at 60 dps; the separate relative leg checks the negative tail |
 
-**`n_cdf64` has no useful RELATIVE accuracy in the left tail.** Both figures above
-are absolute errors, and the oracle that produces them sweeps absolute error over
-±6.5, so it cannot observe this. `erf64_erfc_abs` computes `erfc` to ~1 ulp, but
-`n_cdf64` routes it through `1 - erf64` and `erf64` is itself `1 - erfc`, so the
-two subtractions cancel that precision away as the result approaches zero.
-Measured on the shipped kernel: **2.3e-6 relative at x = -7, 1.8% relative at
-x = -8, and exactly `0.0` below about x = -8.3** where the true value is ~1e-17.
-Do not use `n_cdf64` for deep-tail probabilities. Routing the negative branch
-straight through `erf64_erfc_abs` would keep the relative accuracy; that is
-shoals#68.
-
-**The kernel is no longer the limiting factor for the price and the Greeks**
-(the left-tail exception above is `n_cdf64`'s spelling, not the kernel).
-`bs_call_f64(100, 100, 0.05, 0.2, 1)` returns `10.450583572185565`. Against the
-f64 values of those decimal inputs — the ones the kernel actually receives — the
-exact price is `10.450583572185567346`, whose correctly-rounded f64 is
-`10.450583572185568`, so the returned value is 1.51 ulp (two representable
-steps) from it. Quoting a reference computed from the decimal spellings instead
-gives `10.45058357218556678` and makes it look like one ulp; the figure above
-uses the f64 inputs, matching the `f32`-rounded-input discipline the Greek table
-below states. The `f32` Greek exports land within ~1 `f32` ulp of their true
-values —
-that is their dtype's rounding, not the approximation's error:
-
-Measured at `K=100, r=0.05, sigma=0.2, T=1`, worst case over
-`S in {60, 80, 100, 120}`, comparing the shipped `f32` exports (`chelis eval`)
-against a 50-digit `mpmath` reference evaluated at the same `f32`-rounded
-inputs. The two columns are each a worst case over those spots and need not
-fall at the same spot.
-
-| export | error vs true | in `f32` ulp |
-|---|---|---|
-| `deltas_call` | 5.17e-8 | 0.87 |
-| `vegas_call` | 1.33e-6 | 0.37 |
-| `rhos_call` | 2.44e-6 | 0.41 |
-| `gammas_call` | 6.53e-10 | 0.35 |
-| `thetas_call` | 1.15e-7 | 0.32 |
+`n_cdf64` delegates to Chelis's `standard_normal_cdf`, whose graph uses
+correctly rounded `erfc` directly for the negative tail. The oracle checks
+relative error at -6, -7, -8, -8.5, and -9 against a 60-digit reference,
+with a limit of 1e-12. This catches a return to `1 - erf` cancellation that
+the absolute sweep cannot see (shoals#68).
 
 **No bound is stated for the Greeks.** The error of a derivative is not
 controlled by the error of the function — in Black–Scholes the true
-`S·φ(d1) − K'·φ(d2)` terms cancel exactly while an approximation's do not, and
-the residue is amplified by `√T/σ` or `1/(Sσ√T)`. The table above is a
-measurement at one parameter set, not a bound over the parameter space.
-Deriving one is out of scope here.
+`S·φ(d1) − K'·φ(d2)` terms cancel exactly, while rounded intermediates may
+leave a residue amplified by `√T/σ` or `1/(Sσ√T)`. The table above measures
+scalar functions, not derivatives over the Greek parameter space.
 
-**What this replaced.** Abramowitz & Stegun 7.1.26, whose ~1.4e-7 bound is a
-property of its coefficients rather than of the arithmetic evaluating them — so
-the `f64` entry point was no better than the `f32` `Nautilus.Special.erf` whose
-coefficients it copied, and no wider cast could have improved it. A ~4.1e8x
-reduction. That was this shell's issue 61.
+Shoals's scalar `erf64` is a compatibility wrapper over Chelis's `erf`, and
+`n_cdf64` delegates to `standard_normal_cdf`. `Shoals.Greeks`,
+`Shoals.PricingExtended`, and the reference modules call Chelis's `erfc`
+directly. Their f32 arithmetic still has its own rounding effects.
 
-Shoals uses its scalar Cody `erf64` kernel for the pricing and Greek paths.
-Chelis 0.18.13 provides correctly rounded `erf` and `erfc` primitives, checked
-by `tests/canonical_erf.ch`. The broader special-function request chelis#902
-remains open. Nautilus 0.7.48 exposes `Nautilus.Special.erf` at f64, checked by
-`tests/nautilus_erf_f64.ch`; its A&S coefficients have the f64 approximation
-gap tracked by nautilus#74. Shoals retains its measured f64 accuracy.
-
-**Not covered here.** `Shoals.Greeks`'s `analytic_delta_call` /
-`analytic_delta_put` use a local `n_cdf` over `Nautilus.Special.erfc`, still the
-`f32` A&S path; `analytic_vega_call` / `analytic_gamma_call` use `n_pdf` and
-never touch `erf`; the `fd_*` Greeks and `src/volsurface.ch` / `src/dupire.ch`
-divide price differences by `h`, `h²` or vega and so amplify whatever error
-remains; `Shoals.PricingExtended`'s `n_cdf_ext` and
-`references/blackscholes.ch` are **call sites, not copies** -- both
-`import Nautilus.Special (erfc)` and carry no coefficients of their own, so
-they inherit whatever that f32 kernel does and need no migration. An earlier
-revision of this paragraph called them "further copies of the A&S kernel",
-which is false: no file under `src/` or `references/` carries the A&S
-constants. `pricing_wire_erf_f64` is the real remaining case, and only in the
-sense that its coefficients are caller-supplied tensor parameters. The duplication that does exist is
-wider than "one kernel per repository", which an earlier revision of this
-paragraph claimed. Inside this repo there are four `.ch` erf bodies:
-`src/pricing.ch::erf64` (Cody's), `src/pricing.ch::pricing_wire_erf_f64`
-(A&S, caller-supplied coefficients), and A&S with hard-coded f64 literals in
-both `research/proof-infra/ad/src/bs.ch` and
-`research/proof-infra/graduation/src/probe.ch` -- each its own reef project,
-all in this repository -- plus TWO Python mirrors,
-`research/proof-infra/ad/harness.py` and
-`scripts/oracle_greeks_gate.py::_erf_as_f32`. The second is the one with a live
-maintenance trigger: it models `Nautilus.Special.erf` and must be re-measured at
-the next Nautilus kernel change (see `docs/UPSTREAM_BUGS.md`).
-Since `erf64` moved to Cody's these are no longer copies of one
-algorithm but two different ones, so it is drift rather than redundancy, and
-drift is the harder case: a caller cannot assume they agree at all. Tracked by
-nautilus#74 and chelis#902; nautilus#59 resolved the signature barrier.
-
-**Scope.** These are kernels this shell authors. Accuracy of chelis primitives
-is upstream's, and upstream has no accuracy contract for shells to inherit —
-chelis#1563 proposes one.
+The separate `bs_call_wire_f64` path retains caller-supplied A&S coefficients
+as part of its published WireDag input contract. It is checked against the
+scalar pricer with a scale-aware tolerance, not exact equality. The dated
+research projects under `research/proof-infra/` retain their own historical
+A&S bodies and do not define the current package pricing API.
 
 ## Automatic differentiation (`grad`) — the Greek-set surface
 

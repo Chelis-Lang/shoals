@@ -1,5 +1,4 @@
 module Shoals.References.BlackScholes
-import Nautilus.Special (erfc)
 export (call_textbook, put_textbook, delta_call_textbook, delta_put_textbook, gamma_textbook, vega_textbook, theta_call_textbook, rho_call_textbook)
 def n_cdf(x: f32) -> f32 = {
   inv_sqrt_2 = cast(0.7071067811865475, f32)

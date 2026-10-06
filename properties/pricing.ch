@@ -23,19 +23,9 @@ def call_bounded_by_spot(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool = {
   c_px = bs_call_scalar(s, k, r, sigma, t)
   lte(c_px, s)
 }
--- Tolerance note (graduation, sanctioned single re-baseline): bs_call_scalar /
--- bs_put_scalar route through one f64 body and downcast, while the reference is the
--- f32 Nautilus-erfc evaluation of A&S. Since shoals#61 those are DIFFERENT
--- approximations -- the f64 body evaluates Cody's -- so the two differ by f32
--- quantization plus a genuine approximation gap at price level, which scales
--- with spot and is not bounded by the ~1.4e-7 erf-level figure, amplified by
--- the price's cancellation. Worst over the exercised fixed points: K=110 call 1.14e-5,
--- ATM put 1.05e-5, most cells ~1e-6, all measured under the old A&S body and not
--- re-measured since; the fixed points still pass. The bound is 5e-5 -- ~4.4x over
--- that worst measured gap, tight enough to catch a per-PR regression. This loosening is accuracy-monotone, NOT a regression: the
--- f64 body is closer to true BS than the old f32 path (max abs err 9.16e-7 vs 3.64e-5,
--- oracle_greeks_gate accuracy-monotone guard). The 1.44e-5 this line carried until
--- shoals#61 was the A&S-in-f64 value, superseded when the kernel moved to Cody's.
+-- The scalar pricer evaluates Chelis's f64 standard_normal_cdf and downcasts;
+-- the textbook reference evaluates the f32 contract normal CDF. The 5e-5
+-- bound covers their model and rounding difference over the fixed-point tests.
 def matches_textbook_reference(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool = {
   optimized = bs_call_scalar(s, k, r, sigma, t)
   reference = call_textbook(s, k, r, sigma, t)

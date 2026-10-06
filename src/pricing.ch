@@ -1,165 +1,15 @@
 module Shoals.Pricing
 import Nautilus.Distributions (normal_sample)
 export (erf64, n_cdf64, bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_vector, bs_call_wire_f64, call_prices, put_prices, call_total, put_total, deltas_call, deltas_put, vegas_call, rhos_call, thetas_call, gammas_call, volgas_call, vannas_call, mc_call_price)
--- One normal CDF behind both price and Greeks. n_cdf(x) = 0.5 * erfc(-x/sqrt2)
--- is the exact expression Shoals.References / Shoals.Greeks use. The displayed
--- Greek is the AD derivative of THIS expression, so price and Greek agree.
---
--- ACCURACY. `erf64` evaluates W. J. Cody's rational approximation (Math. Comp.
--- 23, 1969): three ranges split at 0.5 and 4, saturating at 6 where erfc
--- underflows f64. Worst observed absolute error >= 3.3675e-16 (~1.52 ulp of
--- 1.0) at x = 0.507001975, measured at 60 dps by
--- `scripts/oracle_erf64_accuracy.py`. That is a FLOOR: the error is jagged at
--- ulp scale, so a grid reports only the worst point it lands on. Re-measure by
--- running the oracle; docs/CHELIS_SURFACE.md carries the figures.
---
--- It replaced Abramowitz & Stegun 7.1.26 (this shell's issue 61), whose ~1.4e-7
--- bound is a property of its coefficients rather than of the arithmetic, so the
--- f64 entry point had been no better than the f32 `Nautilus.Special.erf` whose
--- coefficients it copied. Chelis 0.18.13 adds a correctly rounded erf
--- primitive, but this kernel remains until its Greek and expiry behavior is
--- compared on the compatible package chain (chelis#902). Nautilus.Special.erf
--- accepts f64 since 0.7.47, but still
--- evaluates the A&S coefficients at ~1.4e-7 accuracy (nautilus#74);
--- this Cody kernel preserves the measured f64 accuracy.
---
--- Three named helpers rather than one expression, because the AD Greeks
--- differentiate through this path and each branch is separately checkable.
--- `abs` is the intrinsic rather than a hand-rolled `if`, which is the clearer
--- spelling and keeps the derivative rule below trivially satisfied. An earlier
--- revision justified it by claiming a hand-rolled `if` returns NaN at +inf; that
--- is withdrawn as unmeasured. Measured at this pin it returns +inf, exactly as
--- the intrinsic does, because a scalar `if` does not propagate the untaken arm's
--- value. The rule that does bind is the DERIVATIVE one (chelis#2640).
-def abs_f64(x: f64) -> f64 = abs(x)
--- Cody region 1 (|x| <= 0.5): erf(x) = x * P(x^2)/Q(x^2), odd by construction.
-def erf64_core_small(x: f64) -> f64 = {
-  -- Domain clamp. See the note above `erf64` for why every core clamps.
-  -- Sequential selects preserve nested AD lowering (chelis#2825).
-  lo = if lt(x, cast(-0.5, f64)) then cast(-0.5, f64) else x
-  xc = if lt(cast(0.5, f64), lo) then cast(0.5, f64) else lo
-  y = mul(xc, xc)
-  xnum0 = mul(cast(0.18577770618460315, f64), y)
-  xden0 = y
-  xnum1 = mul(add(xnum0, cast(3.1611237438705655, f64)), y)
-  xden1 = mul(add(xden0, cast(23.601290952344122, f64)), y)
-  xnum2 = mul(add(xnum1, cast(113.86415415105016, f64)), y)
-  xden2 = mul(add(xden1, cast(244.02463793444417, f64)), y)
-  xnum3 = mul(add(xnum2, cast(377.485237685302, f64)), y)
-  xden3 = mul(add(xden2, cast(1282.6165260773723, f64)), y)
-  mul(xc, div(add(xnum3, cast(3209.3775891384694, f64)), add(xden3, cast(2844.236833439171, f64))))
-}
--- Cody region 2 (0.5 < |x| < 4): erfc(|x|) = exp(-x^2) * P(|x|)/Q(|x|).
--- The dispatcher routes |x| == 4 to region 3; Cody's CALERF puts it here
--- (`IF (Y .LE. FOUR)`), where it is one ulp better. See this shell's issue 68.
-def erf64_core_erfc_mid(axr: f64) -> f64 = {
-  -- Domain clamp. See the note above `erf64` for why every core clamps.
-  ax = if lt(cast(4.0, f64), axr) then cast(4.0, f64) else axr
-  xnum0 = mul(cast(2.1531153547440383e-8, f64), ax)
-  xden0 = ax
-  xnum1 = mul(add(xnum0, cast(0.5641884969886701, f64)), ax)
-  xden1 = mul(add(xden0, cast(15.744926110709835, f64)), ax)
-  xnum2 = mul(add(xnum1, cast(8.883149794388377, f64)), ax)
-  xden2 = mul(add(xden1, cast(117.6939508913125, f64)), ax)
-  xnum3 = mul(add(xnum2, cast(66.11919063714163, f64)), ax)
-  xden3 = mul(add(xden2, cast(537.1811018620099, f64)), ax)
-  xnum4 = mul(add(xnum3, cast(298.6351381974001, f64)), ax)
-  xden4 = mul(add(xden3, cast(1621.3895745666903, f64)), ax)
-  xnum5 = mul(add(xnum4, cast(881.952221241769, f64)), ax)
-  xden5 = mul(add(xden4, cast(3290.7992357334597, f64)), ax)
-  xnum6 = mul(add(xnum5, cast(1712.0476126340707, f64)), ax)
-  xden6 = mul(add(xden5, cast(4362.619090143247, f64)), ax)
-  xnum7 = mul(add(xnum6, cast(2051.0783778260716, f64)), ax)
-  xden7 = mul(add(xden6, cast(3439.3676741437216, f64)), ax)
-  mul(exp(neg(mul(ax, ax))), div(add(xnum7, cast(1230.3393547979972, f64)), add(xden7, cast(1230.3393548037495, f64))))
-}
--- Cody region 3 (4 <= |x| < 6): erfc(|x|) = exp(-x^2)/|x| * (1/sqrt(pi) - R(1/x^2)).
-def erf64_core_erfc_tail(axr: f64) -> f64 = {
-  -- LOWER clamp only, and the asymmetry is the point. A clamp is safe only when
-  -- its UNTAKEN arm has a finite VALUE *and* a finite DERIVATIVE. The
-  -- derivative half is not decoration: `if lt(x, 1.0) then 2.0 else sqrt(x)`
-  -- has a finite untaken value at x = 0 and still grads to NaN, because the
-  -- adjoint multiplies the untaken arm's derivative (+inf) by the 0 mask. Here
-  -- the untaken arm is the constant 1.0, so an unbounded operand never reaches
-  -- the multiply. NO UPPER CLAMP: its untaken arm would be the operand, +inf at
-  -- ax = +inf, so `0 * inf = NaN` -- and this branch is total at +inf where
-  -- regions 1 and 2 are not. Adding one for uniformity removes that.
-  guarded = if lt(axr, cast(1.0, f64)) then cast(1.0, f64) else axr
-  ax = guarded
-  y = div(cast(1.0, f64), mul(guarded, guarded))
-  xnum0 = mul(cast(0.016315387137302097, f64), y)
-  xden0 = y
-  xnum1 = mul(add(xnum0, cast(0.30532663496123236, f64)), y)
-  xden1 = mul(add(xden0, cast(2.568520192289822, f64)), y)
-  xnum2 = mul(add(xnum1, cast(0.36034489994980445, f64)), y)
-  xden2 = mul(add(xden1, cast(1.8729528499234604, f64)), y)
-  xnum3 = mul(add(xnum2, cast(0.12578172611122926, f64)), y)
-  xden3 = mul(add(xden2, cast(0.5279051029514285, f64)), y)
-  xnum4 = mul(add(xnum3, cast(0.016083785148742275, f64)), y)
-  xden4 = mul(add(xden3, cast(0.06051834131244132, f64)), y)
-  r = mul(y, div(add(xnum4, cast(0.0006587491615298378, f64)), add(xden4, cast(0.0023352049762686918, f64))))
-  div(mul(exp(neg(mul(ax, ax))), sub(cast(0.5641895835477563, f64), r)), guarded)
-}
--- EVERY core clamps its argument into its own region at entry: load-bearing,
--- not defensive. Two reasons, and the first is not the one an earlier revision
--- gave. (1) Numerical: every core runs on every operand the dispatcher sees,
--- and a core evaluated outside its own Cody region returns a wrong number --
--- true of any transform or none. (2) The adjoint: a clamp is an `if`, and under
--- `grad` an untaken arm with an unbounded DERIVATIVE poisons the result even
--- though its value does not propagate (chelis#2640, against
--- `spec/06-transformations.md` §2.10.1; fixed upstream at 0.18.12, not at this
--- pin). The claim that an out-of-region non-finite VALUE poisons the selected
--- arm is withdrawn: measured at this pin, it does not.
---
--- Every core needs one, not only region 3: regions 1 and 2 are
--- P(y)/Q(y) Horner chains with positive coefficients, so numerator AND
--- denominator overflow to +inf and inf/inf = NaN -- their hazard is not
--- division. The clamps never bind where the dispatcher routes, so no returned
--- value changes.
---
--- This makes each core total over the FINITE f64 domain, not over all of f64:
--- the clamps and dispatcher are themselves `if`s, so +/-inf still poisons a
--- sibling arm wherever an untaken arm is unbounded. Imported Std.Scalar
--- Imported `min`/`max` are available (chelis#1582 closed); changing this
--- kernel awaits the compatible package-chain gate.
--- Sequential dispatcher for the same nested-grad lowering gap (chelis#2825).
-def erf64_erfc_abs(ax: f64) -> f64 = {
-  tail = if lt(ax, cast(6.0, f64)) then erf64_core_erfc_tail(ax) else cast(0.0, f64)
-  if lt(ax, cast(4.0, f64)) then erf64_core_erfc_mid(ax) else tail
-}
-def erf64(x: f64) -> f64 = {
-  ax = abs_f64(x)
-  y = sub(cast(1.0, f64), erf64_erfc_abs(ax))
-  signed = if lt(x, cast(0.0, f64)) then neg(y) else y
-  finite = if lt(ax, cast(0.5, f64)) then erf64_core_small(x) else signed
-  -- NaN propagates rather than saturating. Every `lt` against NaN is false, so
-  -- without this guard the dispatcher falls through to the saturation arm and
-  -- returns 1.0: a negative spot then priced to a silent 0.0 where the A&S
-  -- kernel returned NaN. Answering zero is worse than answering NaN for a
-  -- pricing kernel, and it diverged between lanes (vmap still gave NaN).
-  --
-  -- `eq(x, x)` is false only for NaN. The guard is safe under masked select
-  -- because BOTH arms are finite whenever the input is: the untaken arm is
-  -- `x` itself for a finite operand, and the saturating 1.0 for a NaN one.
-  if eq(x, x) then finite else x
-}
--- ABSOLUTE accuracy only. `erf64_erfc_abs` computes erfc to ~1 ulp, but this
--- spelling routes it through `1 - erf64`, and `erf64` is itself `1 - erfc`, so
--- the two subtractions cancel away the relative precision in the LEFT TAIL.
--- Measured on the shipped kernel: n_cdf64(-7) is 2.3e-6 relative, n_cdf64(-8)
--- is 1.8% relative, and below about -8.3 it returns exactly 0.0 where the true
--- value is ~1e-17. Do not use this for deep-tail probabilities. Routing the
--- negative branch straight through `erf64_erfc_abs` would keep the full
--- relative accuracy; that is this shell's issue 68, deliberately not done here.
-def n_cdf64(x: f64) -> f64 = {
-  inv_sqrt_2 = cast(0.7071067811865476, f64)
-  mul(cast(0.5, f64), sub(cast(1.0, f64), erf64(neg(mul(x, inv_sqrt_2)))))
-}
+-- Pricing uses Chelis's correctly rounded erf and standard normal CDF.
+-- Keep the exported f64 names because Shoals schema major 1 is additive-only.
+def erf64(x: f64) -> f64 = erf(x)
+def n_cdf64(x: f64) -> f64 = standard_normal_cdf(x)
 -- DENOMINATOR FLOOR, and why it is a clamp rather than a branch on the price.
 --
 -- `sigma*sqrt(t)` is exactly 0 whenever t = 0 or sigma = 0, i.e. whenever there
 -- is no remaining uncertainty. For num != 0 the unguarded division already
--- behaved correctly: +/-inf saturates `erf64` and the formula collapses to
+-- behaved correctly: +/-inf saturates the normal CDF and the formula collapses to
 -- `max(s - k*exp(-rt), 0)`, which is the right answer. The defect (shoals#88)
 -- is only the point where num is ALSO 0 -- the forward sitting exactly on the
 -- strike -- where 0/0 is NaN. Measured members of that class: s = k with t = 0
@@ -170,7 +20,7 @@ def n_cdf64(x: f64) -> f64 = {
 -- num is 0, so d1 = d2 = 0, both normal CDFs are 0.5, and the price is
 -- 0.5*s - 0.5*k*exp(-rt) = 0 exactly when the forward is at the strike, which
 -- is the correct intrinsic. For num != 0, num/floor is a large finite number
--- that saturates `erf64` identically to the +/-inf it replaces, so no
+-- that saturates the normal CDF identically to the +/-inf it replaces, so no
 -- currently-correct value moves.
 --
 -- IT MUST BE A CLAMP ON THE DENOMINATOR, NOT A BRANCH ON THE PRICE -- and the
@@ -222,7 +72,7 @@ def bs_put_f64(s: f64, k: f64, r: f64, sigma: f64, t: f64) -> f64 = {
   disc = exp(neg(mul(r, t)))
   sub(mul(k, mul(disc, nnd2)), mul(s, nnd1))
 }
--- f32 entry points: compute via the f64 body and downcast. One erf behind price.
+-- f32 entry points: compute via the f64 body and downcast.
 def bs_call_scalar(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = cast(bs_call_f64(cast(s, f64), cast(k, f64), cast(r, f64), cast(sigma, f64), cast(t, f64)), f32)
 def bs_put_scalar(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = cast(bs_put_f64(cast(s, f64), cast(k, f64), cast(r, f64), cast(sigma, f64), cast(t, f64)), f32)
 -- Vectorization helpers. vmap cannot capture free f64 vars in the host evaluator
@@ -246,11 +96,10 @@ def f64_col[n](xs: tensor[n, f64]) -> tensor[n, 1, f64] = {
 -- Constants are point-valued tensor inputs because introducing them through
 -- host-only shape/vmap plumbing would erase the named WireDag root.
 --
--- This path does NOT evaluate `erf64`. Its erf is Abramowitz & Stegun 7.1.26
--- built from the caller-supplied coefficients, so it kept the ~1.4e-7 bound
--- that this shell's issue 61 removed from the scalar kernel. The two are different
--- approximations and agree only to the scale-aware bound `tests/pricing.ch`
--- asserts. Migrating it is separate work; see docs/CHELIS_SURFACE.md.
+-- This path does not evaluate `erf64`. Its erf uses the caller-supplied
+-- Abramowitz & Stegun coefficients to preserve the public WireDag input
+-- contract. The scalar path uses Chelis's correctly rounded builtin, so the
+-- two paths agree only within the scale-aware bound in `tests/pricing.ch`.
 def pricing_wire_select_f64[n](mask: &tensor[n, f64], a: tensor[n, f64], b: tensor[n, f64], half: &tensor[n, f64]) -> tensor[n, f64] = {
   one = add(copy(half), copy(half))
   add(mul(copy(mask), a), mul(sub(one, copy(mask)), b))
@@ -279,7 +128,7 @@ def pricing_wire_normal_cdf_f64[n](x: &tensor[n, f64], half: &tensor[n, f64], in
 }
 -- DENOMINATOR FLOOR, wire lane. Same defect as `d1_64` above (shoals#88) and a
 -- strictly worse symptom: the scalar lane only returned NaN where num was ALSO
--- zero, because +/-inf saturates `erf64`. This lane returned NaN at EVERY
+-- zero, because +/-inf saturates the scalar normal CDF. This lane returned NaN at EVERY
 -- moneyness on expiry, measured, because nothing here saturates -- every
 -- selector is arithmetic, and `0 * inf` is NaN.
 --

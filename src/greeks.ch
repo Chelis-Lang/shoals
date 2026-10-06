@@ -1,5 +1,4 @@
 module Shoals.Greeks
-import Nautilus.Special (erfc)
 import Shoals.Pricing (bs_call_scalar, bs_put_scalar)
 export (n_pdf, fd_delta_call, fd_delta_put, fd_gamma_call, fd_vega_call, fd_vega_put, fd_rho_call, fd_rho_put, fd_theta_call, fd_theta_put, fd_vanna_call, fd_volga_call, analytic_delta_call, analytic_delta_put, analytic_vega_call, analytic_gamma_call, pathwise_smooth_call_terminal_delta, lr_digital_call_delta)
 def n_pdf(x: f32) -> f32 = {

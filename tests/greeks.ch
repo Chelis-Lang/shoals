@@ -3,20 +3,10 @@ import Std.Test (assert_close, assert_true)
 import Shoals.Greeks (fd_delta_call, fd_delta_put, fd_gamma_call, fd_vega_call, fd_vega_put, fd_rho_call, fd_rho_put, fd_theta_call, fd_theta_put, fd_vanna_call, fd_volga_call, analytic_delta_call, analytic_delta_put, analytic_vega_call, analytic_gamma_call, pathwise_smooth_call_terminal_delta, lr_digital_call_delta)
 import Shoals.Pricing (deltas_call, vegas_call)
 def abs_f32(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then neg(x) else x
--- Light FIRST-ORDER AD-Greek standing smoke (single vmap(grad) -- fast enough for
--- tests/). deltas_call and vegas_call are the AD derivatives of the displayed
--- f64 Black-Scholes body. The targets are the TRUE Black-Scholes derivatives,
--- computed in f64 by the closed forms in scripts/oracle_greeks_gate.py and
--- correctly rounded at the precision printed here. They were previously the
--- exact derivatives of the
--- displayed A&S-erf price, which differ from the true ones by up to 5.2e-6 --
--- past the 5e-6 tolerance below, which is how this test caught the kernel
--- change. Since `erf64` moved to Cody's approximation (>= 3.3675e-16, this shell's
--- issue 61) the displayed price is within a few f64 ulp of the true one -- not
--- exact, but ~9 orders inside this file's 5e-6 band -- so the two coincide
--- and the indirection is gone. Five of the six old targets sat inside tolerance
--- by luck rather than correctness; all six were replaced. The heavy
--- nested-grad second-order Greeks live in tests-manual/greeks_secondorder.ch.
+-- First-order AD Greeks differentiate the f64 Black-Scholes body using
+-- Chelis's standard-normal CDF. The targets are textbook Black-Scholes
+-- derivatives at these f32 outputs; the wider oracle runs in
+-- scripts/oracle_greeks_gate.py.
 def test_deltas_call_ad_matches_displayed_deriv() -> unit ! { Test } = {
   spots = to_tensor([cast(80.0, f32), cast(100.0, f32), cast(120.0, f32)])
   d = to_list(deltas_call(spots, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32)))
