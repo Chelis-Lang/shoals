@@ -13,9 +13,15 @@ export (gbm_path, gbm_terminal, gbm_paths_antithetic_terminal_mean, merton_jump_
 -- lambda = 0 there is no Poisson law to be negative, and the NaN comes from
 -- `sqrt(t)` on the diffusion side regardless of the jump parameters.
 --
--- The general lesson of shoals#139 is to guard the INPUT, not a derived
+-- The general lesson is to guard the INPUT, not a derived
 -- product: `lambda * t` destroys the sign information the guard needs, while
--- `gte(t, 0.0)` rejects `t = -1` cleanly. Within this module the two
+-- `gte(t, 0.0)` rejects `t = -1` cleanly. (No issue number is cited here on
+-- purpose: in this repository a `shoals#NNN` token in `src/` denotes a LIVE
+-- narrowing that `reef conform audit` row 9 requires be covered by a
+-- tests_blocked/ probe or a docs/UPSTREAM_BUGS.md entry. This guard is a fix,
+-- not a workaround, so citing it here would assert a limitation that does not
+-- exist. The provenance lives in the commit, the CHANGELOG, docs/src/
+-- stochastic.md, and the tests_neg/stochastic/ rationales.) Within this module the two
 -- `gte(rate, zero)` clauses are the only guards keying on a product's sign,
 -- and with the horizon checked upstream the only remaining routes to a
 -- `-0.0` rate are a zero horizon or a zero lambda, both of which have the
