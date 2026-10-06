@@ -1,7 +1,7 @@
 module Shoals.Tenor
 import Std.Datetime (Date, Period, DayOverflow, period, period_months, period_days, date_add_period)
 import Std.Datetime.Business (BusinessCalendar, BusinessDayRoll, NonBusinessStart, RejectNonBusinessStart, RollStartForward, is_business_day, business_day_offset, business_day_roll)
-export (Tenor, tenor_days, tenor_weeks, tenor_months, tenor_years, tenor_period, tenor_apply, parse_tenor, try_parse_tenor, BusinessDayTenor, overnight, tomorrow_next, spot_next, business_day_tenor_lag, business_day_tenor_length, business_day_tenor_dates, SpotLag, spot_lag, spot_date)
+export (Tenor, tenor_days, tenor_weeks, tenor_months, tenor_years, tenor_period, tenor_apply, parse_tenor, try_parse_tenor, BusinessDayTenor, overnight, tomorrow_next, spot_next, business_day_tenor_lag, business_day_tenor_length, business_day_tenor_dates, SpotLag, two_calendar_lag, lagged_date)
 -- A tenor is a positive `Std.Datetime.Period`: a month is a calendar month and
 -- a year is twelve of them, never a fixed number of days. Applying one takes
 -- the caller's `DayOverflow` policy, because a month step from the 31st has
@@ -57,6 +57,6 @@ def business_day_tenor_dates(t: BusinessDayTenor, trade: Date, calendar: Busines
 -- lands on the next business day.
 type SpotLag =
   | SpotLag { days: i64, count_calendar: BusinessCalendar, adjust_calendar: BusinessCalendar, roll: BusinessDayRoll }
-def spot_lag(days: i64, count_calendar: BusinessCalendar, adjust_calendar: BusinessCalendar, roll: BusinessDayRoll) -> SpotLag = if lt(days, 0i64) then fail(tenor_failure("spot_lag", string_concat(string_concat("lag ", to_string(days)), " is negative"))) else SpotLag { days, count_calendar, adjust_calendar, roll }
+def two_calendar_lag(days: i64, count_calendar: BusinessCalendar, adjust_calendar: BusinessCalendar, roll: BusinessDayRoll) -> SpotLag = if lt(days, 0i64) then fail(tenor_failure("two_calendar_lag", string_concat(string_concat("lag ", to_string(days)), " is negative"))) else SpotLag { days, count_calendar, adjust_calendar, roll }
 def counted(lag: SpotLag, trade: Date) -> Date = if eq(lag.days, 0i64) then trade else if is_business_day(lag.count_calendar, trade) then business_day_offset(lag.count_calendar, trade, lag.days, RejectNonBusinessStart) else business_day_offset(lag.count_calendar, trade, sub(lag.days, 1i64), RollStartForward)
-def spot_date(lag: SpotLag, trade: Date) -> Date = business_day_roll(lag.adjust_calendar, counted(lag, trade), lag.roll)
+def lagged_date(lag: SpotLag, trade: Date) -> Date = business_day_roll(lag.adjust_calendar, counted(lag, trade), lag.roll)

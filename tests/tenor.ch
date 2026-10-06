@@ -4,7 +4,7 @@ import Std.Datetime (Date, date, period, ClampToMonthEnd, RejectInvalidDay)
 import Std.Datetime.Business (Following, ModifiedFollowing, RejectNonBusinessStart, RollStartForward)
 import Shoreleave.UsFederal (us_federal)
 import Shoreleave.JapanBank (japan_bank)
-import Shoals.Tenor (Tenor, tenor_days, tenor_weeks, tenor_months, tenor_years, tenor_period, tenor_apply, parse_tenor, try_parse_tenor, overnight, tomorrow_next, spot_next, business_day_tenor_dates, spot_lag, spot_date)
+import Shoals.Tenor (Tenor, tenor_days, tenor_weeks, tenor_months, tenor_years, tenor_period, tenor_apply, parse_tenor, try_parse_tenor, overnight, tomorrow_next, spot_next, business_day_tenor_dates, two_calendar_lag, lagged_date)
 def d(y: i64, m: i64, day: i64) -> Date = date(y, m, day)
 -- A month is a calendar month, not 30 days, and a year is twelve months.
 def test_months_are_calendar_months() -> unit ! { Test } = {
@@ -48,9 +48,9 @@ def test_business_day_tenor_from_a_holiday_rolls_forward() -> unit ! { Test } = 
 -- (31 December to 3 January) push the count to 6 January, where counting in
 -- US federal days would give 2 January.
 def test_spot_counts_in_one_calendar_and_rolls_in_another() -> unit ! { Test } = {
-  lag = spot_lag(2i64, japan_bank(), us_federal(), Following)
-  _ = assert_eq(spot_date(lag, d(2025i64, 7i64, 2i64)), d(2025i64, 7i64, 7i64), "Japanese count reaches 4 July; the US roll moves it to 7 July")
-  _ = assert_eq(spot_date(lag, d(2025i64, 12i64, 30i64)), d(2026i64, 1i64, 6i64), "Japanese year-end closures move the count to 6 January")
-  assert_eq(spot_date(spot_lag(2i64, us_federal(), us_federal(), Following), d(2025i64, 12i64, 30i64)), d(2026i64, 1i64, 2i64), "a US count from 30 December reaches 2 January")
+  lag = two_calendar_lag(2i64, japan_bank(), us_federal(), Following)
+  _ = assert_eq(lagged_date(lag, d(2025i64, 7i64, 2i64)), d(2025i64, 7i64, 7i64), "Japanese count reaches 4 July; the US roll moves it to 7 July")
+  _ = assert_eq(lagged_date(lag, d(2025i64, 12i64, 30i64)), d(2026i64, 1i64, 6i64), "Japanese year-end closures move the count to 6 January")
+  assert_eq(lagged_date(two_calendar_lag(2i64, us_federal(), us_federal(), Following), d(2025i64, 12i64, 30i64)), d(2026i64, 1i64, 2i64), "a US count from 30 December reaches 2 January")
 }
-def test_spot_from_a_weekend_counts_the_next_business_day_first() -> unit ! { Test } = assert_eq(spot_date(spot_lag(2i64, us_federal(), us_federal(), ModifiedFollowing), d(2025i64, 7i64, 5i64)), d(2025i64, 7i64, 8i64), "from Saturday 5 July, T+1 is Monday 7 and T+2 Tuesday 8")
+def test_spot_from_a_weekend_counts_the_next_business_day_first() -> unit ! { Test } = assert_eq(lagged_date(two_calendar_lag(2i64, us_federal(), us_federal(), ModifiedFollowing), d(2025i64, 7i64, 5i64)), d(2025i64, 7i64, 8i64), "from Saturday 5 July, T+1 is Monday 7 and T+2 Tuesday 8")
