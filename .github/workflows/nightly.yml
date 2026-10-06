@@ -162,11 +162,10 @@ jobs:
       # growth is real; it is attributing a specific number of seconds to a
       # specific PR that the data does not support.
       #
-      # chelis#1391 is CLOSED upstream, fixed by chelis#3058 (`04612253c`,
-      # batching sharded at MAX_BATCH_FILES = 4). No release carries that fix
-      # yet, so this pin still has the regression: re-measure and lower the
-      # budget at the first pin that carries #3058. That same measurement is
-      # what shoals#80 needs in order to cost running this suite per-PR.
+      # Chelis 0.19.0 includes the chelis#3058 fix (`04612253c`, batching
+      # sharded at MAX_BATCH_FILES = 4). The raised budget remains until a
+      # measurement on the pinned release establishes safe headroom. That
+      # measurement also informs shoals#80's per-PR suite cost.
       #
       # RE-PROBE, 2026-10-04 at head 69e1e59 on the `=0.18.11` release
       # binary, the current 49 files and 549 tests, one 10-core machine, both
