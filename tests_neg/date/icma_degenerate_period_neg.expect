@@ -1,5 +1,0 @@
-Shoals.Date: ACT/ACT ICMA coupon period must end after it starts
-
-Assumption: the coupon period is the denominator of the ICMA fraction. An empty
-or reversed period has no length to accrue against, and silently returning a
-NaN or an infinity would hide which of the two intervals was malformed.

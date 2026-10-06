@@ -1,5 +1,0 @@
-Shoals.Date: ACT/ACT ICMA coupon frequency must be >= 1
-
-Assumption: a frequency below 1 is rejected, not just a frequency of exactly
-zero. A negative frequency would return a negative year fraction, which is
-indistinguishable from a legitimately reversed accrual interval.

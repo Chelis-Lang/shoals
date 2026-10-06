@@ -1,5 +1,0 @@
-Shoals.Date: ACT/ACT ICMA coupon period must end after it starts
-
-Assumption: the coupon period is the denominator of the ICMA fraction, so a
-reversed period is rejected rather than absorbed as a negative length. Only
-pinning the empty period would leave the guard satisfiable by an equality test.

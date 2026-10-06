@@ -1,5 +1,1 @@
-Shoals.Date: ACT/ACT ICMA coupon frequency must be >= 1
-
-Assumption: a coupon frequency is a count of periods per year, so zero is not
-a degenerate case to be absorbed. Dividing by it would return an infinity that
-a caller would read as a year fraction.
+Shoals.Date.year_fraction: domain: ACT/ACT ICMA frequency 0 is below 1
