@@ -18,6 +18,6 @@ import Shoals.Stochastic (merton_jump_terminal)
 def test_neg_merton_rejects_nonfinite_jump_mean() -> unit ! { Test } = {
   template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(8, i64))))
   jumps_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(8, i64))))
-  paths = with seed(3i64) { merton_jump_terminal(template, jumps_template, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(4.0, f32), log(cast(0.0, f32)), cast(0.2, f32), cast(1.0, f32)) }
+  paths = merton_jump_terminal(key_from_seed(3i64), template, jumps_template, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(4.0, f32), log(cast(0.0, f32)), cast(0.2, f32), cast(1.0, f32))
   assert_true(gt(mean_vec(paths), cast(0.0, f32)), "should not reach here: unguarded this returned NaN for every path")
 }

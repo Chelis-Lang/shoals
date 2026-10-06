@@ -142,7 +142,7 @@ def test_merton_sampler_log_jump_moment_survives_the_f32_exponent_range() -> uni
 def test_merton_terminal_prices_stay_positive_at_high_intensity() -> unit ! { Test } = {
   template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(64, i64))))
   jumps_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(64, i64))))
-  paths = with seed(7i64) { merton_jump_terminal(template, jumps_template, cast(100.0, f32), cast(0.0, f32), cast(0.0, f32), cast(1000.0, f32), cast(0.0953, f32), cast(0.0, f32), cast(1.0, f32)) }
+  paths = merton_jump_terminal(key_from_seed(7i64), template, jumps_template, cast(100.0, f32), cast(0.0, f32), cast(0.0, f32), cast(1000.0, f32), cast(0.0953, f32), cast(0.0, f32), cast(1.0, f32))
   usable = fold(fn (acc: bool, v: f32) -> and(acc, and(gt(v, cast(0.0, f32)), eq(sub(v, v), cast(0.0, f32)))), true, to_list(paths))
   assert_true(usable, "every Merton terminal value at lambda*t = 1000 is positive and finite")
 }
