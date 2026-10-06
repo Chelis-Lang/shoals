@@ -1,6 +1,6 @@
 module Shoals.Date
 import Std.Datetime (Date, date, try_date, is_leap_year, date_add_days, date_add_months, ClampToMonthEnd, date_days_until, date_weekday, date_year, date_month, date_day, Weekday, Saturday, Sunday, date_lt, date_lte)
-import Std.Datetime.Business (BusinessCalendar, Following, Preceding, ModifiedFollowing, RollStartForward, RejectNonBusinessStart, business_day_roll, business_day_offset)
+import Std.Datetime.Business (BusinessCalendar, Following, Preceding, ModifiedFollowing, RollStartForward, RollStartBackward, RejectNonBusinessStart, business_day_roll, business_day_offset)
 import Shoals.HolidayCal (Calendar, as_business_calendar, weekend_only_calendar)
 export (DayCount, year_fraction, add_business_days, is_weekend, date_roll_following, date_roll_modified_following, date_roll_preceding, date_roll_following_published, date_roll_modified_following_published, date_roll_preceding_published, schedule_from_tenor, add_months, days_in_month, schedule_from_tenor_calendar)
 -- `ActActIcma` carries the enclosing coupon period and the coupon frequency
@@ -83,11 +83,17 @@ def is_weekend(d: Date) -> bool =
   }
 -- Every roll takes its calendar. `weekend_only_calendar()` applies a
 -- Monday-to-Friday business week without holiday dates.
-def add_business_days(d: Date, n: i64, cal: Calendar) -> Date =
-  if lte(n, 0i64) then d else {
-    core = as_business_calendar(cal)
-    if Std.Datetime.Business.is_business_day(core, d) then business_day_offset(core, d, n, RejectNonBusinessStart) else business_day_offset(core, d, sub(n, 1i64), RollStartForward)
-  }
+-- A non-business start sits between two business days. A positive count
+-- starts from the following one, so its first step lands there; a negative
+-- count starts from the preceding one, so its first step lands there. Zero
+-- business days from a non-business start is the following business day, the
+-- core offset of 0 under `RollStartForward`; from a business day it is the
+-- start. Each case is one `business_day_offset` call, so the calendar's
+-- horizon bounds every answer.
+def add_business_days(d: Date, n: i64, cal: Calendar) -> Date = {
+  core = as_business_calendar(cal)
+  if Std.Datetime.Business.is_business_day(core, d) then business_day_offset(core, d, n, RejectNonBusinessStart) else if gt(n, 0i64) then business_day_offset(core, d, sub(n, 1i64), RollStartForward) else if lt(n, 0i64) then business_day_offset(core, d, add(n, 1i64), RollStartBackward) else business_day_offset(core, d, 0i64, RollStartForward)
+}
 def date_roll_following(d: Date, cal: Calendar) -> Date = business_day_roll(as_business_calendar(cal), d, Following)
 def date_roll_preceding(d: Date, cal: Calendar) -> Date = business_day_roll(as_business_calendar(cal), d, Preceding)
 def date_roll_modified_following(d: Date, cal: Calendar) -> Date = business_day_roll(as_business_calendar(cal), d, ModifiedFollowing)

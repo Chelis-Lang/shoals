@@ -15,7 +15,7 @@ def tight64() -> f64 = cast(1e-12, f64)
 -- weekend-only implementation for every WEEKEND date. A weekday holiday is the
 -- only input that separates them.
 def nyc_cal() -> Calendar = hc_nyc_calendar()
-def eom_holiday_cal() -> Calendar = Calendar { name: "eom-test", holidays: [date(cast(2025, i64), cast(7, i64), cast(31, i64))] }
+def eom_holiday_cal() -> Calendar = Calendar { name: "eom-test", holidays: [date(cast(2025, i64), cast(7, i64), cast(31, i64))], valid_from: date(2025i64, 1i64, 1i64), valid_until: date(2025i64, 12i64, 31i64) }
 def independence_day() -> Date = date(cast(2025, i64), cast(7, i64), cast(4, i64))
 def same_date(actual: Date, expected: Date) -> f32 = cast(date_days_until(actual, expected), f32)
 def test_act_360_one_year() -> unit ! { Test } = {
@@ -289,13 +289,37 @@ def test_add_business_days_from_a_holiday_counts_two_later_business_days() -> un
   expected = date(2025i64, 7i64, 8i64)
   assert_close(same_date(landed, expected), 0.0f32, 0.001f32, "two business days after a holiday reach Tuesday")
 }
-def test_add_business_days_zero_is_the_identity_even_on_a_holiday() -> unit ! { Test } = {
-  landed = add_business_days(independence_day(), cast(0, i64), nyc_cal())
-  assert_close(same_date(landed, independence_day()), cast(0.0, f32), cast(0.001, f32), "zero business days does not roll, even from a holiday")
+-- A non-business start sits between two business days. A positive count
+-- starts from the following one and a negative count from the preceding one,
+-- so one step either way lands on the adjacent business day. Zero business
+-- days from a non-business start is the following business day. July 4 2025
+-- is a Friday holiday in New York; July 5 and 6 are the weekend.
+def offset_gap(start: Date, n: i64, cal: Calendar, expected: Date) -> f32 = same_date(add_business_days(start, n, cal), expected)
+def test_add_business_days_zero_from_a_holiday_is_the_following_business_day() -> unit ! { Test } = assert_close(offset_gap(independence_day(), 0i64, nyc_cal(), date(2025i64, 7i64, 7i64)), 0.0f32, 0.001f32, "zero business days from the July 4 holiday is Monday July 7")
+def test_add_business_days_zero_from_a_business_day_is_the_identity() -> unit ! { Test } = assert_close(offset_gap(date(2025i64, 7i64, 7i64), 0i64, nyc_cal(), date(2025i64, 7i64, 7i64)), 0.0f32, 0.001f32, "zero business days from Monday July 7 is July 7")
+def test_add_business_days_negative_from_a_holiday() -> unit ! { Test } = {
+  _ = assert_close(offset_gap(independence_day(), -1i64, nyc_cal(), date(2025i64, 7i64, 3i64)), 0.0f32, 0.001f32, "one business day before the July 4 holiday is Thursday July 3")
+  _ = assert_close(offset_gap(independence_day(), -3i64, nyc_cal(), date(2025i64, 7i64, 1i64)), 0.0f32, 0.001f32, "three business days before the July 4 holiday is Tuesday July 1")
+  assert_close(offset_gap(independence_day(), -5i64, nyc_cal(), date(2025i64, 6i64, 27i64)), 0.0f32, 0.001f32, "five business days before the July 4 holiday is Friday June 27")
 }
-def test_add_business_days_negative_does_not_step_backward() -> unit ! { Test } = {
-  landed = add_business_days(independence_day(), cast(-5, i64), nyc_cal())
-  assert_close(same_date(landed, independence_day()), cast(0.0, f32), cast(0.001, f32), "a negative count does not step backward, as docs/src/scope.md states")
+def test_add_business_days_negative_across_a_weekend_and_a_holiday() -> unit ! { Test } = {
+  mon = date(2025i64, 7i64, 7i64)
+  _ = assert_close(offset_gap(mon, -1i64, nyc_cal(), date(2025i64, 7i64, 3i64)), 0.0f32, 0.001f32, "one business day before Monday July 7 skips the weekend and the holiday")
+  assert_close(offset_gap(mon, -3i64, nyc_cal(), date(2025i64, 7i64, 1i64)), 0.0f32, 0.001f32, "three business days before Monday July 7 is Tuesday July 1")
+}
+def test_add_business_days_from_a_weekend_day() -> unit ! { Test } = {
+  sat = date(2025i64, 7i64, 5i64)
+  _ = assert_close(offset_gap(sat, -1i64, weekend_only_calendar(), date(2025i64, 7i64, 4i64)), 0.0f32, 0.001f32, "one business day before Saturday is Friday on a weekend-only calendar")
+  _ = assert_close(offset_gap(sat, -3i64, weekend_only_calendar(), date(2025i64, 7i64, 2i64)), 0.0f32, 0.001f32, "three business days before Saturday is Wednesday on a weekend-only calendar")
+  _ = assert_close(offset_gap(sat, 0i64, weekend_only_calendar(), date(2025i64, 7i64, 7i64)), 0.0f32, 0.001f32, "zero business days from Saturday is Monday on a weekend-only calendar")
+  _ = assert_close(offset_gap(sat, -1i64, nyc_cal(), date(2025i64, 7i64, 3i64)), 0.0f32, 0.001f32, "one business day before Saturday skips the Friday holiday in New York")
+  _ = assert_close(offset_gap(sat, -3i64, nyc_cal(), date(2025i64, 7i64, 1i64)), 0.0f32, 0.001f32, "three business days before Saturday is Tuesday July 1 in New York")
+  assert_close(offset_gap(sat, 0i64, nyc_cal(), date(2025i64, 7i64, 7i64)), 0.0f32, 0.001f32, "zero business days from Saturday is Monday in New York")
+}
+def test_add_business_days_negative_across_a_weekend_only() -> unit ! { Test } = {
+  mon = date(2025i64, 7i64, 7i64)
+  _ = assert_close(offset_gap(mon, -1i64, weekend_only_calendar(), date(2025i64, 7i64, 4i64)), 0.0f32, 0.001f32, "one business day before Monday is Friday on a weekend-only calendar")
+  assert_close(offset_gap(mon, -3i64, weekend_only_calendar(), date(2025i64, 7i64, 2i64)), 0.0f32, 0.001f32, "three business days before Monday is Wednesday on a weekend-only calendar")
 }
 def test_add_business_days_weekend_only_lands_on_the_holiday() -> unit ! { Test } = {
   thu = date(cast(2025, i64), cast(7, i64), cast(3, i64))

@@ -1,5 +1,5 @@
 module Shoals.HolidayCal
-import Std.Datetime (Date, date, date_add_days, date_weekday, date_year, date_month, date_day, Weekday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday)
+import Std.Datetime (Date, date, date_add_days, date_lt, date_weekday, date_year, date_month, date_day, Weekday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday)
 import Std.Datetime.Business (BusinessCalendar, Weekmask, business_calendar)
 import Shoreleave.UsFederal (us_federal)
 import Shoreleave.EnglandAndWales (england_and_wales)
@@ -16,50 +16,82 @@ def hc_new_south_wales_published() -> BusinessCalendar = new_south_wales()
 def hc_hong_kong_published() -> BusinessCalendar = hong_kong()
 def hc_target_published() -> BusinessCalendar = target()
 def hc_nyse_published() -> BusinessCalendar = nyse()
+-- A local calendar carries the dates its holiday list covers. Business-day
+-- answers exist only inside `valid_from..valid_until`; outside it the list has
+-- no data, so the adapted `BusinessCalendar` gets that horizon and the core
+-- trapping and `try_` operations reject the date rather than guess a weekday.
 type Calendar =
-  | Calendar { name: string, holidays: List[Date] }
-def empty_calendar(name: string) -> Calendar = Calendar { name, holidays: [] }
-def weekend_only_calendar() -> Calendar = Calendar { name: "weekend", holidays: [] }
+  | Calendar { name: string, holidays: List[Date], valid_from: Date, valid_until: Date }
+def first_date() -> Date = date(-9999i64, 1i64, 1i64)
+def last_date() -> Date = date(9999i64, 12i64, 31i64)
+def year_start(year: i64) -> Date = date(year, 1i64, 1i64)
+def year_end(year: i64) -> Date = date(year, 12i64, 31i64)
+-- These two state that no date is a holiday, so the claim holds everywhere.
+def empty_calendar(name: string) -> Calendar = Calendar { name, holidays: [], valid_from: first_date(), valid_until: last_date() }
+def weekend_only_calendar() -> Calendar = Calendar { name: "weekend", holidays: [], valid_from: first_date(), valid_until: last_date() }
+def in_coverage(d: Date, valid_from: Date, valid_until: Date) -> bool = and(not(date_lt(d, valid_from)), not(date_lt(valid_until, d)))
+-- A holiday outside the coverage cannot affect an answer inside it, so the
+-- business calendar keeps only the holidays its horizon can ask about. A joint
+-- calendar's union list is the case this serves.
 def as_business_calendar(cal: Calendar) -> BusinessCalendar =
   match cal with {
-    | Calendar { name: _, holidays: hs } => business_calendar(Weekmask { monday: true, tuesday: true, wednesday: true, thursday: true, friday: true, saturday: false, sunday: false }, hs, date(-9999i64, 1i64, 1i64), date(9999i64, 12i64, 31i64))
+    | Calendar { name: _, holidays: hs, valid_from: lo, valid_until: hi } => business_calendar(Weekmask { monday: true, tuesday: true, wednesday: true, thursday: true, friday: true, saturday: false, sunday: false }, filter(fn (h: Date) -> in_coverage(h, lo, hi), hs), lo, hi)
   }
 def date_eq(a: Date, b: Date) -> bool = eq(a, b)
 def list_contains_date(holidays: List[Date], d: Date) -> bool = fold(fn (acc: bool, h: Date) -> or(acc, date_eq(h, d)), false, holidays)
 def is_holiday(cal: Calendar, d: Date) -> bool =
   match cal with {
-    | Calendar { name: _, holidays: hs } => list_contains_date(hs, d)
+    | Calendar { name: _, holidays: hs, valid_from: _, valid_until: _ } => list_contains_date(hs, d)
   }
 def is_business_day(cal: Calendar, d: Date) -> bool = Std.Datetime.Business.is_business_day(as_business_calendar(cal), d)
 def easter_sunday_gregorian(year: i64) -> Date = Std.Datetime.easter_sunday_gregorian(year)
 def good_friday(year: i64) -> Date = date_add_days(easter_sunday_gregorian(year), -2i64)
 def easter_monday(year: i64) -> Date = date_add_days(easter_sunday_gregorian(year), 1i64)
-def hc_nyc_calendar_year(year: i64) -> Calendar = Calendar { name: "nyc", holidays: [date(year, cast(1, i64), cast(1, i64)), date(year, cast(7, i64), cast(4, i64)), date(year, cast(12, i64), cast(25, i64))] }
-def hc_ldn_calendar_year(year: i64) -> Calendar = Calendar { name: "ldn", holidays: [date(year, cast(1, i64), cast(1, i64)), good_friday(year), easter_monday(year), date(year, cast(12, i64), cast(25, i64)), date(year, cast(12, i64), cast(26, i64))] }
+def hc_nyc_calendar_year(year: i64) -> Calendar = Calendar { name: "nyc", holidays: [date(year, cast(1, i64), cast(1, i64)), date(year, cast(7, i64), cast(4, i64)), date(year, cast(12, i64), cast(25, i64))], valid_from: year_start(year), valid_until: year_end(year) }
+def hc_ldn_calendar_year(year: i64) -> Calendar = Calendar { name: "ldn", holidays: [date(year, cast(1, i64), cast(1, i64)), good_friday(year), easter_monday(year), date(year, cast(12, i64), cast(25, i64)), date(year, cast(12, i64), cast(26, i64))], valid_from: year_start(year), valid_until: year_end(year) }
 def concat_holidays(years: List[i64], gen: i64 -> List[Date]) -> List[Date] =
   fold(fn (acc: List[Date], y: i64) -> {
     yhol = gen(y)
     fold(fn (acc2: List[Date], d: Date) -> if list_contains_date(acc2, d) then acc2 else append(acc2, d), acc, yhol)
   }, [], years)
-def hc_nyc_calendar_multi(years: List[i64]) -> Calendar = {
-  gen = fn (y: i64) -> match hc_nyc_calendar_year(y) with {
-    | Calendar { name: _, holidays: hs } => hs
+-- A multi-year list covers one unbroken run of years, given in any order. An
+-- empty list or a missing year inside the run would leave dates with no data,
+-- so both fail with a domain error.
+def list_contains_year(years: List[i64], y: i64) -> bool = fold(fn (acc: bool, x: i64) -> or(acc, eq(x, y)), false, years)
+def year_run(function: string, years: List[i64]) -> (i64, i64) =
+  if eq(len(years), 0i64) then fail(string_concat(function, ": domain: the year list is empty")) else {
+    lo = fold(fn (acc: i64, y: i64) -> if lt(y, acc) then y else acc, index(years, 0i64), years)
+    hi = fold(fn (acc: i64, y: i64) -> if gt(y, acc) then y else acc, index(years, 0i64), years)
+    missing = filter(fn (y: i64) -> not(list_contains_year(years, y)), range(lo, add(hi, 1i64)))
+    if gt(len(missing), 0i64) then fail(string_concat(function, string_concat(": domain: the years must be consecutive; ", string_concat(to_string(index(missing, 0i64)), " is missing")))) else (lo, hi)
   }
-  Calendar { name: "nyc-multi", holidays: concat_holidays(years, gen) }
+def hc_nyc_calendar_multi(years: List[i64]) -> Calendar = {
+  run = year_run("hc_nyc_calendar_multi", years)
+  gen = fn (y: i64) -> match hc_nyc_calendar_year(y) with {
+    | Calendar { name: _, holidays: hs, valid_from: _, valid_until: _ } => hs
+  }
+  Calendar { name: "nyc-multi", holidays: concat_holidays(years, gen), valid_from: year_start(run.0), valid_until: year_end(run.1) }
 }
 def hc_ldn_calendar_multi(years: List[i64]) -> Calendar = {
+  run = year_run("hc_ldn_calendar_multi", years)
   gen = fn (y: i64) -> match hc_ldn_calendar_year(y) with {
-    | Calendar { name: _, holidays: hs } => hs
+    | Calendar { name: _, holidays: hs, valid_from: _, valid_until: _ } => hs
   }
-  Calendar { name: "ldn-multi", holidays: concat_holidays(years, gen) }
+  Calendar { name: "ldn-multi", holidays: concat_holidays(years, gen), valid_from: year_start(run.0), valid_until: year_end(run.1) }
 }
-def hc_nyc_calendar() -> Calendar = Calendar { name: "nyc", holidays: [date(cast(2025, i64), cast(1, i64), cast(1, i64)), date(cast(2025, i64), cast(1, i64), cast(20, i64)), date(cast(2025, i64), cast(2, i64), cast(17, i64)), date(cast(2025, i64), cast(5, i64), cast(26, i64)), date(cast(2025, i64), cast(6, i64), cast(19, i64)), date(cast(2025, i64), cast(7, i64), cast(4, i64)), date(cast(2025, i64), cast(9, i64), cast(1, i64)), date(cast(2025, i64), cast(10, i64), cast(13, i64)), date(cast(2025, i64), cast(11, i64), cast(11, i64)), date(cast(2025, i64), cast(11, i64), cast(27, i64)), date(cast(2025, i64), cast(12, i64), cast(25, i64))] }
-def hc_ldn_calendar() -> Calendar = Calendar { name: "ldn", holidays: [date(cast(2025, i64), cast(1, i64), cast(1, i64)), good_friday(cast(2025, i64)), easter_monday(cast(2025, i64)), date(cast(2025, i64), cast(5, i64), cast(5, i64)), date(cast(2025, i64), cast(5, i64), cast(26, i64)), date(cast(2025, i64), cast(8, i64), cast(25, i64)), date(cast(2025, i64), cast(12, i64), cast(25, i64)), date(cast(2025, i64), cast(12, i64), cast(26, i64))] }
+def hc_nyc_calendar() -> Calendar = Calendar { name: "nyc", holidays: [date(cast(2025, i64), cast(1, i64), cast(1, i64)), date(cast(2025, i64), cast(1, i64), cast(20, i64)), date(cast(2025, i64), cast(2, i64), cast(17, i64)), date(cast(2025, i64), cast(5, i64), cast(26, i64)), date(cast(2025, i64), cast(6, i64), cast(19, i64)), date(cast(2025, i64), cast(7, i64), cast(4, i64)), date(cast(2025, i64), cast(9, i64), cast(1, i64)), date(cast(2025, i64), cast(10, i64), cast(13, i64)), date(cast(2025, i64), cast(11, i64), cast(11, i64)), date(cast(2025, i64), cast(11, i64), cast(27, i64)), date(cast(2025, i64), cast(12, i64), cast(25, i64))], valid_from: year_start(2025i64), valid_until: year_end(2025i64) }
+def hc_ldn_calendar() -> Calendar = Calendar { name: "ldn", holidays: [date(cast(2025, i64), cast(1, i64), cast(1, i64)), good_friday(cast(2025, i64)), easter_monday(cast(2025, i64)), date(cast(2025, i64), cast(5, i64), cast(5, i64)), date(cast(2025, i64), cast(5, i64), cast(26, i64)), date(cast(2025, i64), cast(8, i64), cast(25, i64)), date(cast(2025, i64), cast(12, i64), cast(25, i64)), date(cast(2025, i64), cast(12, i64), cast(26, i64))], valid_from: year_start(2025i64), valid_until: year_end(2025i64) }
 def merge_holidays(a: List[Date], b: List[Date]) -> List[Date] = fold(fn (acc: List[Date], d: Date) -> if list_contains_date(acc, d) then acc else append(acc, d), a, b)
+-- A date is a holiday in the joint calendar when either side lists it, but a
+-- business-day answer needs both sides' data, so the coverage is the
+-- intersection. Disjoint coverage leaves `valid_from` after `valid_until`,
+-- which `as_business_calendar` rejects.
+def later_date(a: Date, b: Date) -> Date = if date_lt(a, b) then b else a
+def earlier_date(a: Date, b: Date) -> Date = if date_lt(a, b) then a else b
 def joint_calendar(left: Calendar, right: Calendar) -> Calendar =
   match left with {
-    | Calendar { name: ln, holidays: lh } => match right with {
-    | Calendar { name: rn, holidays: rh } => Calendar { name: ln, holidays: merge_holidays(lh, rh) }
+    | Calendar { name: ln, holidays: lh, valid_from: lf, valid_until: lu } => match right with {
+    | Calendar { name: _, holidays: rh, valid_from: rf, valid_until: ru } => Calendar { name: ln, holidays: merge_holidays(lh, rh), valid_from: later_date(lf, rf), valid_until: earlier_date(lu, ru) }
   }
   }
 export (hc_tyo_holidays_year, hc_syd_holidays_year, hc_fra_holidays_year, hc_hkg_holidays_year, hc_tyo_is_holiday, hc_syd_is_holiday, hc_fra_is_holiday, hc_hkg_is_holiday)

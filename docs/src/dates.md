@@ -96,11 +96,15 @@ business day only when it is neither a weekend nor a holiday in that calendar.
 `date_roll_following` advances to the next business day, `date_roll_preceding`
 retreats to the previous one, and `date_roll_modified_following` rolls forward
 unless that crosses into the next month, in which case it rolls back.
-`add_business_days` steps forward `n` days, skipping non-business days.
-On a non-business start, a positive count begins with the next business day;
-zero and negative counts return the start date. The local `Calendar` rolls
+`add_business_days` moves `n` business days, forward for a positive count
+and backward for a negative one, skipping non-business days. A non-business
+start sits between two business days: a positive count's first step lands on
+the following business day and a negative count's on the preceding one. Zero
+business days returns a business-day start unchanged and moves a
+non-business start to the following business day. The local `Calendar` rolls
 and offsets use the same `Std.Datetime.Business` operations as published
-calendars through `as_business_calendar`.
+calendars through `as_business_calendar`, so a start or result outside the
+calendar's coverage fails with a domain error.
 The `*_published` rolls accept Shoreleave calendars and use
 `Std.Datetime.Business` rules, including their finite date horizons.
 

@@ -1,8 +1,8 @@
 module Shoals.Tests.HolidayCal
 import Std.Test (assert_true, assert_false, assert_eq)
 import Std.Datetime (date, date_year, date_month, date_day)
-import Std.Datetime.Business (try_is_business_day, business_calendar_holidays)
-import Shoals.HolidayCal (Calendar, is_holiday, is_business_day, as_business_calendar, hc_nyc_calendar, hc_ldn_calendar, joint_calendar, weekend_only_calendar, empty_calendar, easter_sunday_gregorian, good_friday, easter_monday, hc_nyc_calendar_multi, hc_ldn_calendar_multi, hc_us_federal_published, hc_england_wales_published)
+import Std.Datetime.Business (try_is_business_day, business_calendar_holidays, business_calendar_valid_from, business_calendar_valid_until)
+import Shoals.HolidayCal (Calendar, is_holiday, is_business_day, as_business_calendar, hc_nyc_calendar, hc_ldn_calendar, joint_calendar, weekend_only_calendar, empty_calendar, easter_sunday_gregorian, good_friday, easter_monday, hc_nyc_calendar_multi, hc_ldn_calendar_multi, hc_ldn_calendar_year, hc_us_federal_published, hc_england_wales_published)
 import Shoals.Date (date_roll_following_published, date_roll_preceding_published, date_roll_modified_following_published)
 def test_published_us_federal_closure_roll() -> unit ! { Test } = {
   day = date(2025i64, 12i64, 24i64)
@@ -35,9 +35,54 @@ def test_local_calendar_business_adapter_preserves_weekday_holidays() -> unit ! 
   _ = assert_eq(try_is_business_day(as_business_calendar(hc_nyc_calendar()), d), Some(false), "the local July 4 closure remains non-business")
   assert_eq(try_is_business_day(as_business_calendar(weekend_only_calendar()), d), Some(true), "a weekend-only calendar leaves July 4 open")
 }
+-- A local list answers business-day queries only for the years it was built
+-- for. Outside them the adapted calendar has no data, so the core `try_` form
+-- returns None rather than a weekday guess.
+def test_adapted_2025_calendar_answers_none_outside_its_year() -> unit ! { Test } = {
+  cal = as_business_calendar(hc_nyc_calendar())
+  _ = assert_eq(try_is_business_day(cal, date(2030i64, 12i64, 25i64)), None, "a 2025 list does not know 2030-12-25")
+  assert_eq(try_is_business_day(cal, date(1900i64, 12i64, 25i64)), None, "a 2025 list does not know 1900-12-25")
+}
+def test_adapted_2025_calendar_keeps_its_in_horizon_answers() -> unit ! { Test } = {
+  cal = as_business_calendar(hc_nyc_calendar())
+  _ = assert_eq(try_is_business_day(cal, date(2025i64, 1i64, 1i64)), Some(false), "New Year's Day 2025 is a holiday")
+  _ = assert_eq(try_is_business_day(cal, date(2025i64, 12i64, 24i64)), Some(true), "Wednesday 2025-12-24 is open")
+  _ = assert_eq(try_is_business_day(cal, date(2025i64, 12i64, 25i64)), Some(false), "Christmas 2025 is a holiday")
+  _ = assert_eq(try_is_business_day(cal, date(2025i64, 12i64, 27i64)), Some(false), "Saturday 2025-12-27 is a weekend day")
+  assert_eq(try_is_business_day(cal, date(2025i64, 12i64, 31i64)), Some(true), "Wednesday 2025-12-31 is open")
+}
+def test_year_constructor_covers_its_year() -> unit ! { Test } = {
+  cal = as_business_calendar(hc_ldn_calendar_year(2027i64))
+  _ = assert_eq(business_calendar_valid_from(cal), date(2027i64, 1i64, 1i64), "a one-year list starts on 1 January")
+  _ = assert_eq(business_calendar_valid_until(cal), date(2027i64, 12i64, 31i64), "a one-year list ends on 31 December")
+  assert_eq(try_is_business_day(cal, date(2028i64, 1i64, 3i64)), None, "the 2027 list does not know 2028")
+}
+def test_multi_year_constructor_covers_its_years_in_any_order() -> unit ! { Test } = {
+  cal = as_business_calendar(hc_nyc_calendar_multi([2026i64, 2025i64, 2027i64]))
+  _ = assert_eq(business_calendar_valid_from(cal), date(2025i64, 1i64, 1i64), "the multi-year list starts with its first year")
+  assert_eq(business_calendar_valid_until(cal), date(2027i64, 12i64, 31i64), "the multi-year list ends with its last year")
+}
+-- A joint calendar knows a day only when both inputs do, so its business-day
+-- horizon is the intersection; its holiday membership stays the union.
+def test_joint_calendar_covers_the_intersection() -> unit ! { Test } = {
+  joint = joint_calendar(hc_nyc_calendar_multi([2025i64, 2026i64]), hc_ldn_calendar_year(2026i64))
+  cal = as_business_calendar(joint)
+  _ = assert_eq(business_calendar_valid_from(cal), date(2026i64, 1i64, 1i64), "the joint horizon starts where both lists start")
+  _ = assert_eq(business_calendar_valid_until(cal), date(2026i64, 12i64, 31i64), "the joint horizon ends where both lists end")
+  _ = assert_true(is_holiday(joint, date(2025i64, 7i64, 4i64)), "holiday membership keeps the New York 2025 date")
+  assert_eq(try_is_business_day(cal, date(2025i64, 7i64, 7i64)), None, "London 2026 data cannot answer for 2025")
+}
+-- `weekend_only_calendar()` and `empty_calendar` state that no date is a
+-- holiday, so their claim holds over the whole `Std.Datetime.Date` range.
+def test_holiday_free_calendars_cover_the_full_date_range() -> unit ! { Test } = {
+  cal = as_business_calendar(weekend_only_calendar())
+  _ = assert_eq(business_calendar_valid_from(cal), date(-9999i64, 1i64, 1i64), "a holiday-free calendar starts at the first date")
+  _ = assert_eq(business_calendar_valid_until(cal), date(9999i64, 12i64, 31i64), "a holiday-free calendar ends at the last date")
+  assert_eq(try_is_business_day(as_business_calendar(empty_calendar("none")), date(1900i64, 12i64, 25i64)), Some(true), "an empty calendar answers for 1900")
+}
 def test_local_calendar_keeps_explicit_weekend_holiday_membership() -> unit ! { Test } = {
   saturday = date(2025i64, 7i64, 5i64)
-  cal = Calendar { name: "weekend-listed", holidays: [saturday] }
+  cal = Calendar { name: "weekend-listed", holidays: [saturday], valid_from: date(2025i64, 1i64, 1i64), valid_until: date(2025i64, 12i64, 31i64) }
   _ = assert_true(is_holiday(cal, saturday), "the local holiday query retains a listed Saturday")
   _ = assert_eq(business_calendar_holidays(as_business_calendar(cal)), [], "the business calendar normalizes Saturday out of its holiday list")
   assert_false(is_business_day(cal, saturday), "Saturday stays non-business through the weekmask")
