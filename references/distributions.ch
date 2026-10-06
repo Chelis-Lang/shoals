@@ -1,5 +1,5 @@
 module Shoals.References.Distributions
-import Nautilus.Special (erfc, log_gamma)
+import Nautilus.Special (log_gamma)
 export (lognormal_pdf_textbook, lognormal_cdf_textbook, student_t_pdf_textbook, bvn_pdf_textbook)
 def lognormal_pdf_textbook(x: f32, mu: f32, sigma: f32) -> f32 =
   if lte(x, cast(0.0, f32)) then cast(0.0, f32) else {

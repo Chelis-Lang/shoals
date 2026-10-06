@@ -1,5 +1,4 @@
 module Shoals.PricingExtended
-import Nautilus.Special (erfc, erf)
 export (n_cdf_ext, n_pdf_ext, bachelier_call, bachelier_put, black_call, black_put, garman_kohlhagen_call, garman_kohlhagen_put, margrabe_exchange_call, pe_margrabe_stulz, pe_asset_or_nothing_call, pe_asset_or_nothing_put, pe_cash_or_nothing_call, pe_cash_or_nothing_put)
 def n_cdf_ext(x: f32) -> f32 = {
   inv_sqrt_2 = cast(0.7071067811865475, f32)

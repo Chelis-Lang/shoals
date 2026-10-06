@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check Shoals' published `erf64`/`n_cdf64` accuracy floors. shoals#61, shoals#64.
+"""Check Shoals' `erf64`/`n_cdf64` accuracy, including left-tail relative error.
 
 Two independent legs, because they have different prerequisites and therefore
 different homes in CI:
@@ -21,11 +21,9 @@ it covered more than it did:
 * The transcription leg proves the carriers AGREE. It cannot prove they are
   right: rewrite every carrier to the same wrong number and this leg is green.
   Only the measurement leg constrains the value itself.
-* The measurement leg proves the published floor is tight for the points it
-  sampled, on the dtype and interval it sampled. It is ABSOLUTE error over
-  +/-6.5 only, so it cannot observe `n_cdf64`'s left-tail RELATIVE blowup
-  (1.8% at x = -8, exactly 0.0 below about -8.3) -- that is shoals#68, and
-  `docs/CHELIS_SURFACE.md` documents it separately.
+* The measurement leg proves the published absolute floor is tight for the
+  points it sampled. A separate relative leg checks `n_cdf64` at negative
+  tail inputs, where an absolute sweep would miss cancellation (shoals#68).
 
 MEASURE IN BINARY: the error is `mpf(f64_result) - erf(mpf(exact_f64_input))` at
 extended precision. `chelis eval --json` hands back the exact f64 as hex bits
@@ -139,7 +137,9 @@ FLOOR_CLAIM_GREP = r">=[[:space:]]*[0-9]+\.?[0-9]*[eE]-[0-9]+"
 # elements (rc=-6, "thread 'main' has overflowed its stack"), so the sweep is
 # batched. Not a kernel problem and not worked around silently: it is a real
 # evaluator limit on literal size, hit at ~4400 elements on this pin.
-BATCH = 800
+BATCH = 200
+LEFT_TAIL_POINTS = (-6.0, -7.0, -8.0, -8.5, -9.0)
+LEFT_TAIL_RELATIVE_LIMIT = "1e-12"
 
 # `chelis eval --json` schema versions this script knows how to read. An
 # unknown version is a LOUD failure, never a duck-typed guess: schema 2 emitted
@@ -306,32 +306,13 @@ def run_transcription(verbose: bool = True) -> tuple[int, dict]:
 # --------------------------------------------------------------------------
 
 def probe_points() -> list[float]:
-    """Where to look. The argmax neighbourhood plus broad coverage.
-
-    The dense window is centred on x = 0.507001975 because an exhaustive scan
-    of +/-150k consecutive doubles found the local maximum there and nothing
-    else in that window passes 3.40e-16. Broad coverage exists to notice a
-    kernel change that moves the argmax somewhere else entirely.
-    """
-    pts: set[float] = set()
-    argmax = 0.507001975
-    step = 2.0**-53
-    for i in range(-600, 601):  # consecutive doubles around the argmax
-        pts.add(argmax + i * step)
-    lo, hi, n = 0.0, 6.5, 900
-    for i in range(n + 1):
-        pts.add(lo + (hi - lo) * i / n)
-    for boundary in (0.5, 4.0, 6.0):  # the three Cody ranges
-        for k in range(-20, 21):
-            pts.add(boundary + k * 2.0**-45)
-    # Negatives are not optional. `erf` is odd so its error magnitude mirrors,
-    # but `n_cdf64` is not: `0.5 * (1 - erf64(-x/sqrt2))` rounds differently on
-    # the two sides, and its worst observed point is at x = -0.717. A grid that
-    # only swept x >= 0 reported a documented floor as overstated when the
-    # grid, not the figure, was what was wrong.
-    pts |= {-x for x in tuple(pts)}
-    pts.add(-0.7170090691949448)
-    pts.add(0.7700537662469848)
+    """A symmetric span plus adjacent f64 values near center and tail points."""
+    pts = {i / 20.0 for i in range(-200, 201)}
+    for center in (-8.0, -4.0, -1.0, -0.5, 0.5, 1.0, 4.0, 8.0):
+        step = math.ulp(center)
+        for offset in range(-8, 9):
+            pts.add(center + offset * step)
+    pts.update((-0.7170090691949448, 0.7700537662469848, -8.5, -9.0))
     return sorted(pts)
 
 
@@ -464,6 +445,25 @@ def worst(points, values, fn, mp):
     return top, at, nans
 
 
+def left_tail_relative(values, mp):
+    """Measure each left-tail sample against a high-precision erfc reference."""
+    errors = []
+    worst_relative = mp.mpf(0)
+    for x, got in zip(LEFT_TAIL_POINTS, values, strict=True):
+        exact = mp.erfc(-mp.mpf(x) / mp.sqrt(2)) / 2
+        if got is None or not math.isfinite(got) or got <= 0:
+            errors.append(f"n_cdf64({x}): nonpositive or nonfinite left-tail result {got!r}")
+            continue
+        relative = abs(mp.mpf(got) - exact) / exact
+        worst_relative = max(worst_relative, relative)
+        if relative > mp.mpf(LEFT_TAIL_RELATIVE_LIMIT):
+            errors.append(
+                f"n_cdf64({x}): relative error {float(relative):.6e} exceeds "
+                f"{LEFT_TAIL_RELATIVE_LIMIT}"
+            )
+    return float(worst_relative), errors
+
+
 def run_measurement(published: dict[str, Published], verbose: bool = True
                     ) -> tuple[int, dict]:
     try:
@@ -535,6 +535,12 @@ def run_measurement(published: dict[str, Published], verbose: bool = True
                 )
         results[name] = record
 
+    tail_values = evaluate(list(LEFT_TAIL_POINTS), "n_cdf64")
+    worst_relative, tail_errors = left_tail_relative(tail_values, mp)
+    errors.extend(tail_errors)
+    results["n_cdf64"]["left_tail_worst_relative"] = worst_relative
+    results["n_cdf64"]["left_tail_points"] = list(LEFT_TAIL_POINTS)
+
     if verbose:
         for name, r in results.items():
             print(
@@ -543,6 +549,8 @@ def run_measurement(published: dict[str, Published], verbose: bool = True
                 f"over {r['points']} points; published floor "
                 f"{r.get('published_floor', '(none)')}"
             )
+        print(f"n_cdf64 left-tail worst relative {worst_relative:.6e} "
+              f"over {len(LEFT_TAIL_POINTS)} points")
         print()
         for e in errors:
             print(f"FAIL: {e}")

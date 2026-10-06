@@ -309,13 +309,17 @@ class MeasurementEnforcement(unittest.TestCase):
         # made n_cdf64 fail too and masked the attribution test.
         order = iter(("erf64", "n_cdf64"))
         self.mod.probe_points = lambda: [0.5]
-        self.mod.evaluate = lambda points, call: [0.0]
+        self.mod.evaluate = lambda points, call: [
+            math.erfc(-x / math.sqrt(2)) / 2 if call == "n_cdf64" else 0.0
+            for x in points
+        ]
         self.mod.worst = lambda points, values, fn, mp: (
             self.MEASURED[next(order)], 0.5, self.nans)
         fake = types.ModuleType("mpmath")
         fake.mp = types.SimpleNamespace(dps=15)
         fake.mpf = float
         fake.erf = math.erf
+        fake.erfc = math.erfc
         fake.sqrt = math.sqrt
         self._prev = sys.modules.get("mpmath")
         sys.modules["mpmath"] = fake
@@ -376,6 +380,12 @@ class MeasurementEnforcement(unittest.TestCase):
         rc, report = self.run_with("3.3675e-16")
         self.assertEqual(rc, 1)
         self.assertTrue(any("NaN" in e for e in report["errors"]), report["errors"])
+
+    def test_zero_left_tail_fails_relative_leg(self):
+        self.mod.evaluate = lambda points, call: [0.0] * len(points)
+        rc, report = self.run_with("3.3675e-16")
+        self.assertEqual(rc, 1)
+        self.assertTrue(any("left-tail" in e for e in report["errors"]), report["errors"])
 
 
 class EvalWireDecode(unittest.TestCase):

@@ -39,8 +39,8 @@ These two satisfy put-call parity: `c - p == s - k * exp(-r * t)`.
 `bs_call_f64_vector` prices matched `f64` tensors of spots, strikes, rates,
 volatilities, and maturities. `bs_call_wire_f64` is a separate pure-tensor
 entry with explicit tensor inputs for its normal-CDF coefficients. It uses
-an Abramowitz–Stegun approximation rather than the scalar kernel's Cody
-approximation, so callers should not expect identical values. The source
+an Abramowitz–Stegun approximation, while the scalar kernel uses Chelis's
+`standard_normal_cdf`, so callers should not expect identical values. The source
 test compares selected rows within `1e-5 + 1e-8 * abs(expected)`.
 `scripts/validate_bs_wire_root.py` checks the compiler-produced graph.
 

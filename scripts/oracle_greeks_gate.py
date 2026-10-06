@@ -1,63 +1,16 @@
 #!/usr/bin/env python3
 """AD-Greeks oracle gate for Shoals.Pricing (stdlib only).
 
-Validates the SHIPPED first-order Greeks in ``Shoals.Pricing`` --
-``deltas_call``, ``vegas_call``, ``rhos_call``, ``thetas_call`` -- the
-nested-grad SECOND-order Greeks ``gammas_call``, ``volgas_call``,
-``vannas_call``, and the tensor-lane prices ``call_prices`` against THREE
-independent references, on a moneyness x maturity grid plus a sign-fold straddle
-(a point near d1=0 and a clearly-negative-d1 low-spot point where the hand-built
-erf's odd reflection is exercised):
+The gate generates one Chelis test over a moneyness and maturity grid. It
+compares first- and second-order AD Greeks, finite differences, vector prices,
+and the reference Black-Scholes price against independent closed forms. The
+reference CDF uses erfc directly, matching the scalar pricing path's use of
+Chelis standard_normal_cdf to within the gate's f32 precision bounds.
 
-  1. ANALYTIC textbook closed forms (delta=N(d1), vega=S phi(d1) sqrt(t),
-     rho=K t e^{-rt} N(d2), theta=-dC/dt) evaluated in this script through the
-     same erf the package body evaluates, so the comparison isolates the AD
-     chain rule, not erf accuracy. Since this shell's issue 61 that is Cody's
-     approximation, mirrored here as `math.erf`; it was Abramowitz-Stegun
-     7.1.26 with the coefficients reproduced exactly, and the f32
-     corroboration leg still models A&S because `Nautilus.Special.erf` does.
-  2. The shipped finite-difference Greeks in ``Shoals.Greeks`` (``fd_delta_call``
-     etc.) INDEPENDENTLY CORROBORATE the closed-form ground truth: the assertion
-     subject is ``ground_truth`` vs ``fd_*`` (not AD vs FD), bounded by an
-     a-priori Richardson truncation band derived from the step ``h`` and f32
-     precision alone (see ``fd_apriori_band``). Because the band never uses the
-     measured AD-vs-FD or gt-vs-FD gap, it can actually fail if the closed-form
-     ground truth is wrong -- it is not the old self-widening ``3*|gt-fd|`` form,
-     which the primary AD-vs-ground-truth gate already rendered vacuous via the
-     triangle inequality. The primary gate (#1's ``ground_truth``) is what
-     constrains AD itself; this corroborates the ground truth that gate uses.
-  3. BINDING CROSS-CHECK: the f64-downcast price (``call_prices``) equals the
-     erfc-based reference price (``Shoals.References.BlackScholes.call_textbook``,
-     which goes through Nautilus.Special.erfc) within an f32-precision bound.
-     This records that the displayed Greek is the derivative of the displayed
-     price -- the two share one erf up to f32 rounding.
-
-  SECOND-ORDER (nested grad): gamma=d2C/dS2, volga=d2C/dsg2, vanna=d2C/dSdsg are
-  validated against (a) the exact f64 SECOND derivative of the DISPLAYED A&S price
-  (primary, tight: this is the correctness invariant -- gamma is the second
-  derivative of the displayed price), (b) the true-BS second-order closed forms
-  (secondary, agree up to A&S model error), and (c) an INDEPENDENT corroboration of
-  the closed-form 2nd-derivative ground truth by tuned CENTRAL finite differences of
-  the DISPLAYED f64 price (subject is ground_truth vs FD, bounded by an a-priori
-  Richardson band from the step alone -- ``so_fd_apriori_band``). A negative-d1
-  sign-fold point is included.
-
-  ACCURACY-MONOTONE guard: the new f64-body reference error vs analytic-true must
-  be <= the old f32-erfc path's error (no illegitimate tolerance re-baseline).
-
-All numeric agreement is established by ``chelis test --json``: this script
-emits ONE generated test file under ``.gate-tmp/`` (gitignored, never under
-``tests/``, so a failing run cannot leave an artifact the wholesale tests/ CI
-scan picks up), runs it once (the package compiles in one pass), and reads
-per-assertion pass/fail. The generated file is unlinked on every exit path. A
-passing assertion certifies |package - reference| < tol, where every tol is
-DERIVED from f32 precision and FD truncation, never a fixed percent (see
-``tol_*`` / ``*_apriori_band`` below). The JSON report states each derived
-tolerance so the bound is auditable.
-
-Exit 0 on pass (or SKIP when the configured chelis is missing/pre-0.8.0 --
-set SHOALS_ORACLE_REQUIRE_CHELIS=1 to make that case FAIL instead, which CI
-does), nonzero on fail. A JSON summary is printed to stdout.
+A separate historical f32 A&S model supplies the accuracy-monotone baseline;
+it is not asserted to mirror the installed Nautilus package. The generated
+file lives under .gate-tmp, is formatted and executed, then removed. CI sets
+SHOALS_ORACLE_REQUIRE_CHELIS=1 so a missing compiler is a failure.
 """
 
 from __future__ import annotations
@@ -96,17 +49,8 @@ def compiler_pin() -> str:
     return match.group(1)
 
 # --------------------------------------------------------------------------
-# Reference math (Python). `erf_pkg` mirrors whatever erf the package body
-# evaluates, so analytic mirrors isolate the AD chain rule, not erf error.
-# That is `math.erf` since this shell's issue 61 -- see `erf_pkg` for why the
-# substitution is faithful. `_erf_as_f32` still models A&S because the f32
-# path still evaluates it. `_true` versions use math.erf for the
-# accuracy-monotone guard's ground truth.
-#
-# NAMING: docstrings below still say "the DISPLAYED A&S price". Read that as
-# "the price the package displays" -- the formulae are unchanged, only the
-# kernel underneath moved.
-# --------------------------------------------------------------------------
+# Reference math. The f32 A&S helper below is retained only as a historical
+# accuracy baseline.
 SQRT2 = math.sqrt(2.0)
 INV_SQRT_2PI = 1.0 / math.sqrt(2.0 * math.pi)
 
@@ -116,24 +60,9 @@ def f32(x: float) -> float:
     return struct.unpack("f", struct.pack("f", x))[0]
 
 
-def erf_pkg(x: float) -> float:
-    """The erf the PACKAGE evaluates, mirrored here so the comparison isolates
-    the AD chain rule rather than erf accuracy.
-
-    Since this shell's issue 61 the package evaluates Cody's approximation at
-    >= 3.3675e-16, so `math.erf` is a faithful mirror: the two differ by
-    ~1e-16, ten orders below this gate's tightest tolerance (3e-6).
-
-    `_erf_as_f32` models the separate f32 Nautilus.Special.erf path: the
-    pinned Nautilus uses a four-term Taylor series below |x|=0.25 and A&S
-    elsewhere. The generated kernel-mirror test checks both arms and their
-    boundary against the installed package at every oracle run.
-    """
-    return math.erf(x)
-
-
 def ncdf_as(x: float) -> float:
-    return 0.5 * (1.0 - erf_pkg(-x / SQRT2))
+    """High-precision reference for the package's erfc-based normal CDF."""
+    return 0.5 * math.erfc(-x / SQRT2)
 
 
 def ncdf_true(x: float) -> float:
@@ -155,7 +84,7 @@ def call_price(s, k, r, sg, t, ncdf):
 
 
 def _erf_as_f32(x: float) -> float:
-    """Pinned Nautilus erf: f32 Taylor near zero, A&S 7.1.26 elsewhere."""
+    """Historical f32 A&S path used by the accuracy-monotone baseline."""
     x = f32(x)
     a1, a2, a3, a4, a5, p = (
         f32(0.254829592), f32(-0.284496736), f32(1.421413741),
@@ -175,7 +104,7 @@ def _erf_as_f32(x: float) -> float:
 
 
 def call_price_old_f32(s, k, r, sg, t) -> float:
-    """OLD shipped path modeled in f32 arithmetic with A&S erf (= Nautilus erfc)."""
+    """Historical f32 A&S price used as the accuracy-monotone baseline."""
     sg = f32(sg)
     sqrt_t = f32(math.sqrt(t))
     d1 = f32((f32(math.log(f32(s / k))) + f32(f32(r + f32(0.5 * f32(sg * sg))) * t))
@@ -189,8 +118,7 @@ def call_price_old_f32(s, k, r, sg, t) -> float:
 def analytic_greeks(s, k, r, sg, t, ncdf):
     """EXACT textbook closed forms (delta=N(d1), vega=S phi(d1) sqrt t, etc.)
     using the EXACT Gaussian pdf -- these equal the TRUE Black-Scholes Greeks.
-    They agree with the AD Greeks only up to the A&S approximation's derivative
-    (model) error, since AD differentiates the A&S-erf price, not true BS."""
+    The scalar pricing body uses the native erfc-based CDF."""
     d1, d2 = d1d2(s, k, r, sg, t)
     delta = ncdf(d1)
     vega = s * npdf(d1) * math.sqrt(t)
@@ -203,15 +131,7 @@ def analytic_greeks(s, k, r, sg, t, ncdf):
 
 
 def erf_pkg_deriv(x: float) -> float:
-    """d/dx of the package's erf, closed form.
-
-    With the package on Cody's approximation the derivative of the
-    approximation and the true derivative agree far inside this gate's
-    tolerances, so this is the exact 2/sqrt(pi) * exp(-x^2) rather than the
-    differentiated A&S rational form it used to be. That older form is what
-    made this gate fail 13 of 14 groups once the kernel changed: it was
-    measuring erf accuracy, which the docstring says it must not.
-    """
+    """Closed-form derivative of the Gaussian erf used by the native CDF."""
     return 1.1283791670955126 * math.exp(-x * x)
 
 
@@ -221,13 +141,7 @@ def pdf_as(x: float) -> float:
 
 
 def erf_pkg_deriv2(x: float) -> float:
-    """d^2/dx^2 of the package's erf, closed form: -2x * 2/sqrt(pi) * exp(-x^2).
-
-    Was the differentiated A&S rational form. Same reasoning as
-    ``erf_pkg_deriv``: with the package on Cody's approximation the true second
-    derivative is the faithful mirror, and the old form measured erf accuracy
-    rather than the AD chain rule.
-    """
+    """Second derivative of Gaussian erf: -2x * 2/sqrt(pi) * exp(-x^2)."""
     return -2.0 * x * 1.1283791670955126 * math.exp(-x * x)
 
 
@@ -239,18 +153,13 @@ def pdf_as_deriv(x: float) -> float:
 
 
 def ad_ground_truth_greeks(s, k, r, sg, t):
-    """The EXACT first-order derivatives of the DISPLAYED A&S-erf price -- what
-    AD must reproduce. CLOSED FORM via the chain rule using the analytic A&S
-    'pdf' (pdf_as = d/dx ncdf_as), NOT finite differences: the A&S erf has a
-    derivative kink at d1=0 (the small-|x| branch boundary) that makes FD of the
-    price noisy exactly at the sign-fold point, whereas AD evaluates the chain
-    rule pointwise. This closed form matches AD to f32 ULPs everywhere, so it is
-    the tight chain-rule oracle isolating the autodiff transform itself.
+    """Closed-form first derivatives of the erfc-based displayed price.
+
+    This chain-rule oracle checks AD independently of finite differences.
 
     With dd1/dP and dd2/dP the param-derivatives of d1,d2, and N=ncdf_as,
     n=pdf_as:  dC/dP = N(d1) [P=S] + S n(d1) dd1/dP - K e^{-rt} n(d2) dd2/dP
-    plus the explicit -rt term in r/t. Standard, but with the A&S n() not the
-    exact Gaussian."""
+    plus the explicit -rt term in r/t."""
     sqrt_t = math.sqrt(t)
     d1, d2 = d1d2(s, k, r, sg, t)
     disc = math.exp(-r * t)
@@ -278,16 +187,15 @@ def ad_ground_truth_greeks(s, k, r, sg, t):
 
 
 def ad_second_order_groundtruth(s, k, r, sg, t):
-    """The EXACT second derivatives of the DISPLAYED A&S-erf price -- what the
+    """The exact second derivatives of the displayed native-CDF price -- what the
     nested-grad Greeks (gammas_call, volgas_call, vannas_call) must reproduce.
-    CLOSED FORM via the chain rule with the analytic A&S pdf and pdf-prime
+    CLOSED FORM via the chain rule with the analytic Gaussian pdf and pdf-prime
     (pdf_as, pdf_as_deriv), NOT finite differences: like the first-order ground
-    truth, this evaluates the chain rule pointwise so the A&S small-|x| branch kink
-    at d1=0 does not inject FD noise. This is the tight oracle isolating the nested
+    truth, this evaluates the chain rule pointwise without finite-difference noise. This is the tight oracle isolating the nested
     autodiff transform; it matches AD to f32 ULPs.
 
       C  = S N(d1) - K e^{-rt} N(d2),  N=ncdf_as, n=pdf_as, n'=pdf_as_deriv.
-      gamma = d2C/dS2, volga = d2C/dsg2, vanna = d2C/dS dsg, all of the A&S price."""
+      gamma = d2C/dS2, volga = d2C/dsg2, vanna = d2C/dS dsg, all of the displayed price."""
     st = math.sqrt(t)
     d1, d2 = d1d2(s, k, r, sg, t)
     disc = math.exp(-r * t)
@@ -321,7 +229,7 @@ def second_order_analytic(s, k, r, sg, t):
     """EXACT textbook closed forms of the TRUE Black-Scholes second-order Greeks
     using the EXACT Gaussian pdf (gamma = phi(d1)/(S sg sqrt t),
     volga = vega d1 d2 / sg, vanna = -phi(d1) d2 / sg). They agree with the AD
-    Greeks only up to the A&S approximation's second-derivative model error, which
+    Greeks within f32 rounding and any measured model difference, which
     is measured per cell as |this - ad_second_order_groundtruth| and folded into
     the secondary tolerance -- it never loosens the primary ground-truth gate."""
     st = math.sqrt(t)
@@ -335,7 +243,7 @@ def second_order_analytic(s, k, r, sg, t):
 
 
 def fd_second_order(s, k, r, sg, t, ncdf):
-    """Tuned CENTRAL finite differences of the DISPLAYED f64 A&S price -- the
+    """Tuned CENTRAL finite differences of the displayed f64 price -- the
     second independent reference required for gamma/volga/vanna. Steps are tuned
     PER GREEK so neither O(h^2) truncation nor f64 cancellation dominates the
     second difference: gamma differences a small curvature out of S-scale prices,
@@ -369,7 +277,7 @@ def fd_second_order(s, k, r, sg, t, ncdf):
 
 
 def fd_greeks(s, k, r, sg, t, ncdf):
-    """Central-difference Greeks of the A&S price body, predicting the SHIPPED
+    """Central-difference Greeks of the native-CDF price body, predicting the SHIPPED
     Shoals.Greeks fd_* (which difference bs_call_scalar in f32). Steps are chosen
     moderate so neither O(h^2) truncation nor f32 quotient rounding dominates;
     the prices are f32-rounded here to mirror the f32 fd_* quotient."""
@@ -410,14 +318,14 @@ def fd_greeks(s, k, r, sg, t, ncdf):
 # (relative); a downcast f32 scalar carries absolute error ~ eps_f32 * |value|,
 # and through the ~20 chained f32 ops in the Greek path the running error is a
 # small multiple. Every tolerance below is built from eps_f32, an explicit
-# FD-truncation prediction, or the measured A&S derivative-model error -- never
+# FD-truncation prediction, or a measured derivative-model difference -- never
 # a fixed percent. Each tol's derivation is echoed into the JSON report.
 # --------------------------------------------------------------------------
 EPS_F32 = 2.0 ** -23
 
 
 def tol_ad_vs_groundtruth(v: float) -> float:
-    """PRIMARY, tight. AD must equal the exact derivative of the DISPLAYED A&S
+    """PRIMARY, tight. AD must equal the exact derivative of the displayed native-CDF
     price (ad_ground_truth_greeks). The only difference is f32 rounding of the
     AD output vs the f64 ground truth, plus the ~4e-9 Richardson residual -> a
     few f32 ULPs of the value, floored for near-zero Greeks."""
@@ -426,10 +334,10 @@ def tol_ad_vs_groundtruth(v: float) -> float:
 
 def tol_ad_vs_analytic(model_err: float, v: float) -> float:
     """SECONDARY. AD vs the EXACT textbook closed form (true BS). These differ by
-    the A&S approximation's derivative-model error, measured per cell as
+    a measured derivative-model difference, measured per cell as
     |exact_analytic - ground_truth| (model_err). Tolerance = 2x that measured
     model error + the f32 floor. This documents that AD tracks true BS to within
-    the erf model error -- it does not loosen to hide an AD bug, because the
+    the measured model difference -- it does not loosen to hide an AD bug, because the
     PRIMARY ground-truth gate already pins AD tight."""
     return 2.0 * model_err + max(8.0 * EPS_F32 * abs(v), 3e-6)
 
@@ -474,7 +382,7 @@ VANNA_ABS_FLOOR = 4e-5                     # vanna ~1e-1..1e0; intermediate floo
 
 def tol_so_vs_groundtruth(greek: str, v: float) -> float:
     """PRIMARY, tight. The nested-grad Greek must equal the exact SECOND derivative
-    of the DISPLAYED A&S price (ad_second_order_groundtruth). Difference is f32
+    of the displayed native-CDF price (ad_second_order_groundtruth). Difference is f32
     rounding of the AD output vs the f64 closed form, doubled-chain-rule band plus
     the greek-specific f32 floor."""
     floor = {"gamma": GAMMA_ABS_FLOOR, "volga": VOLGA_ABS_FLOOR, "vanna": VANNA_ABS_FLOOR}[greek]
@@ -483,10 +391,10 @@ def tol_so_vs_groundtruth(greek: str, v: float) -> float:
 
 def tol_so_vs_analytic(greek: str, model_err: float, v: float) -> float:
     """SECONDARY. Nested-grad Greek vs the EXACT true-BS second-order closed form.
-    They differ by the A&S approximation's SECOND-derivative model error, measured
+    They differ by a measured second-derivative model difference, measured
     per cell as |true_BS - ground_truth| (model_err). Tolerance = 2x that measured
     model error + the primary band. Documents that AD tracks true BS to within the
-    erf model error; the primary ground-truth gate keeps AD itself pinned tight."""
+    measured model difference; the primary ground-truth gate keeps AD itself pinned tight."""
     return 2.0 * model_err + tol_so_vs_groundtruth(greek, v)
 
 
@@ -523,7 +431,6 @@ def build_test_source(grid, refs):
         "import Shoals.Pricing (call_prices, deltas_call, vegas_call, rhos_call, thetas_call, gammas_call, volgas_call, vannas_call)",
         "import Shoals.References.BlackScholes (call_textbook)",
         "import Shoals.Greeks (fd_delta_call, fd_vega_call, fd_rho_call, fd_theta_call)",
-        "import Nautilus.Special (erf)",
     ]
     # Group cells by (k,r,sg,t) so we issue one vector call per group.
     groups: dict = {}
@@ -531,20 +438,7 @@ def build_test_source(grid, refs):
         key = (cell["k"], cell["r"], cell["sigma"], cell["t"])
         groups.setdefault(key, []).append((cell, ref))
 
-    test_names = ["test_nautilus_erf_mirror"]
-    lines.append("def test_nautilus_erf_mirror() -> unit ! { Test } = {")
-    # Both signs, the former cutover, the changed Taylor interval, adjacent
-    # f32 values around the new cutover, and the unchanged rational arm.
-    mirror_points = [0.0, 1e-6, 1e-5, 0.03796697407960892, 0.1,
-                     0.2499999850988388, 0.25, 0.2500000298023224, 1.0, 3.0]
-    mirror_points += [-x for x in mirror_points[1:]]
-    for i, x in enumerate(mirror_points):
-        expected = _erf_as_f32(x)
-        tolerance = 2.0 ** (math.frexp(abs(expected))[1] - 23) if expected else 0.0
-        prefix = "  _ = " if i + 1 < len(mirror_points) else "  "
-        lines.append(prefix + f'assert_close(erf({lit32(x)}), {lit32(expected)}, '
-                     f'{lit32(tolerance)}, "nautilus erf mirror {i}")')
-    lines.append("}")
+    test_names = []
     for gi, (key, members) in enumerate(groups.items()):
         k, r, sg, t = key
         spots = [m[0]["s"] for m in members]
@@ -571,8 +465,8 @@ def build_test_source(grid, refs):
                 f'assert_close(index(cp, {idx}), call_textbook({lit32(s)}, {common}), '
                 f'{lit32(tol_binding(ref["price_ref"]))}, "g{gi}c{j} price==erfc-ref")'
             )
-            # PRIMARY (tight): AD Greek == exact derivative of the DISPLAYED A&S
-            # price (Richardson ground truth). Isolates the autodiff transform.
+            # PRIMARY (tight): AD Greek == exact derivative of the displayed
+            # native-CDF price. Isolates the autodiff transform.
             for gk, lst in (("delta", "dl"), ("vega", "vl"), ("rho", "rl"), ("theta", "tl")):
                 gt = ref["ground_truth"][gk]
                 asserts.append(
@@ -580,7 +474,7 @@ def build_test_source(grid, refs):
                     f'{lit32(tol_ad_vs_groundtruth(gt))}, "g{gi}c{j} {gk} ad==groundtruth")'
                 )
             # SECONDARY: AD vs EXACT textbook analytic (true BS) -- agree up to the
-            # measured A&S derivative-model error.
+            # measured derivative-model difference.
             for gk, lst in (("delta", "dl"), ("vega", "vl"), ("rho", "rl"), ("theta", "tl")):
                 an = ref["analytic"][gk]
                 merr = abs(an - ref["ground_truth"][gk])
@@ -615,7 +509,7 @@ def build_test_source(grid, refs):
             # ---- SECOND-ORDER GREEKS (nested grad): gamma, volga, vanna ----
             so_lst = {"gamma": "gm", "volga": "vg", "vanna": "vn"}
             # PRIMARY (tight): nested-grad Greek == exact SECOND derivative of the
-            # DISPLAYED A&S price (closed-form ground truth). Isolates nested AD.
+            # displayed native-CDF price (closed-form ground truth). Isolates nested AD.
             for gk in ("gamma", "volga", "vanna"):
                 sgt = ref["so_ground_truth"][gk]
                 asserts.append(
@@ -771,29 +665,22 @@ def main() -> int:
 
     # Build references + accuracy-monotone guard.
     refs = []
-    acc_new_max = 0.0  # max |A&S-body price - true price|
-    acc_old_max = 0.0  # max |f32-erfc path price - true price| (modeled)
+    acc_new_max = 0.0  # max |native-CDF price after f32 cast - true price|
+    acc_old_max = 0.0  # max |historical f32 A&S price - true price| (modeled)
     for cell in grid:
         s, k, r, sg, t = cell["s"], cell["k"], cell["r"], cell["sigma"], cell["t"]
         ag = analytic_greeks(s, k, r, sg, t, ncdf_as)
         fg = fd_greeks(s, k, r, sg, t, ncdf_as)
         price_as = call_price(s, k, r, sg, t, ncdf_as)
         price_true = call_price(s, k, r, sg, t, ncdf_true)
-        # NEW path: A&S erf computed in f64 then downcast to f32 (bs_call_scalar).
-        # OLD path: A&S erf computed in f32 arithmetic (Nautilus.Special.erfc).
-        # These no longer inherit one model error: since this shell's issue 61
-        # the new path evaluates Cody's and the old f32 path evaluates A&S, so
-        # this compares two approximations rather than isolating arithmetic
-        # precision. The guard still means "new is at least as accurate as
-        # old" -- measured 9.16e-7 against 3.64e-5 -- but not "same model,
-        # different width". The difference vs true is
-        # the arithmetic precision. The monotone guard asserts new <= old.
+        # Compare the native-CDF f64 price after downcast with the historical
+        # f32 A&S model. The monotone guard asserts new <= old on this grid.
         price_new_f32 = f32(price_as)
         price_old_f32 = call_price_old_f32(s, k, r, sg, t)
         acc_new_max = max(acc_new_max, abs(price_new_f32 - price_true))
         acc_old_max = max(acc_old_max, abs(price_old_f32 - price_true))
         gt = ad_ground_truth_greeks(s, k, r, sg, t)
-        # Second-order references: exact 2nd derivative of the DISPLAYED A&S price
+        # Second-order references: exact 2nd derivative of the displayed price
         # (primary), true-BS 2nd-order closed form (secondary), tuned f64 FD of the
         # displayed price (secondary).
         so_gt = ad_second_order_groundtruth(s, k, r, sg, t)
@@ -847,7 +734,7 @@ def _finish(grid, refs, test_names, src, rc, per_test, summary, out, err,
     n_fail = summary.get("failed", 0)
     failures = {k: v for k, v in per_test.items() if v[0] != "pass"}
 
-    # The monotone guard: the new f64-A&S body must be at least as accurate.
+    # The native-CDF f64 body must be at least as accurate on this grid.
     monotone_ok = acc_new_max <= acc_old_max + 1e-12
 
     all_ok = (rc == 0) and (n_fail == 0) and (n_pass == len(test_names)) and monotone_ok
@@ -867,7 +754,7 @@ def _finish(grid, refs, test_names, src, rc, per_test, summary, out, err,
         },
         "accuracy_monotone": {
             "new_f64_body_max_abs_err_vs_true": acc_new_max,
-            "old_f32_erfc_path_max_abs_err_vs_true_modeled": acc_old_max,
+            "old_f32_as_path_max_abs_err_vs_true_modeled": acc_old_max,
             "new_le_old": monotone_ok,
         },
         "sign_fold": [
@@ -923,8 +810,8 @@ def _finish(grid, refs, test_names, src, rc, per_test, summary, out, err,
                 "subject is closed-form ground_truth vs in-package fd_*; band is "
                 "derived from h+precision alone (NOT from any gt-vs-fd gap), so it "
                 "can fail if the closed form is wrong",
-            "binding": "max(16*eps_f32*|price|, 1e-4); f32 quantization plus the "
-                       "Cody-vs-A&S approximation gap, which sits far below it",
+            "binding": "max(16*eps_f32*|price|, 1e-4); f32 quantization and "
+                       "native-CDF versus contract-CDF approximation gap",
             "so_ad2_vs_groundtruth (PRIMARY, gating)":
                 "max(48*eps_f32*|v|, greek_floor); nested grad == exact f64 2nd-deriv of the displayed price",
             "so_ad2_vs_analytic (secondary)":

@@ -17,12 +17,10 @@ import Std.Contracts (normal_cdf)
 --
 -- `Std.Contracts.normal_cdf` is the certified A&S f32 normal CDF
 -- (0.5*erfc(-x/sqrt2), the Abramowitz-Stegun 7.1.26 coefficients). The shipped
--- pricer (`Shoals.Pricing.bs_call_scalar`) computes a DIFFERENT approximation in
--- an f64 body: since shoals#61 `erf64`/`n_cdf64` evaluate W. J. Cody's rational
--- approximation, NOT A&S. So the binding is measured agreement, not identity of
--- model: the two are compared and shown to agree inside a stated f32 bound.
--- That bound is what licenses the scoping, and nothing weaker does: the two
--- approximations are NOT interchangeable outside it. Their price-level gap
+-- pricer (`Shoals.Pricing.bs_call_scalar`) evaluates Chelis's
+-- `standard_normal_cdf` in f64 before downcasting. The binding is measured
+-- agreement within a stated f32 bound, not identity of the evaluated graph.
+-- Their price-level gap
 -- scales with spot, so no fixed figure bounds it over free parameters.
 -- That binding is the S7 cross-check
 -- (`tests/composites_binding.ch`), not a value-level proof, because erf/log are
