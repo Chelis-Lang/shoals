@@ -29,6 +29,15 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   predictions trade places. Separately, the old count variance was
   `rate*(1 - q)` rather than `rate` at EVERY parameter, a deficit the 5x
   budget ratio bounds at 20% and which does not shrink as the rate grows.
+  That half is pinned on its own observable rather than on the fraction,
+  because `P(N = 0)` alone cannot see it: a sampler thinning over the *new*
+  17-slot budget would give 0.826075 against Poisson's 0.826959, inside the
+  fraction test's tolerance at -0.33 standard errors. With `p = 1` and
+  `sigma = 0`, `X = (log(S_t) + moment)*eta_up` is a compound Poisson sum of
+  unit exponentials, so `Var(X) = rate + Var(N)` is directly observable.
+  Measured at `rate = 3` over six seeds at 20000 draws: `s^2` in
+  [5.9533, 6.0076] against Poisson's 6.0 and the thinned law's 5.4375 -- about
+  29 seed standard errors of separation.
 - *Leg 2, the mean.* The exact terminal-mean error is
   `exp(n_max*log(1 + q*zeta) - rate*zeta) - 1`: **-5.63%** at `rate = 0.19`
   with `zeta = 2`, **-1.50%** at `rate = 10` with `zeta = 0.125`, **-9.91%**
@@ -49,6 +58,12 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   `log E[w^N]` IS `rate*zeta`, so shoals#132 was a sampler defect and not a
   compensator one. What the exported moment adds is the enumeration
   correction, so the identity survives truncation at any slot count.
+- *Cost.* The slot bound carries twelve absolute slots, so a low-intensity
+  call now draws at least twelve uniforms and exponentials per path where the
+  thinned sampler budgeted one: at `rate = 0.19` with `zeta = 2` the table is
+  17 slots, about 17x the per-path draws. That buys the count law and is not
+  tunable without reintroducing the truncation the bound exists to prevent.
+  `chelis test tests/` is unchanged at 521 passed in about 60s.
 - Two inputs now refuse rather than answer. `eta_up <= 1` makes `E[exp(Y)]`
   divergent and previously returned NaN for every path; a negative
   `lambda_jump*t` previously returned a jump-free path compensated for a

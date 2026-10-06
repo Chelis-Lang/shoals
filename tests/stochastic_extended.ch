@@ -382,6 +382,61 @@ def test_kou_terminal_count_law_is_poisson_below_the_old_slot_cap() -> unit ! { 
   _ = assert_true(lt(rel_gap(frac, poisson), cast(0.01, f32)), "the Kou no-jump fraction at lambda*t=0.19 matches the Poisson exp(-0.19)")
   assert_true(gt(sub(frac, capped), cast(0.008, f32)), "the Kou no-jump fraction at lambda*t=0.19 rejects the one-slot cap's 1-0.19")
 }
+-- shoals#132 leg 1, SECOND half: the count VARIANCE. The no-jump-fraction
+-- test above pins P(N = 0), which is one moment of the count law, and a
+-- red-team round showed that is not enough on its own. A sampler that thinned
+-- over the NEW 17-slot budget rather than the old 1-slot one gives
+-- P(N = 0) = (1 - 0.19/17)^17 = 0.826075 against Poisson's 0.826959 -- a
+-- 0.107% relative gap that sails through that test's 1% tolerance at -0.33
+-- standard errors. So the fraction test pins "the budget is no longer one
+-- slot"; it does not pin "the count is Poisson". This test does.
+--
+-- The observable: with p = 1 every jump is up, so J = (sum of N Exp(1)
+-- draws) / eta_up, and with sigma = 0 and mu = 0 the drift is exactly
+-- -moment. Therefore X = (log(S_t) + moment) * eta_up is a compound Poisson
+-- sum of unit exponentials, giving E[X] = rate and
+-- Var(X) = rate * Var(Exp) + Var(N) * E[Exp]^2 = rate + Var(N). The count
+-- variance is read off directly, which no function of P(N = 0) alone can do.
+--
+-- At rate = 3 the two laws are far apart: Poisson gives Var(X) = 6.0 and the
+-- thinned Binomial(16, 3/16) gives 3 + 16*(3/16)*(13/16) = 5.4375. Measured
+-- over six seeds at 20000 draws: s^2 in [5.9533, 6.0076], mean 5.9765, seed
+-- sd 0.0192 -- so the 0.5625 gap to the thinned law is about 29 seed standard
+-- errors. The 0.15 tolerance is 3.2x the worst observed deviation and still
+-- leaves the thinned value 3.75 tolerances away.
+--
+-- The mean leg is asserted too, and it is the off-by-one guard: E[X] = rate
+-- holds only if the sampler adds exactly N jumps. Adding N+1 or N-1 would
+-- move it by a full unit against a seed sd of 0.0082. Measured E[X] over the
+-- same six seeds: 3.0080, sd 0.0082. The tolerance is set from the THEORETICAL
+-- standard error sqrt(6/20000) = 0.0173 rather than that observed spread,
+-- deliberately: the observed seed spread here is about half the theoretical
+-- value, which suggests key_from_seed on small integers may not give fully
+-- independent streams, and a tolerance calibrated on a possibly-correlated
+-- sample would be too tight if that correlation ever changed.
+def test_kou_terminal_count_variance_is_poisson_not_thinned() -> unit ! { Test } = {
+  one = cast(1.0, f32)
+  zero = cast(0.0, f32)
+  n = cast(20000, i64)
+  template = to_tensor(map(fn (i: i64) -> zero, range(cast(0, i64), n)))
+  jumps_template = to_tensor(map(fn (i: i64) -> zero, range(cast(0, i64), n)))
+  rate = cast(3.0, f32)
+  eta_up = cast(4.0, f32)
+  eta_dn = cast(3.0, f32)
+  mom = sto_kou_sampler_log_jump_moment(rate, one, eta_up, eta_dn, one)
+  paths = sto_kou_jump_terminal(key_from_seed(3i64), template, jumps_template, one, zero, zero, rate, one, eta_up, eta_dn, one)
+  xs = to_tensor(map(fn (sv: f32) -> mul(add(log(sv), mom), eta_up), to_list(paths)))
+  sd = std_vec(copy(xs), cast(1, i64))
+  s2 = mul(sd, sd)
+  m = mean_vec(xs)
+  gap_m = sub(m, rate)
+  gap_m_abs = if lt(gap_m, zero) then neg(gap_m) else gap_m
+  gap_v = sub(s2, cast(6.0, f32))
+  gap_v_abs = if lt(gap_v, zero) then neg(gap_v) else gap_v
+  _ = assert_true(lt(gap_m_abs, cast(0.1, f32)), "the Kou sampler places exactly N jumps: E[X] is lambda*t")
+  _ = assert_true(lt(gap_v_abs, cast(0.15, f32)), "the Kou count variance is Poisson's: Var(X) = rate + rate")
+  assert_true(gt(s2, cast(5.72, f32)), "the Kou count variance rejects the thinned Binomial's 5.4375")
+}
 -- A terminal-mean check on the sampler, at the ONLY kind of parameter point
 -- where one is statistically meaningful -- and a standing note that leg 2 of
 -- shoals#132 deliberately has no Monte-Carlo oracle.
@@ -405,9 +460,12 @@ def test_kou_terminal_count_law_is_poisson_below_the_old_slot_cap() -> unit ! { 
 -- regression pin. The regression pin for the sampler is the no-jump fraction
 -- test above.
 --
--- Tolerance from measurement, not from taste: SE is 0.0021 at 4000 paths, and
--- two seeds give |mean - 1| of 1.24 and 0.61 standard errors. 0.012 is about
--- 5.5 SE.
+-- Tolerance from the EXACT standard error, not from a sample estimate of it.
+-- E[S_t^2] = exp(-2m) * exp(rate * (w2 - 1)) with
+-- w2 = E[exp(2Y)] = p*eta_up/(eta_up - 2) + (1 - p)*eta_dn/(eta_dn + 2)
+-- = 1.190476 here, giving Var 0.020563, sd 0.143398 and SE 0.002267 at 4000
+-- paths. The 0.012 tolerance is therefore 5.29 SE. Two seeds give |mean - 1|
+-- of 1.24 and 0.61 standard errors.
 def test_kou_terminal_mean_matches_s0_exp_mu_t() -> unit ! { Test } = {
   zero = cast(0.0, f32)
   one = cast(1.0, f32)

@@ -174,8 +174,11 @@ returns a NaN sentinel.
 enumerated Poisson law over a finite slot table, then adds the first `N` of
 that path's pre-drawn double-exponential jumps, so the aggregate log jump is a
 genuine compound Poisson sum. The table is sized on the exponentially tilted
-mean `lambda_jump * t * (1 + zeta)`, and an intensity whose table would exceed
-the slot cap is refused rather than silently truncated.
+mean `lambda_jump * t * max(1, 1 + zeta)` -- the multiplier is floored at one,
+so a negative `zeta` sizes the table on the plain rate rather than shrinking it
+-- plus a seven-standard-deviation margin and twelve absolute slots. An
+intensity whose table would exceed the slot cap is refused rather than silently
+truncated.
 
 `sto_kou_sampler_log_jump_moment` returns `log E[exp(J)]` for that aggregate
 log jump, which is exactly what `sto_kou_jump_terminal` subtracts from the log
@@ -193,4 +196,9 @@ Two cautions, both load-bearing:
 - Kou pays the slot bound harder than Merton does. Merton aggregates its `N`
   jumps in closed form as a single Gaussian, so a slot costs one table entry.
   Kou's jump sizes have no such form, so every slot is also a per-path draw
-  and a fold step.
+  and a fold step. The twelve absolute slots in the bound therefore set a
+  floor of twelve draws per path even at a near-zero intensity, where the
+  older thinned sampler budgeted one. At `lambda_jump * t = 0.19` with
+  `zeta = 2` the table is 17 slots, so a low-intensity call costs about 17x
+  the per-path draws it used to. This buys the count law and is not tunable
+  without reintroducing the truncation the bound exists to prevent.
