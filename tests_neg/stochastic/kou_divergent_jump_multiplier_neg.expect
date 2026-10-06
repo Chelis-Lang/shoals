@@ -1,0 +1,23 @@
+Shoals.Stochastic: kou jump parameters must be finite
+Assumption: the jump-count table needs a finite jump multiplier
+w = E[exp(Y)] = 1 + zeta, and eta_up <= 1 does not give it one -- the up-jump
+exponential moment integral diverges. sto_kou_compensator returns a NaN
+sentinel in that case and always has; what changed in shoals#132 is that the
+sampler no longer multiplies that NaN into its drift and returns NaN for every
+path.
+
+This guard and its Merton counterpart are the same predicate reached by two
+different routes, which is why the finiteness check lives in
+count_params_finite rather than in either model. Merton's non-finite
+log_w comes from a non-finite INPUT; Kou's comes from a divergent moment of
+perfectly finite ones. A reader looking only at Merton's fixture would
+conclude the check is about input validation. It is not.
+
+Deleting this guard clause does NOT make the fixture pass. Measured on this
+pin: it then fails with the SLOT CAP diagnostic instead, because exp(NaN) is
+NaN, `lt(nan, 1.0)` is false so the tilted mean stays NaN, and
+`not(lte(nan, 4096.0))` is true. `--expect neg` sees the wrong text and the
+file fails as WRONG-DIAGNOSTIC rather than passing; the assertion is never
+reached. That is the whole point of pairing a required diagnostic with the
+fixture: a guard removal has to change the TEXT, not merely keep something
+failing.

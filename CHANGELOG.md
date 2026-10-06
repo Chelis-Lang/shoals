@@ -8,6 +8,70 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **BREAKING: `Shoals.Stochastic.sto_kou_jump_terminal` samples a compound
+  Poisson jump count** (shoals#132). It previously allocated a fixed slot
+  budget `n_max = trunc(5*lambda_jump*t + 1)` and thinned it at
+  `q = lambda_jump*t/n_max`, so its jump count was `Binomial(n_max, q)` while
+  its drift subtracted the compound-Poisson compensator `lambda_jump*t*zeta`.
+  Those are different count laws with different exponential moments, so the
+  advertised `E[S_t] = s0*exp(mu*t)` did not hold. Two legs, both now pinned by
+  tests.
+- *Leg 1, the count law.* Below `lambda_jump*t = 0.2` the slot budget was
+  exactly ONE, so a second jump was impossible where Poisson puts up to
+  1.59e-2 of its mass. This is decidable from the no-jump fraction alone:
+  **any** count law capped at one jump with the right mean has
+  `P(N=0) = 1 - rate` identically, against Poisson's `exp(-rate)`. Measured at
+  `lambda_jump*t = 0.19`, `p = 1`, `eta_up = 1.5`, `eta_dn = 3`, `sigma = 0`,
+  `s0 = 1`, `mu = 0`, seed 31, 20000 draws: the old sampler's no-jump fraction
+  was **0.81285**, which sits 1.0 standard errors from the capped law's 0.81
+  and 5.3 from Poisson's 0.826959. The new sampler's is **0.82725** -- 6.2
+  standard errors from the capped law and 0.1 from Poisson. The two
+  predictions trade places. Separately, the old count variance was
+  `rate*(1 - q)` rather than `rate` at EVERY parameter, a deficit the 5x
+  budget ratio bounds at 20% and which does not shrink as the rate grows.
+  That half is pinned on its own observable rather than on the fraction,
+  because `P(N = 0)` alone cannot see it: a sampler thinning over the *new*
+  17-slot budget would give 0.826075 against Poisson's 0.826959, inside the
+  fraction test's tolerance at -0.33 standard errors. With `p = 1` and
+  `sigma = 0`, `X = (log(S_t) + moment)*eta_up` is a compound Poisson sum of
+  unit exponentials, so `Var(X) = rate + Var(N)` is directly observable.
+  Measured at `rate = 3` over six seeds at 20000 draws: `s^2` in
+  [5.9533, 6.0076] against Poisson's 6.0 and the thinned law's 5.4375 -- about
+  29 seed standard errors of separation.
+- *Leg 2, the mean.* The exact terminal-mean error is
+  `exp(n_max*log(1 + q*zeta) - rate*zeta) - 1`: **-5.63%** at `rate = 0.19`
+  with `zeta = 2`, **-1.50%** at `rate = 10` with `zeta = 0.125`, **-9.91%**
+  at `rate = 10` with `zeta = 1/3`, and **-41.14%** at `rate = 50` with
+  `zeta = 1/3`. These are derived from the source formulas, not sampled, and
+  deliberately so: `E[S_t^2]` is finite only for `eta_up > 2`, and every
+  materially biased point violates or approaches that bound, so no terminal
+  mean estimate has a usable standard error there. Measured at `eta_up = 2`,
+  `rate = 10`, 4000 paths: sample sd 31.9, standard error 0.50 -- an
+  estimator that cannot adjudicate a 10% bias. Leg 2's oracle is therefore
+  the deterministic moment identity, not a Monte-Carlo mean.
+- `sto_kou_sampler_log_jump_moment` is newly exported, as its Merton
+  counterpart is, and returns `log E[exp(J)]` for the law the sampler actually
+  draws. The jump-count table, slot bound, finiteness predicate and slot cap
+  are now shared between the two samplers rather than duplicated; Merton's
+  moment is bit-identical across that refactor at all five of its pinned
+  parameter points. **The closed form was never wrong**: for a Poisson count
+  `log E[w^N]` IS `rate*zeta`, so shoals#132 was a sampler defect and not a
+  compensator one. What the exported moment adds is the enumeration
+  correction, so the identity survives truncation at any slot count.
+- *Cost.* The slot bound carries twelve absolute slots, so a low-intensity
+  call now draws at least twelve uniforms and exponentials per path where the
+  thinned sampler budgeted one: at `rate = 0.19` with `zeta = 2` the table is
+  17 slots, about 17x the per-path draws. That buys the count law and is not
+  tunable without reintroducing the truncation the bound exists to prevent.
+  `chelis test tests/` is unchanged at 521 passed in about 60s.
+- Two inputs now refuse rather than answer. `eta_up <= 1` makes `E[exp(Y)]`
+  divergent and previously returned NaN for every path; a negative
+  `lambda_jump*t` previously returned a jump-free path compensated for a
+  negative jump contribution, which is a plausible-looking price for a model
+  that does not exist. An intensity whose tilted mean would exceed the slot cap
+  is refused naming that quantity. Terminal values for a given key and
+  parameters change.
+
 - **BREAKING: `Shoals.Stochastic.merton_jump_terminal` samples a compound
   Poisson jump count** (shoals#98). It previously drew ONE Gaussian for the
   aggregate log jump, moment-matched in the log to the compound Poisson sum
