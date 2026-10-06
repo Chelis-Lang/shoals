@@ -14,6 +14,10 @@ Black-Scholes here assumes a non-dividend-paying underlying and positive spot, s
 
 `bootstrap_zero_from_par` assumes annual coupons and integer-year pillars. `bootstrap_multi` accepts deposits, zero-coupon bonds, and par swaps in strictly increasing tenor order; it solves one pillar at a time. Its swap dates are year fractions rather than calendar-rolled dates. Invalid instruments or order raise an error, and so does a quote whose zero rate falls outside the `[-0.5, 2.0]` search bracket, a residual that is not finite over it, a solve that does not converge, and a `paths_template` whose length does not match the instrument list; none of these returns a NaN sentinel (shoals#79). Widening the bracket is a separate question: a quote outside it is rejected, not re-solved. `Shoals.Curves` uses `f32` rates and maturities. Basis-curve helpers are also exported, but there is no general joint multi-curve solve.
 
+`Shoals.Cds` uses `f32` elapsed year times. Its hazard-curve constructor and
+bootstrap reject non-increasing pillars, and the curve is opaque so a caller
+cannot bypass that check with a record literal. See [Credit default swaps](cds.md).
+
 `Shoals.Tenor` tenors are `Std.Datetime` periods, so a month is a calendar month; applying one, and every schedule, takes an explicit `DayOverflow` policy. ON, TN, and SN are business-day tenors, and spot lags count in one calendar and roll in another. `Shoals.Schedule` steps from a fixed anchor with explicit stub and end-of-month arguments and rolls its dates only when given a calendar. `parse_tenor` accepts only a positive count followed by uppercase `D`, `W`, `M`, or `Y`; anything else fails.
 
 `Shoals.Date.year_fraction` returns an exact rational `YearFraction`, converted to `f64` or `f32` by one correctly rounded step; `Shoals.Curves` remains `f32`, so a caller mixing them converts at the boundary. A convention's extra inputs are required fields of its variant: ACT/ACT ICMA takes the reference period and frequency and fails on an accrual outside that period, 30E/360 ISDA takes the maturity, 30/360 US the end-of-month flag, and BUS/252 a business calendar. ACT/ACT AFB is not provided.

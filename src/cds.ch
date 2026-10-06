@@ -1,9 +1,28 @@
 module Shoals.Cds
 import Nautilus.Roots (brent)
-export (HazardCurve, hazard_curve_from_pillars, cds_survival_from_hazards, cds_premium_leg_value, cds_protection_leg_value, cds_pv, cds_bootstrap_hazards)
+export (HazardCurve, hazard_curve_from_pillars, hazard_curve_pillars, cds_survival_from_hazards, cds_premium_leg_value, cds_protection_leg_value, cds_pv, cds_bootstrap_hazards)
+-- Only this module constructs a curve. Both producers check caller-supplied
+-- times, so a consumer cannot bypass pillar ordering with a record literal.
+@opaque
 type HazardCurve[n] =
   | HazardCurve { times: tensor[n, f32], hazards: tensor[n, f32] }
-def hazard_curve_from_pillars[n](times: tensor[n, f32], hazards: tensor[n, f32]) -> HazardCurve[n] = HazardCurve { times, hazards }
+def cds_first_unsorted_time(times: List[f32]) -> i64 = fold(fn (acc: i64, j: i64) -> if gte(acc, 0i64) then acc else if gt(index(times, j), index(times, sub(j, 1i64))) then acc else j, -1i64, range(1i64, len(times)))
+def cds_unsorted_time_detail(times: List[f32], j: i64) -> string = {
+  i_prev = sub(j, 1i64)
+  string_concat(": index ", string_concat(to_string(j), string_concat(" has time ", string_concat(to_string(index(times, j)), string_concat(", which does not exceed time ", string_concat(to_string(index(times, i_prev)), string_concat(" at index ", to_string(i_prev))))))))
+}
+def cds_validate_pillar_times(times: List[f32], function: string) -> unit = {
+  j = cds_first_unsorted_time(times)
+  if gte(j, 0i64) then fail(string_concat(string_concat("Shoals.Cds.", function), string_concat(": pillar times must be strictly increasing", cds_unsorted_time_detail(times, j)))) else ()
+}
+def hazard_curve_from_pillars[n](times: tensor[n, f32], hazards: tensor[n, f32]) -> HazardCurve[n] = {
+  _ = cds_validate_pillar_times(to_list(copy(times)), "hazard_curve_from_pillars")
+  HazardCurve { times, hazards }
+}
+def hazard_curve_pillars[n](curve: HazardCurve[n]) -> (tensor[n, f32], tensor[n, f32]) =
+  match curve with {
+    | HazardCurve { times: ts, hazards: hs } => (ts, hs)
+  }
 def cds_integrated_hazard(times_l: List[f32], hazards_l: List[f32], t: f32) -> f32 = {
   pairs = zip(times_l, hazards_l)
   init = (cast(0.0, f32), cast(0.0, f32))
@@ -112,6 +131,7 @@ def cds_bootstrap_step(spread: f32, tenor: f32, recovery: f32, r: f32, n_premium
 def cds_bootstrap_hazards[n](spreads: tensor[n, f32], tenors: tensor[n, f32], recovery: f32, r: f32, n_premiums_per_year: i64) -> HazardCurve[n] = {
   spreads_l = to_list(copy(spreads))
   tenors_l = to_list(copy(tenors))
+  _ = cds_validate_pillar_times(tenors_l, "cds_bootstrap_hazards")
   pairs = zip(tenors_l, spreads_l)
   init = ([], [])
   out = fold(fn (state: (List[f32], List[f32]), entry: (f32, f32)) -> {
