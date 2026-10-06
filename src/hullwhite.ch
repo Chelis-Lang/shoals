@@ -35,11 +35,11 @@ def hw1f_step(r: f32, a: f32, theta_bar: f32, sigma: f32, dt: f32, z: f32) -> f3
   diffusion = mul(sigma, mul(sqrt(dt), z))
   add(r, add(drift, diffusion))
 }
-def hw1f_path[n](paths_template: tensor[n, f32], r0: f32, a: f32, theta_bar: f32, sigma: f32, t: f32, n_steps: i64) -> tensor[n, f32] ! { Random } = {
+def hw1f_path[n](rng_key: key, paths_template: tensor[n, f32], r0: f32, a: f32, theta_bar: f32, sigma: f32, t: f32, n_steps: i64) -> tensor[n, f32] = {
   n_paths = numel(copy(paths_template))
   total = mul(n_paths, n_steps)
   big_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), total)))
-  z_t = normal_sample(big_template, cast(0.0, f32), cast(1.0, f32))
+  z_t = normal_sample(rng_key, big_template, cast(0.0, f32), cast(1.0, f32))
   z_l = to_list(z_t)
   dt = div(t, cast(n_steps, f32))
   path_idxs = range(cast(0, i64), n_paths)
@@ -76,12 +76,13 @@ def hw2f_step(x: f32, y: f32, a: f32, b: f32, sigma1: f32, sigma2: f32, rho: f32
   diff_y = mul(sigma2, mul(sqrt_dt, w2))
   (add(x, add(drift_x, diff_x)), add(y, add(drift_y, diff_y)))
 }
-def hw2f_path[n](paths_template: tensor[n, f32], x0: f32, y0: f32, a: f32, b: f32, sigma1: f32, sigma2: f32, rho: f32, t: f32, n_steps: i64) -> (tensor[n, f32], tensor[n, f32]) ! { Random } = {
+def hw2f_path[n](rng_key: key, paths_template: tensor[n, f32], x0: f32, y0: f32, a: f32, b: f32, sigma1: f32, sigma2: f32, rho: f32, t: f32, n_steps: i64) -> (tensor[n, f32], tensor[n, f32]) = {
+  (rng_draw_0, rng_draw_1) = split_key(rng_key)
   n_paths = numel(copy(paths_template))
   total = mul(n_paths, n_steps)
   big_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), total)))
-  z1_t = normal_sample(copy(big_template), cast(0.0, f32), cast(1.0, f32))
-  z2_t = normal_sample(big_template, cast(0.0, f32), cast(1.0, f32))
+  z1_t = normal_sample(rng_draw_0, copy(big_template), cast(0.0, f32), cast(1.0, f32))
+  z2_t = normal_sample(rng_draw_1, big_template, cast(0.0, f32), cast(1.0, f32))
   z1_l = to_list(z1_t)
   z2_l = to_list(z2_t)
   dt = div(t, cast(n_steps, f32))

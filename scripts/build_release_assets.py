@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Build Shoals release artifacts from canonical dependency provenance.
 
-Chelis 0.17.5 preserves caller-provided GitHub owner casing in Reef registry
-metadata and packages that string into ``reef.lock`` (chelis#1002). Until the
-compiler canonicalizes it, the Shoals release path explicitly reinstalls each
-dependency through the canonical lowercase coordinate immediately before the
-build and rejects any non-canonical generated lockfile.
+Chelis preserves caller-provided GitHub owner casing in Reef registry metadata
+and packages that string into ``reef.lock`` (chelis#1002). Until the compiler
+canonicalizes it, build in a fresh registry populated through canonical
+lowercase coordinates and reject any non-canonical generated lockfile.
 """
 
 from __future__ import annotations
@@ -15,12 +14,12 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import tomllib
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEPENDENCY_ORDER = ("nautilus", "coral")
 CANONICAL_ORG = "chelis-lang"
 
 
@@ -32,12 +31,13 @@ def manifest(package_root: Path) -> dict:
 def dependency_versions(package_root: Path) -> dict[str, str]:
     dependencies = manifest(package_root).get("dependencies", {})
     versions: dict[str, str] = {}
-    for name in DEPENDENCY_ORDER:
-        spec = dependencies.get(name)
+    for name, spec in dependencies.items():
+        if name == "chelis-std":
+            continue
         version = spec.get("version") if isinstance(spec, dict) else None
-        if not isinstance(version, str):
+        if not isinstance(version, str) or not version.startswith("=") or not version[1:]:
             raise RuntimeError(f"reef.toml has no exact {name} dependency version")
-        versions[name] = version
+        versions[name] = version[1:]
     return versions
 
 
@@ -71,9 +71,9 @@ def resolve_binary(package_root: Path) -> str:
     return binary
 
 
-def checked_run(command: list[str], *, cwd: Path) -> None:
+def checked_run(command: list[str], *, cwd: Path, env: dict[str, str]) -> None:
     completed = subprocess.run(
-        command, cwd=cwd, capture_output=True, text=True, check=False
+        command, cwd=cwd, env=env, capture_output=True, text=True, check=False
     )
     if completed.returncode != 0:
         raise RuntimeError(
@@ -88,8 +88,8 @@ def expected_dependency_identity(
     """Return versions and any pre-build official hashes to preserve.
 
     A prior lock is supporting evidence only: a build may start without one.
-    When it exists, the canonicalization workaround must not change either
-    official dependency artifact hash while rewriting the provenance spelling.
+    When it exists, regeneration must not change either official dependency
+    artifact hash while rewriting the provenance spelling.
     """
     versions = dependency_versions(package_root)
     lock_path = package_root / "reef.lock"
@@ -144,25 +144,47 @@ def validate_canonical_lock(
 
 def build(binary: str, package_root: Path) -> None:
     expected = expected_dependency_identity(package_root)
-    # Reinstall even on cache hits. In Chelis 0.17.5 this is the only
-    # downstream operation that rewrites an already-present mixed-case registry
-    # origin to its canonical representation (chelis#1002).
-    for coordinate in release_coordinates(package_root):
-        checked_run(
-            [binary, "reef", "install", "--from-github", coordinate],
-            cwd=package_root,
-        )
-    # Reef 0.17.5 can retain an existing dist payload even after it rewrites
-    # reef.lock. Remove only this manifest's two derived payloads so the bytes
-    # are regenerated from the just-canonicalized registry (chelis#1002).
-    name, version = package_identity(package_root)
-    for suffix in ("chb", "tar.zst"):
-        candidate = package_root / "dist" / f"{name}-{version}.{suffix}"
-        if candidate.is_file():
-            candidate.unlink()
-    checked_run([binary, "reef", "build", str(package_root)], cwd=package_root)
-    with (package_root / "reef.lock").open("rb") as source:
-        validate_canonical_lock(tomllib.load(source), expected)
+    lock_path = package_root / "reef.lock"
+    prior_lock = lock_path.read_bytes() if lock_path.is_file() else None
+    # A lowercase reinstall does not rewrite the remote_origin of an already
+    # installed mixed-case entry. A fresh registry closes that state leak.
+    with tempfile.TemporaryDirectory(prefix="shoals-release-reef-") as raw:
+        env = os.environ.copy()
+        env["CHELIS_REEF_HOME"] = raw
+        for coordinate in release_coordinates(package_root):
+            checked_run(
+                [binary, "reef", "install", "--from-github", coordinate],
+                cwd=package_root,
+                env=env,
+            )
+        try:
+            # Reef can retain a prior lock's origin and previously built dist
+            # payload even after registry contents change. Re-resolve both from
+            # this fresh registry, restoring the prior lock on failure.
+            lock_path.unlink(missing_ok=True)
+            name, version = package_identity(package_root)
+            for suffix in ("chb", "tar.zst"):
+                candidate = package_root / "dist" / f"{name}-{version}.{suffix}"
+                if candidate.is_file():
+                    candidate.unlink()
+            checked_run(
+                [binary, "reef", "update", "--offline"],
+                cwd=package_root,
+                env=env,
+            )
+            checked_run(
+                [binary, "reef", "build", "--no-auto-fetch", str(package_root)],
+                cwd=package_root,
+                env=env,
+            )
+            with lock_path.open("rb") as source:
+                validate_canonical_lock(tomllib.load(source), expected)
+        except BaseException:
+            if prior_lock is None:
+                lock_path.unlink(missing_ok=True)
+            else:
+                lock_path.write_bytes(prior_lock)
+            raise
 
 
 def main() -> int:

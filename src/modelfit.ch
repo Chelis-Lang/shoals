@@ -291,13 +291,10 @@ def mf_bfgs_linesearch[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor
   armijo = add(sse_curr, mul(mul(c1, alpha), gp))
   if lte(sse_try, armijo) then (alpha, sse_try) else if lte(backtracks_left, cast(0, i64)) then (alpha, sse_try) else mf_bfgs_linesearch(model, features, observed, weights, theta, lo, hi, p, sse_curr, gp, mul(alpha, cast(0.5, f32)), sub(backtracks_left, cast(1, i64)))
 }
-def mf_bfgs_update[n](h: tensor[n, n, f32], s: &tensor[n, f32], y: &tensor[n, f32], tpl_n: &tensor[n, f32]) -> tensor[n, n, f32] = {
+def mf_bfgs_update[n](h: tensor[n, n, f32], s: &tensor[n, f32], y: &tensor[n, f32]) -> tensor[n, n, f32] = {
   ys = inner_product(copy(y), copy(s))
   eps_skip = cast(1e-10, f32)
-  if lte(ys, eps_skip) then {
-    _ = drop(tpl_n)
-    h
-  } else {
+  if lte(ys, eps_skip) then h else {
     rho = div(cast(1.0, f32), ys)
     neg_rho = neg(rho)
     hy = matvec(copy(h), copy(y))
@@ -312,7 +309,6 @@ def mf_bfgs_update[n](h: tensor[n, n, f32], s: &tensor[n, f32], y: &tensor[n, f3
     h2 = add(h1, outer_neg_s_yth1)
     s_scaled = scale_vec(copy(s), rho)
     outer_s_s_scaled = einsum("i,j->ij", s_scaled, copy(s))
-    _ = drop(tpl_n)
     add(h2, outer_s_s_scaled)
   }
 }
@@ -335,13 +331,11 @@ def mf_bfgs_rec[n, m](model: &tensor[n, f32] -> &tensor[m, f32] -> tensor[m, f32
     g_new = mf_fd_gradient(model, copy(features), copy(observed), copy(weights), copy(theta_new), sse_new, fd_eps)
     s = la_vec_sub(copy(theta_new), copy(theta))
     y = la_vec_sub(copy(g_new), copy(g))
-    tpl_n = to_tensor(map(fn (t: f32) -> cast(0.0, f32), to_list(copy(theta_new))))
-    h_new = mf_bfgs_update(h, copy(s), copy(y), copy(tpl_n))
+    h_new = mf_bfgs_update(h, copy(s), copy(y))
     _ = drop(s)
     _ = drop(y)
     _ = drop(g)
     _ = drop(theta)
-    _ = drop(tpl_n)
     grad_norm = l2_norm_vec(copy(g_new))
     theta_norm = l2_norm_vec(copy(theta_new))
     one_f = cast(1.0, f32)

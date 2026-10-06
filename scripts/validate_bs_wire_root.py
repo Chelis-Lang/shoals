@@ -18,8 +18,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENTRY = "bs_call_wire_f64"
-EXPECTED_ENTRY_ROOT = 859
-EXPECTED_NODE_COUNT = 1665
+EXPECTED_ENTRY_ROOT = 848
+EXPECTED_NODE_COUNT = 1643
 # Schema-13 migration (Chelis 0.18.10). The 0.18.9 pin captured schema 11 with
 # entry root 770 and 1488 nodes (raw hash 955c1df6...). Under the published
 # 0.18.10 binary the same src/pricing.ch lowers to schema 13, entry root 773
@@ -71,7 +71,14 @@ EXPECTED_NODE_COUNT = 1665
 # 3be34d901db81b1a0b250d6cb6e8b8b934f11c13323206fb1894b50e9fcfab02. Later
 # values at this schema, all with root 859 and 1665 nodes: 9709d1a4... and
 # 904bd65b... (shoals#88), 11db7522... (shoals#102's comment retarget), and the
-# value below (shoals#101's expiry limits).
+# 811f1cda... value from shoals#101's expiry limits.
+# Chelis 0.18.13 emits schema 27 for this same source closure. Relative to
+# schema 23, the DAG has 11 fewer Copy and 11 fewer Drop nodes; every other
+# op-kind count is unchanged. The named entry remains a Copy of the same Sub
+# computation, all 15 reachable loads and the tensor[n, f64] output survive,
+# and two independent cold lowerings produce the exact response pinned below.
+# This establishes the WireDag boundary and deterministic artifact, not a
+# general numerical or shape equivalence claim.
 #
 # NOTE for whoever drifts this next: the raw artifact embeds source spans, so
 # editing a COMMENT in src/pricing.ch moves this hash while leaving the graph
@@ -82,7 +89,7 @@ EXPECTED_NODE_COUNT = 1665
 # named loads and op kinds all still match. The node count is checked BEFORE the
 # hash, so a hash-only failure already tells you the count agreed. Confirm that
 # shape, then re-pin; do not go looking for a numerical regression.
-EXPECTED_RAW_SHA256 = "811f1cda0a046bbe5e24c51514e9f266815849e9824184786c0b9d93e32ad546"
+EXPECTED_RAW_SHA256 = "634fd1368eaf3e20eb6355569ff972676e14f8596554b9e2fe0091397d8d0b67"
 FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
 EXPECTED_LOADS = {
     "a1",
@@ -102,7 +109,7 @@ EXPECTED_LOADS = {
     "two_over_sqrt_pi",
 }
 # Exact version, checked against each published compiler during a pin bump.
-WIRE_DAG_SCHEMA_VERSION = 15
+WIRE_DAG_SCHEMA_VERSION = 27
 WIRE_OPS = {
     "add",
     "cast",

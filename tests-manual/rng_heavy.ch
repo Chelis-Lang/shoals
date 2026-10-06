@@ -68,34 +68,42 @@ def test_halton_unit_interval() -> unit ! { Test } = {
   ok = halton_points_in_unit_interval(cast(128, i64), cast(8, i64))
   assert_close(to01(ok), cast(1.0, f32), cast(0.001, f32), "halton_points(128, 8) values in [0, 1)")
 }
-def monotone_payoff[n](template: tensor[n, f32]) -> tensor[n, f32] ! { Random } = {
-  z = normal_sample(template, cast(0.0, f32), cast(1.0, f32))
+def monotone_payoff[n](rng_key: key, template: tensor[n, f32]) -> tensor[n, f32] = {
+  z = normal_sample(rng_key, template, cast(0.0, f32), cast(1.0, f32))
   zs = to_list(z)
   to_tensor(map(fn (zi: f32) -> add(cast(1.0, f32), mul(cast(0.5, f32), zi)), zs))
 }
-def anti_monotone_payoff[n](template: tensor[n, f32]) -> tensor[n, f32] ! { Random } = {
-  z = normal_sample(template, cast(0.0, f32), cast(1.0, f32))
-  zs = to_list(z)
-  to_tensor(map(fn (zi: f32) -> add(cast(1.0, f32), mul(cast(0.5, f32), neg(zi))), zs))
-}
 def make_zeros[m](n: i64) -> tensor[m, f32] = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), n)))
-def trial_plain[n](template: tensor[n, f32]) -> f32 ! { Random } = {
-  g = monotone_payoff(template)
+def trial_plain[n](rng_key: key, template: tensor[n, f32]) -> f32 = {
+  g = monotone_payoff(rng_key, template)
   gl = to_list(copy(g))
   n_f = cast(numel(g), f32)
   s = fold(fn (acc: f32, v: f32) -> add(acc, v), cast(0.0, f32), gl)
   div(s, n_f)
 }
-def trial_anti[n](template_a: tensor[n, f32], template_b: tensor[n, f32]) -> f32 ! { Random } = {
-  gp = monotone_payoff(template_a)
-  gm = anti_monotone_payoff(template_b)
+def trial_anti[n](rng_key: key, template: tensor[n, f32]) -> f32 = {
+  zs = to_list(normal_sample(rng_key, template, cast(0.0, f32), cast(1.0, f32)))
+  gp = to_tensor(map(fn (zi: f32) -> add(cast(1.0, f32), mul(cast(0.5, f32), zi)), zs))
+  gm = to_tensor(map(fn (zi: f32) -> add(cast(1.0, f32), mul(cast(0.5, f32), neg(zi))), zs))
   antithetic_terminal_mean(gp, gm)
+}
+def test_antithetic_linear_payoffs_cancel() -> unit ! { Test } = {
+  paired = trial_anti(key_from_seed(101i64), make_zeros(cast(64, i64)))
+  assert_close(paired, cast(1.0, f32), cast(0.00001, f32), "paired signs use the same normal draw")
 }
 def test_antithetic_mean_reduces_variance() -> unit ! { Test } = {
   k_outer = cast(20, i64)
   k_idxs = range(cast(0, i64), k_outer)
-  plain_means = with seed(101i64) { map(fn (k: i64) -> trial_plain(make_zeros(cast(2000, i64))), k_idxs) }
-  anti_means = with seed(101i64) { map(fn (k: i64) -> trial_anti(make_zeros(cast(2000, i64)), make_zeros(cast(2000, i64))), k_idxs) }
+  plain_state = fold(fn (state: (key, List[f32]), k: i64) -> {
+    (draw_key, next_key) = split_key(state.0)
+    (next_key, append(state.1, trial_plain(draw_key, make_zeros(cast(2000, i64)))))
+  }, (key_from_seed(101i64), []), k_idxs)
+  anti_state = fold(fn (state: (key, List[f32]), k: i64) -> {
+    (draw_key, next_key) = split_key(state.0)
+    (next_key, append(state.1, trial_anti(draw_key, make_zeros(cast(2000, i64)))))
+  }, (key_from_seed(101i64), []), k_idxs)
+  plain_means = plain_state.1
+  anti_means = anti_state.1
   var_plain = variance_vec(to_tensor(plain_means), cast(1, i64))
   var_anti = variance_vec(to_tensor(anti_means), cast(1, i64))
   reduced = lt(var_anti, var_plain)

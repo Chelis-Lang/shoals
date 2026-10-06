@@ -53,12 +53,12 @@ def lsm_chunk_list_to_lists(flat: List[f32], chunk_size: i64) -> List[List[f32]]
   }, ([], [], cast(0, i64)), flat)
   acc_state.0
 }
-def lsm_american_put[n](paths_template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32, n_steps: i64) -> f32 ! { Random } = {
+def lsm_american_put[n](rng_key: key, paths_template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32, n_steps: i64) -> f32 = {
   n_paths = numel(copy(paths_template))
   total_z = mul(n_paths, n_steps)
   z_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), total_z)))
   _ = paths_template
-  z_t = normal_sample(z_template, cast(0.0, f32), cast(1.0, f32))
+  z_t = normal_sample(rng_key, z_template, cast(0.0, f32), cast(1.0, f32))
   dt = div(t, cast(n_steps, f32))
   sqrt_dt = sqrt(dt)
   half_sigma_sq = mul(cast(0.5, f32), mul(sigma, sigma))

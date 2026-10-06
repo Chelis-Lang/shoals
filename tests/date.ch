@@ -1,6 +1,6 @@
 module Shoals.Tests.Date
 import Std.Test (assert_close)
-import Std.Time (Date, date, days_between, date_lte)
+import Std.Datetime (Date, date, date_days_until, date_lte)
 import Shoals.Date (DayCount, Act360, Act365, ThirtyThreeSixty, ActActIsda, ActActIcma, year_fraction, is_weekend, date_roll_following, date_roll_preceding, date_roll_modified_following, add_business_days, schedule_from_tenor, add_months, days_in_month, schedule_from_tenor_calendar)
 import Shoals.HolidayCal (Calendar, hc_nyc_calendar, weekend_only_calendar)
 import Shoals.Properties.Date (year_fraction_matches_textbook, whole_isda_year_is_exactly_one, isda_reverses_under_swap, date_roll_following_idempotent_on_weekday)
@@ -17,7 +17,7 @@ def tight64() -> f64 = cast(1e-12, f64)
 def nyc_cal() -> Calendar = hc_nyc_calendar()
 def eom_holiday_cal() -> Calendar = Calendar { name: "eom-test", holidays: [date(cast(2025, i64), cast(7, i64), cast(31, i64))] }
 def independence_day() -> Date = date(cast(2025, i64), cast(7, i64), cast(4, i64))
-def same_date(actual: Date, expected: Date) -> f32 = cast(days_between(actual, expected), f32)
+def same_date(actual: Date, expected: Date) -> f32 = cast(date_days_until(actual, expected), f32)
 def test_act_360_one_year() -> unit ! { Test } = {
   start = date(cast(2025, i64), cast(1, i64), cast(1, i64))
   end = date(cast(2026, i64), cast(1, i64), cast(1, i64))
@@ -180,7 +180,7 @@ def test_act_act_isda_same_year_ordinary_exact() -> unit ! { Test } = {
 -- Red-team round 3, F10. THE SAME CLASS AS F7, IN THE LEG THE F7 MATRIX DID NOT
 -- COVER. ICMA's accrual range has two independently varying endpoints, and every
 -- ICMA assertion in this file passed `period_start` as the accrual start. So
--- replacing `days_between(start, end)` with `days_between(period_start, end)` --
+-- replacing `date_days_until(start, end)` with `date_days_until(period_start, end)` --
 -- ignoring the caller's accrual start entirely -- passed all 62 tests. The END
 -- axis was pinned, because one test varies it; the START axis was constant
 -- everywhere, including inside the independent-reference property, whose driver

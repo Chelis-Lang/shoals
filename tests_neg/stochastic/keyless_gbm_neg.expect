@@ -1,0 +1,2 @@
+`Shoals.Stochastic.gbm_terminal`: expected 6 arguments, got 5 arguments
+Assumption: a Shoals stochastic export requires its affine key as the first argument.

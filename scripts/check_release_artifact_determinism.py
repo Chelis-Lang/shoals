@@ -36,7 +36,8 @@ def checked_run(command: list[str], *, cwd: Path, env: dict[str, str]) -> None:
 def copy_candidate(destination: Path) -> Path:
     package = destination / "shoals"
     ignored = shutil.ignore_patterns(
-        ".git", "dist", "__pycache__", ".gate-tmp", "target"
+        ".git", ".venv", "reef.lock", ".reef-write.lock", "dist",
+        "__pycache__", ".gate-tmp", "target",
     )
     shutil.copytree(ROOT, package, ignore=ignored)
     return package
@@ -47,11 +48,15 @@ def versions(package: Path) -> tuple[str, str, dict[str, str]]:
         reef = tomllib.load(source)
     info = reef["package"]
     deps = reef["dependencies"]
-    return (
-        info["compiler"].removeprefix("="),
-        info["version"],
-        {name: deps[name]["version"] for name in ("nautilus", "coral")},
-    )
+    versions: dict[str, str] = {}
+    for name, spec in deps.items():
+        if name == "chelis-std":
+            continue
+        version = spec.get("version") if isinstance(spec, dict) else None
+        if not isinstance(version, str) or not version.startswith("=") or not version[1:]:
+            raise RuntimeError(f"reef.toml has no exact {name} dependency version")
+        versions[name] = version[1:]
+    return info["compiler"].removeprefix("="), info["version"], versions
 
 
 def payloads(package: Path, version: str) -> dict[str, bytes]:

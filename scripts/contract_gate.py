@@ -122,7 +122,7 @@ def reef_pins() -> tuple[str, str]:
 def reef_dependency_version(name: str) -> str:
     text = (REPO / "reef.toml").read_text()
     match = re.search(
-        rf"^\s*{re.escape(name)}\s*=\s*\{{[^}}]*\bversion\s*=\s*\"([0-9.]+)\"",
+        rf"^\s*{re.escape(name)}\s*=\s*\{{[^}}]*\bversion\s*=\s*\"=?([0-9.]+)\"",
         text,
         re.M,
     )
@@ -132,28 +132,24 @@ def reef_dependency_version(name: str) -> str:
 
 
 def generated_note_errors(manifest: dict, version: str, pin: str) -> list[str]:
-    """Bind the producer note to observed official-chain release evidence."""
+    """Keep the producer note aligned with the pinned chain and proof set."""
     note = manifest.get("generated_note")
     if not isinstance(note, str):
         return ["generated_note must be a string"]
     nautilus = reef_dependency_version("nautilus")
     coral = reef_dependency_version("coral")
-    required = (
-        f"Shoals {version} release",
+    required = [
+        f"Shoals {version}",
         f"official Chelis {pin} / Nautilus {nautilus} / Coral {coral} chain",
-        "333cb4d3688573036d37828eba68416c11c5d1b4",
-        "65f5949a540a547aacbee9845b3d40d2a02d1b28e3c8d608fc7af140fafd6ccf",
-        "9728e7824cd5d8aba26daf5189f95b90c98f9636b8aa0b6ca2fe9cc286c44801",
-        "1b932d75ed4d03a53f90b2093f0801992e963050",
-        "daeb7a4a3cef0f3c98e06c048998cd207a9aa372d161e7c115e430068ecbdd1d",
-        "d5a861566850a0706aae07f68b21bc2eecdd0dfcedafbe26a0083447fa24143b",
-        "2ff17977ef5d3a9cb193c2be9dfee0151fda8146",
-        "97fcab7dc44f80e2d05b70dc117bf1d8276328e408593fe0d89729d00ffea4b1",
-        "da9b67fd475c26713e611c078969a342fa07bb1bbfaeccca34af6ddcdbcea68e",
-        "25 accepted constraint-directed samples",
-        "seeds 0, 1, and 2",
+        f"{len(manifest.get('invariants', []))} active invariants",
         "compiler-owned dependency edges",
-    )
+    ]
+    deferred_ids = {
+        item.get("id") for item in manifest.get("deferred_invariants", [])
+        if isinstance(item, dict)
+    }
+    if "shoals.inv.put_call_parity_reflection.v1" in deferred_ids:
+        required.append("chelis#3116")
     out = [
         f"generated_note missing official evidence clause {phrase!r}"
         for phrase in required if phrase not in note
@@ -161,7 +157,7 @@ def generated_note_errors(manifest: dict, version: str, pin: str) -> list[str]:
     forbidden = (
         "pre-release", "not yet published", "expected 0.17.5 release tier",
         "must be reproduced against the official target artifacts",
-        "1dfa6ddd31a4fe167e204781a14021b7c84fc468",
+        "Retained prior", "Prior official-chain evidence",
     )
     for phrase in forbidden:
         if phrase in note:

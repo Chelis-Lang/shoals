@@ -82,6 +82,22 @@ class RiskInvariantGateTests(unittest.TestCase):
             ),
             [],
         )
+        stale_note = copy.deepcopy(manifest)
+        stale_note["generated_note"] = stale_note["generated_note"].replace(
+            f"Chelis {manifest['chelis_pin']}", "Chelis 0.0.0"
+        )
+        self.assertTrue(CONTRACT_GATE.generated_note_errors(
+            stale_note, stale_note["pkg_version"], stale_note["chelis_pin"]
+        ))
+        if any(item.get("id") == "shoals.inv.put_call_parity_reflection.v1"
+               for item in manifest["deferred_invariants"]):
+            unqualified_note = copy.deepcopy(manifest)
+            unqualified_note["generated_note"] = unqualified_note["generated_note"].replace(
+                "chelis#3116", ""
+            )
+            self.assertTrue(CONTRACT_GATE.generated_note_errors(
+                unqualified_note, unqualified_note["pkg_version"], unqualified_note["chelis_pin"]
+            ))
 
         missing = copy.deepcopy(manifest)
         missing["invariants"] = [

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ast
+import importlib.util
 import re
 import unittest
 from pathlib import Path
@@ -13,6 +14,19 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseWorkflowTests(unittest.TestCase):
+    def test_heston_manual_gate_generates_explicit_key_source(self) -> None:
+        script = ROOT / "scripts/manual_gates/phase3l_shoals_oracle_heston_qe.py"
+        spec = importlib.util.spec_from_file_location("heston_qe_gate", script)
+        assert spec is not None and spec.loader is not None
+        gate = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(gate)
+        source = gate._subst(gate.QE_SETUP)
+        self.assertNotIn("with seed", source)
+        self.assertIn(
+            "heston_qe_paths_terminal(key_from_seed(2026i64), template,",
+            source,
+        )
+
     def test_every_dependency_coordinate_uses_canonical_lowercase_owner(self) -> None:
         paths = [
             ROOT / ".github/workflows/ci.yml",
@@ -24,8 +38,10 @@ class ReleaseWorkflowTests(unittest.TestCase):
         combined = "\n".join(path.read_text() for path in paths)
         self.assertNotIn("Chelis-Lang/nautilus", combined)
         self.assertNotIn("Chelis-Lang/coral", combined)
+        self.assertNotIn("Chelis-Lang/shoreleave", combined)
         self.assertIn("chelis-lang/nautilus", combined)
         self.assertIn("chelis-lang/coral", combined)
+        self.assertIn("chelis-lang/shoreleave", combined)
         adversarial = (
             ROOT / "scripts/check_release_artifact_determinism.py"
         ).read_text()

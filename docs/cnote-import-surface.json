@@ -2,9 +2,9 @@
   "schema_id": "chelis-shell.invariant-surface",
   "schema_version": "1.0",
   "pkg": "shoals",
-  "pkg_version": "0.24.13",
-  "chelis_pin": "0.18.11",
-  "generated_note": "Producer manifest for the C Note characterization engine (frozen contract characterization_contract_v1.md sec 1). The Shoals 0.24.13 release will publish this byte-for-byte as shoals-0.24.13.invariants.json. Its gate must reproduce every active tier against the official Chelis 0.18.11 / Nautilus 0.7.46 / Coral 0.7.43 chain. The 0.18.11 expected-tier column is copied from the 0.18.10 expectation with no automatic promotion; successful observation at this pin is required before release. Published inputs: Chelis source a7e592f88a148d8323b8f9a8f679c8e163ad3ee7, installed Darwin compiler SHA-256 416e7b5875c7b2d3c8cc5835e0b89a983ff46e866f6f4989d9876a93e2e60951; Nautilus CHB b581332e726ebec25a851bb7d453882dfa0c39c2cb5f640a4327d51d1b821b7a, archive 8a37bccd8c57e8d0b727a0f23f8de7082008aef43ebc77f899e647290fb0b71f; Coral source 1f8e437bae11aa97913f9535134b5e7805d59bd3, CHB ce1cd84906996feae3adae75253c709d025cebbcc39e956447fd70298eade592, archive 0dc97f32fc1e8f22a592762f144fe89632c52879da77e2869029b67c13f39852. Canon Breadth includes the Tier-B GREEK SIGN family on tr_crr_call_2step, fuzz-validated direct Black-Scholes and Black-76 call-price properties, and seven actual-AD Black-Scholes consistency records. Shoals#42 binds delta, vega, rho, theta, gamma, volga, and vanna goals to the exported AD vectors, the displayed bs_call_scalar price, and their shared bs_call_f64 body using compiler-owned dependency edges. Runtime-oracle and multi-seed fuzz evidence are distinct from deferred certified-box and global-proof evidence; no bumped-price result is relabeled as AD correctness. The actual-AD and direct-price Greek families are release-gated over seeds 0, 1, and 2. Shoals#37 declares distinct parametric inverse-CDF and historical empirical-quantile VaR/ES coherence families. Each family covers confidence monotonicity, ES dominance, and non-negativity at 25 accepted constraint-directed samples for deterministic seeds 0, 1, and 2, with corrupt controls and compiler-owned dependency edges to every risk function named by a goal, including the mandatory second CVaR edges. These are sampled fuzz_validated observations, not global proofs. General-size promotion stubs remain gated on induction. The MODEL-FREE canon carries kind-scoped direct-output-function invariants for the CRR european_call no-arbitrage family and discrete-compounding fixed_income family. Since Chelis 0.17.2 every active binding is validated from the compiler summary dependency graph: direct lanes require exact property-to-model edges, multi-function relations require every declared extra edge, actual-AD lanes require the AD output and displayed price to reach the same compiler-reported price body, and structural composites require the exact property-to-chelis-std/Std.Contracts.normal_cdf edge. Every below-proven tier cites a tier_upgrade_trigger and a dischargeability_probe. Prior official-chain evidence retained for de-narrowing: the 0.18.6 chain (Chelis cf49f85bf0d1bca2c87c88a3e459c446912189c0, archive 08580435570c6fd44716f4d5c64117e973e379808cefeaaa97c8faefa2588f6c, payload 1c88c737d7d3740eb4adbe7b50ea31d29ee64498b9d74b35664255ca16aea8d4; the Nautilus 0.7.43 and Coral 0.7.40 CHB and archive hashes were not recorded in this manifest because both were staged rather than published when that chain was consumed), the 0.18.5 chain (Chelis 6602f01719f55b8d4c7f52ee70e7c7b58f136107, archive 0ff7b4e168d8b51277e05d44bfa658364630176d56d79c9cf8aceaea15335551, payload bcf8da8bd2df9acb8816194f9251b26e23ec57527d4fc928bea6e1f6120628b2; Nautilus 85d88133b0aaf5fde3a0f425dca4a1e5fa1056de, CHB f5ed24c05c4e20fdf6c72601e2e9dd68cf46a63730eb79d9189adc493704f028, archive fcdf32e581d95a43b0c37d672ff241348f75f308179d0b03f6f79a5247506f95; Coral 8da830db79a561c5e97fb4592f3fea2fbc492641, CHB b54e8a410a3f747f0a02dc6fb8496d9fe868c288d6db1ffb2f634664f499835a, archive 38149dab1bceed366dc93bc62f6e3f46e21fe4d27af49510ca024bc66d16a77f), the 0.18.4 chain (Chelis c0138c828bf2c42e1c8941e824f16616bd974fd5, archive ac905d2a2d471ff09a46e39c7ae78ede85aab2f97515553b445ffd0dc0d29fea, payload b6b80d65bf1822f6ad926915b4c5d4b3c94e414a9afcafa0bc02f9fc29a48037; Nautilus 5bf6fd11ea4faa5bec0ca79e8974653b5e3158f8, CHB e92a47020f5691b49e5b39aba0094c7e1ed2e39d9dce55a9a135fd34480cc083, archive 1bba785ccead8c38275f8daa111a27516b4f21d16eb3223c23dbb7bcb6a0a6f3; Coral 53a40e781d869c19529ae2e4fcdad780f0a97f1b, CHB a5be8783717b951db11f58beb9084a674ab86c7891cb847a6e74e4a04535e85e, archive e68ac948c3539c3eba95283b49a907a753acc1de540a4a3840410ae79bf70854), the 0.18.3 chain (Chelis 29700dd73c0e35b672bdd384493054b3107ce308, archive cc8737adf8c21040432d94b96635ef48895bd7ac8cdf94bd7696046c44bc7371, payload 3a14b0d7e0a46a49c9b25f3dc61573d5972a91b411021672e09b8e3e0e9e1eba; Nautilus c8466b29ffbe4ebc4126363db8c62a06a5b10e7f, CHB 2ba0d478f55d5b270801ada1b51d8dbc75a4d721a24bb8aa42f6f663b0e19bad, archive a881f0b96a908a8356b720bfe21e6bde724bea204310e51957b452ad3740a47c; Coral 8e38cd42aeb5e45d7ad5f92ed61143e1c121fb8b, CHB b8c41f1b563c2d460c764fb4373a26c7c0c622bd905c6d39a9284349f9a224de, archive 5358b34994df4637dfce7e0deb48d78c6c61ddb807ef50a25261427093973de9) and the 0.18.1 chain: Chelis source 333cb4d3688573036d37828eba68416c11c5d1b4, archive 65f5949a540a547aacbee9845b3d40d2a02d1b28e3c8d608fc7af140fafd6ccf, compiler payload 9728e7824cd5d8aba26daf5189f95b90c98f9636b8aa0b6ca2fe9cc286c44801; Nautilus source 1b932d75ed4d03a53f90b2093f0801992e963050, CHB daeb7a4a3cef0f3c98e06c048998cd207a9aa372d161e7c115e430068ecbdd1d, archive d5a861566850a0706aae07f68b21bc2eecdd0dfcedafbe26a0083447fa24143b; Coral source 2ff17977ef5d3a9cb193c2be9dfee0151fda8146, CHB 97fcab7dc44f80e2d05b70dc117bf1d8276328e408593fe0d89729d00ffea4b1, archive da9b67fd475c26713e611c078969a342fa07bb1bbfaeccca34af6ddcdbcea68e.",
+  "pkg_version": "0.24.14",
+  "chelis_pin": "0.18.13",
+  "generated_note": "Producer manifest for Shoals 0.24.14 C Note characterization. The release publishes the accepted manifest as shoals-0.24.14.invariants.json. The official Chelis 0.18.13 / Nautilus 0.7.48 / Coral 0.7.45 chain supplies the compiler and package inputs; Shoals also uses Shoreleave 0.1.0. The 36 active invariants declare expected tiers at this pin. The proof gate checks compiler-owned dependency edges, proof status, tier and qualifiers, satisfying and corrupt controls, and non-vacuous preconditions. Fuzz-gated pricing and risk properties use deterministic multi-seed sampling and remain empirical observations. The put-call parity invariant relying on f32 normal-CDF reflection is deferred under chelis#3116 until the per-width contract validates.",
   "models": [
     {
       "id": "bs_call",
@@ -754,7 +754,9 @@
         "0.18.6": "fuzz_validated",
         "0.18.9": "fuzz_validated",
         "0.18.10": "fuzz_validated",
-        "0.18.11": "fuzz_validated"
+        "0.18.11": "fuzz_validated",
+        "0.18.12": "fuzz_validated",
+        "0.18.13": "fuzz_validated"
       },
       "tier_upgrade_trigger": "prove a sound monotonic contract for Nautilus.Distributions.normal_inv_cdf through the real parametric_var body",
       "dischargeability_probe": "shoals37_risk_multi_seed",
@@ -823,7 +825,9 @@
         "0.18.6": "fuzz_validated",
         "0.18.9": "fuzz_validated",
         "0.18.10": "fuzz_validated",
-        "0.18.11": "fuzz_validated"
+        "0.18.11": "fuzz_validated",
+        "0.18.12": "fuzz_validated",
+        "0.18.13": "fuzz_validated"
       },
       "tier_upgrade_trigger": "prove the Gaussian inverse-CDF and tail-ratio relation through the real parametric_var and parametric_cvar bodies",
       "dischargeability_probe": "shoals37_risk_multi_seed",
@@ -904,7 +908,9 @@
         "0.18.6": "fuzz_validated",
         "0.18.9": "fuzz_validated",
         "0.18.10": "fuzz_validated",
-        "0.18.11": "fuzz_validated"
+        "0.18.11": "fuzz_validated",
+        "0.18.12": "fuzz_validated",
+        "0.18.13": "fuzz_validated"
       },
       "tier_upgrade_trigger": "prove normal_inv_cdf(alpha) > 0 for alpha > 0.5 through the real parametric_var body",
       "dischargeability_probe": "shoals37_risk_multi_seed",
@@ -970,7 +976,9 @@
         "0.18.6": "fuzz_validated",
         "0.18.9": "fuzz_validated",
         "0.18.10": "fuzz_validated",
-        "0.18.11": "fuzz_validated"
+        "0.18.11": "fuzz_validated",
+        "0.18.12": "fuzz_validated",
+        "0.18.13": "fuzz_validated"
       },
       "tier_upgrade_trigger": "bridge std.quantile.monotonicity through the exported Shoals.Risk.historical_var wrapper",
       "dischargeability_probe": "shoals37_risk_multi_seed",
@@ -1038,7 +1046,9 @@
         "0.18.6": "fuzz_validated",
         "0.18.9": "fuzz_validated",
         "0.18.10": "fuzz_validated",
-        "0.18.11": "fuzz_validated"
+        "0.18.11": "fuzz_validated",
+        "0.18.12": "fuzz_validated",
+        "0.18.13": "fuzz_validated"
       },
       "tier_upgrade_trigger": "prove empirical tail-mean dominance through historical_var and historical_cvar",
       "dischargeability_probe": "shoals37_risk_multi_seed",
@@ -1118,7 +1128,9 @@
         "0.18.6": "fuzz_validated",
         "0.18.9": "fuzz_validated",
         "0.18.10": "fuzz_validated",
-        "0.18.11": "fuzz_validated"
+        "0.18.11": "fuzz_validated",
+        "0.18.12": "fuzz_validated",
+        "0.18.13": "fuzz_validated"
       },
       "tier_upgrade_trigger": "prove quantile range preservation through the exported historical_var wrapper",
       "dischargeability_probe": "shoals37_risk_multi_seed",
@@ -1230,7 +1242,9 @@
         "0.18.6": "proven",
         "0.18.9": "proven",
         "0.18.10": "proven",
-        "0.18.11": "proven"
+        "0.18.11": "proven",
+        "0.18.12": "proven",
+        "0.18.13": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice pricer returns a negative call price -- free money at these inputs",
@@ -1348,7 +1362,9 @@
         "0.18.6": "proven",
         "0.18.9": "proven",
         "0.18.10": "proven",
-        "0.18.11": "proven"
+        "0.18.11": "proven",
+        "0.18.12": "proven",
+        "0.18.13": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price falls when spot rises -- a monotonicity (delta-sign) violation",
@@ -1456,96 +1472,13 @@
         "0.18.6": "disproved",
         "0.18.9": "disproved",
         "0.18.10": "disproved",
-        "0.18.11": "disproved"
+        "0.18.11": "disproved",
+        "0.18.12": "disproved",
+        "0.18.13": "disproved"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "admits arbitrage: the undiscounted model prices the call at 1.125 when the underlying spot is only 1.0 (C > s)",
       "fuzz_domain_note": "polynomial break; cvc5 refutes C<=s and the witness re-executes at f32 (in_region_defect, not reals-hedged)"
-    },
-    {
-      "id": "shoals.inv.put_call_parity_reflection.v1",
-      "kind_applies_to": [
-        "finance.option_pricer.european_call"
-      ],
-      "target_model": "bs_call",
-      "property": {
-        "file": "properties/composites.ch",
-        "name": "put_call_parity_reflection",
-        "module": "Shoals.Properties.Composites"
-      },
-      "binding": {
-        "mechanism": "contract-abstraction",
-        "references_output_fn": "structural",
-        "goal_pattern": null,
-        "contracts": [
-          "std.normal_cdf.reflection"
-        ],
-        "compiler_dependency": {
-          "package": "chelis-std",
-          "module": "Std.Contracts",
-          "kind": "function",
-          "name": "normal_cdf",
-          "source_file": "src/contracts.ch"
-        }
-      },
-      "preconditions": [
-        {
-          "lhs": "s",
-          "op": "gte",
-          "rhs": {
-            "const": 0.0
-          }
-        },
-        {
-          "lhs": "k",
-          "op": "gte",
-          "rhs": {
-            "const": 0.0
-          }
-        },
-        {
-          "lhs": "disc",
-          "op": "gte",
-          "rhs": {
-            "const": 0.0
-          }
-        },
-        {
-          "lhs": "disc",
-          "op": "lte",
-          "rhs": {
-            "const": 1.0
-          }
-        }
-      ],
-      "controls": {
-        "satisfying": {
-          "name": "put_call_parity_reflection",
-          "expected": "passed"
-        },
-        "violating": {
-          "name": "put_call_parity_corrupted",
-          "expected": "failed",
-          "witness_required": true
-        }
-      },
-      "expected_tier_per_pin": {
-        "0.14.0": "proven_modulo_contract",
-        "0.16.1": "proven_modulo_contract",
-        "0.17.1": "proven_modulo_contract",
-        "0.18.1": "proven_modulo_contract",
-        "0.18.3": "proven_modulo_contract",
-        "0.18.4": "proven_modulo_contract",
-        "0.18.5": "proven_modulo_contract",
-        "0.18.6": "proven_modulo_contract",
-        "0.18.9": "proven_modulo_contract",
-        "0.18.10": "proven_modulo_contract",
-        "0.18.11": "proven_modulo_contract"
-      },
-      "tier_upgrade_trigger": "chelis#434",
-      "dischargeability_probe": "p12_shoals_published_composites",
-      "violation_text": "put-call parity fails under the sound reflection contract",
-      "fuzz_domain_note": "structure proven at Tier B for any N satisfying the reflection contract; the contract is fuzz-validated on the real n_cdf"
     },
     {
       "id": "shoals.inv.call_upper_bounded_by_spot.v1",
@@ -1625,7 +1558,9 @@
         "0.18.6": "proven_modulo_contract",
         "0.18.9": "proven_modulo_contract",
         "0.18.10": "proven_modulo_contract",
-        "0.18.11": "proven_modulo_contract"
+        "0.18.11": "proven_modulo_contract",
+        "0.18.12": "proven_modulo_contract",
+        "0.18.13": "proven_modulo_contract"
       },
       "tier_upgrade_trigger": "chelis#434",
       "dischargeability_probe": "p12_shoals_published_composites",
@@ -1685,7 +1620,9 @@
         "0.18.6": "proven_modulo_contract",
         "0.18.9": "proven_modulo_contract",
         "0.18.10": "proven_modulo_contract",
-        "0.18.11": "proven_modulo_contract"
+        "0.18.11": "proven_modulo_contract",
+        "0.18.12": "proven_modulo_contract",
+        "0.18.13": "proven_modulo_contract"
       },
       "tier_upgrade_trigger": "chelis#434",
       "dischargeability_probe": "p12_shoals_published_composites",
@@ -1784,7 +1721,9 @@
         "0.18.6": "proven",
         "0.18.9": "proven",
         "0.18.10": "proven",
-        "0.18.11": "proven"
+        "0.18.11": "proven",
+        "0.18.12": "proven",
+        "0.18.13": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the european-call pricer returns a negative price -- free money at these inputs",
@@ -1882,7 +1821,9 @@
         "0.18.6": "proven",
         "0.18.9": "proven",
         "0.18.10": "proven",
-        "0.18.11": "proven"
+        "0.18.11": "proven",
+        "0.18.12": "proven",
+        "0.18.13": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the call is priced above the underlying spot -- admits arbitrage",
@@ -1980,7 +1921,9 @@
         "0.18.6": "proven",
         "0.18.9": "proven",
         "0.18.10": "proven",
-        "0.18.11": "proven"
+        "0.18.11": "proven",
+        "0.18.12": "proven",
+        "0.18.13": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the call is priced below its discounted intrinsic value s - k*disc^2 -- admits arbitrage (buy and exercise)",
@@ -2085,7 +2028,9 @@
         "0.18.6": "proven",
         "0.18.9": "proven",
         "0.18.10": "proven",
-        "0.18.11": "proven"
+        "0.18.11": "proven",
+        "0.18.12": "proven",
+        "0.18.13": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "a lower-strike call is worth less than a higher-strike call -- a bull-spread (strike-monotonicity) violation admitting arbitrage",
@@ -2190,7 +2135,9 @@
         "0.18.6": "proven",
         "0.18.9": "proven",
         "0.18.10": "proven",
-        "0.18.11": "proven"
+        "0.18.11": "proven",
+        "0.18.12": "proven",
+        "0.18.13": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "a long butterfly on equally-spaced strikes has negative value -- a convexity-in-strike violation admitting arbitrage",
@@ -2246,7 +2193,9 @@
         "0.18.6": "proven",
         "0.18.9": "proven",
         "0.18.10": "proven",
-        "0.18.11": "proven"
+        "0.18.11": "proven",
+        "0.18.12": "proven",
+        "0.18.13": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the multi-period discount factor falls outside (0, 1] -- discounting a non-negative yield either creates value or turns it negative",
@@ -2309,7 +2258,9 @@
         "0.18.6": "proven",
         "0.18.9": "proven",
         "0.18.10": "proven",
-        "0.18.11": "proven"
+        "0.18.11": "proven",
+        "0.18.12": "proven",
+        "0.18.13": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond PV is non-positive or exceeds the undiscounted sum of its cashflows -- not a proper present value",
@@ -2379,7 +2330,9 @@
         "0.18.6": "proven",
         "0.18.9": "proven",
         "0.18.10": "proven",
-        "0.18.11": "proven"
+        "0.18.11": "proven",
+        "0.18.12": "proven",
+        "0.18.13": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond price rises as yield rises -- a duration/DV01 sign violation",
@@ -2449,7 +2402,9 @@
         "0.18.6": "proven",
         "0.18.9": "proven",
         "0.18.10": "proven",
-        "0.18.11": "proven"
+        "0.18.11": "proven",
+        "0.18.12": "proven",
+        "0.18.13": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond price is concave in yield -- a negative-convexity violation",
@@ -2528,7 +2483,9 @@
         "0.18.6": "disproved",
         "0.18.9": "disproved",
         "0.18.10": "disproved",
-        "0.18.11": "disproved"
+        "0.18.11": "disproved",
+        "0.18.12": "disproved",
+        "0.18.13": "disproved"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "reports zero rate sensitivity: the undiscounted bond prices at 3.0 whether the yield is 0.0 or 1.0 (dP/dy = 0, DV01 understated to zero)",
@@ -2646,7 +2603,9 @@
         "0.18.6": "proven",
         "0.18.9": "proven",
         "0.18.10": "proven",
-        "0.18.11": "proven"
+        "0.18.11": "proven",
+        "0.18.12": "proven",
+        "0.18.13": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price falls when the up-move factor increases -- a vega-sign violation (wider volatility decreases the option value)",
@@ -2764,7 +2723,9 @@
         "0.18.6": "proven",
         "0.18.9": "proven",
         "0.18.10": "proven",
-        "0.18.11": "proven"
+        "0.18.11": "proven",
+        "0.18.12": "proven",
+        "0.18.13": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price falls when the discount factor increases -- the call value should rise with less discounting",
@@ -2889,7 +2850,9 @@
         "0.18.6": "proven",
         "0.18.9": "proven",
         "0.18.10": "proven",
-        "0.18.11": "proven"
+        "0.18.11": "proven",
+        "0.18.12": "proven",
+        "0.18.13": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price is concave in spot -- a gamma-sign violation (the second derivative in spot is negative)",
@@ -3027,7 +2990,9 @@
         "0.18.6": "fuzz_validated",
         "0.18.9": "fuzz_validated",
         "0.18.10": "fuzz_validated",
-        "0.18.11": "fuzz_validated"
+        "0.18.11": "fuzz_validated",
+        "0.18.12": "fuzz_validated",
+        "0.18.13": "fuzz_validated"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p08_pkg_bs_positive",
@@ -3107,7 +3072,9 @@
         "0.18.6": "fuzz_validated",
         "0.18.9": "fuzz_validated",
         "0.18.10": "fuzz_validated",
-        "0.18.11": "fuzz_validated"
+        "0.18.11": "fuzz_validated",
+        "0.18.12": "fuzz_validated",
+        "0.18.13": "fuzz_validated"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p15_bs_greeks_multi_seed",
@@ -3187,7 +3154,9 @@
         "0.18.6": "fuzz_validated",
         "0.18.9": "fuzz_validated",
         "0.18.10": "fuzz_validated",
-        "0.18.11": "fuzz_validated"
+        "0.18.11": "fuzz_validated",
+        "0.18.12": "fuzz_validated",
+        "0.18.13": "fuzz_validated"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p15_bs_greeks_multi_seed",
@@ -3267,7 +3236,9 @@
         "0.18.6": "fuzz_validated",
         "0.18.9": "fuzz_validated",
         "0.18.10": "fuzz_validated",
-        "0.18.11": "fuzz_validated"
+        "0.18.11": "fuzz_validated",
+        "0.18.12": "fuzz_validated",
+        "0.18.13": "fuzz_validated"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p15_bs_greeks_multi_seed",
@@ -3347,7 +3318,9 @@
         "0.18.6": "fuzz_validated",
         "0.18.9": "fuzz_validated",
         "0.18.10": "fuzz_validated",
-        "0.18.11": "fuzz_validated"
+        "0.18.11": "fuzz_validated",
+        "0.18.12": "fuzz_validated",
+        "0.18.13": "fuzz_validated"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p15_bs_greeks_multi_seed",
@@ -3430,7 +3403,9 @@
         "0.18.6": "fuzz_validated",
         "0.18.9": "fuzz_validated",
         "0.18.10": "fuzz_validated",
-        "0.18.11": "fuzz_validated"
+        "0.18.11": "fuzz_validated",
+        "0.18.12": "fuzz_validated",
+        "0.18.13": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -3536,7 +3511,9 @@
         "0.18.6": "fuzz_validated",
         "0.18.9": "fuzz_validated",
         "0.18.10": "fuzz_validated",
-        "0.18.11": "fuzz_validated"
+        "0.18.11": "fuzz_validated",
+        "0.18.12": "fuzz_validated",
+        "0.18.13": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -3642,7 +3619,9 @@
         "0.18.6": "fuzz_validated",
         "0.18.9": "fuzz_validated",
         "0.18.10": "fuzz_validated",
-        "0.18.11": "fuzz_validated"
+        "0.18.11": "fuzz_validated",
+        "0.18.12": "fuzz_validated",
+        "0.18.13": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -3748,7 +3727,9 @@
         "0.18.6": "fuzz_validated",
         "0.18.9": "fuzz_validated",
         "0.18.10": "fuzz_validated",
-        "0.18.11": "fuzz_validated"
+        "0.18.11": "fuzz_validated",
+        "0.18.12": "fuzz_validated",
+        "0.18.13": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -3854,7 +3835,9 @@
         "0.18.6": "fuzz_validated",
         "0.18.9": "fuzz_validated",
         "0.18.10": "fuzz_validated",
-        "0.18.11": "fuzz_validated"
+        "0.18.11": "fuzz_validated",
+        "0.18.12": "fuzz_validated",
+        "0.18.13": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -3960,7 +3943,9 @@
         "0.18.6": "fuzz_validated",
         "0.18.9": "fuzz_validated",
         "0.18.10": "fuzz_validated",
-        "0.18.11": "fuzz_validated"
+        "0.18.11": "fuzz_validated",
+        "0.18.12": "fuzz_validated",
+        "0.18.13": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -4066,7 +4051,9 @@
         "0.18.6": "fuzz_validated",
         "0.18.9": "fuzz_validated",
         "0.18.10": "fuzz_validated",
-        "0.18.11": "fuzz_validated"
+        "0.18.11": "fuzz_validated",
+        "0.18.12": "fuzz_validated",
+        "0.18.13": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -4127,6 +4114,11 @@
       "id": "shoals.inv.fi_bond_general_pv_bounded.v1",
       "reason": "PV bounded in (0, nominal] for the n-period coupon bond. Same ceiling: fold body requires induction. Proven at fixed size n=2 as fi_bond_pv_bounded. Property authored at n=5 in properties/canongeneral.ch.",
       "trigger": "chelis induction tier."
+    },
+    {
+      "id": "shoals.inv.put_call_parity_reflection.v1",
+      "reason": "The f32 normal-CDF reflection contract fails validation at the Chelis 0.18.13 pin under its fixed 1e-10 tolerance. A proof that assumes that contract cannot characterize put-call parity at this pin.",
+      "trigger": "chelis#3116: revalidate the corrected per-width reflection contract, its corrupt control, and the put-call parity proof on the pinned release."
     }
   ]
 }

@@ -1,6 +1,6 @@
 module Shoals.TestsNeg.DateIcmaZeroFrequency
 import Std.Test (assert_eq)
-import Std.Time (date)
+import Std.Datetime (date)
 import Shoals.Date (ActActIcma, year_fraction)
 -- A coupon frequency of zero would divide by zero and hand back an infinity
 -- that reads as a year fraction. ACT/ACT ICMA scales by the number of coupon

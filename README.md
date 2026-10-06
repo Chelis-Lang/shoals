@@ -4,26 +4,14 @@ Shoals is a quantitative finance library for [Chelis](https://github.com/Chelis-
 
 ## Install and try it
 
-The package version and exact Chelis, Nautilus, Coral, and standard-library pins are in [`reef.toml`](reef.toml). The current release artifacts are available through the Chelis-Lang GitHub repositories. The Chelis compiler repository is private: installing its release toolchain requires repository access and an authenticated [GitHub CLI](https://cli.github.com/). Access to the pinned dependency release assets is also required. See the [Chelis installation guide](https://github.com/Chelis-Lang/chelis/blob/main/docs/book/src/install.md) for supported platforms and setup details.
-
-From a Shoals source checkout:
-
-```sh
-gh auth login                      # once, if needed
-gh release download --repo Chelis-Lang/chelis --pattern chelisup.sh --output - | sh
-export PATH="$HOME/.chelis/bin:$PATH"
-chelisup install 0.18.11
-chelis reef build
-chelis test tests/pricing.ch --filter test_bs_call_atm --timeout 120 --suite-timeout 180 --jobs 1
-```
-
-`chelisup install 0.18.11` installs the compiler pinned by `reef.toml`.
-`chelis reef build` resolves the declared dependencies, fetching missing release
-packages as needed, then checks and builds Shoals. The last command runs the
-source test that prices a one-year at-the-money Black-Scholes call at
-approximately 10.4506. Run all commands from the repository root. For the
-pricer and a seeded Monte Carlo example, see
-[Getting started](docs/src/getting-started.md).
+The package version and exact Chelis, Nautilus, Coral, Shoreleave, and
+standard-library pins are in [`reef.toml`](reef.toml). Use the
+[Chelis installation guide](https://github.com/Chelis-Lang/chelis/blob/main/docs/book/src/install.md)
+to install the compiler and the declared package releases. Reef builds use
+installed packages; `chelis reef build` does not download missing dependencies.
+The [Getting started](docs/src/getting-started.md) chapter shows a pricer and
+a seeded Monte Carlo example. The source tests include a one-year
+at-the-money Black-Scholes call at approximately 10.4506.
 
 ## Modules
 
@@ -44,7 +32,11 @@ export PATH="$PWD/.venv/bin:$PATH"
 .venv/bin/python scripts/run_local_gate.py
 ```
 
-The default gate runs source formatting, lint, the package build, negative tests, and repository contract checks. The longer runtime, manual, and proof checks run separately in the nightly and release workflows; `scripts/run_local_gate.py --full` runs them locally when needed. A focused pricing test is shown above. Book readers can render the documentation with `mdbook build docs`.
+Run the gate after installing the package releases declared in `reef.toml`.
+It checks source formatting, lint, the package build, negative tests, and
+repository contracts. The longer runtime, manual, and proof checks run in
+nightly and release workflows; `scripts/run_local_gate.py --full` runs them
+locally. Book readers can render the documentation with `mdbook build docs`.
 
 ## License
 

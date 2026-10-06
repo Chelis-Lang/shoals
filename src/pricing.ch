@@ -16,10 +16,12 @@ export (erf64, n_cdf64, bs_call_scalar, bs_put_scalar, bs_call_f64, bs_call_f64_
 -- It replaced Abramowitz & Stegun 7.1.26 (this shell's issue 61), whose ~1.4e-7
 -- bound is a property of its coefficients rather than of the arithmetic, so the
 -- f64 entry point had been no better than the f32 `Nautilus.Special.erf` whose
--- coefficients it copied. Hand-rolled here because Chelis has no canonical erf
--- (chelis#902) and `Nautilus.Special` is f32-only (nautilus#59,
--- tests_blocked/special/erf_builtin_absent.ch); the f32 sibling keeps the old
--- bound (nautilus#56).
+-- coefficients it copied. Chelis 0.18.13 adds a correctly rounded erf
+-- primitive, but this kernel remains until its Greek and expiry behavior is
+-- compared on the compatible package chain (chelis#902). Nautilus.Special.erf
+-- accepts f64 since 0.7.47, but still
+-- evaluates the A&S coefficients at ~1.4e-7 accuracy (nautilus#74);
+-- this Cody kernel preserves the measured f64 accuracy.
 --
 -- Three named helpers rather than one expression, because the AD Greeks
 -- differentiate through this path and each branch is separately checkable.
@@ -33,7 +35,9 @@ def abs_f64(x: f64) -> f64 = abs(x)
 -- Cody region 1 (|x| <= 0.5): erf(x) = x * P(x^2)/Q(x^2), odd by construction.
 def erf64_core_small(x: f64) -> f64 = {
   -- Domain clamp. See the note above `erf64` for why every core clamps.
-  xc = if lt(x, cast(-0.5, f64)) then cast(-0.5, f64) else if lt(cast(0.5, f64), x) then cast(0.5, f64) else x
+  -- Sequential selects preserve nested AD lowering (chelis#2825).
+  lo = if lt(x, cast(-0.5, f64)) then cast(-0.5, f64) else x
+  xc = if lt(cast(0.5, f64), lo) then cast(0.5, f64) else lo
   y = mul(xc, xc)
   xnum0 = mul(cast(0.18577770618460315, f64), y)
   xden0 = y
@@ -115,9 +119,14 @@ def erf64_core_erfc_tail(axr: f64) -> f64 = {
 --
 -- This makes each core total over the FINITE f64 domain, not over all of f64:
 -- the clamps and dispatcher are themselves `if`s, so +/-inf still poisons a
--- sibling arm wherever an untaken arm is unbounded. `min`/`max` would remove
--- the rest but fail at eval under vmap at this pin (chelis#1582).
-def erf64_erfc_abs(ax: f64) -> f64 = if lt(ax, cast(4.0, f64)) then erf64_core_erfc_mid(ax) else if lt(ax, cast(6.0, f64)) then erf64_core_erfc_tail(ax) else cast(0.0, f64)
+-- sibling arm wherever an untaken arm is unbounded. Imported Std.Scalar
+-- Imported `min`/`max` are available (chelis#1582 closed); changing this
+-- kernel awaits the compatible package-chain gate.
+-- Sequential dispatcher for the same nested-grad lowering gap (chelis#2825).
+def erf64_erfc_abs(ax: f64) -> f64 = {
+  tail = if lt(ax, cast(6.0, f64)) then erf64_core_erfc_tail(ax) else cast(0.0, f64)
+  if lt(ax, cast(4.0, f64)) then erf64_core_erfc_mid(ax) else tail
+}
 def erf64(x: f64) -> f64 = {
   ax = abs_f64(x)
   y = sub(cast(1.0, f64), erf64_erfc_abs(ax))
@@ -514,8 +523,8 @@ def vannas_call[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) ->
     g64 = vmap(fn (sa: tensor[1, f64], ka: tensor[1, f64], ra: tensor[1, f64], va: tensor[1, f64], ta: tensor[1, f64]) -> grad(fn (ss: f64, kk: f64, rr: f64, x: f64, tt: f64) -> grad(fn (y: f64, k2: f64, r2: f64, s2: f64, t2: f64) -> bs_call_f64(y, k2, r2, s2, t2), wrt=y)(ss, kk, rr, x, tt), wrt=x)(tensor_to_scalar(sum(sa, 0)), tensor_to_scalar(sum(ka, 0)), tensor_to_scalar(sum(ra, 0)), tensor_to_scalar(sum(va, 0)), tensor_to_scalar(sum(ta, 0))))(sc, kc, rc, vc, tc)
     cast(g64, f32)
   }
-def mc_call_price[n](template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 ! { Random } = {
-  z = normal_sample(template, cast(0.0, f32), cast(1.0, f32))
+def mc_call_price[n](rng_key: key, template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 = {
+  z = normal_sample(rng_key, template, cast(0.0, f32), cast(1.0, f32))
   half_sigma_sq = mul(cast(0.5, f32), mul(sigma, sigma))
   drift = mul(sub(r, half_sigma_sq), t)
   vol_sqrt_t = mul(sigma, sqrt(t))

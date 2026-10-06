@@ -4,7 +4,7 @@ Module: `Shoals.Tenor`.
 
 This module represents a tenor as a count and a unit, provides constructors
 for the common units including the overnight family, converts a tenor to a
-number of days, and advances a date by a tenor. Dates come from `Std.Time`.
+number of days, and advances a date by a tenor. Dates come from `Std.Datetime`.
 
 ## Types
 
@@ -67,7 +67,7 @@ d = tenor_to_days(months_n(cast(3, i64)))  // d == 90
 
 ref = date(cast(2025, i64), cast(6, i64), cast(15, i64))
 shifted = tenor_apply(months_n(cast(3, i64)), ref)
-// days_between(ref, shifted) == 90
+// date_days_until(ref, shifted) == 90
 ```
 
 Months and years use the fixed thirty-day and three-hundred-sixty-five-day

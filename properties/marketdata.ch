@@ -1,5 +1,5 @@
 module Shoals.Properties.MarketData
-import Std.Time (Date)
+import Std.Datetime (Date)
 import Shoals.MarketData (Side, Quote, Bar, Snapshot, make_quote, make_bar, quote_value, md_bar_high, md_bar_low, md_bar_open, md_bar_close, make_snapshot, snapshot_lookup)
 def quote_round_trip(side: Side, value: f32, d: Date) -> bool = {
   q = make_quote(side, value, d)

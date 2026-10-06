@@ -58,13 +58,14 @@ def dependency_releases() -> list[str]:
         manifest = tomllib.load(source)
     dependencies = manifest.get("dependencies", {})
     releases: list[str] = []
-    for name in ("nautilus", "coral"):
-        spec = dependencies.get(name)
+    for name, spec in dependencies.items():
+        if name == "chelis-std":
+            continue
         version = spec.get("version") if isinstance(spec, dict) else None
-        if not isinstance(version, str):
+        if not isinstance(version, str) or not version.startswith("=") or not version[1:]:
             raise RuntimeError(f"reef.toml has no exact {name} dependency version")
         # Keep registry provenance canonical until chelis#1002 is fixed.
-        releases.append(f"chelis-lang/{name}@v{version}")
+        releases.append(f"chelis-lang/{name}@v{version[1:]}")
     return releases
 
 
@@ -184,14 +185,16 @@ def main() -> int:
         (package / "src").mkdir()
         (package / "reef.toml").write_text(
             f"""\
+schema = "3"
 [package]
 name = "shoals-latency-oracle"
 version = "0.1.0"
 compiler = "={compiler}"
 module_prefix = "ShoalsLatencyOracle"
+resolver = "2"
 
 [dependencies]
-shoals = {{ version = "{shoals}" }}
+shoals = {{ version = "={shoals}" }}
 """
         )
         (package / "src" / "main.ch").write_text(
@@ -209,6 +212,12 @@ def price_at_one() -> f32 =
 """
         )
 
+        checked_run(
+            [binary, "reef", "update", "--offline"],
+            env=env,
+            cwd=package,
+            label="consumer dependency lock",
+        )
         build = subprocess.run(
             [binary, "reef", "build", "."],
             cwd=package,

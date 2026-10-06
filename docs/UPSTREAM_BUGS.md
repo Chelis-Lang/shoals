@@ -1,7 +1,7 @@
 # Shoals Upstream Bugs
 
 Tracked upstream chelis issues and capability gaps that affect Shoals, per the
-[downstream shell repo contract](../../c-note/docs/shell_repo_contract.md) §4.
+[downstream shell repo contract](https://github.com/Chelis-Lang/chelis/blob/v0.18.13/spec/design/shell_repo_contract.md) §4.
 The reachability map these entries lean on — what the proof stack can and cannot
 discharge for finance at this pin — is `research/proof-infra/report.md`; keep
 entries consistent with it.
@@ -77,10 +77,9 @@ in code that is CLOSED upstream but not sitting in §Archived.
   so any citation in `src/` demands a `tests_blocked/` probe.
     - **Affected surface / narrowing:** Shoals had exactly one such citation --
       `src/pricing.ch:72` names `shoals#19` in the Beacon-seam design comment.
-      **Amended 2026-09-05:** `src/pricing.ch` now also cites `chelis#902` and
-      `nautilus#56`, which are genuine upstream citations covered by the entry
-      above and by `tests_blocked/special/erf_builtin_absent.ch`, so row 12's
-      demand is satisfied on their account rather than evaded.
+      `src/pricing.ch` also cites chelis#902 and nautilus#74. The available
+      primitive is checked in `tests/canonical_erf.ch`; Shoals keeps its Cody
+      kernel until the numeric and Greek oracles validate a replacement.
       `shoals#19` is an own-repo issue, already resolved, and already carried in
       §Archived below, which is why row 9 (`staleness-audit`) correctly PASSES
       on its coverage. **There is no narrowing.** Because that line is a section
@@ -108,14 +107,15 @@ in code that is CLOSED upstream but not sitting in §Archived.
       **Amended 2026-09-05:** `tests_blocked/` is no longer empty, so row 12
       now reads `PASS` on the unmodified tree whether or not this defect is
       fixed, and the old "require row 12 `NA`" criterion can no longer
-      discriminate. Re-probe by moving `tests_blocked/special/` aside and
-      re-running `chelis reef conform audit`: with the directory empty and the
+      discriminate. Re-probe in an isolated copy with every `.ch` probe under
+      `tests_blocked/` temporarily absent, then run `chelis reef conform audit`: with the directory empty and the
       `src/` citations still present, row 12 reads `NA` if fixed and `FAIL` if
       not. Restore the directory afterwards. Then replace this draft path with
       the issue number everywhere it is cited.
 
-- **chelis#1391 --
-  `chelis test --batch-mode auto` regressed 2.6x on this suite.** On one quiet
+- **shoals#111 -- the nightly `tests/` suite exceeds its hosted budget.**
+  Chelis 0.18.13 includes the chelis#1391 batching fix. Shoals keeps the
+  raised hosted budget until the suite is remeasured on its runner. On one quiet
   10-core machine with warm caches, `chelis test tests/ --timeout 1200
   --suite-timeout 1500 --jobs auto` over the same 43 files and 371 tests went
   from **3m01s** (0.18.5, 4m27s user) to **7m54s** (0.18.6, 9m37s user, stable
@@ -142,12 +142,10 @@ in code that is CLOSED upstream but not sitting in §Archived.
       compilation-unit size. Re-time both batch modes on the same machine and
       require `auto` to beat `file` again before lowering the nightly budget
       back.
-    - **Re-probe 2026-10-04 — trigger fired, verdict STILL BLOCKING.**
+    - **Re-probe 2026-10-04 on Chelis 0.18.11 — still blocking at that pin.**
       chelis#1391 is CLOSED upstream, fixed by **chelis#3058**
-      (`04612253c`, batching sharded at `MAX_BATCH_FILES = 4`). **No release
-      carries the fix** (`git tag --contains 04612253c` is empty and the merge
-      postdates `v0.18.12`), so the `=0.18.11` pin still has the regression
-      and the narrowing stands. Re-timed per the trigger at head `69e1e59` on
+      (`04612253c`, batching sharded at `MAX_BATCH_FILES = 4`). The
+      `=0.18.11` pin still had the regression. Re-timed per the trigger at head `69e1e59` on
       the release binary, the current 49 files and 549 tests, one 10-core
       machine, both legs back to back: `--batch-mode auto` 1113s wall / 1218s
       child CPU (1.09 cores), `--batch-mode file` 341s wall / 1264s child CPU
@@ -170,76 +168,55 @@ in code that is CLOSED upstream but not sitting in §Archived.
       transfer to a 2-vCPU runner. shoals#111 owns measuring it, which one
       `workflow_dispatch` settles.
 
-      This entry therefore stays here rather than moving to §Archived, which
-      is why `scripts/audit_workarounds.py` full mode reports it STALE: at
-      `scripts/audit_workarounds.py:275-281` a CLOSED active-subject offers
-      only §Archived or a re-cited residue issue, with no waiver path, so the
-      guard has no state for "fixed upstream, in no release". Retire it at the
-      first pin that carries chelis#3058, after re-timing.
+      Shoals#111 owns the remaining hosted timeout and a measured
+      `--batch-mode file` comparison on the 2-vCPU runner. Keep the raised
+      budget until that issue's suite measurement shows it can be lowered.
 
-- **Nothing blocks shipping the current proof surface.** The finance proof
-  surface ships as documented in `research/proof-infra/report.md`: the economic
-  / dynamic-programming properties reach the SMT tier with no transcendental
-  contract; the derivatives structural properties
-  (`properties/composites.ch`: upper bound, put–call parity with reflection,
-  delta ∈ [0,1]) reach SMT as **composites** — structure proven for any `N`
-  satisfying its contract, with that contract separately fuzz-validated on the
-  real `n_cdf`. The real transcendental pricing bodies degrade **honestly** to
-  fuzz (never a false proven — the coupled-subterm goals stay deferred, see
-  chelis#637 below). Both entries above are tooling defects, not semantic ones.
+- **The proof gate checks the pinned finance surface.** Economic and dynamic
+  programming properties reach the SMT tier without a transcendental contract.
+  The structural upper-bound and delta properties use the validated normal-CDF
+  range contract. Put-call parity through the f32 reflection contract is
+  deferred: its fixed tolerance fails validation at this pin (chelis#3116).
+  Direct transcendental pricing properties remain fuzz-validated; coupled
+  subterm proofs remain deferred under chelis#637.
 
 ## Tracking
 
-- **nautilus#56 / chelis#902 — no f64-callable `erf`, so this shell carries its
-  own kernel.** `Nautilus.Special` is f32-only, so a Shoals f64 grad path
-  cannot call its `erf`; `Shoals.Pricing` therefore hand-rolls one. The
-  duplication is the narrowing. The accuracy problem that came with it is
-  fixed: `erf64` now evaluates Cody's rational approximation at a worst
-  observed absolute error of >= 3.3675e-16 (~1.52 ulp, measured at 60 dps by
-  `scripts/oracle_erf64_accuracy.py`; a floor, since the error is jagged at ulp
-  scale and a grid finds only the worst point it samples), replacing the
-  Abramowitz & Stegun 7.1.26 coefficients it had copied from the f32 sibling
-  at ~1.4e-7.
-    - **Affected surface / narrowing:** a second implementation of `erf` lives
-      in this repo and must be maintained and measured here. `Shoals.Greeks`,
-      `Shoals.PricingExtended` and `references/blackscholes.ch` all
-      `import Nautilus.Special (erfc)`: they are **call sites, not copies**,
-      and no file under `src/` or `references/` carries the A&S constants.
-      `pricing_wire_erf_f64` remains, its coefficients caller-supplied tensor
-      parameters. The duplication is wider than one kernel
-      per repository: `src/pricing.ch` holds Cody's and the wire A&S form, and
-      `research/proof-infra/ad/src/bs.ch` and
-      `research/proof-infra/graduation/src/probe.ch` each hard-code the A&S
-      f64 literals again. They are now different algorithms -- Cody's in the
-      shipped kernel, A&S in the research probes and upstream -- so it is
-      drift, not redundancy.
-    - **State at pin 0.18.6 (re-probed 2026-09-12):** nautilus#56 CLOSED,
-      nautilus#59 and chelis#902 OPEN. The probe still blocks:
-      `tests_blocked/special/erf_builtin_absent.ch` reports `precision
-      mismatch: expected f32, got f64` — the package `erf` resolves and refuses
-      the width. nautilus#56 closing does not unblock it, because the f32-only
-      signature is nautilus#59's subject. The three repairs are disjoint:
-      nautilus#56 is the f32 original's own bound and changes coefficients, not
-      the signature; nautilus#59 removes the reason to duplicate but leaves the
-      bound wherever A&S is still used; chelis#902 supplies a canonical `erf`
-      and removes both. None is a chelis arithmetic defect.
-    - **The f32-only signature is filed as nautilus#59.** nautilus#12 is the LinAlg
-      signature barrier and does not cover `Nautilus.Special`; citing it would
-      make the de-narrowing branch unexecutable, since closing it would not
-      yield an f64 `erf`.
-    - **0.18.11 / Nautilus 0.7.46 refresh:** the f64 blocked probe still
-      rejects. The published f32 kernel now uses the four-term Taylor series
-      below `|x|=0.25`; `scripts/oracle_greeks_gate.py` mirrors that branch.
-      Its generated mirror test covers both signs, both arms, and adjacent
-      f32 values at the cutoff (19 points, two-ulp budget). These checks pass
-      against the installed published package; this is not an accuracy bound.
-    - **Re-probe trigger:** the blocked probe passing, either issue closing, or
-      **any nautilus pin bump past 0.7.46**. Kernel changes invalidate the
-      mirror in `scripts/oracle_greeks_gate.py::_erf_as_f32` even without an
-      issue transition; re-run its generated mirror checks and inspect the
-      published kernel before accepting a new pin.
-      Follow that probe's sidecar; which repair landed decides whether this
-      kernel is deleted in favour of a callable one or merely re-pointed.
+- **chelis#2825 — nested gradients reject a generated logical `not` in a
+  nonlinear clamp.** Shoals spells the small-region clamp and erfc dispatcher
+  as sequential selections. `tests-manual/greeks_secondorder.ch` and the Greek
+  oracle exercise the exported nested-gradient path. Keep that spelling until
+  the upstream reproducer in chelis#2825 passes on the pinned compiler and
+  the pricing and AD gates pass on the compatible package chain.
+
+- **chelis#2103 — untaken arithmetic under `vmap`/`grad` can poison a
+  selected result.** `src/pricing.ch` clamps the finite inputs to each `erf64`
+  core so both the untaken value and its derivative stay finite under masked
+  selection. The tail has a lower clamp only; the finite-domain guarantee does
+  not cover infinities. The NaN guard and the subnormal-sigma price and gamma
+  tests pin the affected path. Re-probe the issue's scalar/vector reproducer,
+  the Greek oracle, and the pricing tests before changing those clamps.
+
+- **nautilus#74 / chelis#902 — Shoals uses a separate f64 `erf`
+  kernel.** Nautilus 0.7.48 exports `erf[prec: {f32, f64}]`, so
+  nautilus#59's signature barrier is gone. Its A&S rational arm retains
+  approximately 1.4e-7 absolute error at f64, while `Shoals.Pricing.erf64`
+  uses Cody's approximation with a measured worst-observed floor of
+  >= 3.3675e-16. Shoals keeps that kernel for accuracy. Chelis 0.18.13
+  provides correctly rounded `erf` and `erfc` primitives; the broader
+  special-function request chelis#902 remains open.
+    - **Current surface:** Nautilus exports generic `Special.erf`, and
+      `tests/nautilus_erf_f64.ch` exercises its f64 call. Its f32 and f64
+      approximation still use A&S coefficients; the replacement must satisfy
+      Shoals's numerical and Greek oracles.
+    - **Narrowing:** `src/pricing.ch` retains its own Cody kernel; `erf_t` and
+      Shoals's tensor-wire and research bodies remain separate approximations.
+      `tests/canonical_erf.ch` checks the available primitive. Compare it against the current
+      kernel, including Greek and expiry behavior, before replacing it.
+    - **Re-probe trigger:** a nautilus#74 or chelis#902 resolution, or a
+      Nautilus pin changing the `Special.erf` kernel. Re-run the generated
+      f32 mirror, measure f64 accuracy, and only de-narrow when the replacement
+      meets Shoals's measured contract.
 
 - **chelis#1002 — Reef preserves caller-provided GitHub owner casing in
   `remote_origin`, making lock and package bytes registry-history-dependent.**
@@ -250,12 +227,14 @@ in code that is CLOSED upstream but not sitting in §Archived.
   bytes solely because the origin strings differed in case.
     - **Affected surface / narrowing:** every Shoals workflow and Python
       installer uses canonical lowercase `chelis-lang/...` coordinates.
-      `scripts/build_release_assets.py` deliberately reinstalls both
-      dependencies immediately before building and rejects a non-canonical
-      generated lock. `scripts/check_release_artifact_determinism.py` release-
-      gates two fresh isolated Reef homes: one adversarially preseeded through
-      mixed-case manual installs and one clean, requiring byte-identical lock,
-      CHB, and archive payloads. This does not claim the compiler is fixed.
+      `scripts/build_release_assets.py` resolves every non-stdlib dependency in a
+      fresh registry using those coordinates, discards a stale generated lock
+      before the build, and rejects a non-canonical replacement. A lowercase
+      reinstall into a mixed-case preseeded registry did not rewrite its
+      origins on Chelis 0.18.12. `scripts/check_release_artifact_determinism.py`
+      compares two isolated Reef homes: one preseeded through mixed-case
+      manual installs and one clean, requiring byte-identical lock, CHB, and
+      archive payloads. This does not claim the compiler is fixed.
     - **State at pin 0.18.6 (2026-08-29):** still OPEN upstream and the 0.18.6
       changelog names no origin canonicalization, so the narrowing stays. The
       adversarial pair (`scripts/check_release_artifact_determinism.py`) could
@@ -436,10 +415,6 @@ in code that is CLOSED upstream but not sitting in §Archived.
       (`nautilus-0.7.46.tar.zst`, `src/timeseries.ch:13`), not off a changelog.
       The probe reports `tensor precision mismatch: f32 vs f64`. Both
       nautilus#70 and nautilus#85 are OPEN and unassigned.
-
-## Parked
-
-No parked entries.
 
 ## Archived
 
@@ -622,6 +597,11 @@ No parked entries.
   load-bearing. The re-pinned WireDag receipt
   (`scripts/validate_bs_wire_root.py`, root 859 / 1665 nodes) reflects the
   floor and involved no compiler change.
+
+- **nautilus#59 — the `Nautilus.Special.erf` f64 signature barrier is
+  resolved.** Nautilus 0.7.48 exports `erf` for f32 and f64, and
+  `tests/nautilus_erf_f64.ch` exercises its f64 call. The approximation gap is
+  tracked separately by nautilus#74.
 
 - **chelis#1200 — `_ = f(x)` marked `x` consumed when `f` destructured a record
   parameter (0.18.4 regression; RESOLVED on 0.18.5).** A `_ =` wildcard discard

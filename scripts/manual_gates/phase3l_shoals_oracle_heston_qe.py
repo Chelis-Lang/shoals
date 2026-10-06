@@ -29,8 +29,8 @@ host-evaluator gate uses T=1y / 256 paths (see SPEC_CONFIG_NOTE).
 
 Mechanics: chelis test reports only the first failing assertion per
 test, and has no stdout I/O for passing tests. To extract numeric
-values we run multiple single-purpose tests, each sharing the same
-RNG seed so the MC numerics are deterministic and consistent across
+values we run multiple single-purpose tests, each reconstructing the same
+root key so the MC numerics are deterministic and consistent across
 extractions. Each extraction test asserts assert_close(value, -12345)
 which always fails, surfacing the actual value in the "got X" field
 of the assertion message.
@@ -78,10 +78,10 @@ SPEC_CONFIG_NOTE = (
 
 QE_SETUP = (
     "  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(N_PATHS, i64))))\n"
-    "  out = with seed(SEED) { heston_qe_paths_terminal(template, "
+    "  out = heston_qe_paths_terminal(key_from_seed(SEEDi64), template, "
     "cast(S0, f32), cast(V0, f32), cast(R, f32), "
     "cast(KAPPA, f32), cast(THETA, f32), cast(SIGMA, f32), cast(RHO, f32), "
-    "cast(T_YEARS, f32), cast(N_STEPS, i64)) }\n"
+    "cast(T_YEARS, f32), cast(N_STEPS, i64))\n"
     "  s_t_list = to_list(out.0)\n"
     "  min_v_list = to_list(out.2)\n"
     "  payoffs = map(fn (s: f32) -> if gt(s, cast(K, f32)) then sub(s, cast(K, f32)) else cast(0.0, f32), s_t_list)\n"

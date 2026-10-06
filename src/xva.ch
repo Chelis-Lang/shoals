@@ -87,13 +87,14 @@ def xva_trapezoidal_df_weighted[n](time_grid: tensor[n, f32], weight: tensor[n, 
 }
 def fva[n](time_grid: tensor[n, f32], epe: tensor[n, f32], funding_spread: f32, discount_rate: f32) -> f32 = mul(funding_spread, xva_trapezoidal_df_weighted(time_grid, epe, discount_rate))
 def kva[n](time_grid: tensor[n, f32], ead: tensor[n, f32], cost_of_capital: f32, regulatory_capital_weight: f32, discount_rate: f32) -> f32 = mul(cost_of_capital, mul(regulatory_capital_weight, xva_trapezoidal_df_weighted(time_grid, ead, discount_rate)))
-def xva_cva_stochastic_recovery[n](time_grid: tensor[n, f32], epe: tensor[n, f32], hazard: f32, recovery_alpha: f32, recovery_beta: f32, discount_rate: f32, n_paths: i64) -> f32 ! { Random } = {
+def xva_cva_stochastic_recovery[n](rng_key: key, time_grid: tensor[n, f32], epe: tensor[n, f32], hazard: f32, recovery_alpha: f32, recovery_beta: f32, discount_rate: f32, n_paths: i64) -> f32 = {
+  (rng_draw_0, rng_draw_1) = split_key(rng_key)
   zero_f = cast(0.0, f32)
   one_f = cast(1.0, f32)
   bare = cva_constant_hazard(time_grid, epe, hazard, zero_f, discount_rate)
   template = to_tensor(map(fn (i: i64) -> zero_f, range(cast(0, i64), n_paths)))
-  xs = gamma_sample(copy(template), recovery_alpha, one_f)
-  ys = gamma_sample(template, recovery_beta, one_f)
+  xs = gamma_sample(rng_draw_0, copy(template), recovery_alpha, one_f)
+  ys = gamma_sample(rng_draw_1, template, recovery_beta, one_f)
   xs_l = to_list(xs)
   ys_l = to_list(ys)
   pairs = zip(xs_l, ys_l)
@@ -143,14 +144,15 @@ def xva_cva_stochastic_hazard[n, m](time_grid: tensor[m, f32], epe: tensor[m, f3
   }
   }
 }
-def xva_cva_wwr_constant_hazard[n](time_grid: tensor[n, f32], epe: tensor[n, f32], hazard: f32, recovery: f32, discount_rate: f32, rho: f32, n_paths: i64) -> f32 ! { Random } = {
+def xva_cva_wwr_constant_hazard[n](rng_key: key, time_grid: tensor[n, f32], epe: tensor[n, f32], hazard: f32, recovery: f32, discount_rate: f32, rho: f32, n_paths: i64) -> f32 = {
+  (rng_draw_0, rng_draw_1) = split_key(rng_key)
   zero_f = cast(0.0, f32)
   one_f = cast(1.0, f32)
   eta_e = cast(0.5, f32)
   lgd = sub(one_f, recovery)
   template = to_tensor(map(fn (i: i64) -> zero_f, range(cast(0, i64), n_paths)))
-  z_e_t = normal_sample(copy(template), zero_f, one_f)
-  z_d_t = normal_sample(template, zero_f, one_f)
+  z_e_t = normal_sample(rng_draw_0, copy(template), zero_f, one_f)
+  z_d_t = normal_sample(rng_draw_1, template, zero_f, one_f)
   ts_l = to_list(copy(time_grid))
   n_grid = numel(copy(time_grid))
   t_max = index(ts_l, sub(cast(n_grid, i64), cast(1, i64)))

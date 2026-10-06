@@ -1,6 +1,6 @@
 # tests_blocked/ — upstream-blocker probes
 
-Every `.ch` here is a **minimal reproducer of an open upstream chelis
+Every `.ch` here is a **minimal reproducer of an open compiler or sibling-shell
 bug** that Shoals works around, **EXPECTED TO FAIL** at the current pin,
 run via `chelis test tests_blocked/ --expect blocked` (a pass = FIX-detected:
 execute the de-narrowing instructions in the probe's `.expect` sidecar,
@@ -9,23 +9,24 @@ entry in the same change set).
 
 ## Current probes
 
-**`special/erf_builtin_absent.ch`** — the f32-only signature on
-`Nautilus.Special`, which is why `Shoals.Pricing` carries its own `erf64`.
-Reports `precision mismatch: expected f32, got f64`: the package `erf`
-resolves and refuses the width. Blocker filed as
-nautilus#59; siblings are nautilus#56
-(the approximation's own bound) and chelis#902 (a canonical `erf` in the
-language). Its sidecar's de-narrowing steps branch on which lands.
+**`timeseries/rolling_f64_absent.ch`** — Nautilus's current TimeSeries
+surface remains tensor-shaped and f32-only (nautilus#70 / nautilus#85).
+Re-probe it against the next compatible Nautilus release and follow its
+sidecar before retiring Shoals's list-shaped f64 indicator layer.
+
+`tests/canonical_erf.ch` checks the available `erf` and `erfc` primitives.
+Shoals's Cody kernel remains in use; any replacement must pass the numerical
+and Greek oracles.
 
 This directory was deliberately empty from the chelis 0.18.6 bump until
 2026-09-05. **That emptiness was load-bearing for the chelis#1387 entry**,
 whose re-probe criterion was "row 12 reads `NA` on the unmodified tree" — a
-criterion the probe above invalidates, since row 12 now reads `PASS` whether
+criterion the remaining probe invalidates, since row 12 now reads `PASS` whether
 or not chelis#1387 is fixed. That entry's trigger has been amended to move
 this directory aside before re-probing; if you add or remove probes here,
 check it still discriminates.
 
-Shoals also carries two actively-blocking upstream entries that are not
+Shoals also carries two actively-blocking entries that are not
 expressible here: one is a `chelis reef conform audit` row verdict and the
 other is a wall-clock measurement, so `chelis test --expect blocked` cannot
 express either. Both are listed under §cannot-be-probed below.

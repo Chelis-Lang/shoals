@@ -59,11 +59,11 @@ historical measures reproduce.
 Module: `Shoals.References.MonteCarlo`.
 
 ```chelis
-def vanilla_call_textbook[n](template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 ! { Random }
+def vanilla_call_textbook[n](rng_key: key, template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32
 ```
 
 A straightforward scalar-fold Monte Carlo call pricer, the reference that
-`Shoals.Pricing.mc_call_price` is checked against under a shared seed.
+`Shoals.Pricing.mc_call_price` is checked against using keys derived from the same seed.
 
 ## Distributions
 
@@ -101,19 +101,15 @@ The first three keep a deliberately crude 30-day-month count
 (`naive_days_between`), so the properties that use them hold only to a loose
 tolerance. The two ACT/ACT references instead compute an exact
 proleptic-Gregorian day number of their own rather than calling
-`Std.Time.days_between`, so they check `Shoals.Date` against an independently
+`Std.Datetime.date_days_until`, so they check `Shoals.Date` against an independently
 derived calendar and hold to floating-point agreement. They also state ISDA
 differently from the subject: the reference clamps every calendar year to the
 interval and divides each segment, where `Shoals.Date` counts a whole interior
 year as exactly 1 and divides only the head and tail stubs. Agreement is
 therefore a real cross-check of the year-boundary handling rather than a
-restatement. The subject carries the loop-free form deliberately, and the cost
-model is worth stating because it is counter-intuitive:
-`Std.Time.days_before_year` recurses one year at a time from 1970, so a single
-`days_between` costs O(|year − 1970|) per endpoint and does **not** depend on the
-span at all. A per-calendar-year fold paid that epoch distance once per year of
-the span, and the product is what made it slow. The subject now makes a bounded
-number of those calls whatever the span — O(1) in the span, still linear in how
-far its dates sit from 1970. The reference keeps the loop but pays neither cost
-per iteration, because `civil_ordinal` is closed-form era/yoe/doy arithmetic with
-no recursion; its span is test-sized regardless.
+restatement. The subject carries the loop-free form deliberately: it makes a
+bounded number of `Std.Datetime` date calls whatever the span. Those calls use
+closed-form Gregorian arithmetic, so dates far from 1970 add no per-year
+traversal cost. The reference keeps a per-year loop for an independent
+cross-check, with its own closed-form `civil_ordinal` calculation; its spans
+are test-sized.

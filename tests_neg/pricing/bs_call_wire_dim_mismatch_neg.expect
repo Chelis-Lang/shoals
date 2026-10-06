@@ -1,4 +1,4 @@
-dimension mismatch
+`Shoals.Pricing.bs_call_wire_f64` argument 2, axis 0: expected 2, got 3
 
 The pure-tensor WireDag pricer requires every market and coefficient tensor to
 share the same row dimension. A three-row strike tensor cannot be paired with

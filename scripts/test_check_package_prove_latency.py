@@ -69,8 +69,8 @@ name = "shoals"
 version = "1.2.3"
 compiler = "=0.17.4"
 [dependencies]
-nautilus = { version = "0.7.36" }
-coral = { version = "0.7.33" }
+nautilus = { version = "=0.7.36" }
+coral = { version = "=0.7.33" }
 """
             )
             isolated = root / "isolated-reef"

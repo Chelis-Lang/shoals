@@ -10,7 +10,7 @@ an order book, and a small set of finance-specific distributions.
 The library is written entirely in Chelis. Numerical primitives that are
 not finance-specific (the normal distribution, special functions,
 statistics, interpolation) come from the upstream `Nautilus` library, and
-the standard date type comes from `Std.Time`. Shoals layers the finance
+the standard date type comes from `Std.Datetime`. Shoals layers the finance
 semantics on top: Black-Scholes, the FX and forward pricers, SVI vol
 surfaces, sensitivity operators on curves, XVA aggregators, and so on.
 
@@ -19,7 +19,7 @@ surfaces, sensitivity operators on curves, XVA aggregators, and so on.
 The chapters introduce the main modules and point to their source tests:
 
 - **Pricing.** Black-Scholes call and put, vectorized price tensors, and a
-  Monte Carlo engine driven by the `Random` effect.
+  Monte Carlo engine driven by explicit random keys.
 - **Greeks.** Finite-difference first- and second-order Greeks, analytic
   Greek references for cross-checking, and pathwise / likelihood-ratio
   estimators for the digital payoff family.
@@ -38,7 +38,8 @@ The chapters introduce the main modules and point to their source tests:
   deposit/zero-coupon/par-swap instrument bootstrap with IFT sensitivities, curve-kind
   metadata, and sensitivity operators.
 - **Dates, calendars, tenors.** Day-count conventions, business-day
-  rolling, holiday calendars, and tenor arithmetic.
+  rolling, local holiday calendars, Shoreleave published calendars, and tenor
+  arithmetic.
 - **Market data.** Quote, bar, and snapshot record types.
 - **Order book.** A price-priority limit order book with best bid and ask,
   spread, and volume-weighted average price.

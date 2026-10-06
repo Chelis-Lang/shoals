@@ -1,7 +1,35 @@
 module Shoals.Tests.HolidayCal
 import Std.Test (assert_true, assert_false, assert_eq)
-import Std.Time (date)
-import Shoals.HolidayCal (Calendar, is_holiday, is_business_day, hc_nyc_calendar, hc_ldn_calendar, joint_calendar, weekend_only_calendar, empty_calendar, easter_sunday_gregorian, good_friday, easter_monday, hc_nyc_calendar_multi, hc_ldn_calendar_multi)
+import Std.Datetime (date, date_year, date_month, date_day)
+import Std.Datetime.Business (try_is_business_day)
+import Shoals.HolidayCal (Calendar, is_holiday, is_business_day, hc_nyc_calendar, hc_ldn_calendar, joint_calendar, weekend_only_calendar, empty_calendar, easter_sunday_gregorian, good_friday, easter_monday, hc_nyc_calendar_multi, hc_ldn_calendar_multi, hc_us_federal_published, hc_england_wales_published)
+import Shoals.Date (date_roll_following_published, date_roll_preceding_published, date_roll_modified_following_published)
+def test_published_us_federal_closure_roll() -> unit ! { Test } = {
+  day = date(2025i64, 12i64, 24i64)
+  landed = date_roll_following_published(day, hc_us_federal_published())
+  assert_true(and(eq(date_year(landed), 2025i64), and(eq(date_month(landed), 12i64), eq(date_day(landed), 29i64))), "US federal closure through December 26 rolls to December 29")
+}
+def test_published_england_wales_bank_holiday_roll() -> unit ! { Test } = {
+  day = date(2025i64, 5i64, 5i64)
+  landed = date_roll_following_published(day, hc_england_wales_published())
+  assert_true(and(eq(date_year(landed), 2025i64), and(eq(date_month(landed), 5i64), eq(date_day(landed), 6i64))), "England and Wales bank holiday rolls to May 6")
+}
+def test_published_calendar_preceding_and_modified_following() -> unit ! { Test } = {
+  cal = hc_england_wales_published()
+  may = date(2025i64, 5i64, 5i64)
+  preceding = date_roll_preceding_published(may, cal)
+  august = date(2025i64, 8i64, 31i64)
+  modified = date_roll_modified_following_published(august, cal)
+  _ = assert_true(and(eq(date_month(preceding), 5i64), eq(date_day(preceding), 2i64)), "preceding roll reaches May 2")
+  assert_true(and(eq(date_month(modified), 8i64), eq(date_day(modified), 29i64)), "modified following stays in August")
+}
+def test_published_calendar_rejects_outside_horizon() -> unit ! { Test } = {
+  result = try_is_business_day(hc_us_federal_published(), date(2031i64, 1i64, 2i64))
+  match result with {
+    | None => assert_true(true, "published calendar has a finite horizon")
+    | Some(_) => assert_true(false, "published calendar must reject a date outside its horizon")
+  }
+}
 def test_nyc_new_year_is_holiday() -> unit ! { Test } = {
   cal = hc_nyc_calendar()
   d = date(cast(2025, i64), cast(1, i64), cast(1, i64))
@@ -69,35 +97,35 @@ def test_weekend_only_calendar_treats_weekday_as_business() -> unit ! { Test } =
 }
 def test_easter_2024() -> unit ! { Test } = {
   e = easter_sunday_gregorian(cast(2024, i64))
-  assert_true(and(eq(e.year, cast(2024, i64)), and(eq(e.month, cast(3, i64)), eq(e.day, cast(31, i64)))), "Easter 2024 = 2024-03-31")
+  assert_true(and(eq(date_year(e), cast(2024, i64)), and(eq(date_month(e), cast(3, i64)), eq(date_day(e), cast(31, i64)))), "Easter 2024 = 2024-03-31")
 }
 def test_easter_2025() -> unit ! { Test } = {
   e = easter_sunday_gregorian(cast(2025, i64))
-  assert_true(and(eq(e.year, cast(2025, i64)), and(eq(e.month, cast(4, i64)), eq(e.day, cast(20, i64)))), "Easter 2025 = 2025-04-20")
+  assert_true(and(eq(date_year(e), cast(2025, i64)), and(eq(date_month(e), cast(4, i64)), eq(date_day(e), cast(20, i64)))), "Easter 2025 = 2025-04-20")
 }
 def test_easter_2026() -> unit ! { Test } = {
   e = easter_sunday_gregorian(cast(2026, i64))
-  assert_true(and(eq(e.year, cast(2026, i64)), and(eq(e.month, cast(4, i64)), eq(e.day, cast(5, i64)))), "Easter 2026 = 2026-04-05")
+  assert_true(and(eq(date_year(e), cast(2026, i64)), and(eq(date_month(e), cast(4, i64)), eq(date_day(e), cast(5, i64)))), "Easter 2026 = 2026-04-05")
 }
 def test_easter_2030() -> unit ! { Test } = {
   e = easter_sunday_gregorian(cast(2030, i64))
-  assert_true(and(eq(e.year, cast(2030, i64)), and(eq(e.month, cast(4, i64)), eq(e.day, cast(21, i64)))), "Easter 2030 = 2030-04-21")
+  assert_true(and(eq(date_year(e), cast(2030, i64)), and(eq(date_month(e), cast(4, i64)), eq(date_day(e), cast(21, i64)))), "Easter 2030 = 2030-04-21")
 }
 def test_easter_2050() -> unit ! { Test } = {
   e = easter_sunday_gregorian(cast(2050, i64))
-  assert_true(and(eq(e.year, cast(2050, i64)), and(eq(e.month, cast(4, i64)), eq(e.day, cast(10, i64)))), "Easter 2050 = 2050-04-10")
+  assert_true(and(eq(date_year(e), cast(2050, i64)), and(eq(date_month(e), cast(4, i64)), eq(date_day(e), cast(10, i64)))), "Easter 2050 = 2050-04-10")
 }
 def test_easter_9999() -> unit ! { Test } = {
   e = easter_sunday_gregorian(cast(9999, i64))
-  assert_true(eq(e.year, cast(9999, i64)), "Easter 9999 returns a valid date in year 9999")
+  assert_true(eq(date_year(e), cast(9999, i64)), "Easter 9999 returns a valid date in year 9999")
 }
 def test_good_friday_2025() -> unit ! { Test } = {
   gf = good_friday(cast(2025, i64))
-  assert_true(and(eq(gf.year, cast(2025, i64)), and(eq(gf.month, cast(4, i64)), eq(gf.day, cast(18, i64)))), "Good Friday 2025 = 2025-04-18")
+  assert_true(and(eq(date_year(gf), cast(2025, i64)), and(eq(date_month(gf), cast(4, i64)), eq(date_day(gf), cast(18, i64)))), "Good Friday 2025 = 2025-04-18")
 }
 def test_easter_monday_2025() -> unit ! { Test } = {
   em = easter_monday(cast(2025, i64))
-  assert_true(and(eq(em.year, cast(2025, i64)), and(eq(em.month, cast(4, i64)), eq(em.day, cast(21, i64)))), "Easter Monday 2025 = 2025-04-21")
+  assert_true(and(eq(date_year(em), cast(2025, i64)), and(eq(date_month(em), cast(4, i64)), eq(date_day(em), cast(21, i64)))), "Easter Monday 2025 = 2025-04-21")
 }
 def test_ldn_multi_2029_christmas() -> unit ! { Test } = {
   cal = hc_ldn_calendar_multi([cast(2025, i64), cast(2026, i64), cast(2027, i64), cast(2028, i64), cast(2029, i64), cast(2030, i64)])

@@ -398,7 +398,7 @@ class EvalWireDecode(unittest.TestCase):
         """These are f64 claims. Measuring an f32 would silently change the
         subject rather than fail."""
         entry = {"type": "scalar", "value": {"dtype": "f32", "bits": "3f000000"}}
-        with self.assertRaises(SystemExit):
+        with self.assertRaises(ValueError):
             self.mod.decode_scalar(entry, 3)
 
     def test_unsupported_schema_is_named_in_the_failure(self):

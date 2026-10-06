@@ -12,11 +12,12 @@ same change set.
 ## 3l: Shoals — Finance
 
 **Goal:** A reef package for quantitative finance. Pricing models, risk measures, yield
-curves, stochastic processes, order books. Built entirely on `chelis-std` + `nautilus` +
-`coral`. Contains only finance-specific logic.
+curves, stochastic processes, order books. Built on `chelis-std`, `nautilus`,
+`coral`, and Shoreleave's published business calendars. Contains only
+finance-specific logic.
 
 **Prerequisite:** 3j (nautilus — distributions, optimization, SDE solvers), 3k (coral —
-for loading/manipulating financial data), 3i (Std.Time for dates, Std.Decimal for cash
+for loading/manipulating financial data), 3i (Std.Datetime for dates, Std.Decimal for cash
 amounts).
 
 ### Key Design Decision: Instruments as Dicts, Not Closed ADTs
@@ -46,10 +47,11 @@ the AD-through-instrument-dict story is validated end-to-end.
 
 | Module | Contents | Key Dependencies |
 |---|---|---|
-| `Shoals.Pricing` | Black-Scholes analytical, Heston semi-analytical, SABR calibration, Monte Carlo engines with variance reduction. Executable Greek coverage currently uses finite-difference checks against textbook references; grad-derived Greeks remain an alpha runtime path until the full pricing body is IR-lowerable under host-runtime `grad`. | `Nautilus.Distributions`, `Nautilus.Sde`, `Random` effect, cumsum |
-| `Shoals.Risk` | VaR (parametric, historical, Monte Carlo), CVaR/expected shortfall, stress testing, scenario generation | `Nautilus.Stats`, sort/quantile, `Random` effect |
-| `Shoals.Curves` | Yield curve construction (bootstrap from market instruments), interpolation (linear, cubic, Nelson-Siegel), day count conventions (ACT/360, ACT/365, 30/360) | `Nautilus.Interpolation`, `Nautilus.Roots`, `Std.Time` |
-| `Shoals.Stochastic` | SDE models: GBM, Heston, SABR, jump-diffusion. Path generation using cumsum + `Nautilus.Sde`. Variance reduction (antithetic, control variates). | `Nautilus.Sde`, `Random`, cumsum, einsum |
+| `Shoals.Pricing` | Black-Scholes analytical, Heston semi-analytical, SABR calibration, Monte Carlo engines with variance reduction. Executable Greek coverage currently uses finite-difference checks against textbook references; grad-derived Greeks remain an alpha runtime path until the full pricing body is IR-lowerable under host-runtime `grad`. | `Nautilus.Distributions`, `Nautilus.Sde`, explicit keys, cumsum |
+| `Shoals.Risk` | VaR (parametric, historical, Monte Carlo), CVaR/expected shortfall, stress testing, scenario generation | `Nautilus.Stats`, sort/quantile, explicit keys |
+| `Shoals.Curves` | Yield curve construction (bootstrap from market instruments), interpolation (linear, cubic, Nelson-Siegel), day count conventions (ACT/360, ACT/365, 30/360) | `Nautilus.Interpolation`, `Nautilus.Roots`, `Std.Datetime` |
+| `Shoals.HolidayCal` / `Shoals.Date` | Local calendar rules and date arithmetic, plus horizon-checked published US federal and England and Wales calendars | `Std.Datetime.Business`, `Shoreleave.UsFederal`, `Shoreleave.EnglandAndWales` |
+| `Shoals.Stochastic` | SDE models: GBM, Heston, SABR, jump-diffusion. Path generation using cumsum + `Nautilus.Sde`. Variance reduction (antithetic, control variates). | `Nautilus.Sde`, explicit keys, cumsum, einsum |
 | `Shoals.Orderbook` | Limit order book representation (price-priority sorted collections), matching logic, bid/ask spread computation, VWAP | Host-side collections, sort, `Std.Decimal` |
 
 ### What Makes This Work in Chelis
@@ -63,15 +65,15 @@ the AD-through-instrument-dict story is validated end-to-end.
   compiler. Full grad-vs-textbook runtime properties remain deferred pending that
   Shoals-specific verification (re-evaluated at the M6 Greeks discipline milestone in
   `docs/plan-quant-surface.md`).
-- **Reproducible Monte Carlo:** The `Random` effect with `withSeed` handlers means every
-  simulation is exactly reproducible. Two runs with the same seed produce identical
-  paths. This is a regulatory requirement.
+- **Reproducible Monte Carlo:** Every simulation consumes an explicit affine key.
+  Reconstructing the same root key from the same seed and following the same key
+  derivations reproduces the same paths for fixed program and declared inputs.
 - **Typed market data:** Named tensor dimensions like `tensor[instrument, scenario, f32]`
   prevent accidentally multiplying a `[portfolio, maturity]` matrix by a
   `[maturity, scenario]` matrix when the dimensions don't match.
 - **Effect-tracked data provenance:** A function that reads from a market data feed has
-  `IO` effect. A function using Monte Carlo has `Random` effect. The type system tracks
-  what each computation depends on.
+  `IO` effect. A Monte Carlo function consumes an explicit key argument. The type
+  system rejects key reuse; fresh draws require derived keys.
 
 ### Test Plan
 
@@ -93,20 +95,17 @@ the AD-through-instrument-dict story is validated end-to-end.
 - `Shoals.Stochastic`: GBM paths satisfy known statistical properties
   (mean = spot * exp(mu*T), variance matches theory)
 - `Shoals.Orderbook`: matching logic satisfies price-time priority invariant
-- Effect tracking: MC pricing propagates `Random`, curve construction propagates `IO`
-  for market data
-- Reproducibility: seeded runtime tests pass for the Shoals Monte Carlo paths. A future
-  compiler-side manifest gate should reject unseeded random operations once
-  `chelis manifest --check` exists.
+- Effect tracking: curve construction propagates `IO` for market data.
+- Reproducibility: Monte Carlo tests reconstruct keys for exact replay and split
+  keys for separate draws; negative tests reject keyless calls and key reuse.
 
-**Reproducibility manifests.** The `chelis manifest` command (compiler-side pass)
-extracts all `Random`-effect-annotated operations into a structured JSON report.
-`chelis manifest --check` is not shipped in the chelis 0.7.11 toolchain and is not
-part of the Shoals CI gate. Target behavior: fail the build if any random operation in a Shoals
-program is unseeded once the compiler-side pass exists. Status: **demo-blocking,
-scoped, ready to build.** Full design: `chelis_manifest_spec.md` in the chelis monorepo
-(concrete CLI surface and JSON schema); historical context in
-`chelis_reproducibility_manifests.md`.
+**Reproducibility manifests.** The planned Chelis manifest command records
+reproducibility metadata; key validity is enforced by the checker. Every random
+Shoals export accepts a key, and multi-draw implementations derive distinct
+child keys before sampling. Randomness carries no effect and has no seed handler.
+The controlling
+contracts are Chelis `spec/04-type-system.md` [04-LIN-9] and
+`spec/05-risc-primitives.md` [05-OP-69] through [05-OP-72].
 
 **Canonical finance properties.** Shoals ships with a `properties/` directory of
 reference `@property` functions:

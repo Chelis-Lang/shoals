@@ -1,4 +1,4 @@
-precision mismatch: expected i64, got f32
+`Shoals.Trees.tr_binom_european_call_generic` argument 7: expected i64, got f32
 
 Assumption: the generic tree depth is an i64 count. A floating-point depth
 must be rejected rather than rounded into a different lattice.

@@ -50,9 +50,9 @@ def matches_textbook_reference_put(s: f32, k: f32, r: f32, sigma: f32, t: f32) -
   abs_diff = if lt(diff, cast(0.0, f32)) then neg(diff) else diff
   lt(abs_diff, cast(0.00005, f32))
 }
-def mc_matches_textbook_mc_reference[n](template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool ! { Random } = {
-  optimized = with seed(42i64) { mc_call_price(copy(template), s0, k, r, sigma, t) }
-  reference = with seed(42i64) { vanilla_call_textbook(template, s0, k, r, sigma, t) }
+def mc_matches_textbook_mc_reference[n](template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool = {
+  optimized = mc_call_price(key_from_seed(42i64), copy(template), s0, k, r, sigma, t)
+  reference = vanilla_call_textbook(key_from_seed(42i64), template, s0, k, r, sigma, t)
   diff = sub(optimized, reference)
   abs_diff = if lt(diff, cast(0.0, f32)) then neg(diff) else diff
   ref_abs = if lt(reference, cast(0.0, f32)) then neg(reference) else reference

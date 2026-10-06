@@ -14,8 +14,8 @@ env:
   # Literal chelis pin. MUST equal reef.toml `compiler = "=X.Y.Z"`;
   # scripts/audit_workarounds.py --pins-only enforces it offline. The extract
   # step re-derives from reef.toml only to assert this has not drifted.
-  CHELIS_TAG: v0.18.11
-  CHELIS_VERSION: 0.18.11
+  CHELIS_TAG: v0.18.13
+  CHELIS_VERSION: 0.18.13
 
 jobs:
   build-reef-assets:
@@ -30,10 +30,11 @@ jobs:
           # chelis pin comes from the literal top-level env; re-derive from
           # reef.toml only to assert it has not drifted (reef.toml is truth).
           REEF_CHELIS=$(grep -oP '^compiler\s*=\s*"=\K[0-9]+\.[0-9]+\.[0-9]+' reef.toml)
-          NAUTILUS_VERSION=$(grep -A0 '^nautilus' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-          CORAL_VERSION=$(grep -A0 '^coral' reef.toml | grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-          PACKAGE_VERSION=$(grep -oP '^version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' reef.toml | head -1)
-          if [ -z "$REEF_CHELIS" ] || [ -z "$NAUTILUS_VERSION" ] || [ -z "$CORAL_VERSION" ] || [ -z "$PACKAGE_VERSION" ]; then
+          NAUTILUS_VERSION=$(grep -A0 '^nautilus' reef.toml | grep -oP 'version\s*=\s*"=?\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          CORAL_VERSION=$(grep -A0 '^coral' reef.toml | grep -oP 'version\s*=\s*"=?\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          SHORELEAVE_VERSION=$(grep -A0 '^shoreleave' reef.toml | grep -oP 'version\s*=\s*"=?\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          PACKAGE_VERSION=$(grep -oP '^version\s*=\s*"=?\K[0-9]+\.[0-9]+\.[0-9]+' reef.toml | head -1)
+          if [ -z "$REEF_CHELIS" ] || [ -z "$NAUTILUS_VERSION" ] || [ -z "$CORAL_VERSION" ] || [ -z "$SHORELEAVE_VERSION" ] || [ -z "$PACKAGE_VERSION" ]; then
             echo "Failed to parse one or more versions from reef.toml" >&2
             cat reef.toml >&2
             exit 1
@@ -45,8 +46,9 @@ jobs:
           fi
           echo "NAUTILUS_TAG=v$NAUTILUS_VERSION" >> "$GITHUB_ENV"
           echo "CORAL_TAG=v$CORAL_VERSION" >> "$GITHUB_ENV"
+          echo "SHORELEAVE_TAG=v$SHORELEAVE_VERSION" >> "$GITHUB_ENV"
           echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_ENV"
-          echo "Detected: chelis=$CHELIS_VERSION (literal, ==reef) nautilus=$NAUTILUS_VERSION coral=$CORAL_VERSION shoals=$PACKAGE_VERSION"
+          echo "Detected: chelis=$CHELIS_VERSION (literal, ==reef) nautilus=$NAUTILUS_VERSION coral=$CORAL_VERSION shoreleave=$SHORELEAVE_VERSION shoals=$PACKAGE_VERSION"
 
       - name: Download chelis toolchain
         env:
@@ -80,6 +82,7 @@ jobs:
           # Canonical lowercase owner is a release-byte narrowing for chelis#1002.
           chelis reef install --from-github "chelis-lang/nautilus@${NAUTILUS_TAG}"
           chelis reef install --from-github "chelis-lang/coral@${CORAL_TAG}"
+          chelis reef install --from-github "chelis-lang/shoreleave@${SHORELEAVE_TAG}"
 
       - name: Verify release bytes converge across adversarial Reef registries (chelis#1002)
         env:

@@ -4,7 +4,7 @@ Module: `Shoals.Pricing`.
 
 This module provides the Black-Scholes call and put in closed form,
 vectorized price tensors over a set of spots, gradient-derived sensitivity
-vectors, and a Monte Carlo call pricer that carries the `Random` effect.
+vectors, and a Monte Carlo call pricer that takes an explicit random key.
 The `f32` scalar calls use an `f64` pricing body with this module's own
 normal-CDF approximation. The approximation loses relative precision in the
 far negative tail. See [Scope and limitations](scope.md) for numerical bounds.
@@ -139,24 +139,22 @@ If you aggregate a Greek vector, test for finiteness rather than for `NaN`: a
 ## Monte Carlo call price
 
 ```chelis
-def mc_call_price[n](template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32 ! { Random }
+def mc_call_price[n](rng_key: key, template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32
 ```
 
 `mc_call_price` simulates terminal prices under geometric Brownian motion,
 takes the discounted mean of the call payoff, and returns the Monte Carlo
 estimate. The number of paths is the length of the `template` tensor. The
-function carries the `Random` effect and must run inside a `with seed(...)`
-block.
+function takes a `key` as its first argument. Derive a reproducible key with
+`key_from_seed`.
 
 From `tests/pricing.ch`, a twenty-thousand-path estimate of the ATM call:
 
 ```chelis
 template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
-mc_px = with seed(42i64) {
-  mc_call_price(template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
-}
+mc_px = mc_call_price(key_from_seed(42i64), template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
 ```
 
 The source test checks a two-percent tolerance at this path count.
-Running the same call twice under the same seed and inputs returns the
-identical value.
+Running the same call twice with keys derived from the same seed and the same
+other inputs returns identical values.

@@ -37,129 +37,6 @@ validation pass, or verification of a fix that a red team reported.
 6. If every local subagent path is unavailable, state that red-team validation is
    blocked. Do not substitute an external agent CLI or main-thread validation.
 
-## Execution Order: New Round
-
-1. Confirm the candidate is committed and pushed, and count this pull request's fresh
-   rounds against the cap. Stop and ask before a round past the cap.
-2. Inventory subagent handles created in your own current session. Stop or interrupt
-   and retire only stale or failed handles that will not be used again. A standing
-   reviewer awaiting a fix is neither; leave it and every other developer's handles
-   alone. The platform need not support deleting a retired handle from its listing.
-3. Choose the worktree and target: an existing worktree pinned to the exact review head
-   with a known clean baseline and no concurrent writer or build owner, together with
-   its warm target, or a new isolated one. Decide whether the target is free right now.
-4. Fill the round brief template below. Every placeholder is required, and the brief
-   does not open with "read `AGENTS.md`".
-5. Spawn a new local subagent with the brief as its whole prompt. In Codex sessions, use
-   `list_agents`, `interrupt_agent`, `spawn_agent`, `send_message` or `followup_task`,
-   and `wait_agent` rather than shelling out to `claude`, `codex exec`, or other
-   external CLIs. If the spawn routes to remote infrastructure, errors, or comes back
-   broken, retire that handle and retry, or report the red team blocked.
-6. Record the initial report in the pull request, assigning a class to any finding the
-   report left unlabeled, and keep the reviewer's handle through the repair loop. The
-   round closes only when that reviewer is satisfied or the reviewer-unavailable fallback
-   below has been recorded.
-
-## Execution Order: Verify My Fix
-
-1. Consolidate the current round's repairs into a local commit. Name the finding and its
-   class, that exact unpushed head, and every repair since the initial report. After a
-   rebase, also name the hand-resolved intersection; do not treat every upstream file
-   brought in by the new base as changed review scope.
-2. Re-run `worktree_status.py` after the author hands off the worktree, paste its output
-   into the verification brief, and send the brief to the standing reviewer. Wait for
-   closed or not closed with the commands it ran.
-3. If the reviewer reports another issue, amend or replace the local repair commit and
-   repeat verification. Do not push the repair while the round remains open.
-4. Record every verification under the same round. When the reviewer is satisfied, push
-   the exact verified head once. If the round confirmed an in-scope P0 or P1, start the
-   owed fresh round after that push, subject to the cap.
-5. If the reviewer is gone, run its exact reproduction yourself and record the commands
-   with "reviewer unavailable". This fallback can close the current repair finding but
-   does not replace an owed fresh round after a confirmed P0 or P1.
-
-## Worktree And Build Reuse
-
-- Freshness is a property of the reviewer context, not the checkout or build cache.
-- Prefer an existing worktree and warm target artifacts when it is pinned to the exact
-  review head, its baseline status is known and clean, and no concurrent agent or build
-  owns it. Otherwise create an isolated worktree or target.
-- The author and standing reviewer may serially reuse the round's worktree. Each handoff
-  requires a fresh busy signal and a clean exact local head; author and reviewer never
-  write or build there concurrently.
-- The brief pastes the busy signal for that target instead of asserting it:
-  `.venv/bin/python scripts/worktree_status.py [--path PATH] [--json] [--quiet]`.
-  That pasted output is the heavyweight-command handshake for that target. It answers
-  free, busy, unknown, or not clean, withholds free when evidence is missing, and prints
-  a finished gate report under a history label rather than as current state, so treat
-  unknown as busy. Free is its best answer rather than a proof; the probe documents the
-  residual case its fail-safe does not reach. The reviewer uses a free target without a cold rebuild and asks
-  before starting any other heavyweight build.
-- A reviewer whose probes mutate tracked source gets its own worktree, whatever the
-  signal reports. This is an exception to reuse, not a caveat on it: sequencing narrows
-  the window in which an inserted variant reaches someone else's compile, and a
-  separate worktree removes it.
-- Reusing a worktree must not relax exact-head verification, adversarial execution, or
-  restoration proof. Restore temporary tests, fixtures, and mutations after the pass
-  and report the final worktree status unless the user explicitly asks to retain them.
-
-## Round Brief Template
-
-Send this as the subagent's prompt, with every placeholder filled.
-Add a context budget or deadline only when one is set for the round.
-
-```text
-Red-team round <N> of <cap> for <PR number or branch>: <one-line subject>.
-
-Head: <full SHA> on <branch>, pushed; CI is running on it.
-Files under review: <every changed file, one per line>.
-In-scope claims: <the pull request's stated claims, one per line>. A finding is in
-scope only when this pull request introduces it, worsens it, or claims to correct it;
-anything else is out of scope and gets an issue link or "untracked", not a repair.
-Worktree: <absolute path>, at the head above, baseline <clean | describe>.
-Target: <absolute path>, warm. Busy signal, taken <HH:MM local>, pasted verbatim from
-`.venv/bin/python scripts/worktree_status.py --path <target>`:
-<paste the command's output here; do not summarise it>
-Use it as is; do not rebuild cold, and ask before starting any other heavyweight build.
-Report budget: <N> characters.
-Deliver by: <SendMessage to <name> | final report>. Nothing else counts as delivery.
-
-Run code, not just eyes: execute tests and commands, add an adversarial probe where
-coverage is thin, check positive and negative cases, and compare docs and examples
-with shipped behavior. Restore every probe and mutation before you report.
-
-Severity: P0/P1 blocks merge; P2 is residual work; a P3 is one line, no reproduction.
-A construct no maintainer would write is not a finding. For prose and design documents
-a wrong normative rule, or a plan that cannot close a named in-scope deliverable, is
-P1; misdescribing current `main` or a seam between delivery slices is P2; staleness
-against a sibling pull request's moving head, wording, pull-request-body line-level
-accuracy, and anything whose fix would add text without a necessity sentence are out
-of scope.
-
-Report: findings by severity, each with its scope classification and its class (the
-defect category or unmet obligation, not the file or line); commands run for every
-P0-P2; coverage against the in-scope claims; anything unvalidated; the reviewed head
-and final worktree status. Stay available afterwards: a confirmed P0/P1 comes back to
-you to verify.
-```
-
-## Verification Brief Template
-
-```text
-Verify the local fix for <finding id: class> on <PR number or branch>.
-
-Local head: <full SHA>, committed and not pushed. Changed since your initial report:
-<files, one per line>.
-Worktree: <absolute path>, clean at the local head above. Busy signal, taken <HH:MM
-local>, pasted verbatim from `.venv/bin/python scripts/worktree_status.py --path
-<worktree>`:
-<paste the command's output here; do not summarise it>
-The author has handed off the worktree and will not write or build there during
-verification. Re-run your exact reproduction against this head. Report closed or not
-closed, the commands you ran, and the head.
-Deliver by: <SendMessage to <name> | final report>.
-```
-
 ## Finding Discipline
 
 - Every pull request, documentation-only work included, needs at least one compliant
@@ -209,3 +86,53 @@ Deliver by: <SendMessage to <name> | final report>.
 - add adversarial probes where coverage is thin
 - verify positive and negative cases
 - check examples, docs, and CLI behavior against shipped behavior
+<!-- shell-local:begin -->
+<!-- shell-local:exclude:begin -->
+<!-- ## Execution Order: New Round -->
+<!-- ## Execution Order: Verify My Fix -->
+<!-- ## Worktree And Build Reuse -->
+<!-- ## Round Brief Template -->
+<!-- ## Verification Brief Template -->
+<!-- shell-local:exclude:end -->
+
+## Shoals New Round
+
+1. Confirm the candidate is committed and pushed, and count prior rounds
+   against the cap. Stop before a round past the cap. Retire only your stale
+   or failed handles; keep a standing reviewer available for verification.
+2. Choose a clean exact-head worktree and available target using the
+   handoff checks below. Use an isolated worktree when ownership is uncertain.
+3. Fill a self-contained brief with the fresh-round fields below, then start
+   a local reviewer through the platform. Do not substitute an external CLI.
+4. Record the findings and their classes in the PR, and retain that reviewer
+   through the local repair loop.
+
+## Shoals Worktree Handoff And Verification
+
+- Keep the reporting reviewer through repair verification. Consolidate the
+  author's repair in a local commit, and push only after that same reviewer
+  confirms the repair on the exact local head.
+- In the worktree being handed over, capture `git rev-parse HEAD` and
+  `git status --porcelain --untracked-files=all`. Resolve `worktree_path` and
+  `target_path` to physical absolute paths with `realpath` before scanning;
+  a path that cannot be resolved is busy. Scan all open handles, including
+  those held by processes whose names and working directories are elsewhere:
+
+  ```sh
+  lsof -nP -x f +D "$worktree_path"
+  lsof -nP -x f +D "$target_path"
+  ```
+
+  `-x f` includes nested mounted filesystems. Inspect stdout, stderr, and
+  exit status from both commands, including exit 1 when nothing matched; do
+  not treat an incomplete or uncertain scan as free. Paste the outputs and
+  timestamp into the brief. A dirty tree or any open holder forbids reuse.
+  The author and reviewer never write or build there concurrently.
+- A fresh-round brief names the PR and round, pushed SHA, changed paths,
+  bounded claims, exact worktree and target, clean status and process
+  evidence, report budget, delivery channel, required executed probes, and
+  final restoration check. A verification brief names the same standing
+  reviewer, unpushed SHA, repairs since the report, exact worktree, clean
+  status and process evidence, reproduction commands, and closed/not-closed
+  response. Restore temporary probes before either handoff.
+<!-- shell-local:end -->
