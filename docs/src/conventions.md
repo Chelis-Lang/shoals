@@ -18,7 +18,7 @@ A Monte Carlo function uses the length of a template tensor to set its path coun
 template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
 ```
 
-`to_list` exposes a tensor's entries and `index` reads one. Use `copy` when a tensor is consumed in one call and needed again. A signature with `[n]` preserves the caller's tensor length in its result.
+`to_list` exposes a tensor's entries and `index` reads one. A call with a `&tensor` parameter borrows its tensor argument. Passing a borrowed `&tensor` to a function that takes ownership requires `copy(x)` to supply a fresh owner. A signature with `[n]` preserves the caller's tensor length in its result.
 
 ## Keyed randomness
 
