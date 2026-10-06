@@ -30,21 +30,29 @@ def test_gbm_replay_and_child_routing() -> unit ! { Test } = {
   _ = assert_true(close3(a, gbm_from_noise(left_reference)), "left child supplies GBM noise")
   assert_true(close3(c, gbm_from_noise(right_reference)), "right child supplies GBM noise")
 }
-def merton_from_noise(rng_key: key) -> tensor[3, f32] = {
-  (diff_key, jump_key) = split_key(rng_key)
-  diff = to_list(normal_sample(diff_key, template(), 0.0f32, 1.0f32))
-  jump = to_list(normal_sample(jump_key, template(), 0.0f32, 1.0f32))
-  drift = merton_compensated_drift(0.05f32, 0.2f32, 0.3f32, -0.1f32, 0.15f32)
-  jump_mean = mul(0.3f32, -0.1f32)
-  jump_std = sqrt(mul(0.3f32, add(mul(0.15f32, 0.15f32), mul(-0.1f32, -0.1f32))))
-  to_tensor(map(fn (pair: (f32, f32)) -> {
-    log_terminal = add(log(100.0f32), add(add(drift, mul(0.2f32, pair.0)), add(jump_mean, mul(jump_std, pair.1))))
-    exp(log_terminal)
-  }, zip(diff, jump)))
-}
-def test_merton_two_child_draws_match_reference() -> unit ! { Test } = {
+-- shoals#98 replaced the aggregate-Gaussian jump approximation with a genuine
+-- compound-Poisson draw, so the old reference here -- which rebuilt
+-- `jump_mean = lambda*t*jump_mean` and
+-- `jump_std = sqrt(lambda*t*(jump_vol^2 + jump_mean^2))` by hand -- no longer
+-- describes the sampler. It could not be ported either: it encoded the
+-- distribution the fix removes, and reproducing the new one needs the
+-- enumerated Poisson table, which does not belong in a key-routing test.
+--
+-- What IS still reproducible in closed form, and is the stronger claim of the
+-- two, is the ZERO-INTENSITY reduction. At `lambda = 0` the jump count is
+-- always zero and the compensator is exactly zero, so the sampler collapses to
+-- GBM with drift `(mu - 0.5*sigma^2)*t` -- which is precisely what
+-- `gbm_from_noise` above already encodes at these parameters. So this test now
+-- pins that reduction AND that the diffusion noise is drawn from the LEFT
+-- child, using the same reference the GBM test uses. The jump-side behaviour is
+-- covered by `tests/stochastic_extended.ch`, which owns the model.
+def test_merton_replay_and_diffusion_child_routing() -> unit ! { Test } = {
   a = merton_jump_terminal(key_from_seed(11i64), template(), template(), 100.0f32, 0.05f32, 0.2f32, 0.3f32, -0.1f32, 0.15f32, 1.0f32)
   b = merton_jump_terminal(key_from_seed(11i64), template(), template(), 100.0f32, 0.05f32, 0.2f32, 0.3f32, -0.1f32, 0.15f32, 1.0f32)
   _ = assert_true(exact3(copy(a), b), "same root replays all Merton samples")
-  assert_true(close3(a, merton_from_noise(key_from_seed(11i64))), "diffusion and jump use separate ordered children")
+  c = merton_jump_terminal(key_from_seed(17i64), template(), template(), 100.0f32, 0.05f32, 0.2f32, 0.3f32, -0.1f32, 0.15f32, 1.0f32)
+  _ = assert_true(not(close3(a, c)), "a different root draws different Merton samples")
+  idle = merton_jump_terminal(key_from_seed(11i64), template(), template(), 100.0f32, 0.05f32, 0.2f32, 0.0f32, -0.1f32, 0.15f32, 1.0f32)
+  (left_reference, _) = split_key(key_from_seed(11i64))
+  assert_true(close3(idle, gbm_from_noise(left_reference)), "at lambda=0 the sampler is GBM on the left child")
 }

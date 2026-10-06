@@ -36,7 +36,7 @@ local list.
 
 ## Simulation, risk, and valuation adjustments
 
-Random draws take an explicit key, which can be derived from a seed. `Shoals.Stochastic.merton_jump_terminal` uses an aggregate Gaussian approximation to jump totals rather than drawing a compound Poisson process. Its correlated GBM helper covers two assets. `Shoals.Rng` has committed Sobol direction numbers for 32 dimensions; higher runtime dimensions use a fallback sequence up to the exposed limit. These choices matter for convergence studies.
+Random draws take an explicit key, which can be derived from a seed. `Shoals.Stochastic.merton_jump_terminal` draws a compound Poisson jump count over a finite enumerated slot table sized on `lambda * t * exp(jump_mean + 0.5 * jump_vol^2)`, and refuses an intensity whose table would exceed the slot cap; `Shoals.Stochastic.sto_kou_jump_terminal` still approximates its jump count by thinning a fixed number of slots. Its correlated GBM helper covers two assets. `Shoals.Rng` has committed Sobol direction numbers for 32 dimensions; higher runtime dimensions use a fallback sequence up to the exposed limit. These choices matter for convergence studies.
 
 `Shoals.Risk` computes Gaussian parametric or sample-based empirical VaR and expected shortfall from **losses** supplied by the caller. `Shoals.RiskExt.mc_var` and `mc_expected_shortfall` summarize supplied simulated losses; they do not generate paths. Use nonempty samples and confidence levels strictly between zero and one. Currency tags in `Shoals.CurrencyTag` are checked at runtime. Converting money requires an exchange rate from the caller.
 

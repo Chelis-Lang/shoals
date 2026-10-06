@@ -1,0 +1,13 @@
+Shoals.Stochastic: merton jump parameters must be finite
+Assumption: the jump-count table needs finite parameters, and the two ordering
+guards beside this one cannot establish that. `exp(-inf)` is zero and the slot
+bound takes `max(1, tilt)`, so a non-finite jump_mean produced a perfectly
+ordinary-looking tilted mean of `lambda * t`, passed both checks, and then
+produced NaN for every terminal value from `mul(cast(0, f32), -inf)` in the
+k=0 term.
+
+An ordering comparison is the wrong instrument for this: `gte(nan, 0.0)` and
+`lte(nan, 4096.0)` are both false, so `not(...)` of either is true and the cap
+guard was rejecting NaN inputs while naming an intensity that was not the
+cause. `sub(x, x) == 0` is true exactly for finite x, which is why the
+finiteness check is the first guard and has its own diagnostic.

@@ -1,6 +1,7 @@
 module Shoals.Stochastic
 import Nautilus.Distributions (normal_sample, uniform_sample, exponential_sample)
-export (gbm_path, gbm_terminal, gbm_paths_antithetic_terminal_mean, merton_jump_terminal, merton_compensated_drift, correlated_gbm_terminal_2d, cholesky_2x2_lower, heston_qe_step, heston_qe_terminal, heston_qe_paths_terminal, sto_kou_compensator, sto_kou_jump_sample, sto_kou_jump_terminal)
+import Nautilus.Special (log_gamma)
+export (gbm_path, gbm_terminal, gbm_paths_antithetic_terminal_mean, merton_jump_terminal, merton_compensated_drift, merton_sampler_log_jump_moment, correlated_gbm_terminal_2d, cholesky_2x2_lower, heston_qe_step, heston_qe_terminal, heston_qe_paths_terminal, sto_kou_compensator, sto_kou_jump_sample, sto_kou_jump_terminal)
 def gbm_path[n](rng_key: key, template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
   z = normal_sample(rng_key, template, cast(0.0, f32), cast(1.0, f32))
   n_i = numel(copy(z))
@@ -42,26 +43,111 @@ def merton_compensated_drift(mu: f32, sigma: f32, lambda: f32, jump_mean: f32, j
   expected_jump = sub(exp(add(jump_mean, half_jump_vol_sq)), cast(1.0, f32))
   sub(sub(mu, half_sigma_sq), mul(lambda, expected_jump))
 }
+-- Number of Poisson jump counts the sampler enumerates, i.e. the support
+-- {0, ..., slots - 1} of merton_jump_count_table. The bound is sized on the
+-- EXPONENTIALLY TILTED mean lambda * t * exp(jump_mean + 0.5 * jump_vol^2)
+-- rather than on lambda * t, because the quantity that has to converge is
+-- E[exp(jump_mean + 0.5 * jump_vol^2)^N], whose terms peak at that tilted
+-- mean. Seven standard deviations plus twelve absolute slots put the truncated
+-- Poisson tail below 1e-10 across the admitted intensity range, which is three
+-- orders below f32 resolution. The bound is a cost knob, not a correctness
+-- one -- the renormalization below makes the mean identity hold at any slot
+-- count -- and the moment tests in tests/stochastic_extended.ch are what prove
+-- it adequate at the parameter points they name.
+def merton_jump_slots(lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> i64 = {
+  zero = cast(0.0, f32)
+  one = cast(1.0, f32)
+  rate = mul(lambda, t)
+  log_tilt = add(jump_mean, mul(cast(0.5, f32), mul(jump_vol, jump_vol)))
+  tilt = exp(log_tilt)
+  tilted = if eq(rate, zero) then zero else mul(rate, if lt(tilt, one) then one else tilt)
+  raw = add(add(tilted, mul(cast(7.0, f32), sqrt(tilted))), cast(12.0, f32))
+  all_finite = eq(add(sub(rate, rate), sub(log_tilt, log_tilt)), zero)
+  if not(all_finite) then fail("Shoals.Stochastic: merton jump parameters must be finite; lambda * t and jump_mean + 0.5 * jump_vol^2 must both be representable") else if not(gte(rate, zero)) then fail("Shoals.Stochastic: merton jump rate lambda * t must be finite and non-negative") else if not(lte(raw, cast(4096.0, f32))) then fail("Shoals.Stochastic: merton jump intensity is too large to enumerate the jump count exactly; lambda * t * exp(jump_mean + 0.5 * jump_vol^2) must leave the slot bound at or below 4096") else cast_trunc(raw, i64)
+}
+-- log P(N = k) for N ~ Poisson(lambda * t), computed in log space on purpose.
+-- The caller multiplies this by exp(k * (jump_mean + 0.5 * jump_vol^2)), which
+-- overflows f32 for large k exactly where the probability underflows, so the
+-- product has to be formed as a single exp of a sum rather than from a
+-- materialized pmf value. The SUM of those products needs the same care and is
+-- an easy thing to miss: it is about exp(lambda * t * (w - 1)), which leaves
+-- f32 above 88.72 and underflows below -103.28 while every individual term is
+-- still perfectly representable. merton_jump_count_table therefore reduces it
+-- as a shifted log-sum-exp, never in linear space.
+def merton_jump_log_pmf(k: i64, rate: f32) -> f32 = {
+  zero = cast(0.0, f32)
+  one = cast(1.0, f32)
+  kf = cast(k, f32)
+  if eq(rate, zero) then if eq(kf, zero) then zero else log(zero) else sub(sub(mul(kf, log(rate)), rate), log_gamma(add(kf, one)))
+}
+-- The jump-count law the sampler draws from, as one table so that the sampler
+-- and the compensator cannot read different numbers. The triple is
+-- (cumulative count distribution over the enumerated slots, the mass those
+-- slots carry, log E[exp(J)] for the aggregate log jump J). The enumerated
+-- mass is one minus the truncated Poisson tail, and BOTH the count draw and
+-- the log moment divide by it, so each describes the same renormalized law
+-- bit for bit. That is the invariant this module owes its callers: the drift
+-- compensates the distribution that was sampled, not a closed form standing
+-- beside it. The tests that pin it are named in the moment function below.
+def merton_jump_count_table(lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> (List[f32], f32, f32) = {
+  rate = mul(lambda, t)
+  log_w = add(jump_mean, mul(cast(0.5, f32), mul(jump_vol, jump_vol)))
+  slot_count = merton_jump_slots(lambda, jump_mean, jump_vol, t)
+  log_pmf_l = map(fn (k: i64) -> merton_jump_log_pmf(k, rate), range(cast(0, i64), slot_count))
+  log_tilted_l = map(fn (lp: (f32, i64)) -> add(lp.0, mul(cast(lp.1, f32), log_w)), zip(log_pmf_l, range(cast(0, i64), slot_count)))
+  peak = fold(fn (acc: f32, term: f32) -> if gt(term, acc) then term else acc, log(cast(0.0, f32)), log_tilted_l)
+  shifted = to_tensor(map(fn (term: f32) -> exp(sub(term, peak)), log_tilted_l))
+  cdf_l = to_list(cumsum(to_tensor(map(fn (lp: f32) -> exp(lp), log_pmf_l)), 0))
+  enumerated_mass = index(cdf_l, sub(slot_count, cast(1, i64)))
+  (cdf_l, enumerated_mass, sub(add(log(tensor_to_scalar(sum(shifted, 0))), peak), log(enumerated_mass)))
+}
+-- log E[exp(J)] for the aggregate log jump J that merton_jump_terminal draws:
+-- J | N ~ Normal(N * jump_mean, N * jump_vol^2) with N the enumerated jump
+-- count, so E[exp(J)] = E[w^N] with w = exp(jump_mean + 0.5 * jump_vol^2).
+-- merton_jump_terminal subtracts exactly this number from the log drift, which
+-- is why its terminal mean is s0 * exp(mu * t) by construction rather than by a
+-- closed form that can desync from the sampler. It converges to
+-- merton_compensated_drift's jump term, lambda * t * (w - 1), and
+-- tests/stochastic_extended.ch pins that agreement.
+def merton_sampler_log_jump_moment(lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> f32 = merton_jump_count_table(lambda, jump_mean, jump_vol, t).2
+-- Merton jump-diffusion terminal values. The aggregate log jump is drawn as a
+-- genuine compound Poisson sum: one uniform picks the jump count N from the
+-- enumerated Poisson law, and the N lognormal jumps are aggregated exactly as
+-- Normal(N * jump_mean, N * jump_vol^2). The log drift subtracts
+-- merton_sampler_log_jump_moment for that same law, so the terminal mean is
+-- s0 * exp(mu * t). The jumps_template draws supply the aggregate jump noise;
+-- the uniform count draws are generated internally at the template length.
 def merton_jump_terminal[n](rng_key: key, template: tensor[n, f32], jumps_template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> tensor[n, f32] = {
-  (rng_draw_0, rng_draw_1) = split_key(rng_key)
-  z_diff = normal_sample(rng_draw_0, template, cast(0.0, f32), cast(1.0, f32))
-  z_jumps = normal_sample(rng_draw_1, jumps_template, cast(0.0, f32), cast(1.0, f32))
-  drift = mul(merton_compensated_drift(mu, sigma, lambda, jump_mean, jump_vol), t)
+  zero = cast(0.0, f32)
+  one = cast(1.0, f32)
+  (rng_draw_0, rng_tail_0) = split_key(rng_key)
+  (rng_draw_1, rng_draw_2) = split_key(rng_tail_0)
+  n_paths = numel(copy(template))
+  z_diff = normal_sample(rng_draw_0, template, zero, one)
+  z_jumps = normal_sample(rng_draw_1, jumps_template, zero, one)
+  counts_template = to_tensor(map(fn (i: i64) -> zero, range(cast(0, i64), n_paths)))
+  u_counts = uniform_sample(rng_draw_2, counts_template, zero, one)
+  counts = merton_jump_count_table(lambda, jump_mean, jump_vol, t)
+  enumerated_mass = counts.1
+  cdf_norm = to_tensor(map(fn (c: f32) -> div(c, enumerated_mass), counts.0))
+  one_i = cast(1, i64)
+  path_extent = shape(u_counts, cast(0, i32))
+  slot_extent = shape(cdf_norm, cast(0, i32))
+  u_grid = expand(reshape(u_counts, [path_extent, one_i]), 1, slot_extent)
+  cdf_grid = expand(reshape(cdf_norm, [one_i, slot_extent]), 0, path_extent)
+  n_jumps_t = sum(cast(gt(u_grid, cdf_grid), f32), 1)
+  half_sigma_sq = mul(cast(0.5, f32), mul(sigma, sigma))
+  drift = sub(mul(sub(mu, half_sigma_sq), t), counts.2)
   vol_sqrt_t = mul(sigma, sqrt(t))
-  expected_jumps = mul(lambda, t)
-  jump_drift = mul(expected_jumps, jump_mean)
-  jump_var_per_jump = add(mul(jump_vol, jump_vol), mul(jump_mean, jump_mean))
-  total_jump_var = mul(expected_jumps, jump_var_per_jump)
-  jump_vol_sqrt = sqrt(total_jump_var)
   log_s0 = log(s0)
-  z_diff_l = to_list(z_diff)
-  z_jumps_l = to_list(z_jumps)
-  pairs = zip(z_diff_l, z_jumps_l)
-  to_tensor(map(fn (entry: (f32, f32)) -> {
-    log_diffuse = add(drift, mul(vol_sqrt_t, entry.0))
-    log_jump = add(jump_drift, mul(jump_vol_sqrt, entry.1))
+  draws = zip(zip(to_list(z_diff), to_list(z_jumps)), to_list(n_jumps_t))
+  to_tensor(map(fn (entry: ((f32, f32), f32)) -> {
+    normals = entry.0
+    n_jumps = entry.1
+    log_jump = add(mul(n_jumps, jump_mean), mul(mul(sqrt(n_jumps), jump_vol), normals.1))
+    log_diffuse = add(drift, mul(vol_sqrt_t, normals.0))
     exp(add(log_s0, add(log_diffuse, log_jump)))
-  }, pairs))
+  }, draws))
 }
 def cholesky_2x2_lower(sigma_xx: f32, sigma_xy: f32, sigma_yy: f32) -> (f32, f32, f32) = {
   l11 = sqrt(sigma_xx)

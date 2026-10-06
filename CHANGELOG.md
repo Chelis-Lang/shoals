@@ -8,6 +8,72 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **BREAKING: `Shoals.Stochastic.merton_jump_terminal` samples a compound
+  Poisson jump count** (shoals#98). It previously drew ONE Gaussian for the
+  aggregate log jump, moment-matched in the log to the compound Poisson sum
+  (`mean = lambda*t*jump_mean`, `variance = lambda*t*(jump_vol^2 + jump_mean^2)`),
+  while `merton_compensated_drift` subtracted the compound Poisson compensator
+  `lambda*(exp(jump_mean + 0.5*jump_vol^2) - 1)`. Those are different
+  distributions with different exponential moments, so the advertised
+  `E[S_t] = s0*exp(mu*t)` did not hold: at `s0=1`, `mu=sigma=0`, `lambda=4`,
+  `jump_mean=0.5`, `jump_vol=0.2`, `t=1` the old sampler's exact expectation is
+  0.862337 against the advertised 1.0 -- a 13.8% shortfall that no sample size
+  reduces. The bias is **signed by `jump_mean`**: its leading term is
+  `-lambda*t*jump_mean*jump_vol^2/2`, so a positive jump mean ran low and a
+  negative one ran high. Per-seed measurements are deliberately not quoted
+  here; they move with the sampling API and the pin, and the exact expectation
+  is the stable statement.
+
+  Two independent normals also sum to one normal, so the old sampler produced a
+  LOGNORMAL terminal price with no jump counts and no heavy tails. Anyone
+  pricing jump risk with it was pricing a reparametrized Black-Scholes.
+
+  The sampler now draws `N` from the Poisson law the compensator names,
+  enumerated over a finite slot table, and aggregates the `N` lognormal jumps
+  exactly as `Normal(N*jump_mean, N*jump_vol^2)`. Terminal values for a given
+  seed therefore change. The log drift subtracts the new export
+  `merton_sampler_log_jump_moment(lambda, jump_mean, jump_vol, t)`, the exact
+  `log E[exp(J)]` of the law that was sampled, so the mean identity holds by
+  construction rather than by a closed form standing beside the sampler. That
+  moment agrees with `lambda*t*(exp(jump_mean + 0.5*jump_vol^2) - 1)` to within
+  the 1e-5 relative tolerance its test asserts, over `lambda*t` from 0.3 to 20
+  and both signs of `jump_mean`; that test is also what proves the slot bound
+  adequate. The agreement is tightest in the middle of that band and loosest at
+  the small-`lambda*t` end, where the enumerated side computes a `log(1 + x)`
+  with `x` near f32 epsilon.
+
+  The enumerated moment is reduced as a shifted log-sum-exp, not in linear
+  space. Each term `exp(log p_k + k*log w)` is representable wherever the slot
+  bound admits it, but their SUM is about `exp(lambda*t*(w - 1))`, which leaves
+  f32 above 88.72 and underflows below -103.28. A linear reduction therefore
+  returned `+-inf` for a large `jump_mean` or `jump_vol` -- and an infinite
+  compensator makes `exp(drift)` zero or infinite on every path with no
+  diagnostic. Measured before the repair: `lambda=55, jump_mean=1.0` and
+  `lambda=1, jump_vol=3.2` both gave `inf` against closed forms of 97.52571 and
+  166.33543, and `lambda=1000, jump_mean=0.0953` priced every path at `0.0`
+  where it now gives a positive finite value. Neither the slot bound nor the
+  intensity range was the discriminating variable; the jump SIZE is.
+
+  Three inputs are refused rather than answered, each with a `tests_neg/`
+  fixture: a negative `lambda*t`, which names no Poisson law and previously
+  returned NaN for every path; an intensity whose slot table would exceed the
+  cap; and a non-finite `lambda*t` or `jump_mean + 0.5*jump_vol^2`. The last
+  one slipped the two ordering guards, because `exp(-inf)` is zero and the
+  bound takes `max(1, tilt)`, so a non-finite `jump_mean` looked like an
+  ordinary intensity and then produced NaN for every path. It is caught by
+  `sub(x, x) == 0`, which is true exactly for finite `x`, where `gte` and `lte`
+  are both false for NaN and so cannot distinguish it.
+
+  One f32 limit is NOT fixed and is now documented in
+  [`docs/src/stochastic.md`](docs/src/stochastic.md): a large `jump_vol` makes
+  the compensator enormous while the typical jump total does not grow with it,
+  so at `lambda=1, jump_vol=3.2` every path reads as `0.0`. The mean of the
+  model is still `s0*exp(mu*t)`; the distribution is simply below f32's
+  smallest subnormal almost everywhere. The previous implementation returns
+  `0.0` at those parameters too, from the identical drift `-166.33543`.
+
+  `merton_compensated_drift` is unchanged.
+
 - **BREAKING: `Shoals.Curves.YieldCurve` and `CurveBasis` are opaque**
   (shoals#119). They are constructible and inspectable only inside
   `Shoals.Curves` (`spec/02-surf-syntax.md` P16). Naming either type in a
