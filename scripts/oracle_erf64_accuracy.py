@@ -138,7 +138,42 @@ FLOOR_CLAIM_GREP = r">=[[:space:]]*[0-9]+\.?[0-9]*[eE]-[0-9]+"
 # batched. Not a kernel problem and not worked around silently: it is a real
 # evaluator limit on literal size, hit at ~4400 elements on this pin.
 BATCH = 200
-LEFT_TAIL_POINTS = (-6.0, -7.0, -8.0, -8.5, -9.0)
+# WHERE THE RELATIVE LEG SWEEPS, AND WHY IT STOPS WHERE IT DOES.
+#
+# The first five points are shoals#68's own table -- the magnitudes that issue
+# measured on the cancelling kernel (2.3e-6 relative at -7, 1.8e-2 at -8,
+# exactly 0.0 below about -8.3). They pin the reported defect.
+#
+# The rest exist because those five do not cover the defect CLASS. shoals#68's
+# failure mode was early saturation, and the pre-#136 kernel's silent-zero band
+# began at x = -8.485 -- inside the original window. A regression that saturated
+# anywhere between -9 and the representability limit would have passed a
+# five-point sweep untouched.
+#
+# -37.0 IS THE FLOOR, and it is a measured choice rather than a round number.
+# `standard_normal_cdf` stays under ONE ULP across this whole range -- worst
+# observed 2.17e-16 (0.977 ulp) at x = -26.95 over a 631-point scan at step
+# 0.05, i.e. about four orders inside the limit below -- because `erfc` carries
+# the negative tail directly. At the thirteen SWEPT points specifically the
+# worst is 9.37e-17, at x = -9.0. Both figures are maxima over a grid, not
+# proofs: an earlier revision of this comment said "at or under 1.4e-16 all the
+# way to -37.5", which is true at the swept points and false off them (15 of
+# those 631 points exceed it). Zero points of the 631 exceed the limit. Past that the RESULT, not the kernel, runs out of
+# room: the true value leaves the normal doubles between -37.5 and -37.6, and
+# measured at 0.18.13 the relative error is 3.1e-9 at x = -38.0, 4.8e-2 at
+# -38.4, and the call returns exactly 0.0 from about -38.5 (where the true value
+# itself rounds to zero below x = -38.4854).
+#
+# So the sweep stops at -37.0 rather than -37.5: one step clear of the cliff, so
+# that an upstream change to subnormal handling cannot turn this leg red without
+# anything in Shoals being wrong. Measured margins, 0.18.13, 80-dps reference:
+# 9.4e-17 at -9, 8.1e-17 at -10, 1.5e-17 at -20, 2.4e-17 at -30, 6.7e-17 at -37.
+#
+# BELOW -37.0 IS DELIBERATELY UNGUARDED, and that is a decision, not an
+# oversight: the boundary is a property of the f64 subnormal range and of the
+# Chelis builtin, so it is upstream's to move. Re-measure before extending.
+LEFT_TAIL_POINTS = (-6.0, -7.0, -8.0, -8.5, -9.0, -10.0, -12.0, -15.0,
+                    -20.0, -25.0, -30.0, -35.0, -37.0)
 LEFT_TAIL_RELATIVE_LIMIT = "1e-12"
 
 # `chelis eval --json` schema versions this script knows how to read. An
@@ -446,7 +481,12 @@ def worst(points, values, fn, mp):
 
 
 def left_tail_relative(values, mp):
-    """Measure each left-tail sample against a high-precision erfc reference."""
+    """Measure each left-tail sample against a high-precision erfc reference.
+
+    Sweeps `LEFT_TAIL_POINTS` and flags any |relative error| above
+    `LEFT_TAIL_RELATIVE_LIMIT`. The range and its floor are a measured choice;
+    the reasoning is on `LEFT_TAIL_POINTS`. Below that floor is unguarded.
+    """
     errors = []
     worst_relative = mp.mpf(0)
     for x, got in zip(LEFT_TAIL_POINTS, values, strict=True):

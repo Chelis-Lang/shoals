@@ -388,6 +388,288 @@ class MeasurementEnforcement(unittest.TestCase):
         self.assertTrue(any("left-tail" in e for e in report["errors"]), report["errors"])
 
 
+class LeftTailRelativeEnforcement(unittest.TestCase):
+    """`left_tail_relative`'s RELATIVE-MAGNITUDE verdict. shoals#140.
+
+    `MeasurementEnforcement.test_zero_left_tail_fails_relative_leg` feeds
+    `0.0`, which the `got <= 0` branch rejects before the relative comparison
+    is ever reached. So the half of this guard that shoals#68's closing comment
+    rests on -- "the relative-error oracle covers the negative tail" -- had no
+    test, and four mutations of it survived the suite on `8ac87b1`:
+
+      * `if relative > mp.mpf(LEFT_TAIL_RELATIVE_LIMIT):` -> `if False:`
+      * `LEFT_TAIL_RELATIVE_LIMIT = "1e-12"` -> `"1.0"`
+      * `LEFT_TAIL_POINTS` five points -> one
+      * `worst_relative = max(worst_relative, relative)` -> `pass`
+
+    Same class as shoals#64 (a guard that cannot fail) seen from the other
+    side: there, nothing invoked the guard; here, the guard runs and its
+    verdict is unreachable by any test. `MeasurementEnforcement`'s docstring
+    records the identical defect on the absolute leg, found by a red-team pass
+    on PR #108, and names its cause -- tests that exercise the helpers in
+    isolation and never call the function that turns a bad measurement into a
+    nonzero exit. This class is that function's missing caller.
+
+    mpmath is stubbed with `math`, so this runs under the bare interpreter the
+    per-PR job uses: the references are `erfc` at |x| in [4.24, 26.16]. `math.erfc`
+    carries up to ~1.3e-13 of its own relative error at the far end, which does
+    not matter here because `exact_at` and the leg under test use the SAME stub
+    -- an unperturbed point therefore measures as exactly 0.0 relative, and the
+    perturbations are 1e-9 or larger. A test that compared the stub against a
+    high-precision reference would need real mpmath.
+    """
+
+    def setUp(self):
+        self.mod = load_oracle()
+        self.fake = types.ModuleType("mpmath")
+        self.fake.mp = types.SimpleNamespace(dps=15)
+        self.fake.mpf = float
+        self.fake.erfc = math.erfc
+        self.fake.sqrt = math.sqrt
+
+    def exact_at(self, x):
+        """The reference the leg itself computes, via the same stub."""
+        return math.erfc(-x / math.sqrt(2)) / 2
+
+    def values_with(self, overrides=None):
+        """One value per LEFT_TAIL_POINTS entry, correct unless overridden."""
+        overrides = overrides or {}
+        return [overrides.get(x, self.exact_at(x))
+                for x in self.mod.LEFT_TAIL_POINTS]
+
+    def test_correct_values_pass_and_report_a_nonzero_worst(self):
+        """Positive control, and it also pins `worst_relative`. Every
+        assertion below would hold vacuously against a function that always
+        errored; and a frozen `worst_relative` of 0 would make the reported
+        figure meaningless while every verdict still passed.
+        """
+        x = self.mod.LEFT_TAIL_POINTS[2]
+        exact = self.exact_at(x)
+        got = exact * (1 - 1e-14)
+        # The expectation is derived from the ACTUAL doubles, not from the
+        # 1e-14 that produced them: that product rounds, so the achieved
+        # relative error differs from the nominal figure by ~0.14%, and
+        # asserting the nominal one fails for a reason unrelated to the guard.
+        induced = abs(got - exact) / exact
+        values = self.values_with({x: got})
+        worst, errors = self.mod.left_tail_relative(values, self.fake)
+        self.assertEqual(errors, [])
+        self.assertGreater(worst, 0.0,
+                           "worst_relative was never updated from its initial 0")
+        self.assertAlmostEqual(worst / induced, 1.0, places=9)
+
+    def test_an_excessive_relative_error_is_rejected(self):
+        """The branch that `if False:` deletes. 1e-9 is a thousand times the
+        published limit and is still a perfectly finite, positive, plausible
+        number -- so nothing else in the leg objects to it."""
+        x = self.mod.LEFT_TAIL_POINTS[3]
+        exact = self.exact_at(x)
+        got = exact * (1 - 1e-9)
+        induced = abs(got - exact) / exact
+        values = self.values_with({x: got})
+        worst, errors = self.mod.left_tail_relative(values, self.fake)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn(str(x), errors[0])
+        self.assertIn("relative error", errors[0])
+        self.assertIn(self.mod.LEFT_TAIL_RELATIVE_LIMIT, errors[0])
+        self.assertAlmostEqual(worst / induced, 1.0, places=9)
+
+    def test_a_positive_near_zero_is_rejected(self):
+        """shoals#68's symptom, in the form that slips past the `got <= 0`
+        branch. The defect that issue reported was `n_cdf64` returning exactly
+        `0.0`; a kernel that returns the smallest subnormal instead is just as
+        wrong and is positive and finite.
+
+        This is also what pins the LIMIT rather than merely the branch: the
+        relative error here is just under 1, so a limit of `1.0` would accept
+        it. That mutation survives the rest of the suite.
+        """
+        x = self.mod.LEFT_TAIL_POINTS[-1]
+        values = self.values_with({x: 5e-324})
+        worst, errors = self.mod.left_tail_relative(values, self.fake)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn(str(x), errors[0])
+        # Measured: exactly 1.0. The smallest subnormal is negligible beside
+        # the reference at `LEFT_TAIL_POINTS[-1]` -- 5.73e-300 now that the
+        # sweep reaches -37.0, and 1.13e-19 when it stopped at -9.0 -- so the
+        # relative error rounds to unity either way (5e-324 / 5.73e-300 is
+        # 8.7e-25).
+        self.assertEqual(worst, 1.0,
+                         "a near-zero return must measure as 100% relative")
+        # THIS is the assertion that pins the LIMIT rather than the branch. The
+        # comparison in the leg is `relative > limit`, so a limit of exactly
+        # 1.0 would NOT reject a relative error of 1.0 -- `1.0 > 1.0` is False.
+        # That mutation survives every other test in this file.
+        self.assertLess(float(self.mod.LEFT_TAIL_RELATIVE_LIMIT), 1.0,
+                        "a limit of 1.0 or looser accepts a near-zero return, "
+                        "which is the shoals#68 symptom")
+
+    def test_the_limit_rejects_the_errors_shoals68_reported(self):
+        """The limit is only meaningful against the magnitudes it exists to
+        catch. shoals#68 measured 2.3e-6 relative at x = -7 and 1.8e-2 at
+        x = -8 on the pre-repair kernel; both must fail at the published
+        limit, or the guard would have been green on the original defect."""
+        # `LEFT_TAIL_RELATIVE_LIMIT` is not a PUBLISHED FLOOR: the
+        # transcription leg polices only `>= N.NNNNe-NN` claims and this is not
+        # one, so nothing in that leg constrains it. An earlier revision of this
+        # comment went further and said `1e-12` "has no other carrier in the
+        # tree", which is only true under this script's own term of art --
+        # docs/CHELIS_SURFACE.md states the limit in prose, and
+        # `test_the_published_doc_states_the_same_limit` below is what couples
+        # the two. These tests bound the value from both sides rather than pin
+        # it exactly; the review measured that it can be loosened 500x, to
+        # 5e-10, without any of them objecting.
+        limit = float(self.mod.LEFT_TAIL_RELATIVE_LIMIT)
+        for reported in (2.3e-6, 1.8e-2):
+            self.assertGreater(reported, limit)
+        for x, reported in ((-7.0, 2.3e-6), (-8.0, 1.8e-2)):
+            self.assertIn(x, self.mod.LEFT_TAIL_POINTS)
+            values = self.values_with({x: self.exact_at(x) * (1 - reported)})
+            _, errors = self.mod.left_tail_relative(values, self.fake)
+            self.assertEqual(len(errors), 1, errors)
+            self.assertIn(str(x), errors[0])
+
+    def test_the_swept_points_cover_the_issues_own_table(self):
+        """Shrinking `LEFT_TAIL_POINTS` to one entry is a surviving mutation.
+        shoals#68's table runs -6 through -9, and those are the magnitudes the
+        closing claim is about."""
+        points = self.mod.LEFT_TAIL_POINTS
+        for x in (-6.0, -7.0, -8.0, -8.5, -9.0):
+            self.assertIn(x, points)
+        self.assertTrue(all(x < 0 for x in points), points)
+
+    def test_the_sweep_has_no_gap_a_saturation_could_hide_in(self):
+        """Endpoints are not coverage. Pinning only the five table points and
+        `min == -37.0` left the band between them unlocked: deleting the seven
+        intermediate points kept the suite green, and a kernel that saturated
+        at, say, -20 would then pass unnoticed -- which is the whole argument
+        the extension to -37 rests on.
+
+        Pinned as a PROPERTY rather than a literal list, so legitimate
+        re-spacing stays possible: no two consecutive swept points may be more
+        than 5 units apart. The shipped sweep's largest gap is exactly 5
+        (-15 to -20, -20 to -25, -25 to -30, -30 to -35)."""
+        points = sorted(self.mod.LEFT_TAIL_POINTS, reverse=True)
+        gaps = [round(a - b, 10) for a, b in zip(points, points[1:])]
+        self.assertTrue(gaps, "the sweep has fewer than two points")
+        self.assertLessEqual(
+            max(gaps), 5.0,
+            f"the sweep has a gap of {max(gaps)} units, wide enough for a "
+            f"saturation regression to hide in: {points}")
+
+    def test_below_the_swept_range_is_unguarded_and_that_is_declared(self):
+        """Not a defect -- a boundary, pinned so it is decided rather than
+        discovered. Nothing in this leg constrains x below
+        `min(LEFT_TAIL_POINTS)`, and that floor is a measured choice: the kernel
+        holds relative error at or under 1.4e-16 to x = -37.5, then the RESULT
+        leaves the normal doubles between -37.5 and -37.6 and accuracy collapses
+        (3.1e-9 at -38.0, 4.8e-2 at -38.4, exactly 0.0 from about -38.5). -37.0
+        is one step clear of that cliff so an upstream change to subnormal
+        handling cannot redden this leg with nothing wrong in Shoals.
+
+        The rationale lives on `LEFT_TAIL_POINTS` itself, which is where
+        someone changing the range will be standing."""
+        self.assertEqual(min(self.mod.LEFT_TAIL_POINTS), -37.0,
+                         "the guarded range changed; re-measure at the pin and "
+                         "update this test together with BOTH carriers -- the "
+                         "boundary comment above LEFT_TAIL_POINTS and the "
+                         "accuracy section of docs/CHELIS_SURFACE.md, which "
+                         "states the point count and the -37 floor")
+        # The floor must stay clear of the subnormal onset between -37.5 and
+        # -37.6; a sweep reaching past it fails on representability, not on a
+        # kernel defect.
+        self.assertGreater(min(self.mod.LEFT_TAIL_POINTS), -37.5,
+                           "the sweep reaches the subnormal cliff, where the "
+                           "limit cannot be met for reasons outside Shoals")
+
+    def test_an_overshoot_is_rejected_as_well_as_an_undershoot(self):
+        """The guard is on |error|, and before this test every override in the
+        class undershot (`exact * (1 - eps)`). With the sign held constant,
+        rewriting `abs(got - exact) / exact` as `(exact - got) / exact` survived
+        the whole suite: an overshooting kernel produces a NEGATIVE relative
+        error, `negative > limit` is False, no error is recorded, and
+        `worst_relative` comes back 0.0 while the nightly leg exits green.
+
+        That is shoals#68's consequence with the sign flipped, and the fourth
+        constant-axis defect found in this file -- which is why the fix is a
+        varied axis rather than a patch at one point.
+        """
+        x = self.mod.LEFT_TAIL_POINTS[2]
+        exact = self.exact_at(x)
+        got = exact * (1 + 1e-9)
+        self.assertGreater(got, exact, "the fixture must overshoot")
+        induced = abs(got - exact) / exact
+        worst, errors = self.mod.left_tail_relative(
+            self.values_with({x: got}), self.fake)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn(str(x), errors[0])
+        self.assertGreater(worst, 0.0,
+                           "an overshoot must register as a positive magnitude")
+        self.assertAlmostEqual(worst / induced, 1.0, places=9)
+
+    def test_every_swept_point_is_actually_measured(self):
+        """Membership in `LEFT_TAIL_POINTS` is not measurement, and the
+        difference was unpinned: slicing the zip to `LEFT_TAIL_POINTS[1:]` and
+        `values[1:]` left x = -6.0 silently unevaluated and the suite green.
+        `test_the_swept_points_cover_the_issues_own_table` cannot see that --
+        it asserts the tuple's contents, not that each entry is reached.
+
+        Perturbing EVERY index in turn rather than adding a case for index 0:
+        this kills any slice at any position, and it cannot go stale when the
+        swept range changes.
+
+        THE SIGN ALTERNATES BY INDEX. Holding it positive here would leave one
+        cell of direction x position unprobed -- a mutation sparing exactly the
+        one index the overshoot test uses survived round 2 for that reason. The
+        two axes now vary together, which is the fifth time a constant axis has
+        had to be closed in this file.
+        """
+        for i, x in enumerate(self.mod.LEFT_TAIL_POINTS):
+            with self.subTest(index=i, x=x):
+                sign = -1.0 if i % 2 == 0 else 1.0
+                values = self.values_with(
+                    {x: self.exact_at(x) * (1 + sign * 1.8e-2)})
+                worst, errors = self.mod.left_tail_relative(values, self.fake)
+                self.assertEqual(
+                    len(errors), 1,
+                    f"index {i} (x = {x}) is in LEFT_TAIL_POINTS but a wrong "
+                    f"value there produced {len(errors)} errors: {errors}")
+                self.assertIn(str(x), errors[0])
+                self.assertGreater(worst, 0.0)
+
+    def test_the_published_doc_states_the_same_limit(self):
+        """The one coupling the transcription leg cannot provide.
+
+        `LEFT_TAIL_RELATIVE_LIMIT` is a bare constant, and
+        `docs/CHELIS_SURFACE.md` states it in prose. Nothing joined them:
+        changing the constant to 1e-11 while the doc still said 1e-12 left both
+        the 54-test suite AND the transcription leg green, because that leg only
+        discovers `>= N.NNNNe-NN` floor claims and this is not one. Same drift
+        class the transcription leg exists to prevent for the floors, one
+        quantity over.
+
+        The floor magnitude is locked too, since the same sentence carries it.
+        """
+        doc = (REPO_ROOT / "docs" / "CHELIS_SURFACE.md").read_text(
+            encoding="utf-8")
+        limit = self.mod.LEFT_TAIL_RELATIVE_LIMIT
+        self.assertIn(
+            f"limit of {limit}", doc,
+            f"docs/CHELIS_SURFACE.md does not state the configured limit "
+            f"{limit!r}; the constant and the doc have drifted apart")
+        floor = int(-min(self.mod.LEFT_TAIL_POINTS))
+        self.assertIn(
+            f"-{floor}", doc,
+            f"docs/CHELIS_SURFACE.md does not mention the swept floor -{floor}")
+
+    def test_a_values_length_mismatch_fails_loudly(self):
+        """`zip(..., strict=True)` is load-bearing: a short response would
+        otherwise measure a prefix and report a clean verdict over points that
+        were never evaluated."""
+        with self.assertRaises(ValueError):
+            self.mod.left_tail_relative(self.values_with()[:-1], self.fake)
+
+
 class EvalWireDecode(unittest.TestCase):
     """The break that killed this oracle for three pin bumps."""
 
