@@ -388,6 +388,160 @@ class MeasurementEnforcement(unittest.TestCase):
         self.assertTrue(any("left-tail" in e for e in report["errors"]), report["errors"])
 
 
+class LeftTailRelativeEnforcement(unittest.TestCase):
+    """`left_tail_relative`'s RELATIVE-MAGNITUDE verdict. shoals#140.
+
+    `MeasurementEnforcement.test_zero_left_tail_fails_relative_leg` feeds
+    `0.0`, which the `got <= 0` branch rejects before the relative comparison
+    is ever reached. So the half of this guard that shoals#68's closing comment
+    rests on -- "the relative-error oracle covers the negative tail" -- had no
+    test, and four mutations of it survived the suite on `8ac87b1`:
+
+      * `if relative > mp.mpf(LEFT_TAIL_RELATIVE_LIMIT):` -> `if False:`
+      * `LEFT_TAIL_RELATIVE_LIMIT = "1e-12"` -> `"1.0"`
+      * `LEFT_TAIL_POINTS` five points -> one
+      * `worst_relative = max(worst_relative, relative)` -> `pass`
+
+    Same class as shoals#64 (a guard that cannot fail) seen from the other
+    side: there, nothing invoked the guard; here, the guard runs and its
+    verdict is unreachable by any test. `MeasurementEnforcement`'s docstring
+    records the identical defect on the absolute leg, found by a red-team pass
+    on PR #108, and names its cause -- tests that exercise the helpers in
+    isolation and never call the function that turns a bad measurement into a
+    nonzero exit. This class is that function's missing caller.
+
+    mpmath is stubbed with `math`, so this runs under the bare interpreter the
+    per-PR job uses: the references are `erfc` at |x| in [4.2, 6.4], which f64
+    evaluates without trouble.
+    """
+
+    def setUp(self):
+        self.mod = load_oracle()
+        self.fake = types.ModuleType("mpmath")
+        self.fake.mp = types.SimpleNamespace(dps=15)
+        self.fake.mpf = float
+        self.fake.erfc = math.erfc
+        self.fake.sqrt = math.sqrt
+
+    def exact_at(self, x):
+        """The reference the leg itself computes, via the same stub."""
+        return math.erfc(-x / math.sqrt(2)) / 2
+
+    def values_with(self, overrides=None):
+        """One value per LEFT_TAIL_POINTS entry, correct unless overridden."""
+        overrides = overrides or {}
+        return [overrides.get(x, self.exact_at(x))
+                for x in self.mod.LEFT_TAIL_POINTS]
+
+    def test_correct_values_pass_and_report_a_nonzero_worst(self):
+        """Positive control, and it also pins `worst_relative`. Every
+        assertion below would hold vacuously against a function that always
+        errored; and a frozen `worst_relative` of 0 would make the reported
+        figure meaningless while every verdict still passed.
+        """
+        x = self.mod.LEFT_TAIL_POINTS[2]
+        exact = self.exact_at(x)
+        got = exact * (1 - 1e-14)
+        # The expectation is derived from the ACTUAL doubles, not from the
+        # 1e-14 that produced them: that product rounds, so the achieved
+        # relative error differs from the nominal figure by ~0.14%, and
+        # asserting the nominal one fails for a reason unrelated to the guard.
+        induced = abs(got - exact) / exact
+        values = self.values_with({x: got})
+        worst, errors = self.mod.left_tail_relative(values, self.fake)
+        self.assertEqual(errors, [])
+        self.assertGreater(worst, 0.0,
+                           "worst_relative was never updated from its initial 0")
+        self.assertAlmostEqual(worst / induced, 1.0, places=9)
+
+    def test_an_excessive_relative_error_is_rejected(self):
+        """The branch that `if False:` deletes. 1e-9 is a thousand times the
+        published limit and is still a perfectly finite, positive, plausible
+        number -- so nothing else in the leg objects to it."""
+        x = self.mod.LEFT_TAIL_POINTS[3]
+        exact = self.exact_at(x)
+        got = exact * (1 - 1e-9)
+        induced = abs(got - exact) / exact
+        values = self.values_with({x: got})
+        worst, errors = self.mod.left_tail_relative(values, self.fake)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn(str(x), errors[0])
+        self.assertIn("relative error", errors[0])
+        self.assertIn(self.mod.LEFT_TAIL_RELATIVE_LIMIT, errors[0])
+        self.assertAlmostEqual(worst / induced, 1.0, places=9)
+
+    def test_a_positive_near_zero_is_rejected(self):
+        """shoals#68's symptom, in the form that slips past the `got <= 0`
+        branch. The defect that issue reported was `n_cdf64` returning exactly
+        `0.0`; a kernel that returns the smallest subnormal instead is just as
+        wrong and is positive and finite.
+
+        This is also what pins the LIMIT rather than merely the branch: the
+        relative error here is just under 1, so a limit of `1.0` would accept
+        it. That mutation survives the rest of the suite.
+        """
+        x = self.mod.LEFT_TAIL_POINTS[-1]
+        values = self.values_with({x: 5e-324})
+        worst, errors = self.mod.left_tail_relative(values, self.fake)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn(str(x), errors[0])
+        # Measured: exactly 1.0. The smallest subnormal is negligible beside a
+        # reference of ~1.13e-19, so the relative error rounds to unity.
+        self.assertEqual(worst, 1.0,
+                         "a near-zero return must measure as 100% relative")
+        # THIS is the assertion that pins the LIMIT rather than the branch. The
+        # comparison in the leg is `relative > limit`, so a limit of exactly
+        # 1.0 would NOT reject a relative error of 1.0 -- `1.0 > 1.0` is False.
+        # That mutation survives every other test in this file.
+        self.assertLess(float(self.mod.LEFT_TAIL_RELATIVE_LIMIT), 1.0,
+                        "a limit of 1.0 or looser accepts a near-zero return, "
+                        "which is the shoals#68 symptom")
+        self.assertLess(float(self.mod.LEFT_TAIL_RELATIVE_LIMIT), worst,
+                        "the published limit must reject a near-zero return")
+
+    def test_the_limit_rejects_the_errors_shoals68_reported(self):
+        """The limit is only meaningful against the magnitudes it exists to
+        catch. shoals#68 measured 2.3e-6 relative at x = -7 and 1.8e-2 at
+        x = -8 on the pre-repair kernel; both must fail at the published
+        limit, or the guard would have been green on the original defect."""
+        limit = float(self.mod.LEFT_TAIL_RELATIVE_LIMIT)
+        for reported in (2.3e-6, 1.8e-2):
+            self.assertGreater(reported, limit)
+        for x, reported in ((-7.0, 2.3e-6), (-8.0, 1.8e-2)):
+            self.assertIn(x, self.mod.LEFT_TAIL_POINTS)
+            values = self.values_with({x: self.exact_at(x) * (1 - reported)})
+            _, errors = self.mod.left_tail_relative(values, self.fake)
+            self.assertEqual(len(errors), 1, errors)
+            self.assertIn(str(x), errors[0])
+
+    def test_the_swept_points_cover_the_issues_own_table(self):
+        """Shrinking `LEFT_TAIL_POINTS` to one entry is a surviving mutation.
+        shoals#68's table runs -6 through -9, and those are the magnitudes the
+        closing claim is about."""
+        points = self.mod.LEFT_TAIL_POINTS
+        for x in (-6.0, -7.0, -8.0, -8.5, -9.0):
+            self.assertIn(x, points)
+        self.assertTrue(all(x < 0 for x in points), points)
+
+    def test_below_the_swept_range_is_unguarded_and_that_is_declared(self):
+        """Not a defect -- a boundary, pinned so it is decided rather than
+        discovered. Nothing in this leg constrains x < min(LEFT_TAIL_POINTS),
+        and the pre-#136 kernel's silent-zero band began at x = -8.485, i.e.
+        just inside this range. Extending the points needs a measurement
+        against the pinned toolchain, so this test records where coverage
+        currently stops."""
+        self.assertEqual(min(self.mod.LEFT_TAIL_POINTS), -9.0,
+                         "the guarded range changed; re-decide the boundary "
+                         "and update this test and the leg's docstring together")
+
+    def test_a_values_length_mismatch_fails_loudly(self):
+        """`zip(..., strict=True)` is load-bearing: a short response would
+        otherwise measure a prefix and report a clean verdict over points that
+        were never evaluated."""
+        with self.assertRaises(ValueError):
+            self.mod.left_tail_relative(self.values_with()[:-1], self.fake)
+
+
 class EvalWireDecode(unittest.TestCase):
     """The break that killed this oracle for three pin bumps."""
 
