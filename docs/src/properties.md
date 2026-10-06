@@ -90,20 +90,19 @@ Module: `Shoals.Properties.Distributions`.
 
 Module: `Shoals.Properties.Date`.
 
-- `year_fraction_matches_textbook(start, end, convention)`: each day-count
-  year fraction agrees with its reference. The two ACT/ACT conventions are
-  checked against an exact independent calendar and hold to `1e-9`; the other
-  three are checked against a crude 30-day-month count and keep its loose
-  tolerance.
-- `whole_isda_year_is_exactly_one(year)`: a whole calendar year is exactly one
-  ACT/ACT ISDA year, leap or not. The `days / 365.25` approximation replaced in
-  shoals#87 failed this in both directions.
-- `isda_reverses_under_swap(start, end)`: swapping the interval endpoints
-  negates the ACT/ACT ISDA fraction.
-- `schedule_monotone_increasing(start, end, step_months)`: a generated
-  schedule is strictly increasing.
-- `date_roll_following_idempotent_on_weekday(d)`: rolling a weekday forward
-  against a weekend-only calendar leaves it unchanged.
+Year fractions are exact rationals, so every date property is an equality,
+not a tolerance.
+
+- `actual_matches_reference(start, end)`: ACT/360 and ACT/365 Fixed equal
+  the reference day count over 360 and over 365.
+- `isda_matches_reference(start, end)`: ACT/ACT ISDA equals the per-year
+  reference sum.
+- `icma_matches_reference(start, end, period_start, period_end, frequency)`:
+  ACT/ACT ICMA equals the reference ratio.
+- `whole_isda_year_is_exactly_one(year)`: a whole calendar year is exactly
+  one ACT/ACT ISDA year, leap or not.
+- `additive_under_isda(a, b, c)`: the ACT/ACT ISDA fraction over `a..c` is
+  the exact sum of those over `a..b` and `b..c`.
 
 These are driven at concrete inputs from `tests/date.ch`. Nothing else in the
 repository calls the `properties/` surface, so a property with no test beside it
@@ -113,12 +112,10 @@ is compiled and never executed.
 
 Module: `Shoals.Properties.Tenor`.
 
-- `tenor_apply_advances_by_tenor_to_days(ref, t)`: applying a tenor advances
-  the date by exactly the tenor's day count.
-- `days_then_weeks_equals_compound(ref, n_days, n_weeks)`: applying a day
-  tenor then a week tenor equals one combined shift.
-- `tenor_to_days_nonneg_for_positive_count(unit, n)`: a non-negative count
-  yields a non-negative day count.
+- `schedule_is_increasing_and_bounded(start, end, months)`: a short-final
+  schedule of whole-month tenors starts at `start`, ends at `end`, and is
+  strictly increasing, whatever the day of month. `tests/schedule.ch` drives
+  it.
 
 ## Market-data properties
 

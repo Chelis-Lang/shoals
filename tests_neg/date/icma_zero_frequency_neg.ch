@@ -1,13 +1,6 @@
 module Shoals.TestsNeg.DateIcmaZeroFrequency
 import Std.Test (assert_eq)
 import Std.Datetime (date)
-import Shoals.Date (ActActIcma, year_fraction)
--- A coupon frequency of zero would divide by zero and hand back an infinity
--- that reads as a year fraction. ACT/ACT ICMA scales by the number of coupon
--- periods per year, so there is no meaningful zero.
-def test_neg_icma_rejects_zero_frequency() -> unit ! { Test } = {
-  period_start = date(cast(2003, i64), cast(11, i64), cast(1, i64))
-  period_end = date(cast(2004, i64), cast(5, i64), cast(1, i64))
-  convention = ActActIcma { period_start, period_end, frequency: cast(0, i64) }
-  assert_eq(year_fraction(period_start, period_end, convention), cast(0.5, f64), "zero coupon frequency must trap")
-}
+import Shoals.Date (ActualActualIcma, year_fraction, year_fraction_to_f64)
+-- A coupon frequency counts periods per year, so zero has no meaning.
+def test_neg_icma_rejects_zero_frequency() -> unit ! { Test } = assert_eq(year_fraction_to_f64(year_fraction(date(2003i64, 11i64, 1i64), date(2004i64, 5i64, 1i64), ActualActualIcma { reference_start: date(2003i64, 11i64, 1i64), reference_end: date(2004i64, 5i64, 1i64), frequency: 0i64 })), 0.5f64, "zero frequency must fail")

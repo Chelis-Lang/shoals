@@ -37,9 +37,10 @@ The chapters introduce the main modules and point to their source tests:
   interpolation, discount factors, a single-curve par bootstrap, a
   deposit/zero-coupon/par-swap instrument bootstrap with IFT sensitivities, curve-kind
   metadata, and sensitivity operators.
-- **Dates, calendars, tenors.** Day-count conventions, business-day
-  rolling, local holiday calendars, Shoreleave published calendars, and tenor
-  arithmetic.
+- **Dates, tenors, schedules.** Exact-rational day-count conventions,
+  calendar-month tenors, business-day money-market tenors and spot lags,
+  and anchored coupon schedules, over `Std.Datetime` and Shoreleave market
+  calendars.
 - **Market data.** Quote, bar, and snapshot record types.
 - **Order book.** A price-priority limit order book with best bid and ask,
   spread, and volume-weighted average price.

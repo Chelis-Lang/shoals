@@ -49,8 +49,8 @@ the AD-through-instrument-dict story is validated end-to-end.
 |---|---|---|
 | `Shoals.Pricing` | Black-Scholes analytical, Heston semi-analytical, SABR calibration, Monte Carlo engines with variance reduction. Executable Greek coverage currently uses finite-difference checks against textbook references; grad-derived Greeks remain an alpha runtime path until the full pricing body is IR-lowerable under host-runtime `grad`. | `Nautilus.Distributions`, `Nautilus.Sde`, explicit keys, cumsum |
 | `Shoals.Risk` | VaR (parametric, historical, Monte Carlo), CVaR/expected shortfall, stress testing, scenario generation | `Nautilus.Stats`, sort/quantile, explicit keys |
-| `Shoals.Curves` | Yield curve construction (bootstrap from market instruments), interpolation (linear, cubic, Nelson-Siegel), day count conventions (ACT/360, ACT/365, 30/360) | `Nautilus.Interpolation`, `Nautilus.Roots`, `Std.Datetime` |
-| `Shoals.HolidayCal` / `Shoals.Date` | Local calendar rules and date arithmetic, plus horizon-checked published US federal and England and Wales calendars | `Std.Datetime.Business`, `Shoreleave.UsFederal`, `Shoreleave.EnglandAndWales` |
+| `Shoals.Curves` | Yield curve construction (bootstrap from market instruments), interpolation (linear, cubic, Nelson-Siegel) | `Nautilus.Interpolation`, `Nautilus.Roots`, `Std.Datetime` |
+| `Shoals.Date` / `Shoals.Tenor` / `Shoals.Schedule` | Exact-rational day counts, calendar-month and business-day tenors, and anchored schedules over Shoreleave market calendars | `Std.Datetime`, `Std.Datetime.Business`, `Shoreleave` |
 | `Shoals.Stochastic` | SDE models: GBM, Heston, SABR, jump-diffusion. Path generation using cumsum + `Nautilus.Sde`. Variance reduction (antithetic, control variates). | `Nautilus.Sde`, explicit keys, cumsum, einsum |
 | `Shoals.Orderbook` | Limit order book representation (price-priority sorted collections), matching logic, bid/ask spread computation, VWAP | Host-side collections, sort, `Std.Decimal` |
 

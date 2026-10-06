@@ -1,51 +1,62 @@
 module Shoals.Tenor
-import Std.Datetime (Date, date_add_days)
-export (TenorUnit, Tenor, tenor, tenor_to_days, tenor_apply, days_per_unit, overnight, tomorrow_next, spot_next, days_n, weeks_n, months_n, years_n, parse_tenor, parse_unit_suffix)
-type TenorUnit =
-  | Day
-  | Week
-  | Month
-  | Year
-  | Overnight
-  | TomorrowNext
-  | SpotNext
+import Std.Datetime (Date, Period, DayOverflow, period, period_months, period_days, date_add_period)
+import Std.Datetime.Business (BusinessCalendar, BusinessDayRoll, NonBusinessStart, RejectNonBusinessStart, RollStartForward, is_business_day, business_day_offset, business_day_roll)
+export (Tenor, tenor_days, tenor_weeks, tenor_months, tenor_years, tenor_period, tenor_apply, parse_tenor, try_parse_tenor, BusinessDayTenor, overnight, tomorrow_next, spot_next, business_day_tenor_lag, business_day_tenor_length, business_day_tenor_dates, SpotLag, two_calendar_lag, lagged_date)
+-- A tenor is a positive `Std.Datetime.Period`: a month is a calendar month and
+-- a year is twelve of them, never a fixed number of days. Applying one takes
+-- the caller's `DayOverflow` policy, because a month step from the 31st has
+-- no day-31 answer in a 30-day month.
+@opaque
 type Tenor =
-  | Tenor { count: i64, unit: TenorUnit }
-def days_per_unit(unit: TenorUnit) -> i64 =
-  match unit with {
-    | Day => cast(1, i64)
-    | Week => cast(7, i64)
-    | Month => cast(30, i64)
-    | Year => cast(365, i64)
-    | Overnight => cast(1, i64)
-    | TomorrowNext => cast(2, i64)
-    | SpotNext => cast(3, i64)
-  }
-def tenor(count: i64, unit: TenorUnit) -> Tenor = Tenor { count, unit }
-def overnight() -> Tenor = Tenor { count: cast(1, i64), unit: Overnight }
-def tomorrow_next() -> Tenor = Tenor { count: cast(1, i64), unit: TomorrowNext }
-def spot_next() -> Tenor = Tenor { count: cast(1, i64), unit: SpotNext }
-def days_n(n: i64) -> Tenor = Tenor { count: n, unit: Day }
-def weeks_n(n: i64) -> Tenor = Tenor { count: n, unit: Week }
-def months_n(n: i64) -> Tenor = Tenor { count: n, unit: Month }
-def years_n(n: i64) -> Tenor = Tenor { count: n, unit: Year }
-def tenor_to_days(t: Tenor) -> i64 =
-  match t with {
-    | Tenor { count: c, unit: u } => mul(c, days_per_unit(u))
-  }
-def tenor_apply(t: Tenor, reference: Date) -> Date = date_add_days(reference, tenor_to_days(t))
-def char_at(text: string, idx: i64) -> string = string_slice(text, idx, cast(1, i64))
-def parse_unit_suffix(suffix: string) -> TenorUnit = if eq(suffix, "D") then Day else if eq(suffix, "W") then Week else if eq(suffix, "M") then Month else if eq(suffix, "Y") then Year else fail("Shoals.Tenor.parse_tenor: unknown unit suffix (expected D/W/M/Y)")
-def parse_tenor(text: string) -> Tenor =
-  if eq(text, "ON") then Tenor { count: cast(1, i64), unit: Overnight } else if eq(text, "TN") then Tenor { count: cast(1, i64), unit: TomorrowNext } else if eq(text, "SN") then Tenor { count: cast(1, i64), unit: SpotNext } else {
-    len = string_len(text)
-    if lt(len, cast(2, i64)) then fail("Shoals.Tenor.parse_tenor: tenor must be at least 2 chars (e.g. 3M, 1Y, ON)") else {
-      suffix = char_at(text, sub(len, cast(1, i64)))
-      digits = string_slice(text, cast(0, i64), sub(len, cast(1, i64)))
-      unit = parse_unit_suffix(suffix)
-      match to_int(digits) with {
-        | Some(n) => Tenor { count: n, unit }
-        | None => fail("Shoals.Tenor.parse_tenor: count is not an integer")
-      }
+  | Tenor { period: Period }
+def tenor_failure(function: string, detail: string) -> string = string_concat(string_concat("Shoals.Tenor.", function), string_concat(": domain: ", detail))
+def positive_count(function: string, n: i64) -> i64 = if lt(n, 1i64) then fail(tenor_failure(function, string_concat(string_concat("count ", to_string(n)), " is below 1"))) else n
+def tenor_days(n: i64) -> Tenor = Tenor { period: period(0i64, positive_count("tenor_days", n)) }
+def tenor_weeks(n: i64) -> Tenor = Tenor { period: period(0i64, mul(7i64, positive_count("tenor_weeks", n))) }
+def tenor_months(n: i64) -> Tenor = Tenor { period: period(positive_count("tenor_months", n), 0i64) }
+def tenor_years(n: i64) -> Tenor = Tenor { period: period(mul(12i64, positive_count("tenor_years", n)), 0i64) }
+def tenor_period(t: Tenor) -> Period = t.period
+def tenor_apply(t: Tenor, reference: Date, overflow: DayOverflow) -> Date = date_add_period(reference, t.period, overflow)
+-- The grammar is exactly: one or more ASCII digits with a value of at least 1,
+-- then one of D, W, M, Y. No sign, space, or other unit is accepted.
+def is_digit(c: string) -> bool = fold(fn (acc: bool, digit: string) -> or(acc, eq(c, digit)), false, ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"])
+def all_digits(text: string) -> bool = fold(fn (acc: bool, i: i64) -> and(acc, is_digit(string_slice(text, i, 1i64))), true, range(0i64, string_len(text)))
+def try_parse_tenor(text: string) -> Option[Tenor] = {
+  n = string_len(text)
+  if lt(n, 2i64) then None else {
+    digits = string_slice(text, 0i64, sub(n, 1i64))
+    unit = string_slice(text, sub(n, 1i64), 1i64)
+    if not(all_digits(digits)) then None else match to_int(digits) with {
+      | None => None
+      | Some(count) => if lt(count, 1i64) then None else if eq(unit, "D") then Some(tenor_days(count)) else if eq(unit, "W") then Some(tenor_weeks(count)) else if eq(unit, "M") then Some(tenor_months(count)) else if eq(unit, "Y") then Some(tenor_years(count)) else None
     }
   }
+}
+def parse_tenor(text: string) -> Tenor =
+  match try_parse_tenor(text) with {
+    | Some(t) => t
+    | None => fail(tenor_failure("parse_tenor", string_concat(string_concat("\"", text), "\" is not a count of at least 1 followed by D, W, M or Y")))
+  }
+-- ON, TN and SN are money-market tenors measured in business days: the start
+-- lies `lag` business days after the trade date and the end `length` business
+-- days after the start. Spot-next starts at spot, whose lag the caller states.
+type BusinessDayTenor =
+  | BusinessDayTenor { lag: i64, length: i64 }
+def overnight() -> BusinessDayTenor = BusinessDayTenor { lag: 0i64, length: 1i64 }
+def tomorrow_next() -> BusinessDayTenor = BusinessDayTenor { lag: 1i64, length: 1i64 }
+def spot_next(spot_days: i64) -> BusinessDayTenor = if lt(spot_days, 0i64) then fail(tenor_failure("spot_next", string_concat(string_concat("spot lag ", to_string(spot_days)), " is negative"))) else BusinessDayTenor { lag: spot_days, length: 1i64 }
+def business_day_tenor_lag(t: BusinessDayTenor) -> i64 = t.lag
+def business_day_tenor_length(t: BusinessDayTenor) -> i64 = t.length
+def business_day_tenor_dates(t: BusinessDayTenor, trade: Date, calendar: BusinessCalendar, start: NonBusinessStart) -> (Date, Date) = {
+  first = business_day_offset(calendar, trade, t.lag, start)
+  (first, business_day_offset(calendar, first, t.length, RejectNonBusinessStart))
+}
+-- Spot lag in the two-calendar form of OpenGamma Strata's DaysAdjustment:
+-- count `days` business days in `count_calendar`, then roll the result in
+-- `adjust_calendar`. Counting from a non-business trade date, the first step
+-- lands on the next business day.
+type SpotLag =
+  | SpotLag { days: i64, count_calendar: BusinessCalendar, adjust_calendar: BusinessCalendar, roll: BusinessDayRoll }
+def two_calendar_lag(days: i64, count_calendar: BusinessCalendar, adjust_calendar: BusinessCalendar, roll: BusinessDayRoll) -> SpotLag = if lt(days, 0i64) then fail(tenor_failure("two_calendar_lag", string_concat(string_concat("lag ", to_string(days)), " is negative"))) else SpotLag { days, count_calendar, adjust_calendar, roll }
+def counted(lag: SpotLag, trade: Date) -> Date = if eq(lag.days, 0i64) then trade else if is_business_day(lag.count_calendar, trade) then business_day_offset(lag.count_calendar, trade, lag.days, RejectNonBusinessStart) else business_day_offset(lag.count_calendar, trade, sub(lag.days, 1i64), RollStartForward)
+def lagged_date(lag: SpotLag, trade: Date) -> Date = business_day_roll(lag.adjust_calendar, counted(lag, trade), lag.roll)

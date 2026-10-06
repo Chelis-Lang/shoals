@@ -1,86 +1,76 @@
 # Holiday calendars
 
-Module: `Shoals.HolidayCal`.
+Shoals has no holiday-calendar module of its own. A business calendar is a
+`Std.Datetime.Business.BusinessCalendar`, and the market calendars come from
+the Shoreleave package. A Shoals function that needs a calendar, such as the
+`Business252` day count, a business-day tenor, a spot lag, or an adjusted
+schedule, takes a `BusinessCalendar` argument; pass the Shoreleave calendar
+whose market and observance rules match the transaction.
 
-This module represents a named calendar as a list of holiday dates, ships
-2025 New York and London lists, combines calendars, and reports whether a
-date is a holiday or a business day. Dates come from `Std.Datetime`.
-It also exposes Shoreleave's published US federal and England and Wales
-business calendars for horizon-checked settlement dates.
-
-## The Calendar type
-
-```chelis
-type Calendar =
-  | Calendar { name: string, holidays: List[Date] }
-
-def empty_calendar(name: string) -> Calendar
-def weekend_only_calendar() -> Calendar
-def hc_nyc_calendar() -> Calendar
-def hc_ldn_calendar() -> Calendar
-def hc_nyc_calendar_year(year: i64) -> Calendar
-def hc_ldn_calendar_year(year: i64) -> Calendar
-def hc_nyc_calendar_multi(years: List[i64]) -> Calendar
-def hc_ldn_calendar_multi(years: List[i64]) -> Calendar
-def joint_calendar(left: Calendar, right: Calendar) -> Calendar
-```
-
-`empty_calendar` and `weekend_only_calendar` carry no holiday dates, so
-under them only weekends are non-business. `hc_nyc_calendar` and `hc_ldn_calendar`
-carry 2025 New York and London holiday lists. The year and multi-year
-constructors generate smaller lists from fixed rules; they are not complete
-bank-holiday calendars. `joint_calendar`
-merges the holiday lists of two calendars, keeping the left calendar's name,
-so a date that is a holiday in either is a holiday in the joint calendar.
-
-## Published calendars
+Chelis does not re-export an imported name, so import the calendar from its
+Shoreleave module directly:
 
 ```chelis
-def hc_us_federal_published() -> BusinessCalendar
-def hc_england_wales_published() -> BusinessCalendar
+import Std.Datetime.Business (Following, business_day_roll)
+import Shoreleave.UsFederal (us_federal)
+
+rolled = business_day_roll(us_federal(), date(2025i64, 7i64, 4i64), Following)
+// Monday 2025-07-07: 4 July is a US federal holiday
 ```
 
-These constructors return the published calendars from Shoreleave 0.1.0.
-They use `Std.Datetime.Business.BusinessCalendar`, which keeps its source's
-holiday data, weekmask, and finite date horizon. A query outside that horizon
-fails with a domain error; the corresponding `try_` operation returns `None`.
-The US federal horizon covers 2021–2030; England and Wales covers 2019–2028.
-Use the published calendars with `Std.Datetime.Business` operations or the
-published-calendar rolls in `Shoals.Date`. The `Calendar` constructors above
-retain their own fixed lists and rules.
+## Which calendar to use
 
-## Predicates
+| Market | Shoreleave calendar | Module | Published horizon |
+|---|---|---|---|
+| US federal government holidays and closures | `us_federal()` | `Shoreleave.UsFederal` | 2021–2030 |
+| New York Stock Exchange | `nyse()` | `Shoreleave.Nyse` | 2026–2028 |
+| US bond market | `sifma()` | `Shoreleave.Sifma` | 2026–2027 |
+| London | `england_and_wales()` | `Shoreleave.EnglandAndWales` | 2019–2028 |
+| Tokyo | `japan_bank()` | `Shoreleave.JapanBank` | 1990–2027 |
+| Sydney | `new_south_wales()` | `Shoreleave.NewSouthWales` | 2026–2027 |
+| Hong Kong | `hong_kong()` | `Shoreleave.HongKong` | 2025–2027 |
+| Euro settlement | `target()` | `Shoreleave.Target` | 2026–2028 |
 
-```chelis
-def is_holiday(cal: Calendar, d: Date) -> bool
-def is_business_day(cal: Calendar, d: Date) -> bool
-```
+Each calendar keeps its source's holiday data, weekmask, and finite horizon.
+A business-day query outside the horizon fails with a domain error, and the
+`try_` form in `Std.Datetime.Business` returns `None`; no calendar answers
+for a year its data does not cover. Each module also has
+`<name>_projected(until_year)`, which extends the published dates with the
+calendar's rules through `until_year`, and `try_<name>_projected`.
 
-`is_holiday` reports whether a date is in the calendar's holiday list.
-`is_business_day` reports whether a date is neither a weekend nor a holiday.
-From `tests/holidaycal.ch`:
+The calendars name their own markets. Japan Bank includes bank-only closures
+such as 2 January. New South Wales public holidays do not include an August
+bank holiday. Hong Kong has a Monday-to-Saturday business week. There is no
+Frankfurt exchange calendar: TARGET is the euro settlement calendar and stays
+open on German public holidays such as 3 October.
 
-```chelis
-cal = hc_nyc_calendar()
-ny = is_holiday(cal, date(cast(2025, i64), cast(1, i64), cast(1, i64)))   // true
-wed = is_business_day(cal, date(cast(2025, i64), cast(8, i64), cast(13, i64)))  // true
-```
+Shoreleave 0.1.0 has no Federal Reserve or USD settlement calendar.
+`us_federal()` is the federal government's calendar: the legal holidays plus
+executive-order closures of federal agencies, such as 24 and 26 December
+2025, when the Federal Reserve Banks and Fedwire stayed open. `sifma()` and
+`nyse()` are not substitutes either; both close on Good Friday, for example.
+A Federal Reserve calendar is tracked in Chelis-Lang/shoreleave#7.
 
-A joint New York and London calendar treats both US Independence Day and UK
-Boxing Day as holidays:
+## Replacing the removed `Shoals.HolidayCal`
 
-```chelis
-joint = joint_calendar(hc_nyc_calendar(), hc_ldn_calendar())
-july4 = is_holiday(joint, date(cast(2025, i64), cast(7, i64), cast(4, i64)))   // true
-boxing = is_holiday(joint, date(cast(2025, i64), cast(12, i64), cast(26, i64))) // true
-```
+`Shoals.HolidayCal` held fixed local holiday lists and rules with known gaps,
+for example a New York list that closed on Columbus Day and stayed open on
+Good Friday, and a London rule without the May and August bank holidays. It
+is removed, and each old calendar maps to a Shoreleave calendar:
 
+| Removed | Replacement |
+|---|---|
+| `hc_nyc_calendar`, `hc_nyc_calendar_year`, `hc_nyc_calendar_multi` | `us_federal()` for US federal government holidays and closures, `nyse()` for the exchange, `sifma()` for bonds; there is no USD settlement calendar (Chelis-Lang/shoreleave#7) |
+| `hc_ldn_calendar`, `hc_ldn_calendar_year`, `hc_ldn_calendar_multi` | `england_and_wales()` |
+| `hc_tyo_is_holiday`, `hc_tyo_holidays_year` | `japan_bank()` |
+| `hc_syd_is_holiday`, `hc_syd_holidays_year` | `new_south_wales()` |
+| `hc_hkg_is_holiday`, `hc_hkg_holidays_year` | `hong_kong()` |
+| `hc_fra_is_holiday`, `hc_fra_holidays_year` | `target()`; there is no Frankfurt exchange calendar |
+| the `hc_*_published()` wrappers | the Shoreleave constructor itself |
+| `Calendar`, `empty_calendar`, `weekend_only_calendar`, `as_business_calendar` | a Shoreleave calendar, or `Std.Datetime.Business.business_calendar(weekmask, holidays, valid_from, valid_until)` for the caller's own data and horizon |
+| `joint_calendar` | `Std.Datetime.Business.business_in_all` (a business day in both) |
+| `is_holiday`, `is_business_day` | `Std.Datetime.Business.is_business_day` and `try_is_business_day` |
+| `easter_sunday_gregorian`, `good_friday`, `easter_monday` | `Std.Datetime.easter_sunday_gregorian`; `Shoreleave.Rules.good_friday` and `easter_monday` |
 
-## International holiday predicates
-
-`hc_tyo_is_holiday`, `hc_syd_is_holiday`, `hc_fra_is_holiday`, and
-`hc_hkg_is_holiday` accept year, month, and day as `i64` values. Each checks
-membership in its annual holiday list. They do not exclude weekends.
-Hong Kong's lookup supports 2025–2030 and returns false for other years.
-The regional rules are limited; check [Scope and limitations](scope.md)
-before using them for settlement.
+`Shoals.Date` also lost its weekend predicate and business-day rolls; see
+[Dates and day counts](dates.md#removed-date-helpers).

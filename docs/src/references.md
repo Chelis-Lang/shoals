@@ -84,32 +84,27 @@ functions match.
 Module: `Shoals.References.Date`.
 
 ```chelis
-def naive_days_between(start: Date, end: Date) -> i64
-def year_fraction_act_360_textbook(start: Date, end: Date) -> f64
-def year_fraction_act_365_textbook(start: Date, end: Date) -> f64
-def year_fraction_thirty_360_textbook(start: Date, end: Date) -> f64
-def year_fraction_act_act_isda_textbook(start: Date, end: Date) -> f64
-def year_fraction_act_act_icma_textbook(
+def actual_days_reference(start: Date, end: Date) -> i64
+def isda_reference(start: Date, end: Date) -> (i64, i64)
+def icma_reference(
   start: Date, end: Date, period_start: Date, period_end: Date, frequency: i64
-) -> f64
+) -> (i64, i64)
 ```
 
-Reference year fractions for the day-count conventions, used to check
-`Shoals.Date.year_fraction`.
+Reference values for `Shoals.Date.year_fraction`, as a day count or as an
+exact fraction `(numerator, denominator)` in lowest terms. They compute an
+exact proleptic-Gregorian day number of their own rather than calling
+`Std.Datetime.date_days_until`, so they check `Shoals.Date` against an
+independently derived calendar. They also state ISDA differently from the
+subject: the reference clamps every calendar year to the interval and sums
+the pieces, where `Shoals.Date` counts a whole interior year as exactly 1 and
+divides only the head and tail stubs. Agreement is therefore a real
+cross-check of the year-boundary handling rather than a restatement. The
+reference keeps a per-year loop; its spans are test-sized.
 
-The first three keep a deliberately crude 30-day-month count
-(`naive_days_between`), so the properties that use them hold only to a loose
-tolerance. The two ACT/ACT references instead compute an exact
-proleptic-Gregorian day number of their own rather than calling
-`Std.Datetime.date_days_until`, so they check `Shoals.Date` against an independently
-derived calendar and hold to floating-point agreement. They also state ISDA
-differently from the subject: the reference clamps every calendar year to the
-interval and divides each segment, where `Shoals.Date` counts a whole interior
-year as exactly 1 and divides only the head and tail stubs. Agreement is
-therefore a real cross-check of the year-boundary handling rather than a
-restatement. The subject carries the loop-free form deliberately: it makes a
-bounded number of `Std.Datetime` date calls whatever the span. Those calls use
-closed-form Gregorian arithmetic, so dates far from 1970 add no per-year
-traversal cost. The reference keeps a per-year loop for an independent
-cross-check, with its own closed-form `civil_ordinal` calculation; its spans
-are test-sized.
+The fixed values in `tests/date.ch` come from published sources: the ACT/ACT
+examples of ISDA's 1999 paper on ACT/ACT under EMU, the ISDA 2006 §4.16
+30/360 definitions, and QuantLib 1.43's `Actual360`, `Actual365Fixed`,
+`ActualActual(ISDA)` and `Thirty360` conventions, which agree with the
+Shoals definitions on 20000 sampled date pairs. BUS/252 values are hand
+counts against `Shoreleave.UsFederal.us_federal()`.

@@ -1,6 +1,1 @@
-Shoals.Tenor.parse_tenor: unknown unit suffix (expected D/W/M/Y)
-
-`parse_tenor` guards the unit suffix with a runtime `fail` naming the
-function and the accepted set (src/tenor.ch `parse_unit_suffix`). The
-tenor text is a runtime value, so the rejection is a runtime panic; the
-`len < 2` and non-integer-count guards are the same shape.
+Shoals.Tenor.parse_tenor: domain: "3X" is not a count of at least 1 followed by D, W, M or Y

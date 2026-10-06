@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 """Closures acceptance oracle (Milestone K / v0.19.0).
 
-Aggregates the four small-wins closure pieces:
+Aggregates the small-wins closure pieces:
 
 - Cross-currency basis curves (`Shoals.Curves.CurveBasis` +
   `curve_basis_from_pillars` + `discount_factor_with_basis`).
 - Sobol 1024-D runtime construction (`Shoals.Rng.sobol_dim_runtime`
   + `sobol_point_runtime_at`).
-- International holiday tables (TYO/SYD/FRA/HKG via
-  `Shoals.HolidayCal.hc_{tyo,syd,fra,hkg}_*`).
 - Margrabe-Stulz exchange option + asset/cash-or-nothing digital
   options (`Shoals.PricingExtended.pe_*`).
 
@@ -28,7 +26,6 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 TEST_FILES = [
     ("curves_basis", "tests/curves_basis.ch"),
     ("rng_sobol_1024", "tests/rng_sobol_1024.ch"),
-    ("holidaycal_intl", "tests/holidaycal_intl.ch"),
     ("pricingextended_closedforms", "tests/pricingextended_closedforms.ch"),
 ]
 
@@ -94,7 +91,7 @@ def main() -> int:
     if all_pass:
         print(
             f"PASS: {GATE_NAME} — {total_passed}/{total_tests} tests across "
-            f"4 closure modules (cross-ccy basis, Sobol 1024-D, intl holidays, "
+            f"3 closure modules (cross-ccy basis, Sobol 1024-D, "
             f"Margrabe-Stulz + digitals)."
         )
         return 0
