@@ -863,7 +863,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Migrate Shoals 0.24.13 to Chelis 0.18.11, Nautilus 0.7.46, and Coral 0.7.43,
   including canonical Surf vocabulary, refreshed conformance artifacts, and
-  the schema-15 WireDag receipt. See `docs/chelis_0_18_11_migration.md`.
+  the schema-15 WireDag receipt. See `docs/archive/chelis_0_18_11_migration.md`.
 
 ### Fixed
 

@@ -14,18 +14,18 @@ def pde_log_grid_params(s0: f32, s_max_mult: f32, n_x: i64) -> (f32, f32) = {
   (x_min, dx)
 }
 def pde_grid_x(x_min: f32, dx: f32, n_x: i64) -> List[f32] = {
-  idxs = 0 |> fn (__chelis_pipe) -> cast(__chelis_pipe, i64) |> range(n_x)
-  map(fn (i: i64) -> add(x_min, i |> fn (__chelis_pipe) -> cast(__chelis_pipe, f32) |> mul(dx)), idxs)
+  idxs = 0 |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(n_x)))
+  map(fn (i: i64) -> add(x_min, i |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, f32) |> mul(dx)))), idxs)
 }
 def pde_payoff_call(xs: List[f32], k: f32) -> List[f32] = map(fn (x: f32) -> pde_max(sub(exp(x), k), pde_zero()), xs)
-def pde_payoff_put(xs: List[f32], k: f32) -> List[f32] = map(fn (x: f32) -> k |> sub(exp(x)) |> pde_max(pde_zero()), xs)
+def pde_payoff_put(xs: List[f32], k: f32) -> List[f32] = map(fn (x: f32) -> (k |> sub(exp(x)) |> pde_max(pde_zero())), xs)
 def pde_op_coeffs(sigma: f32, r: f32, q: f32, dx: f32) -> (f32, f32, f32) = {
   sigma_sq = mul(sigma, sigma)
   half_sigma_sq = mul(pde_half(), sigma_sq)
   drift = r |> sub(q) |> sub(half_sigma_sq)
   dx_sq = mul(dx, dx)
   diff_part = div(half_sigma_sq, dx_sq)
-  adv_part = div(drift, 2.0 |> fn (__chelis_pipe) -> cast(__chelis_pipe, f32) |> mul(dx))
+  adv_part = div(drift, 2.0 |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, f32) |> mul(dx))))
   a_coef = sub(diff_part, adv_part)
   b_coef = sub(neg(div(sigma_sq, dx_sq)), r)
   c_coef = add(diff_part, adv_part)
@@ -34,7 +34,7 @@ def pde_op_coeffs(sigma: f32, r: f32, q: f32, dx: f32) -> (f32, f32, f32) = {
 def pde_build_lhs(a_coef: f32, b_coef: f32, c_coef: f32, alpha: f32, n_x: i64) -> (List[f32], List[f32], List[f32]) = {
   n_xm1 = sub(n_x, cast(1, i64))
   neg_alpha = neg(alpha)
-  idxs = 0 |> fn (__chelis_pipe) -> cast(__chelis_pipe, i64) |> range(n_x)
+  idxs = 0 |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(n_x)))
   lower_l = map(fn (i: i64) -> {
     is_lo = eq(i, cast(0, i64))
     is_hi = eq(i, n_xm1)
@@ -56,7 +56,8 @@ def pde_thomas_fwd(lower: List[f32], diag: List[f32], upper: List[f32], b_vec: L
   d0 = index(diag, cast(0, i64))
   b0 = index(b_vec, cast(0, i64))
   init_state = ([d0], [b0])
-  step_idxs = 1 |> fn (__chelis_pipe) -> cast(__chelis_pipe, i64) |> range(n_x)
+  step_idxs = 1
+    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(n_x)))
   final_state = fold(fn (st: (List[f32], List[f32]), i: i64) -> {
     d_acc = st.0
     b_acc = st.1
@@ -84,7 +85,8 @@ def pde_thomas_bwd(upper: List[f32], diag_f: List[f32], b_f: List[f32], n_x: i64
   safe_dl = if lt(abs_dl, cast(1e-10, f32)) then pde_one() else d_last
   x_last = div(b_last, safe_dl)
   init_state = [x_last]
-  step_idxs = 1 |> fn (__chelis_pipe) -> cast(__chelis_pipe, i64) |> range(n_x)
+  step_idxs = 1
+    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(n_x)))
   rev_x = fold(fn (acc: List[f32], j: i64) -> {
     i = n_xm1 |> sub(j) |> sub(cast(0, i64))
     last_idx = sub(cast(len(acc), i64), cast(1, i64))
@@ -97,7 +99,7 @@ def pde_thomas_bwd(upper: List[f32], diag_f: List[f32], b_f: List[f32], n_x: i64
     x_i = b_i |> sub(mul(u_i, x_ip1)) |> div(safe_di)
     append(acc, x_i)
   }, init_state, step_idxs)
-  rev_idxs = 0 |> fn (__chelis_pipe) -> cast(__chelis_pipe, i64) |> range(n_x)
+  rev_idxs = 0 |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(n_x)))
   map(fn (k: i64) -> {
     rev_pos = n_xm1 |> sub(k) |> sub(cast(0, i64))
     index(rev_x, rev_pos)
@@ -111,7 +113,7 @@ def pde_thomas_solve(lower: List[f32], diag: List[f32], upper: List[f32], b_vec:
 }
 def pde_apply_op_with_alpha(v: List[f32], a_coef: f32, b_coef: f32, c_coef: f32, alpha: f32, bc_lo: f32, bc_hi: f32, n_x: i64) -> List[f32] = {
   n_xm1 = sub(n_x, cast(1, i64))
-  idxs = 0 |> fn (__chelis_pipe) -> cast(__chelis_pipe, i64) |> range(n_x)
+  idxs = 0 |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(n_x)))
   map(fn (i: i64) -> {
     is_lo = eq(i, cast(0, i64))
     is_hi = eq(i, n_xm1)
@@ -193,7 +195,8 @@ def pde_vanilla_driver(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_x:
   c_coef = op_coeffs.2
   v_init = if is_call then pde_payoff_call(xs, k) else pde_payoff_put(xs, k)
   dt = div(t, cast(n_t, f32))
-  step_idxs = 0 |> fn (__chelis_pipe) -> cast(__chelis_pipe, i64) |> range(n_t)
+  step_idxs = 0
+    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(n_t)))
   v_final = fold(fn (v_acc: List[f32], n: i64) -> {
     tau_next = mul(cast(add(n, cast(1, i64)), f32), dt)
     bc_pair_next = if is_american then pde_bc_american_put(k) else if is_call then pde_bc_call(s_max, k, r, q, tau_next) else pde_bc_put(k, r, tau_next)
@@ -233,10 +236,10 @@ def pde_adi_apply_1d(v_row: List[f32], a_coef: f32, b_half: f32, c_coef: f32, al
 }
 def pde_adi_transpose(v_2d: List[List[f32]], n_outer: i64, n_inner: i64) -> List[List[f32]] = {
   idxs_outer = 0
-    |> fn (__chelis_pipe) -> cast(__chelis_pipe, i64) |> range(n_outer)
+    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(n_outer)))
   rows = map(fn (i: i64) -> index(v_2d, i), idxs_outer)
   idxs_inner = 0
-    |> fn (__chelis_pipe) -> cast(__chelis_pipe, i64) |> range(n_inner)
+    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(n_inner)))
   map(fn (j: i64) -> map(fn (row: List[f32]) -> index(row, j), rows), idxs_inner)
 }
 def pde_adi_apply_along_x2_2d(v_2d: List[List[f32]], a2: f32, b2_half: f32, c2: f32, alpha: f32) -> List[List[f32]] = map(fn (row: List[f32]) -> pde_adi_apply_1d(row, a2, b2_half, c2, alpha), v_2d)
@@ -265,7 +268,7 @@ def pde_adi_cross_apply_2d(v_2d: List[List[f32]], cross_coef: f32, dt: f32, dx1:
   n_x1m1 = sub(n_x1, cast(1, i64))
   n_x2m1 = sub(n_x2, cast(1, i64))
   denom = 4.0
-    |> fn (__chelis_pipe) -> cast(__chelis_pipe, f32) |> mul(mul(dx1, dx2))
+    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, f32) |> mul(mul(dx1, dx2))))
   rows_enum = enumerate(v_2d)
   map(fn (re: (i64, List[f32])) -> {
     i = re.0
@@ -319,7 +322,8 @@ def pde_spread_option_adi(s1_0: f32, s2_0: f32, k: f32, r: f32, q1: f32, q2: f32
   v_init = pde_adi_payoff_spread_2d(xs1, xs2, k)
   dt = div(t, cast(n_t, f32))
   half_dt = mul(pde_half(), dt)
-  step_idxs = 0 |> fn (__chelis_pipe) -> cast(__chelis_pipe, i64) |> range(n_t)
+  step_idxs = 0
+    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(n_t)))
   v_final = fold(fn (v_acc: List[List[f32]], n: i64) -> {
     is_rannacher = lt(n, cast(2, i64))
     alpha_lhs_step = if is_rannacher then dt else half_dt

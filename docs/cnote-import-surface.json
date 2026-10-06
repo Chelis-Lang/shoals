@@ -3,8 +3,8 @@
   "schema_version": "1.0",
   "pkg": "shoals",
   "pkg_version": "0.24.14",
-  "chelis_pin": "0.18.13",
-  "generated_note": "Producer manifest for Shoals 0.24.14 C Note characterization. The release publishes the accepted manifest as shoals-0.24.14.invariants.json. The official Chelis 0.18.13 / Nautilus 0.7.48 / Coral 0.7.45 chain supplies the compiler and package inputs; Shoals also uses Shoreleave 0.1.0. The 36 active invariants declare expected tiers at this pin. The proof gate checks compiler-owned dependency edges, proof status, tier and qualifiers, satisfying and corrupt controls, and non-vacuous preconditions. Fuzz-gated pricing and risk properties use deterministic multi-seed sampling and remain empirical observations. The put-call parity invariant relying on f32 normal-CDF reflection is deferred under chelis#3116 until the per-width contract validates.",
+  "chelis_pin": "0.19.0",
+  "generated_note": "Producer manifest for Shoals 0.24.14 C Note characterization on Chelis 0.19.0. The release publishes the accepted manifest as shoals-0.24.14.invariants.json. The 36 active invariants declare expected proof tiers at the compiler pin. The proof gate checks compiler-owned dependency edges, proof status, tier and qualifiers, satisfying and corrupt controls, and non-vacuous preconditions. Fuzz-gated pricing and risk properties use deterministic multi-seed sampling and remain empirical observations. The put-call parity invariant relying on f32 normal-CDF reflection is deferred under chelis#3116 until the per-width contract validates.",
   "models": [
     {
       "id": "bs_call",
@@ -756,7 +756,8 @@
         "0.18.10": "fuzz_validated",
         "0.18.11": "fuzz_validated",
         "0.18.12": "fuzz_validated",
-        "0.18.13": "fuzz_validated"
+        "0.18.13": "fuzz_validated",
+        "0.19.0": "fuzz_validated"
       },
       "tier_upgrade_trigger": "prove a sound monotonic contract for Nautilus.Distributions.normal_inv_cdf through the real parametric_var body",
       "dischargeability_probe": "shoals37_risk_multi_seed",
@@ -827,7 +828,8 @@
         "0.18.10": "fuzz_validated",
         "0.18.11": "fuzz_validated",
         "0.18.12": "fuzz_validated",
-        "0.18.13": "fuzz_validated"
+        "0.18.13": "fuzz_validated",
+        "0.19.0": "fuzz_validated"
       },
       "tier_upgrade_trigger": "prove the Gaussian inverse-CDF and tail-ratio relation through the real parametric_var and parametric_cvar bodies",
       "dischargeability_probe": "shoals37_risk_multi_seed",
@@ -910,7 +912,8 @@
         "0.18.10": "fuzz_validated",
         "0.18.11": "fuzz_validated",
         "0.18.12": "fuzz_validated",
-        "0.18.13": "fuzz_validated"
+        "0.18.13": "fuzz_validated",
+        "0.19.0": "fuzz_validated"
       },
       "tier_upgrade_trigger": "prove normal_inv_cdf(alpha) > 0 for alpha > 0.5 through the real parametric_var body",
       "dischargeability_probe": "shoals37_risk_multi_seed",
@@ -978,7 +981,8 @@
         "0.18.10": "fuzz_validated",
         "0.18.11": "fuzz_validated",
         "0.18.12": "fuzz_validated",
-        "0.18.13": "fuzz_validated"
+        "0.18.13": "fuzz_validated",
+        "0.19.0": "fuzz_validated"
       },
       "tier_upgrade_trigger": "bridge std.quantile.monotonicity through the exported Shoals.Risk.historical_var wrapper",
       "dischargeability_probe": "shoals37_risk_multi_seed",
@@ -1048,7 +1052,8 @@
         "0.18.10": "fuzz_validated",
         "0.18.11": "fuzz_validated",
         "0.18.12": "fuzz_validated",
-        "0.18.13": "fuzz_validated"
+        "0.18.13": "fuzz_validated",
+        "0.19.0": "fuzz_validated"
       },
       "tier_upgrade_trigger": "prove empirical tail-mean dominance through historical_var and historical_cvar",
       "dischargeability_probe": "shoals37_risk_multi_seed",
@@ -1130,7 +1135,8 @@
         "0.18.10": "fuzz_validated",
         "0.18.11": "fuzz_validated",
         "0.18.12": "fuzz_validated",
-        "0.18.13": "fuzz_validated"
+        "0.18.13": "fuzz_validated",
+        "0.19.0": "fuzz_validated"
       },
       "tier_upgrade_trigger": "prove quantile range preservation through the exported historical_var wrapper",
       "dischargeability_probe": "shoals37_risk_multi_seed",
@@ -1244,7 +1250,8 @@
         "0.18.10": "proven",
         "0.18.11": "proven",
         "0.18.12": "proven",
-        "0.18.13": "proven"
+        "0.18.13": "proven",
+        "0.19.0": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice pricer returns a negative call price -- free money at these inputs",
@@ -1364,7 +1371,8 @@
         "0.18.10": "proven",
         "0.18.11": "proven",
         "0.18.12": "proven",
-        "0.18.13": "proven"
+        "0.18.13": "proven",
+        "0.19.0": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price falls when spot rises -- a monotonicity (delta-sign) violation",
@@ -1474,7 +1482,8 @@
         "0.18.10": "disproved",
         "0.18.11": "disproved",
         "0.18.12": "disproved",
-        "0.18.13": "disproved"
+        "0.18.13": "disproved",
+        "0.19.0": "disproved"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "admits arbitrage: the undiscounted model prices the call at 1.125 when the underlying spot is only 1.0 (C > s)",
@@ -1560,7 +1569,8 @@
         "0.18.10": "proven_modulo_contract",
         "0.18.11": "proven_modulo_contract",
         "0.18.12": "proven_modulo_contract",
-        "0.18.13": "proven_modulo_contract"
+        "0.18.13": "proven_modulo_contract",
+        "0.19.0": "proven_modulo_contract"
       },
       "tier_upgrade_trigger": "chelis#434",
       "dischargeability_probe": "p12_shoals_published_composites",
@@ -1622,7 +1632,8 @@
         "0.18.10": "proven_modulo_contract",
         "0.18.11": "proven_modulo_contract",
         "0.18.12": "proven_modulo_contract",
-        "0.18.13": "proven_modulo_contract"
+        "0.18.13": "proven_modulo_contract",
+        "0.19.0": "proven_modulo_contract"
       },
       "tier_upgrade_trigger": "chelis#434",
       "dischargeability_probe": "p12_shoals_published_composites",
@@ -1723,7 +1734,8 @@
         "0.18.10": "proven",
         "0.18.11": "proven",
         "0.18.12": "proven",
-        "0.18.13": "proven"
+        "0.18.13": "proven",
+        "0.19.0": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the european-call pricer returns a negative price -- free money at these inputs",
@@ -1823,7 +1835,8 @@
         "0.18.10": "proven",
         "0.18.11": "proven",
         "0.18.12": "proven",
-        "0.18.13": "proven"
+        "0.18.13": "proven",
+        "0.19.0": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the call is priced above the underlying spot -- admits arbitrage",
@@ -1923,7 +1936,8 @@
         "0.18.10": "proven",
         "0.18.11": "proven",
         "0.18.12": "proven",
-        "0.18.13": "proven"
+        "0.18.13": "proven",
+        "0.19.0": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the call is priced below its discounted intrinsic value s - k*disc^2 -- admits arbitrage (buy and exercise)",
@@ -2030,7 +2044,8 @@
         "0.18.10": "proven",
         "0.18.11": "proven",
         "0.18.12": "proven",
-        "0.18.13": "proven"
+        "0.18.13": "proven",
+        "0.19.0": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "a lower-strike call is worth less than a higher-strike call -- a bull-spread (strike-monotonicity) violation admitting arbitrage",
@@ -2137,7 +2152,8 @@
         "0.18.10": "proven",
         "0.18.11": "proven",
         "0.18.12": "proven",
-        "0.18.13": "proven"
+        "0.18.13": "proven",
+        "0.19.0": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "a long butterfly on equally-spaced strikes has negative value -- a convexity-in-strike violation admitting arbitrage",
@@ -2195,7 +2211,8 @@
         "0.18.10": "proven",
         "0.18.11": "proven",
         "0.18.12": "proven",
-        "0.18.13": "proven"
+        "0.18.13": "proven",
+        "0.19.0": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the multi-period discount factor falls outside (0, 1] -- discounting a non-negative yield either creates value or turns it negative",
@@ -2260,7 +2277,8 @@
         "0.18.10": "proven",
         "0.18.11": "proven",
         "0.18.12": "proven",
-        "0.18.13": "proven"
+        "0.18.13": "proven",
+        "0.19.0": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond PV is non-positive or exceeds the undiscounted sum of its cashflows -- not a proper present value",
@@ -2332,7 +2350,8 @@
         "0.18.10": "proven",
         "0.18.11": "proven",
         "0.18.12": "proven",
-        "0.18.13": "proven"
+        "0.18.13": "proven",
+        "0.19.0": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond price rises as yield rises -- a duration/DV01 sign violation",
@@ -2404,7 +2423,8 @@
         "0.18.10": "proven",
         "0.18.11": "proven",
         "0.18.12": "proven",
-        "0.18.13": "proven"
+        "0.18.13": "proven",
+        "0.19.0": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond price is concave in yield -- a negative-convexity violation",
@@ -2485,7 +2505,8 @@
         "0.18.10": "disproved",
         "0.18.11": "disproved",
         "0.18.12": "disproved",
-        "0.18.13": "disproved"
+        "0.18.13": "disproved",
+        "0.19.0": "disproved"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "reports zero rate sensitivity: the undiscounted bond prices at 3.0 whether the yield is 0.0 or 1.0 (dP/dy = 0, DV01 understated to zero)",
@@ -2605,7 +2626,8 @@
         "0.18.10": "proven",
         "0.18.11": "proven",
         "0.18.12": "proven",
-        "0.18.13": "proven"
+        "0.18.13": "proven",
+        "0.19.0": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price falls when the up-move factor increases -- a vega-sign violation (wider volatility decreases the option value)",
@@ -2725,7 +2747,8 @@
         "0.18.10": "proven",
         "0.18.11": "proven",
         "0.18.12": "proven",
-        "0.18.13": "proven"
+        "0.18.13": "proven",
+        "0.19.0": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price falls when the discount factor increases -- the call value should rise with less discounting",
@@ -2852,7 +2875,8 @@
         "0.18.10": "proven",
         "0.18.11": "proven",
         "0.18.12": "proven",
-        "0.18.13": "proven"
+        "0.18.13": "proven",
+        "0.19.0": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price is concave in spot -- a gamma-sign violation (the second derivative in spot is negative)",
@@ -2992,7 +3016,8 @@
         "0.18.10": "fuzz_validated",
         "0.18.11": "fuzz_validated",
         "0.18.12": "fuzz_validated",
-        "0.18.13": "fuzz_validated"
+        "0.18.13": "fuzz_validated",
+        "0.19.0": "fuzz_validated"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p08_pkg_bs_positive",
@@ -3074,7 +3099,8 @@
         "0.18.10": "fuzz_validated",
         "0.18.11": "fuzz_validated",
         "0.18.12": "fuzz_validated",
-        "0.18.13": "fuzz_validated"
+        "0.18.13": "fuzz_validated",
+        "0.19.0": "fuzz_validated"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p15_bs_greeks_multi_seed",
@@ -3156,7 +3182,8 @@
         "0.18.10": "fuzz_validated",
         "0.18.11": "fuzz_validated",
         "0.18.12": "fuzz_validated",
-        "0.18.13": "fuzz_validated"
+        "0.18.13": "fuzz_validated",
+        "0.19.0": "fuzz_validated"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p15_bs_greeks_multi_seed",
@@ -3238,7 +3265,8 @@
         "0.18.10": "fuzz_validated",
         "0.18.11": "fuzz_validated",
         "0.18.12": "fuzz_validated",
-        "0.18.13": "fuzz_validated"
+        "0.18.13": "fuzz_validated",
+        "0.19.0": "fuzz_validated"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p15_bs_greeks_multi_seed",
@@ -3320,7 +3348,8 @@
         "0.18.10": "fuzz_validated",
         "0.18.11": "fuzz_validated",
         "0.18.12": "fuzz_validated",
-        "0.18.13": "fuzz_validated"
+        "0.18.13": "fuzz_validated",
+        "0.19.0": "fuzz_validated"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p15_bs_greeks_multi_seed",
@@ -3405,7 +3434,8 @@
         "0.18.10": "fuzz_validated",
         "0.18.11": "fuzz_validated",
         "0.18.12": "fuzz_validated",
-        "0.18.13": "fuzz_validated"
+        "0.18.13": "fuzz_validated",
+        "0.19.0": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -3513,7 +3543,8 @@
         "0.18.10": "fuzz_validated",
         "0.18.11": "fuzz_validated",
         "0.18.12": "fuzz_validated",
-        "0.18.13": "fuzz_validated"
+        "0.18.13": "fuzz_validated",
+        "0.19.0": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -3621,7 +3652,8 @@
         "0.18.10": "fuzz_validated",
         "0.18.11": "fuzz_validated",
         "0.18.12": "fuzz_validated",
-        "0.18.13": "fuzz_validated"
+        "0.18.13": "fuzz_validated",
+        "0.19.0": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -3729,7 +3761,8 @@
         "0.18.10": "fuzz_validated",
         "0.18.11": "fuzz_validated",
         "0.18.12": "fuzz_validated",
-        "0.18.13": "fuzz_validated"
+        "0.18.13": "fuzz_validated",
+        "0.19.0": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -3837,7 +3870,8 @@
         "0.18.10": "fuzz_validated",
         "0.18.11": "fuzz_validated",
         "0.18.12": "fuzz_validated",
-        "0.18.13": "fuzz_validated"
+        "0.18.13": "fuzz_validated",
+        "0.19.0": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -3945,7 +3979,8 @@
         "0.18.10": "fuzz_validated",
         "0.18.11": "fuzz_validated",
         "0.18.12": "fuzz_validated",
-        "0.18.13": "fuzz_validated"
+        "0.18.13": "fuzz_validated",
+        "0.19.0": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -4053,7 +4088,8 @@
         "0.18.10": "fuzz_validated",
         "0.18.11": "fuzz_validated",
         "0.18.12": "fuzz_validated",
-        "0.18.13": "fuzz_validated"
+        "0.18.13": "fuzz_validated",
+        "0.19.0": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {

@@ -5,7 +5,7 @@ to this file so Claude-style and Codex-style entry points do not drift.
 
 ## Repo Identity
 
-<!-- BEGIN CHELIS MANAGED BLOCK: agents-inheritance chelis@0.18.13 (sha256:9cfaf4c0e8542d6a) -->
+<!-- BEGIN CHELIS MANAGED BLOCK: agents-inheritance chelis@0.19.0 (sha256:249002df5d76d070) -->
 # Chelis Agent Contract
 
 Keep this file concise and relevant to every agent working in this repository.
@@ -108,7 +108,7 @@ function of those inputs, and feedback that varies between identical runs is a d
 
 ## Subagents
 
-[`docs/investigations/agent_contract_rationale.md`](https://github.com/Chelis-Lang/chelis/blob/v0.18.13/docs/investigations/agent_contract_rationale.md)
+[`docs/investigations/agent_contract_rationale.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.0/docs/investigations/agent_contract_rationale.md)
 holds the measurements behind these rules.
 
 - Every subagent prompt names the delivery mechanism and the complete expected report.
@@ -165,9 +165,9 @@ holds the measurements behind these rules.
   there. One trap it enforces at compile time: `reef setup` subprocesses the real
   `chelisup` binary, never `chelisup::install::install` in-process, because that helper
   copies `current_exe()` over the shim. Design:
-  [`spec/design/chelis_packaging_and_install.md`](https://github.com/Chelis-Lang/chelis/blob/v0.18.13/spec/design/chelis_packaging_and_install.md).
+  [`spec/design/chelis_packaging_and_install.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.0/spec/design/chelis_packaging_and_install.md).
 - **Downstream shells** inherit this complete contract through a stamped managed block
-  and must satisfy [`spec/design/shell_repo_contract.md`](https://github.com/Chelis-Lang/chelis/blob/v0.18.13/spec/design/shell_repo_contract.md),
+  and must satisfy [`spec/design/shell_repo_contract.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.0/spec/design/shell_repo_contract.md),
   shipped in the toolchain as `chelis reef conform`. Full inheritance is the default,
   but each shell decides which portions apply. Shell-owned additions stay outside the
   block and should remain when they are relevant and current. To omit an inherited
@@ -313,20 +313,18 @@ C Note is the consumer. Shoals' local obligations:
   compatibility oracle; metamorphic substitution remains the complementary
   semantic anti-vacuity check. Both gates run in CI and the
   local gate. Every active invariant is observed against the release binary.
-  At 0.17.5 the direct Black-Scholes and Black-76 call-price positivity family
-  and the direct Black-Scholes spot-monotonicity/delta, vega, rho, and gamma
-  comparisons complete at `fuzz_validated` with corrupted twins. The Greek
-  family runs over three deterministic seeds. Promotion to `proven` remains
-  blocked by chelis#637 because free-variable abstraction discards the coupled
-  pricing subterms. Shoals#37 adds distinct parametric inverse-CDF and
-  historical empirical-quantile VaR/ES families, each covering confidence
-  monotonicity, ES dominance, and positivity over 25 accepted samples at seeds
-  0, 1, and 2. Shoals#42 adds a separate actual-AD consistency family: seven
-  records call the exported first- and second-order Greek vectors and the
-  displayed price, with compiler-owned edges from both to their shared price
-  body. The 0.24.5 release gate reproduces that evidence against the
-  official, sidecar-verified Chelis 0.17.5 / Nautilus 0.7.37 / Coral 0.7.34
-  artifacts. The direct intrinsic-bound and inline `grad`-in-property sign
+  The direct Black-Scholes and Black-76 call-price positivity family and the
+  direct Black-Scholes spot-monotonicity/delta, vega, rho, and gamma comparisons
+  run at `fuzz_validated` with corrupted twins. The Greek family uses three
+  deterministic seeds. Promotion to `proven` remains blocked by chelis#637
+  because free-variable abstraction discards the coupled pricing subterms.
+  Shoals#37 supplies distinct parametric inverse-CDF and historical
+  empirical-quantile VaR/ES families, each covering confidence monotonicity,
+  ES dominance, and positivity over 25 accepted samples at seeds 0, 1, and 2.
+  Shoals#42 supplies a separate actual-AD consistency family: seven records
+  call the exported first- and second-order Greek vectors and the displayed
+  price, with compiler-owned edges from both to their shared price body. The
+  direct intrinsic-bound and inline `grad`-in-property sign
   invariants remain deferred until their own per-surface probes demonstrate a
   stable tier. That unsupported inline-`grad` claim is distinct from the active
   records that call already-exported AD sensitivity functions.
@@ -343,6 +341,8 @@ one change set (contract §7):
    literal `CHELIS_TAG` / `CHELIS_VERSION` env pair in each toolchain-installing
    workflow. Verify with `python3 scripts/audit_workarounds.py --pins-only`.
    Install via the pinned toolchain (the shared install action reads the pin).
+   The README reads versions from `reef.toml`; review its prose for stale
+   release claims, without adding a second version list.
 2. Run `chelis test tests_blocked/ --expect blocked`; FIX-detected →
    execute the sidecar de-narrowing instructions and promote the probe;
    DRIFTED → investigate before re-citing.

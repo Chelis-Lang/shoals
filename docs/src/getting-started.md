@@ -7,32 +7,31 @@ are declared in `reef.toml`.
 
 ## Install the pinned toolchain and dependencies
 
-Install the pinned Chelis compiler and published package dependencies with an
-authenticated [GitHub CLI](https://cli.github.com/). The
+Install the pinned Chelis compiler and published package dependencies. The
 [Chelis installation guide](https://github.com/Chelis-Lang/chelis/blob/main/docs/book/src/install.md)
-covers supported platforms.
+covers supported platforms and `chelisup` setup.
 
 ```sh
-gh auth login                      # once, if needed
-gh release download --repo Chelis-Lang/chelis --pattern chelisup.sh --output - | sh
-export PATH="$HOME/.chelis/bin:$PATH"
-gh repo clone Chelis-Lang/shoals
+git clone https://github.com/Chelis-Lang/shoals.git
 cd shoals
-chelisup install 0.18.13
-chelis reef install --from-github chelis-lang/nautilus@v0.7.48
-chelis reef install --from-github chelis-lang/coral@v0.7.45
-chelis reef install --from-github chelis-lang/shoreleave@v0.1.0
+chelisup install 0.19.0
+```
+
+Install the Nautilus, Coral, and Shoreleave release tags declared in
+`reef.toml` with `chelis reef install --from-github`, passing each exact tag
+as `chelis-lang/<name>@v<version>`. Then lock and build:
+
+```sh
 chelis reef update --offline
 chelis reef build
 ```
 
-`chelisup install 0.18.13` installs the compiler pinned by `reef.toml`.
-The three `reef install` commands fetch the published dependency artifacts;
+`chelisup install 0.19.0` installs the compiler pinned by `reef.toml`.
+Install each published dependency release declared in `reef.toml` with
+`chelis reef install --from-github chelis-lang/NAME@vVERSION` before updating.
 `reef update --offline` records their exact versions and hashes in `reef.lock`.
 `chelis reef build` checks Shoals and produces its Reef artifacts from that
-locked graph. If you already have `chelisup`, begin with the clone and keep
-the pinned compiler installation step. Run the remaining commands from the
-checkout root.
+locked graph. Run the commands from the checkout root.
 
 ## Price a call
 
