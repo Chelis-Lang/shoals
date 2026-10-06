@@ -151,9 +151,14 @@ BATCH = 200
 # five-point sweep untouched.
 #
 # -37.0 IS THE FLOOR, and it is a measured choice rather than a round number.
-# `standard_normal_cdf` holds relative error at or under 1.4e-16 all the way to
-# x = -37.5 -- four orders inside the limit below -- because `erfc` carries the
-# negative tail directly. Past that the RESULT, not the kernel, runs out of
+# `standard_normal_cdf` stays under ONE ULP across this whole range -- worst
+# observed 2.17e-16 (0.977 ulp) at x = -26.95 over a 631-point scan at step
+# 0.05, i.e. about four orders inside the limit below -- because `erfc` carries
+# the negative tail directly. At the thirteen SWEPT points specifically the
+# worst is 9.37e-17, at x = -9.0. Both figures are maxima over a grid, not
+# proofs: an earlier revision of this comment said "at or under 1.4e-16 all the
+# way to -37.5", which is true at the swept points and false off them (15 of
+# those 631 points exceed it). Zero points of the 631 exceed the limit. Past that the RESULT, not the kernel, runs out of
 # room: the true value leaves the normal doubles between -37.5 and -37.6, and
 # measured at 0.18.13 the relative error is 3.1e-9 at x = -38.0, 4.8e-2 at
 # -38.4, and the call returns exactly 0.0 from about -38.5 (where the true value

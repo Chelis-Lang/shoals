@@ -1047,8 +1047,10 @@ The sweep reaches -37 because shoals#68's failure mode was early **saturation**,
 and five points clustered at -6 to -9 pin that issue's table without covering
 the class: the pre-#136 kernel's silent-zero band began at x = -8.485, and a
 regression saturating anywhere further out would have passed unnoticed.
-Measured at this pin, `standard_normal_cdf` holds relative error at or under
-1.4e-16 to x = -37.5, four orders inside the limit. It stops at -37 rather than
+Measured at this pin, `standard_normal_cdf` stays under **one ulp** across the
+range -- worst observed 2.17e-16 (0.977 ulp) at x = -26.95 over a 631-point
+scan, about four orders inside the limit, and under 9.4e-17 at the thirteen
+swept points themselves. Those are grid maxima, not proofs. It stops at -37 rather than
 -37.5 because past that the **result** runs out of room rather than the kernel
 being wrong -- the true value leaves the normal doubles between -37.5 and -37.6,
 and relative error reaches 3.1e-9 at -38.0 and 4.8e-2 at -38.4 before the call

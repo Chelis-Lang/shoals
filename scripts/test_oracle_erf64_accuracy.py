@@ -411,8 +411,12 @@ class LeftTailRelativeEnforcement(unittest.TestCase):
     nonzero exit. This class is that function's missing caller.
 
     mpmath is stubbed with `math`, so this runs under the bare interpreter the
-    per-PR job uses: the references are `erfc` at |x| in [4.2, 6.4], which f64
-    evaluates without trouble.
+    per-PR job uses: the references are `erfc` at |x| in [4.24, 26.16]. `math.erfc`
+    carries up to ~1.3e-13 of its own relative error at the far end, which does
+    not matter here because `exact_at` and the leg under test use the SAME stub
+    -- an unperturbed point therefore measures as exactly 0.0 relative, and the
+    perturbations are 1e-9 or larger. A test that compared the stub against a
+    high-precision reference would need real mpmath.
     """
 
     def setUp(self):
@@ -485,8 +489,11 @@ class LeftTailRelativeEnforcement(unittest.TestCase):
         worst, errors = self.mod.left_tail_relative(values, self.fake)
         self.assertEqual(len(errors), 1, errors)
         self.assertIn(str(x), errors[0])
-        # Measured: exactly 1.0. The smallest subnormal is negligible beside a
-        # reference of ~1.13e-19, so the relative error rounds to unity.
+        # Measured: exactly 1.0. The smallest subnormal is negligible beside
+        # the reference at `LEFT_TAIL_POINTS[-1]` -- 5.73e-300 now that the
+        # sweep reaches -37.0, and 1.13e-19 when it stopped at -9.0 -- so the
+        # relative error rounds to unity either way (5e-324 / 5.73e-300 is
+        # 8.7e-25).
         self.assertEqual(worst, 1.0,
                          "a near-zero return must measure as 100% relative")
         # THIS is the assertion that pins the LIMIT rather than the branch. The
@@ -502,10 +509,16 @@ class LeftTailRelativeEnforcement(unittest.TestCase):
         catch. shoals#68 measured 2.3e-6 relative at x = -7 and 1.8e-2 at
         x = -8 on the pre-repair kernel; both must fail at the published
         limit, or the guard would have been green on the original defect."""
-        # `LEFT_TAIL_RELATIVE_LIMIT` is an ORACLE-INTERNAL constant, not a
-        # published floor: the transcription leg polices only `>= N.NNNNe-NN`
-        # claims and this is not one, and `1e-12` has no other carrier in the
-        # tree. These tests bound it from both sides rather than pin its value.
+        # `LEFT_TAIL_RELATIVE_LIMIT` is not a PUBLISHED FLOOR: the
+        # transcription leg polices only `>= N.NNNNe-NN` claims and this is not
+        # one, so nothing in that leg constrains it. An earlier revision of this
+        # comment went further and said `1e-12` "has no other carrier in the
+        # tree", which is only true under this script's own term of art --
+        # docs/CHELIS_SURFACE.md states the limit in prose, and
+        # `test_the_published_doc_states_the_same_limit` below is what couples
+        # the two. These tests bound the value from both sides rather than pin
+        # it exactly; the review measured that it can be loosened 500x, to
+        # 5e-10, without any of them objecting.
         limit = float(self.mod.LEFT_TAIL_RELATIVE_LIMIT)
         for reported in (2.3e-6, 1.8e-2):
             self.assertGreater(reported, limit)
@@ -525,6 +538,25 @@ class LeftTailRelativeEnforcement(unittest.TestCase):
             self.assertIn(x, points)
         self.assertTrue(all(x < 0 for x in points), points)
 
+    def test_the_sweep_has_no_gap_a_saturation_could_hide_in(self):
+        """Endpoints are not coverage. Pinning only the five table points and
+        `min == -37.0` left the band between them unlocked: deleting the seven
+        intermediate points kept the suite green, and a kernel that saturated
+        at, say, -20 would then pass unnoticed -- which is the whole argument
+        the extension to -37 rests on.
+
+        Pinned as a PROPERTY rather than a literal list, so legitimate
+        re-spacing stays possible: no two consecutive swept points may be more
+        than 5 units apart. The shipped sweep's largest gap is exactly 5
+        (-15 to -20, -20 to -25, -25 to -30, -30 to -35)."""
+        points = sorted(self.mod.LEFT_TAIL_POINTS, reverse=True)
+        gaps = [round(a - b, 10) for a, b in zip(points, points[1:])]
+        self.assertTrue(gaps, "the sweep has fewer than two points")
+        self.assertLessEqual(
+            max(gaps), 5.0,
+            f"the sweep has a gap of {max(gaps)} units, wide enough for a "
+            f"saturation regression to hide in: {points}")
+
     def test_below_the_swept_range_is_unguarded_and_that_is_declared(self):
         """Not a defect -- a boundary, pinned so it is decided rather than
         discovered. Nothing in this leg constrains x below
@@ -539,8 +571,10 @@ class LeftTailRelativeEnforcement(unittest.TestCase):
         someone changing the range will be standing."""
         self.assertEqual(min(self.mod.LEFT_TAIL_POINTS), -37.0,
                          "the guarded range changed; re-measure at the pin and "
-                         "update this test together with the boundary comment "
-                         "above LEFT_TAIL_POINTS")
+                         "update this test together with BOTH carriers -- the "
+                         "boundary comment above LEFT_TAIL_POINTS and the "
+                         "accuracy section of docs/CHELIS_SURFACE.md, which "
+                         "states the point count and the -37 floor")
         # The floor must stay clear of the subnormal onset between -37.5 and
         # -37.6; a sweep reaching past it fails on representability, not on a
         # kernel defect.
@@ -583,10 +617,18 @@ class LeftTailRelativeEnforcement(unittest.TestCase):
         Perturbing EVERY index in turn rather than adding a case for index 0:
         this kills any slice at any position, and it cannot go stale when the
         swept range changes.
+
+        THE SIGN ALTERNATES BY INDEX. Holding it positive here would leave one
+        cell of direction x position unprobed -- a mutation sparing exactly the
+        one index the overshoot test uses survived round 2 for that reason. The
+        two axes now vary together, which is the fifth time a constant axis has
+        had to be closed in this file.
         """
         for i, x in enumerate(self.mod.LEFT_TAIL_POINTS):
             with self.subTest(index=i, x=x):
-                values = self.values_with({x: self.exact_at(x) * (1 - 1.8e-2)})
+                sign = -1.0 if i % 2 == 0 else 1.0
+                values = self.values_with(
+                    {x: self.exact_at(x) * (1 + sign * 1.8e-2)})
                 worst, errors = self.mod.left_tail_relative(values, self.fake)
                 self.assertEqual(
                     len(errors), 1,
@@ -594,6 +636,31 @@ class LeftTailRelativeEnforcement(unittest.TestCase):
                     f"value there produced {len(errors)} errors: {errors}")
                 self.assertIn(str(x), errors[0])
                 self.assertGreater(worst, 0.0)
+
+    def test_the_published_doc_states_the_same_limit(self):
+        """The one coupling the transcription leg cannot provide.
+
+        `LEFT_TAIL_RELATIVE_LIMIT` is a bare constant, and
+        `docs/CHELIS_SURFACE.md` states it in prose. Nothing joined them:
+        changing the constant to 1e-11 while the doc still said 1e-12 left both
+        the 54-test suite AND the transcription leg green, because that leg only
+        discovers `>= N.NNNNe-NN` floor claims and this is not one. Same drift
+        class the transcription leg exists to prevent for the floors, one
+        quantity over.
+
+        The floor magnitude is locked too, since the same sentence carries it.
+        """
+        doc = (REPO_ROOT / "docs" / "CHELIS_SURFACE.md").read_text(
+            encoding="utf-8")
+        limit = self.mod.LEFT_TAIL_RELATIVE_LIMIT
+        self.assertIn(
+            f"limit of {limit}", doc,
+            f"docs/CHELIS_SURFACE.md does not state the configured limit "
+            f"{limit!r}; the constant and the doc have drifted apart")
+        floor = int(-min(self.mod.LEFT_TAIL_POINTS))
+        self.assertIn(
+            f"-{floor}", doc,
+            f"docs/CHELIS_SURFACE.md does not mention the swept floor -{floor}")
 
     def test_a_values_length_mismatch_fails_loudly(self):
         """`zip(..., strict=True)` is load-bearing: a short response would
