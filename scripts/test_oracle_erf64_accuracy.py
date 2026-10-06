@@ -496,14 +496,16 @@ class LeftTailRelativeEnforcement(unittest.TestCase):
         self.assertLess(float(self.mod.LEFT_TAIL_RELATIVE_LIMIT), 1.0,
                         "a limit of 1.0 or looser accepts a near-zero return, "
                         "which is the shoals#68 symptom")
-        self.assertLess(float(self.mod.LEFT_TAIL_RELATIVE_LIMIT), worst,
-                        "the published limit must reject a near-zero return")
 
     def test_the_limit_rejects_the_errors_shoals68_reported(self):
         """The limit is only meaningful against the magnitudes it exists to
         catch. shoals#68 measured 2.3e-6 relative at x = -7 and 1.8e-2 at
         x = -8 on the pre-repair kernel; both must fail at the published
         limit, or the guard would have been green on the original defect."""
+        # `LEFT_TAIL_RELATIVE_LIMIT` is an ORACLE-INTERNAL constant, not a
+        # published floor: the transcription leg polices only `>= N.NNNNe-NN`
+        # claims and this is not one, and `1e-12` has no other carrier in the
+        # tree. These tests bound it from both sides rather than pin its value.
         limit = float(self.mod.LEFT_TAIL_RELATIVE_LIMIT)
         for reported in (2.3e-6, 1.8e-2):
             self.assertGreater(reported, limit)
@@ -533,6 +535,53 @@ class LeftTailRelativeEnforcement(unittest.TestCase):
         self.assertEqual(min(self.mod.LEFT_TAIL_POINTS), -9.0,
                          "the guarded range changed; re-decide the boundary "
                          "and update this test and the leg's docstring together")
+
+    def test_an_overshoot_is_rejected_as_well_as_an_undershoot(self):
+        """The guard is on |error|, and before this test every override in the
+        class undershot (`exact * (1 - eps)`). With the sign held constant,
+        rewriting `abs(got - exact) / exact` as `(exact - got) / exact` survived
+        the whole suite: an overshooting kernel produces a NEGATIVE relative
+        error, `negative > limit` is False, no error is recorded, and
+        `worst_relative` comes back 0.0 while the nightly leg exits green.
+
+        That is shoals#68's consequence with the sign flipped, and the fourth
+        constant-axis defect found in this file -- which is why the fix is a
+        varied axis rather than a patch at one point.
+        """
+        x = self.mod.LEFT_TAIL_POINTS[2]
+        exact = self.exact_at(x)
+        got = exact * (1 + 1e-9)
+        self.assertGreater(got, exact, "the fixture must overshoot")
+        induced = abs(got - exact) / exact
+        worst, errors = self.mod.left_tail_relative(
+            self.values_with({x: got}), self.fake)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn(str(x), errors[0])
+        self.assertGreater(worst, 0.0,
+                           "an overshoot must register as a positive magnitude")
+        self.assertAlmostEqual(worst / induced, 1.0, places=9)
+
+    def test_every_swept_point_is_actually_measured(self):
+        """Membership in `LEFT_TAIL_POINTS` is not measurement, and the
+        difference was unpinned: slicing the zip to `LEFT_TAIL_POINTS[1:]` and
+        `values[1:]` left x = -6.0 silently unevaluated and the suite green.
+        `test_the_swept_points_cover_the_issues_own_table` cannot see that --
+        it asserts the tuple's contents, not that each entry is reached.
+
+        Perturbing EVERY index in turn rather than adding a case for index 0:
+        this kills any slice at any position, and it cannot go stale when the
+        swept range changes.
+        """
+        for i, x in enumerate(self.mod.LEFT_TAIL_POINTS):
+            with self.subTest(index=i, x=x):
+                values = self.values_with({x: self.exact_at(x) * (1 - 1.8e-2)})
+                worst, errors = self.mod.left_tail_relative(values, self.fake)
+                self.assertEqual(
+                    len(errors), 1,
+                    f"index {i} (x = {x}) is in LEFT_TAIL_POINTS but a wrong "
+                    f"value there produced {len(errors)} errors: {errors}")
+                self.assertIn(str(x), errors[0])
+                self.assertGreater(worst, 0.0)
 
     def test_a_values_length_mismatch_fails_loudly(self):
         """`zip(..., strict=True)` is load-bearing: a short response would
