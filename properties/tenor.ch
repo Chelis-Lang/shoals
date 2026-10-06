@@ -1,14 +1,13 @@
 module Shoals.Properties.Tenor
-import Std.Datetime (Date, date_add_days, date_days_until)
-import Shoals.Tenor (Tenor, TenorUnit, tenor, tenor_to_days, tenor_apply, days_n, weeks_n, months_n, years_n)
-def tenor_apply_advances_by_tenor_to_days(ref: Date, t: Tenor) -> bool = {
-  shifted = tenor_apply(t, ref)
-  delta = date_days_until(ref, shifted)
-  eq(delta, tenor_to_days(t))
+import Std.Datetime (Date, ClampToMonthEnd, date_lt, date_lte)
+import Shoals.Tenor (tenor_months)
+import Shoals.Schedule (ShortFinal, schedule_unadjusted)
+export (schedule_is_increasing_and_bounded)
+-- A short-final monthly schedule starts at the start, ends at the end, and is
+-- strictly increasing, whatever the day of month.
+def schedule_is_increasing_and_bounded(start: Date, end: Date, months: i64) -> bool = {
+  xs = schedule_unadjusted(start, end, tenor_months(months), ShortFinal, false, ClampToMonthEnd)
+  n = len(xs)
+  bounds = and(and(date_lte(index(xs, 0i64), start), date_lte(start, index(xs, 0i64))), and(date_lte(index(xs, sub(n, 1i64)), end), date_lte(end, index(xs, sub(n, 1i64)))))
+  and(bounds, fold(fn (acc: bool, i: i64) -> and(acc, date_lt(index(xs, sub(i, 1i64)), index(xs, i))), true, range(1i64, n)))
 }
-def days_then_weeks_equals_compound(ref: Date, n_days: i64, n_weeks: i64) -> bool = {
-  via_compose = tenor_apply(weeks_n(n_weeks), tenor_apply(days_n(n_days), ref))
-  via_sum = date_add_days(ref, add(n_days, mul(n_weeks, cast(7, i64))))
-  eq(date_days_until(via_compose, via_sum), cast(0, i64))
-}
-def tenor_to_days_nonneg_for_positive_count(unit: TenorUnit, n: i64) -> bool = if lt(n, cast(0, i64)) then true else gte(tenor_to_days(tenor(n, unit)), cast(0, i64))
