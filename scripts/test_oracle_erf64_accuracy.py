@@ -527,14 +527,26 @@ class LeftTailRelativeEnforcement(unittest.TestCase):
 
     def test_below_the_swept_range_is_unguarded_and_that_is_declared(self):
         """Not a defect -- a boundary, pinned so it is decided rather than
-        discovered. Nothing in this leg constrains x < min(LEFT_TAIL_POINTS),
-        and the pre-#136 kernel's silent-zero band began at x = -8.485, i.e.
-        just inside this range. Extending the points needs a measurement
-        against the pinned toolchain, so this test records where coverage
-        currently stops."""
-        self.assertEqual(min(self.mod.LEFT_TAIL_POINTS), -9.0,
-                         "the guarded range changed; re-decide the boundary "
-                         "and update this test and the leg's docstring together")
+        discovered. Nothing in this leg constrains x below
+        `min(LEFT_TAIL_POINTS)`, and that floor is a measured choice: the kernel
+        holds relative error at or under 1.4e-16 to x = -37.5, then the RESULT
+        leaves the normal doubles between -37.5 and -37.6 and accuracy collapses
+        (3.1e-9 at -38.0, 4.8e-2 at -38.4, exactly 0.0 from about -38.5). -37.0
+        is one step clear of that cliff so an upstream change to subnormal
+        handling cannot redden this leg with nothing wrong in Shoals.
+
+        The rationale lives on `LEFT_TAIL_POINTS` itself, which is where
+        someone changing the range will be standing."""
+        self.assertEqual(min(self.mod.LEFT_TAIL_POINTS), -37.0,
+                         "the guarded range changed; re-measure at the pin and "
+                         "update this test together with the boundary comment "
+                         "above LEFT_TAIL_POINTS")
+        # The floor must stay clear of the subnormal onset between -37.5 and
+        # -37.6; a sweep reaching past it fails on representability, not on a
+        # kernel defect.
+        self.assertGreater(min(self.mod.LEFT_TAIL_POINTS), -37.5,
+                           "the sweep reaches the subnormal cliff, where the "
+                           "limit cannot be met for reasons outside Shoals")
 
     def test_an_overshoot_is_rejected_as_well_as_an_undershoot(self):
         """The guard is on |error|, and before this test every override in the

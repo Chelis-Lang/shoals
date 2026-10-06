@@ -1039,9 +1039,22 @@ that they are right, and only the nightly leg constrains the value. A missing
 
 `n_cdf64` delegates to Chelis's `standard_normal_cdf`, whose graph uses
 correctly rounded `erfc` directly for the negative tail. The oracle checks
-relative error at -6, -7, -8, -8.5, and -9 against a 60-digit reference,
-with a limit of 1e-12. This catches a return to `1 - erf` cancellation that
-the absolute sweep cannot see (shoals#68).
+relative error at thirteen points from -6 down to **-37**, against a 60-digit
+reference, with a limit of 1e-12. This catches a return to `1 - erf`
+cancellation that the absolute sweep cannot see (shoals#68).
+
+The sweep reaches -37 because shoals#68's failure mode was early **saturation**,
+and five points clustered at -6 to -9 pin that issue's table without covering
+the class: the pre-#136 kernel's silent-zero band began at x = -8.485, and a
+regression saturating anywhere further out would have passed unnoticed.
+Measured at this pin, `standard_normal_cdf` holds relative error at or under
+1.4e-16 to x = -37.5, four orders inside the limit. It stops at -37 rather than
+-37.5 because past that the **result** runs out of room rather than the kernel
+being wrong -- the true value leaves the normal doubles between -37.5 and -37.6,
+and relative error reaches 3.1e-9 at -38.0 and 4.8e-2 at -38.4 before the call
+returns `0.0` from about -38.5. Below -37 is therefore unguarded on purpose: the
+boundary belongs to the f64 subnormal range and the Chelis builtin, not to
+Shoals, so re-measure before extending it.
 
 **No bound is stated for the Greeks.** The error of a derivative is not
 controlled by the error of the function — in Black–Scholes the true
