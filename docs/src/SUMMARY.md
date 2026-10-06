@@ -3,7 +3,7 @@
 [Introduction](introduction.md)
 
 - [Getting started](getting-started.md)
-- [Working with tensors and effects](conventions.md)
+- [Working with tensors and keys](conventions.md)
 
 # Module reference
 

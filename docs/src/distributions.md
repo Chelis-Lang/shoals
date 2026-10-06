@@ -69,8 +69,8 @@ references under the [property checks](properties.md).
 The exported `_s` functions wrap Nautilus gamma, beta, chi-squared,
 exponential, uniform, and Poisson calls. For example, `gamma_pdf_s`,
 `gamma_cdf_s`, and `gamma_inv_cdf_s` take the same arguments as their
-Nautilus counterparts. The sampling wrappers carry `Random` and need
-`with seed(...)`. `dist_mvn_factor` computes a Cholesky factor from a
-covariance tensor; `dist_mvn_sample_one` uses that lower factor to draw
+Nautilus counterparts. The sampling wrappers take an explicit `key`, which
+you can obtain with `key_from_seed`. `dist_mvn_factor` computes a Cholesky
+factor from a covariance tensor; `dist_mvn_sample_one` uses that lower factor to draw
 one multivariate-normal sample. Supply a suitable positive-definite
 covariance matrix.

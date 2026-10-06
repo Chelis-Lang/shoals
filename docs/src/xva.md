@@ -82,7 +82,7 @@ institution gains on its own default.
 def fva[n](time_grid: tensor[n, f32], epe: tensor[n, f32], funding_spread: f32, discount_rate: f32) -> f32
 def kva[n](time_grid: tensor[n, f32], ead: tensor[n, f32], cost_of_capital: f32, regulatory_capital_weight: f32, discount_rate: f32) -> f32
 def xva_cva_stochastic_hazard[n, m](time_grid: tensor[m, f32], epe: tensor[m, f32], hazards: HazardCurve[n], recovery: f32, discount_rate: f32) -> f32
-def xva_cva_wwr_constant_hazard[n](time_grid: tensor[n, f32], epe: tensor[n, f32], hazard: f32, recovery: f32, discount_rate: f32, rho: f32, n_paths: i64) -> f32 ! { Random }
+def xva_cva_wwr_constant_hazard[n](rng_key: key, time_grid: tensor[n, f32], epe: tensor[n, f32], hazard: f32, recovery: f32, discount_rate: f32, rho: f32, n_paths: i64) -> f32
 ```
 
 `fva` multiplies the trapezoidal integral of discounted positive exposure
@@ -92,7 +92,7 @@ between supplied grid points, without a contribution before the first
 point. `xva_cva_stochastic_hazard` uses a `Shoals.Cds.HazardCurve` to
 compute interval survival changes; despite its name, it does not draw
 random paths. `xva_cva_wwr_constant_hazard` samples correlated exposure
-and default shocks; it carries `Random` and requires a seed.
+and default shocks; it takes an explicit key, which can be derived from a seed.
 
 Supply increasing times, matching tensor lengths, valid recoveries, and
 positive path counts where used. These functions do not model collateral

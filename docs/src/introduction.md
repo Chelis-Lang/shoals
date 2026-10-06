@@ -19,7 +19,7 @@ surfaces, sensitivity operators on curves, XVA aggregators, and so on.
 The chapters introduce the main modules and point to their source tests:
 
 - **Pricing.** Black-Scholes call and put, vectorized price tensors, and a
-  Monte Carlo engine driven by the `Random` effect.
+  Monte Carlo engine driven by explicit random keys.
 - **Greeks.** Finite-difference first- and second-order Greeks, analytic
   Greek references for cross-checking, and pathwise / likelihood-ratio
   estimators for the digital payoff family.

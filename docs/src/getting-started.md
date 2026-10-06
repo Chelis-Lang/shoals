@@ -7,7 +7,10 @@ are declared in `reef.toml`.
 
 ## Install the pinned toolchain and dependencies
 
-The Chelis compiler release is private. You need access to its GitHub repository and an authenticated [GitHub CLI](https://cli.github.com/). Access to the pinned Nautilus and Coral releases is also needed. The [Chelis installation guide](https://github.com/Chelis-Lang/chelis/blob/main/docs/book/src/install.md) covers supported platforms.
+Install the pinned Chelis compiler and published package dependencies with an
+authenticated [GitHub CLI](https://cli.github.com/). The
+[Chelis installation guide](https://github.com/Chelis-Lang/chelis/blob/main/docs/book/src/install.md)
+covers supported platforms.
 
 ```sh
 gh auth login                      # once, if needed
@@ -15,15 +18,21 @@ gh release download --repo Chelis-Lang/chelis --pattern chelisup.sh --output - |
 export PATH="$HOME/.chelis/bin:$PATH"
 gh repo clone Chelis-Lang/shoals
 cd shoals
-chelisup install 0.18.11
+chelisup install 0.18.13
+chelis reef install --from-github chelis-lang/nautilus@v0.7.48
+chelis reef install --from-github chelis-lang/coral@v0.7.45
+chelis reef install --from-github chelis-lang/shoreleave@v0.1.0
+chelis reef update --offline
 chelis reef build
 ```
 
-`chelisup install 0.18.11` installs the compiler pinned by `reef.toml`.
-`chelis reef build` resolves the declared dependencies, fetching missing
-release packages as needed, then checks Shoals and produces its Reef artifacts.
-If you already have `chelisup`, begin with the clone and keep the pinned
-compiler installation step. Run the remaining commands from the checkout root.
+`chelisup install 0.18.13` installs the compiler pinned by `reef.toml`.
+The three `reef install` commands fetch the published dependency artifacts;
+`reef update --offline` records their exact versions and hashes in `reef.lock`.
+`chelis reef build` checks Shoals and produces its Reef artifacts from that
+locked graph. If you already have `chelisup`, begin with the clone and keep
+the pinned compiler installation step. Run the remaining commands from the
+checkout root.
 
 ## Price a call
 
@@ -45,4 +54,4 @@ chelis test tests/pricing.ch --filter test_bs_call_atm --timeout 120 --suite-tim
 chelis test tests/pricing.ch --filter test_bs_put_atm --timeout 120 --suite-timeout 180 --jobs 1
 ```
 
-To inspect the full exported API, start with [Pricing](pricing.md), then [Working with tensors and effects](conventions.md). These chapters distinguish standalone commands from excerpts that require the surrounding module and imports.
+To inspect the full exported API, start with [Pricing](pricing.md), then [Working with tensors and keys](conventions.md). These chapters distinguish standalone commands from excerpts that require the surrounding module and imports.
