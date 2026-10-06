@@ -1,8 +1,6 @@
 module Shoals.Date
-import Std.Datetime (Date, date, try_date, is_leap_year, date_add_days, date_add_months, ClampToMonthEnd, date_days_until, date_weekday, date_year, date_month, date_day, Weekday, Saturday, Sunday, date_lt, date_lte)
-import Std.Datetime.Business (BusinessCalendar, Following, Preceding, ModifiedFollowing, RollStartForward, RollStartBackward, RejectNonBusinessStart, business_day_roll, business_day_offset)
-import Shoals.HolidayCal (Calendar, as_business_calendar, weekend_only_calendar)
-export (DayCount, year_fraction, add_business_days, is_weekend, date_roll_following, date_roll_modified_following, date_roll_preceding, date_roll_following_published, date_roll_modified_following_published, date_roll_preceding_published, schedule_from_tenor, add_months, days_in_month, schedule_from_tenor_calendar)
+import Std.Datetime (Date, date, is_leap_year, date_days_until, date_year, date_month, date_day, date_lte)
+export (DayCount, year_fraction)
 -- `ActActIcma` carries the enclosing coupon period and the coupon frequency
 -- because ACT/ACT ICMA is not computable from (start, end) alone. Holding them
 -- in the variant rather than in an optional parameter makes an ICMA request
@@ -75,49 +73,3 @@ def year_fraction(start: Date, end: Date, convention: DayCount) -> f64 =
     | ActActIsda => isda_fraction(start, end)
     | ActActIcma { period_start: ps, period_end: pe, frequency: f } => icma_fraction(start, end, ps, pe, f)
   }
-def is_weekend(d: Date) -> bool =
-  match date_weekday(d) with {
-    | Saturday => true
-    | Sunday => true
-    | _ => false
-  }
--- Every roll takes its calendar. `weekend_only_calendar()` applies a
--- Monday-to-Friday business week without holiday dates.
--- A non-business start sits between two business days. A positive count
--- starts from the following one, so its first step lands there; a negative
--- count starts from the preceding one, so its first step lands there. Zero
--- business days from a non-business start is the following business day, the
--- core offset of 0 under `RollStartForward`; from a business day it is the
--- start. Each case is one `business_day_offset` call, so the calendar's
--- horizon bounds every answer.
-def add_business_days(d: Date, n: i64, cal: Calendar) -> Date = {
-  core = as_business_calendar(cal)
-  if Std.Datetime.Business.is_business_day(core, d) then business_day_offset(core, d, n, RejectNonBusinessStart) else if gt(n, 0i64) then business_day_offset(core, d, sub(n, 1i64), RollStartForward) else if lt(n, 0i64) then business_day_offset(core, d, add(n, 1i64), RollStartBackward) else business_day_offset(core, d, 0i64, RollStartForward)
-}
-def date_roll_following(d: Date, cal: Calendar) -> Date = business_day_roll(as_business_calendar(cal), d, Following)
-def date_roll_preceding(d: Date, cal: Calendar) -> Date = business_day_roll(as_business_calendar(cal), d, Preceding)
-def date_roll_modified_following(d: Date, cal: Calendar) -> Date = business_day_roll(as_business_calendar(cal), d, ModifiedFollowing)
-def date_roll_following_published(d: Date, cal: BusinessCalendar) -> Date = business_day_roll(cal, d, Following)
-def date_roll_preceding_published(d: Date, cal: BusinessCalendar) -> Date = business_day_roll(cal, d, Preceding)
-def date_roll_modified_following_published(d: Date, cal: BusinessCalendar) -> Date = business_day_roll(cal, d, ModifiedFollowing)
-def schedule_from_tenor(start: Date, end: Date, step_months: i64) -> List[Date] = {
-  step_days = mul(step_months, cast(30, i64))
-  total = date_days_until(start, end)
-  n_steps = if lt(step_days, cast(1, i64)) then cast(0, i64) else floor_div(total, step_days)
-  idxs = range(cast(0, i64), add(n_steps, cast(1, i64)))
-  fold(fn (acc: List[Date], i: i64) -> {
-    candidate = date_add_days(start, mul(i, step_days))
-    append(acc, candidate)
-  }, [], idxs)
-}
-def days_in_month(year: i64, month: i64) -> i64 = Std.Datetime.days_in_month(year, month)
-def add_months(d: Date, n: i64) -> Date = date_add_months(d, n, ClampToMonthEnd)
-def schedule_from_tenor_calendar(start: Date, end: Date, step_months: i64) -> List[Date] = {
-  end_ord = date_days_until(start, end)
-  rough = if lt(step_months, cast(1, i64)) then cast(0, i64) else add(floor_div(end_ord, mul(step_months, cast(28, i64))), cast(2, i64))
-  idxs = range(cast(0, i64), add(rough, cast(1, i64)))
-  fold(fn (acc: List[Date], i: i64) -> {
-    candidate = add_months(start, mul(i, step_months))
-    if gt(date_days_until(candidate, end), cast(-1, i64)) then append(acc, candidate) else acc
-  }, [], idxs)
-}

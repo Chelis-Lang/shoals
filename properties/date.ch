@@ -1,11 +1,9 @@
 module Shoals.Properties.Date
-import Std.Datetime (Date, date, date_day, date_lt, date_lte)
-import Shoals.Date (DayCount, Act360, Act365, ThirtyThreeSixty, ActActIsda, ActActIcma, year_fraction, schedule_from_tenor, schedule_from_tenor_calendar, date_roll_following, is_weekend, add_months)
-import Shoals.HolidayCal (Calendar, weekend_only_calendar)
+import Std.Datetime (Date, date)
+import Shoals.Date (DayCount, Act360, Act365, ThirtyThreeSixty, ActActIsda, ActActIcma, year_fraction)
 import Shoals.References.Date (year_fraction_act_360_textbook, year_fraction_act_365_textbook, year_fraction_thirty_360_textbook, year_fraction_act_act_isda_textbook, year_fraction_act_act_icma_textbook)
-export (year_fraction_matches_textbook, schedule_monotone_increasing, date_roll_following_idempotent_on_weekday, add_months_then_neg_is_identity, schedule_calendar_monotone_increasing, whole_isda_year_is_exactly_one, isda_reverses_under_swap)
+export (year_fraction_matches_textbook, whole_isda_year_is_exactly_one, isda_reverses_under_swap)
 def abs_f64(x: f64) -> f64 = if lt(x, cast(0.0, f64)) then neg(x) else x
-def date_eq(a: Date, b: Date) -> bool = and(date_lte(a, b), date_lte(b, a))
 -- The ACT/ACT legs compare two exact calendars against each other, so they hold
 -- to floating-point agreement. The other three compare against the crude
 -- 30-day-month textbook count in `Shoals.References.Date` and keep its loose
@@ -43,30 +41,4 @@ def isda_reverses_under_swap(start: Date, end: Date) -> bool = {
   forward = year_fraction(start, end, ActActIsda)
   backward = year_fraction(end, start, ActActIsda)
   lt(abs_f64(add(forward, backward)), cast(1e-12, f64))
-}
-def schedule_monotone_increasing(start: Date, end: Date, step_months: i64) -> bool = {
-  dates = schedule_from_tenor(start, end, step_months)
-  n = len(dates)
-  if lte(n, cast(1, i64)) then true else {
-    idxs = range(cast(1, i64), n)
-    fold(fn (acc: bool, i: i64) -> {
-      prev = index(dates, sub(i, cast(1, i64)))
-      curr = index(dates, i)
-      and(acc, date_lt(prev, curr))
-    }, true, idxs)
-  }
-}
-def date_roll_following_idempotent_on_weekday(d: Date) -> bool = if is_weekend(d) then true else date_eq(date_roll_following(d, weekend_only_calendar()), d)
-def add_months_then_neg_is_identity(d: Date, n: i64) -> bool = if gt(date_day(d), cast(28, i64)) then true else date_eq(add_months(add_months(d, n), neg(n)), d)
-def schedule_calendar_monotone_increasing(start: Date, end: Date, step_months: i64) -> bool = {
-  dates = schedule_from_tenor_calendar(start, end, step_months)
-  n = len(dates)
-  if lte(n, cast(1, i64)) then true else {
-    idxs = range(cast(1, i64), n)
-    fold(fn (acc: bool, i: i64) -> {
-      prev = index(dates, sub(i, cast(1, i64)))
-      curr = index(dates, i)
-      and(acc, date_lt(prev, curr))
-    }, true, idxs)
-  }
 }
