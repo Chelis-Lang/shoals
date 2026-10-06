@@ -5,32 +5,27 @@ description: Use when writing downstream Chelis Surf or Deep programs, validatin
 
 # Chelis Downstream Skill
 
-Use this skill to write Chelis that works with the current compiler snapshot and to help
-shell authors prepare Reef packages. Keep context small: load deeper specs only when the
-task needs exact grammar, type, CLI, or package semantics.
+Use this skill to write Chelis that works with the current compiler release and to help
+shell authors prepare Reef packages. Keep context small: open the relevant public docs
+when exact grammar, type, CLI, or package semantics matter.
 
-If the user is modifying Chelis itself, stop using this file as the authority. Use the
-repository `AGENTS.md` plus the shared local skills in `agent-skills/`.
+This skill is for writing downstream programs and packages. It does not cover work on
+the Chelis compiler itself.
 
 ## Setup and Discovery
 
-- Ensure `chelis --help` works. From a checkout: `cargo build -p chelis-cli` and put
-  `target/debug` on `PATH`.
+- Follow the [installation guide](https://chelis.ch/docs/chelis/install/) and verify
+  that `chelis --version` and `chelis --help` work. A compiler source checkout is not
+  needed to write Chelis programs or use Reef packages.
 - Use Surf (`.ch`) for human-facing code. Use Deep (`.dp`) for canonical machine output.
-- Read [`docs/CHELIS_SURFACE.md`](../../docs/CHELIS_SURFACE.md) for the complete
-  capability inventory before designing around a suspected language gap. In a shell,
-  `chelis reef conform sync` keeps that file equal to the guide of the pinned release
-  ([shell contract §3](https://github.com/Chelis-Lang/chelis/blob/v0.18.13/spec/design/shell_repo_contract.md)); this skill does not
-  repeat it.
 - Inspect current CLI commands with `chelis --help` and subcommand help, especially
   `chelis fmt --help`, `chelis check --help`, and `chelis reef --help`.
-- Read `docs/book/src/` first for onboarding. Load numbered specs only for details:
-  `spec/02-surf-syntax.md`, `spec/03-deep-syntax.md`,
-  `spec/04-type-system.md`, `spec/05-risc-primitives.md`, and `spec/09-tide.md`.
+- For language syntax, types, commands, examples, and package workflows, use the
+  [Chelis documentation](https://chelis.ch/docs/chelis/).
 
 ## Successful Language Subset
 
-Prefer this subset before trying broader planned language features:
+These common forms provide a useful starting point:
 
 - Function definitions: `def f[n](x: tensor[n, f32]) -> tensor[n, f32] = ...`
 - Blocks with local bindings: `{ y = relu(x); softmax(y, 0) }`
@@ -48,11 +43,15 @@ Rules to preserve:
 
 - No implicit broadcasting. Shapes must match unless an explicit helper changes them.
 - No implicit precision promotion. Use `cast` when changing precision.
-- `sum`, `cumsum`, `trace`, and `einsum` over `i8` or `i16` return `i32` (`spec/04` §5.7.1);
+- `sum`, `cumsum`, `trace`, and `einsum` over `i8` or `i16` return `i32`;
   declare the result as `i32`, pass `accumulator=i64` to `sum` or `einsum`, or narrow
   it with an explicit `cast`.
 - Named dimensions are nominal: `batch` and `seq` do not unify by size.
-- Integer literals default to `i32`; float literals default to `f32`.
+- Integer literals default to `i32`; float literals default to `f32`. A suffix states
+  another dtype, and so does the construct that directly contains the literal: a
+  declaration (`x: f64 = 1.1`), a `cast` (`cast(1.1, f64)` is `1.1f64`), or the dtype
+  argument of `to_tensor` (`to_tensor([1.1, 2.2], f64)`). An unsuffixed `to_tensor`
+  element needs a suffix or the dtype argument.
 - Reduction-style calls need an explicit axis argument.
 
 ## Style Rules for Generated Surf
@@ -143,7 +142,9 @@ Generate Deep only when a tool needs the canonical AST. Every node includes its 
 map, calls use `app`, references use `var`, and literals carry a type.
 
 ```chelis-deep
-(defsig {} square (t-fn {} (t-tensor {} (t-prim {} f32)) (t-tensor {} (t-prim {} f32))))
+(defsig {}
+  square
+  (t-fn {} (t-tensor {} (t-prim {} f32)) (t-tensor {} (t-prim {} f32))))
 
 (def {}
   square
@@ -183,7 +184,9 @@ map, calls use `app`, references use `var`, and literals carry a type.
   (fn {}
     (params {} (x {type: (t-tensor {} (d-var {} n) (t-prim {} f32))}))
     (let {}
-      (bind {} y (app {} (var {} add) (var {} x) (var {} x)))
+      (bind {}
+        y
+        (app {} (var {} add) (var {} x) (var {} x)))
       (app {} (var {} relu) (var {} y)))))
 ```
 
@@ -199,10 +202,10 @@ map, calls use `app`, references use `var`, and literals carry a type.
   relu_then_softmax
   (fn {}
     (params {} (x {type: (t-tensor {} (d-var {} n) (t-prim {} f32))}))
-    (pipe {}
-      (var {} x)
-      (var {} relu)
-      (fn {} (params {} __chelis_pipe) (app {} (var {} softmax) (var {} __chelis_pipe) (lit {type: (t-prim {} i32)} 0))))))
+    (app {}
+      (var {} softmax)
+      (app {} (var {} relu) (var {} x))
+      (lit {type: (t-prim {} i32)} 0))))
 ```
 
 ```chelis-deep
@@ -223,16 +226,20 @@ map, calls use `app`, references use `var`, and literals carry a type.
     (let {}
       (bind {}
         logits
-        (pipe {}
-          (var {} x)
-          (var {} relu)
-          (fn {} (params {} __chelis_pipe) (app {} (var {} add) (var {} __chelis_pipe) (var {} labels))))
+        (app {} (var {} add) (app {} (var {} relu) (var {} x)) (var {} labels))
         loss
-        (pipe {}
-          (app {} (var {} softmax) (var {} logits) (lit {type: (t-prim {} i32)} 0))
-          (var {} log)
-          (fn {} (params {} __chelis_pipe) (app {} (var {} mul) (var {} __chelis_pipe) (var {} labels)))
-          (fn {} (params {} __chelis_pipe) (app {} (var {} sum) (var {} __chelis_pipe) (lit {type: (t-prim {} i32)} 0)))))
+        (app {}
+          (var {} sum)
+          (app {}
+            (var {} mul)
+            (app {}
+              (var {} log)
+              (app {}
+                (var {} softmax)
+                (var {} logits)
+                (lit {type: (t-prim {} i32)} 0)))
+            (var {} labels))
+          (lit {type: (t-prim {} i32)} 0)))
       (var {} loss))))
 ```
 
@@ -289,11 +296,7 @@ map, calls use `app`, references use `var`, and literals carry a type.
 
 (defsig {} keep (t-fn {} (t-adt {} Weights) (t-adt {} Weights)))
 
-(def {}
-  keep
-  (fn {}
-    (params {} (w {type: (t-adt {} Weights)}))
-    (var {} w)))
+(def {} keep (fn {} (params {} (w {type: (t-adt {} Weights)})) (var {} w)))
 ```
 
 ```chelis-deep
@@ -366,8 +369,6 @@ nautilus = "^0.7"
 
 - Package source lives under `src/`; module names should match the prefix and path.
 - `CHELIS_REEF_HOME` defaults to `~/.chelis/reef`.
-- Remote shell fetches use the authenticated GitHub REST API, so they need
-  `GITHUB_TOKEN` or a working `gh auth token`, also for public repositories.
 
 Common Reef loop:
 
@@ -379,9 +380,7 @@ chelis reef build
 
 ## Where to Load More Detail
 
-- Onboarding and examples: `docs/book/src/README.md`, `docs/book/src/examples.md`
-- CLI and style gate: `docs/book/src/cli.md`
-- Reef package workflow: `docs/book/src/reef.md`
-- Executable examples: `examples/*.ch`
-- Runtime package layout: `packages/chelis-std/reef.toml` and `packages/chelis-std/src/`
-- Authoritative syntax/types: numbered specs under `spec/`
+- Start with the [Chelis documentation](https://chelis.ch/docs/chelis/).
+- Browse [examples](https://chelis.ch/docs/chelis/examples/), the
+  [CLI reference](https://chelis.ch/docs/chelis/cli/), and the
+  [Reef package guide](https://chelis.ch/docs/chelis/reef/).

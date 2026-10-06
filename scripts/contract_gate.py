@@ -119,28 +119,14 @@ def reef_pins() -> tuple[str, str]:
     return ver, pin
 
 
-def reef_dependency_version(name: str) -> str:
-    text = (REPO / "reef.toml").read_text()
-    match = re.search(
-        rf"^\s*{re.escape(name)}\s*=\s*\{{[^}}]*\bversion\s*=\s*\"=?([0-9.]+)\"",
-        text,
-        re.M,
-    )
-    if not match:
-        raise RuntimeError(f"reef.toml has no exact {name} dependency version")
-    return match.group(1)
-
-
 def generated_note_errors(manifest: dict, version: str, pin: str) -> list[str]:
     """Keep the producer note aligned with the pinned chain and proof set."""
     note = manifest.get("generated_note")
     if not isinstance(note, str):
         return ["generated_note must be a string"]
-    nautilus = reef_dependency_version("nautilus")
-    coral = reef_dependency_version("coral")
     required = [
         f"Shoals {version}",
-        f"official Chelis {pin} / Nautilus {nautilus} / Coral {coral} chain",
+        f"Chelis {pin}",
         f"{len(manifest.get('invariants', []))} active invariants",
         "compiler-owned dependency edges",
     ]

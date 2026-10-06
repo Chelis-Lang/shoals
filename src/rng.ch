@@ -14,8 +14,8 @@ def pow2_list_32() -> List[i64] =
   map(fn (j: i64) -> {
     init = cast(1, i64)
     two = cast(2, i64)
-    fold(fn (acc: i64, unused: i64) -> mul(acc, two), init, 0 |> fn (__chelis_pipe) -> cast(__chelis_pipe, i64) |> range(j))
-  }, 0 |> fn (__chelis_pipe) -> cast(__chelis_pipe, i64) |> range(cast(33, i64)))
+    fold(fn (acc: i64, unused: i64) -> mul(acc, two), init, 0 |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(j))))
+  }, 0 |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(cast(33, i64)))))
 def bit_at_i64(n: i64, j: i64, pow2: List[i64]) -> i64 = n |> floor_div(index(pow2, j)) |> mod(cast(2, i64))
 def i64_xor_pow2(a: i64, b: i64, pow2: List[i64]) -> i64 = i64_xor_32(a, b)
 def i64_xor_32(a: i64, b: i64) -> i64 = {
@@ -43,7 +43,7 @@ def i64_xor_32(a: i64, b: i64) -> i64 = {
 def halton_value(i: i64, base: i64) -> f32 = {
   init_state = (cast(1.0, f32), cast(0.0, f32), add(i, cast(1, i64)))
   iters = 0
-    |> fn (__chelis_pipe) -> cast(__chelis_pipe, i64) |> range(cast(64, i64))
+    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(cast(64, i64))))
   base_f = cast(base, f32)
   final = fold(fn (state: (f32, f32, i64), unused: i64) -> {
     f_acc = state.0
@@ -72,8 +72,8 @@ def sobol_value_from_slice(i: i64, dim_slice: List[i64], two_pow_32: f32) -> f32
     new_ir = floor_div(ir, two)
     (new_acc, new_ir)
   }, init, dim_slice)
-  final_state.0
-  |> fn (__chelis_pipe) -> cast(__chelis_pipe, f32) |> div(two_pow_32)
+  (final_state.0)
+  |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, f32) |> div(two_pow_32)))
 }
 def sobol_value(i: i64, d: i64, table: List[i64], pow2: List[i64], two_pow_32: f32) -> f32 = {
   base_idx = mul(d, cast(32, i64))
@@ -83,7 +83,7 @@ def sobol_value(i: i64, d: i64, table: List[i64], pow2: List[i64], two_pow_32: f
 def halton_points[total](n_points: i64, n_dims: i64) -> tensor[total, f32] = {
   primes_l = to_list(prime_table())
   idxs = 0
-    |> fn (__chelis_pipe) -> cast(__chelis_pipe, i64) |> range(mul(n_points, n_dims))
+    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(mul(n_points, n_dims))))
   flat_l = map(fn (k: i64) -> {
     i_row = floor_div(k, n_dims)
     d_col = sub(k, mul(n_dims, i_row))
@@ -95,10 +95,11 @@ def halton_points[total](n_points: i64, n_dims: i64) -> tensor[total, f32] = {
 def sobol_points[total](n_points: i64, n_dims: i64) -> tensor[total, f32] = {
   table_l = to_list(sobol_direction_table())
   two_pow_32 = cast(4294967296.0, f32)
-  d_idxs = 0 |> fn (__chelis_pipe) -> cast(__chelis_pipe, i64) |> range(n_dims)
-  dim_slices = map(fn (d: i64) -> table_l |> skip(mul(d, cast(32, i64))) |> take(cast(32, i64)), d_idxs)
+  d_idxs = 0
+    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(n_dims)))
+  dim_slices = map(fn (d: i64) -> (table_l |> skip(mul(d, cast(32, i64))) |> take(cast(32, i64))), d_idxs)
   idxs = 0
-    |> fn (__chelis_pipe) -> cast(__chelis_pipe, i64) |> range(mul(n_points, n_dims))
+    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(mul(n_points, n_dims))))
   flat_l = map(fn (k: i64) -> {
     i_row = floor_div(k, n_dims)
     d_col = sub(k, mul(n_dims, i_row))
@@ -113,7 +114,7 @@ def antithetic_terminal_mean[n](payoffs_plus: tensor[n, f32], payoffs_minus: ten
   pairs = zip(pl, ml)
   n_f = cast(numel(payoffs_plus), f32)
   s = fold(fn (acc: f32, entry: (f32, f32)) -> add(acc, 0.5
-  |> fn (__chelis_pipe) -> cast(__chelis_pipe, f32) |> mul(add(entry.0, entry.1))), cast(0.0, f32), pairs)
+  |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, f32) |> mul(add(entry.0, entry.1))))), cast(0.0, f32), pairs)
   div(s, n_f)
 }
 def control_variate_terminal_mean[n](target_payoffs: tensor[n, f32], control_payoffs: tensor[n, f32], control_known_mean: f32, regression_coef: f32) -> f32 = {
@@ -163,12 +164,12 @@ def sobol_dim_runtime[n](d_idx: i64, template: tensor[n, f32]) -> tensor[n, f32]
     table_l = to_list(sobol_direction_table())
     two_pow_32 = cast(4294967296.0, f32)
     dim_slice = table_l |> skip(mul(d_idx, cast(32, i64))) |> take(cast(32, i64))
-    idxs = 0 |> fn (__chelis_pipe) -> cast(__chelis_pipe, i64) |> range(n_pts)
+    idxs = 0 |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(n_pts)))
     flat_l = map(fn (i: i64) -> sobol_value_from_slice(i, dim_slice, two_pow_32), idxs)
     to_tensor(flat_l)
   } else {
     base = rng_sobol_runtime_fallback_base(d_idx)
-    idxs = 0 |> fn (__chelis_pipe) -> cast(__chelis_pipe, i64) |> range(n_pts)
+    idxs = 0 |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(n_pts)))
     flat_l = map(fn (i: i64) -> halton_value(i, base), idxs)
     to_tensor(flat_l)
   }

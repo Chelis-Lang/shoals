@@ -5,8 +5,8 @@ export (tr_crr_european_call, tr_crr_european_put, tr_crr_american_call, tr_crr_
 -- INPUTS. Pure arithmetic + ITE (relu), no transcendentals, so the pricing
 -- structure lowers to cvc5 -- shoals' genuine proven-over-reals model lane
 -- (dischargeability probe p14; properties in Shoals.Properties.CanonTrees).
--- General-depth CRR needs induction over the lattice and is held out (no chelis
--- induction tier at 0.16.1; re-probe on an induction/fixed-point capability).
+-- These properties cover the fixed-depth model; general-depth CRR is a
+-- separate export with its own proof obligations.
 def relu(x: f32) -> f32 = if (x >= 0.0) then x else 0.0
 def tr_crr_call_2step(s: f32, k: f32, u: f32, d: f32, q: f32, disc: f32) -> f32 = ((disc * disc) * ((((q * q) * relu((((s * u) * u) - k))) + (((2.0 * q) * (1.0 - q)) * relu((((s * u) * d) - k)))) + (((1.0 - q) * (1.0 - q)) * relu((((s * d) * d) - k)))))
 -- DEFECTIVE pricer (manifest `defective: true`): the same 2-step CRR call with
@@ -256,7 +256,7 @@ def tr_tri_terminal_call(s0: f32, k: f32, log_u: f32, n: i64) -> List[f32] = {
   size = add(mul(tr_i2(), n), tr_i1())
   idxs = range(tr_i0(), size)
   map(fn (kx: i64) -> {
-    j_f = kx |> fn (__chelis_pipe) -> cast(__chelis_pipe, f32) |> sub(n_f)
+    j_f = kx |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, f32) |> sub(n_f)))
     s = mul(s0, j_f |> mul(log_u) |> exp)
     s |> sub(k) |> tr_max(tr_zero())
   }, idxs)
@@ -266,7 +266,7 @@ def tr_tri_terminal_put(s0: f32, k: f32, log_u: f32, n: i64) -> List[f32] = {
   size = add(mul(tr_i2(), n), tr_i1())
   idxs = range(tr_i0(), size)
   map(fn (kx: i64) -> {
-    j_f = kx |> fn (__chelis_pipe) -> cast(__chelis_pipe, f32) |> sub(n_f)
+    j_f = kx |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, f32) |> sub(n_f)))
     s = mul(s0, j_f |> mul(log_u) |> exp)
     k |> sub(s) |> tr_max(tr_zero())
   }, idxs)
@@ -290,7 +290,7 @@ def tr_tri_back_american_put(vs: List[f32], i_to: i64, s0: f32, k: f32, log_u: f
     v_m = index(vs, add(kx, tr_i1()))
     v_u = index(vs, add(kx, tr_i2()))
     cont = mul(disc, p_u |> mul(v_u) |> add(add(mul(p_m, v_m), mul(p_d, v_d))))
-    j_f = kx |> fn (__chelis_pipe) -> cast(__chelis_pipe, f32) |> sub(i_to_f)
+    j_f = kx |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, f32) |> sub(i_to_f)))
     s = mul(s0, j_f |> mul(log_u) |> exp)
     exer = k |> sub(s) |> tr_max(tr_zero())
     tr_max(exer, cont)

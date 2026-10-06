@@ -32,7 +32,7 @@ def cva_constant_hazard[n](time_grid: tensor[n, f32], epe: tensor[n, f32], hazar
   pairs = zip(ts_l, epe_l)
   init = (cast(0.0, f32), cast(0.0, f32))
   loss_given_default = 1.0
-    |> fn (__chelis_pipe) -> cast(__chelis_pipe, f32) |> sub(recovery)
+    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, f32) |> sub(recovery)))
   out = fold(fn (state: (f32, f32), entry: (f32, f32)) -> {
     prev_t = state.0
     accum = state.1
@@ -51,7 +51,7 @@ def dva_constant_hazard[n](time_grid: tensor[n, f32], ene: tensor[n, f32], hazar
   pairs = zip(ts_l, ene_l)
   init = (cast(0.0, f32), cast(0.0, f32))
   loss_given_default = 1.0
-    |> fn (__chelis_pipe) -> cast(__chelis_pipe, f32) |> sub(recovery_own)
+    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, f32) |> sub(recovery_own)))
   out = fold(fn (state: (f32, f32), entry: (f32, f32)) -> {
     prev_t = state.0
     accum = state.1
@@ -80,7 +80,7 @@ def xva_trapezoidal_df_weighted[n](time_grid: tensor[n, f32], weight: tensor[n, 
     dfw_i = mul(df_i, w_i)
     dt_i = sub(t_i, prev_t)
     avg_dfw = add(prev_dfw, dfw_i) |> mul(cast(0.5, f32))
-    contribution = if eq(idx, cast(0, i64)) then cast(0.0, f32) else avg_dfw |> mul(dt_i)
+    contribution = if eq(idx, cast(0, i64)) then cast(0.0, f32) else (avg_dfw |> mul(dt_i))
     (t_i, dfw_i, add(accum, contribution), add(idx, cast(1, i64)))
   }, init, pairs)
   out.2
