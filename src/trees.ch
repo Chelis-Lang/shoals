@@ -5,8 +5,8 @@ export (tr_crr_european_call, tr_crr_european_put, tr_crr_american_call, tr_crr_
 -- INPUTS. Pure arithmetic + ITE (relu), no transcendentals, so the pricing
 -- structure lowers to cvc5 -- shoals' genuine proven-over-reals model lane
 -- (dischargeability probe p14; properties in Shoals.Properties.CanonTrees).
--- General-depth CRR needs induction over the lattice and is held out (no chelis
--- induction tier at 0.16.1; re-probe on an induction/fixed-point capability).
+-- These properties cover the fixed-depth model; general-depth CRR is a
+-- separate export with its own proof obligations.
 def relu(x: f32) -> f32 = if (x >= 0.0) then x else 0.0
 def tr_crr_call_2step(s: f32, k: f32, u: f32, d: f32, q: f32, disc: f32) -> f32 = ((disc * disc) * ((((q * q) * relu((((s * u) * u) - k))) + (((2.0 * q) * (1.0 - q)) * relu((((s * u) * d) - k)))) + (((1.0 - q) * (1.0 - q)) * relu((((s * d) * d) - k)))))
 -- DEFECTIVE pricer (manifest `defective: true`): the same 2-step CRR call with
