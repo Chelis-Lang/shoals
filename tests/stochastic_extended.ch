@@ -409,11 +409,22 @@ def test_kou_terminal_count_law_is_poisson_below_the_old_slot_cap() -> unit ! { 
 -- holds only if the sampler adds exactly N jumps. Adding N+1 or N-1 would
 -- move it by a full unit against a seed sd of 0.0082. Measured E[X] over the
 -- same six seeds: 3.0080, sd 0.0082. The tolerance is set from the THEORETICAL
--- standard error sqrt(6/20000) = 0.0173 rather than that observed spread,
--- deliberately: the observed seed spread here is about half the theoretical
--- value, which suggests key_from_seed on small integers may not give fully
--- independent streams, and a tolerance calibrated on a possibly-correlated
--- sample would be too tight if that correlation ever changed.
+-- standard error sqrt(6/20000) = 0.0173 rather than from that observed spread,
+-- because a six-sample spread is a bad basis for a tolerance: the sampling SD
+-- of a six-sample standard deviation is 32% of its own value, so an observed
+-- 0.0082 against a true 0.0173 is an unremarkable low draw rather than a
+-- measurement. Calibrating on it would make this test tighter than the
+-- physics, which is the dangerous direction to be wrong in.
+--
+-- That deflation is NOT evidence of correlated RNG streams, which was the
+-- first thing suspected here. Measured directly: eight adjacent seed pairs
+-- (k, k+1), 20000 uniforms each, mean Pearson r = +0.0001 -- 0.04 standard
+-- errors -- with the worst single pair at 2.15 SE out of eight, which is
+-- ordinary chance. Seeds a million apart came out no better (mean +1.29 SE).
+-- Consecutive small seeds are fine, as [05-RNG-2]'s construction already
+-- implies: the key is XORed into the element word BEFORE splitmix64's
+-- finalizer, so adjacent seeds avalanche. Scope of that check: linear
+-- correlation at matching element indices, not independence in full.
 def test_kou_terminal_count_variance_is_poisson_not_thinned() -> unit ! { Test } = {
   one = cast(1.0, f32)
   zero = cast(0.0, f32)
