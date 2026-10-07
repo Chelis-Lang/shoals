@@ -197,7 +197,7 @@ For semiannual or gapped instruments use `bootstrap_multi` below. A
 ```chelis
 times = to_tensor([cast(1.0, f32), cast(2.0, f32)])
 pars = to_tensor([cast(0.05, f32), cast(0.06, f32)])
-curve = bootstrap_zero_from_par(times, pars)
+par_curve = bootstrap_zero_from_par(times, pars)
 // rates [0.048790097, 0.058554675]; the two-year par bond reprices to 1.0
 ```
 
