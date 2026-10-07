@@ -12,6 +12,42 @@ double-exponential jump helpers. Random draws take an explicit `key` argument;
 length, or the number of terminal draws, is the length of a template
 tensor you supply.
 
+## The time horizon
+
+Every sampler in this module requires a time horizon that is **finite and
+non-negative**, and refuses anything else at its entry rather than returning a
+value. This holds at all nine entry points -- `gbm_path`, `gbm_terminal`,
+`gbm_paths_antithetic_terminal_mean`, `merton_jump_terminal`,
+`sto_kou_jump_terminal`, `correlated_gbm_terminal_2d`, `heston_qe_terminal`,
+`heston_qe_paths_terminal`, and `heston_qe_step` (whose per-step `dt` is a
+horizon for this purpose). There are two diagnostics:
+
+```text
+Shoals.Stochastic: the time horizon must be non-negative; ...
+Shoals.Stochastic: the time horizon must be finite; ...
+```
+
+They are distinct because `gte(nan, 0.0)` is false, so a single ordering check
+would report a NaN horizon as a negative one and name the wrong cause.
+
+`t = 0` is admitted and returns `s0`. So is `t = -0.0`, which is the same
+horizon with its sign bit set: `sqrt(-0.0)` is `-0.0`, and no answer changes.
+
+The guard lives at each sampler's entry and keys on `t` itself, not on a
+product containing it (shoals#139). That placement matters. A negative horizon
+makes `sigma * sqrt(t)` NaN, which is a precondition of the **diffusion** and
+not of any jump count -- so the jump-count guard described under Merton below,
+which refuses a negative Poisson rate `lambda * t`, cannot see it at
+`lambda = 0`: `0.0 * -1.0` is `-0.0`, whose sign bit is set but which compares
+`>= 0.0` as true in IEEE 754, and at `lambda = 0` there is genuinely no Poisson
+law to be negative. Guarding the input rather than the product is what closes
+that gap, and the same reasoning applies to any guard that tests a product, sum
+or quotient rather than its operands.
+
+A horizon of `+inf` is refused on the same ground rather than for tidiness: the
+log drift and `sigma * sqrt(t)` are then both `+inf`, so
+`drift + vol_sqrt_t * z` is `inf - inf` for every negative draw, which is NaN.
+
 ## Geometric Brownian motion
 
 ```chelis

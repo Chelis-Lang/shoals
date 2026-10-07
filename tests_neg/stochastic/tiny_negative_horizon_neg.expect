@@ -1,0 +1,32 @@
+Shoals.Stochastic: the time horizon must be non-negative; sqrt of a negative horizon is NaN, so every path value would be NaN
+Assumption: the guard refuses EVERY negative horizon, not merely a
+conspicuously negative one. `sqrt` does not care about magnitude: at the
+negative min subnormal -1.4e-45 the diffusion term is NaN exactly as it is at
+t = -1, and the sampler returns NaN for every path.
+
+Why this file exists separately from the other horizon fixtures, which all use
+t = -1.0: it pins the guard's LOWER BOUNDARY, and nothing else in the suite
+does. The positive-parity tests in tests/stochastic.ch pin t = 0 and t = -0.0
+from above; the negative fixtures pin t = -1.0 from below; the interval between
+was untested. A red-team round measured the consequence: the mutant
+`gte(t, -0.01)` passes all 88 OTHER negative fixtures (11 of which this change set added) AND both
+positive-parity tests, while admitting t = -0.001 and returning NaN for all
+eight paths -- i.e. it reintroduces shoals#139 in full with a green suite. Any
+threshold in (-0.125, 0) survived that suite.
+
+The horizon value is the SMALLEST-MAGNITUDE negative f32 for a measured reason,
+not for emphasis. A first version of this fixture used -1e-6 and was itself
+defeated: the mutant `gte(t, -1e-9)` REFUSES -1e-6, so the fixture passed and
+that mutant survived at 89 ok / 0 failing. A fixture only kills thresholds
+coarser than its own magnitude. Since `gte(-1.4e-45, x)` is true for every
+negative f32 `x`, this value is admitted by ANY negative threshold and so
+closes the whole family rather than a prefix of it.
+
+That is the "do not trust green" case in this change: the guard's two
+boundaries need pinning from BOTH sides, and a correct-looking family of
+fixtures at one magnitude does not pin a threshold.
+
+Deleting the guard does NOT make this file pass. The assertion is one that NaN
+also fails, so it would then fail on the assertion rather than on the refusal,
+`--expect neg` would see the wrong text, and the file would report
+WRONG-DIAGNOSTIC.

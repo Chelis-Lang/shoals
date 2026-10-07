@@ -1,0 +1,30 @@
+Shoals.Stochastic: the time horizon must be non-negative; sqrt of a negative horizon is NaN, so every path value would be NaN
+Assumption: a time horizon is a precondition of this sampler, not of its jump
+count. Every sampler in Shoals.Stochastic forms `sigma * sqrt(t)` and a log
+drift proportional to t, so `t < 0` makes `sqrt(t)` NaN and every path value
+NaN -- a wrong answer dressed as an answer, which is the failure mode this
+repository files bugs about. checked_horizon refuses instead.
+
+Why the jump-count guards could not cover this (shoals#139): PR #131's
+`gte(rate, zero)` clause keys on the PRODUCT `lambda * t`, and `0.0 * -1.0` is
+`-0.0`, whose sign bit is set but which compares `>= 0.0` as true in IEEE 754.
+At lambda = 0 there is no Poisson law to be negative, so that guard
+legitimately admits the input and the NaN arrives from the diffusion side.
+Guarding `t` itself rather than a product containing it is what closes it.
+
+What this fixture does NOT assert: it does not pin the `-0.0` case. `t = -0.0`
+stays ADMITTED on purpose -- `gte(-0.0, 0.0)` is true, `sqrt(-0.0)` is `-0.0`,
+and the measured terminal values are s0 to within the log/exp round trip. The
+positive-parity case for that lives in tests/stochastic.ch.
+
+Deleting the checked_horizon call from THIS sampler does not make the fixture
+pass: the assertion is one that NaN also fails, so the file would then fail on
+the assertion rather than on the refusal, `--expect neg` would see the wrong
+text, and it would report WRONG-DIAGNOSTIC. Deleting the guard from a DIFFERENT
+sampler leaves this fixture green, which is why there is one file per sampler
+rather than one file for the module.
+
+This sampler had NO horizon validation at all before shoals#139 -- `sqrt(t)`
+went straight through with nothing to bypass -- so this fixture pins a guard
+that is new rather than one that was repaired. Measured on shoals@bba1a22 at
+n = 8, seed 7: every path value came back NaN.

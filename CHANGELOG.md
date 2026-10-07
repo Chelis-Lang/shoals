@@ -358,6 +358,59 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **BREAKING: every path sampler in `Shoals.Stochastic` refuses a time horizon
+  that is not finite and non-negative** (shoals#139). A negative `t` returned
+  NaN for every path value with no diagnostic. Measured on `bba1a22` at
+  `s0 = 100, mu = 0.05, sigma = 0.2`, n = 8, seed 7, `t = -1`: NaN at **all
+  nine** entry points -- `gbm_path`, `gbm_terminal`,
+  `gbm_paths_antithetic_terminal_mean`, `merton_jump_terminal` (at
+  `lambda = 0`), `sto_kou_jump_terminal` (at `lambda_jump = 0`),
+  `correlated_gbm_terminal_2d`, `heston_qe_terminal`,
+  `heston_qe_paths_terminal`, and `heston_qe_step` (at `dt = -0.125`). The
+  issue named four; the sweep found nine.
+- *Why the existing guard did not cover it, and why the fix is not another
+  clause in it.* shoals#131 added `gte(rate, zero)` on the Poisson rate
+  `lambda * t`, which refuses `lambda = 4, t = -1` correctly. At `lambda = 0`,
+  `0.0 * -1.0` is `-0.0`: its sign bit is set, but it compares `>= 0.0` as
+  **true** in IEEE 754, so the rate guard admits it -- legitimately, because at
+  `lambda = 0` there is no Poisson law to be negative. The NaN came from
+  `sigma * sqrt(t)` on the **diffusion** side, which is why a jump-count guard
+  was the wrong place and why that guard's documented claim stayed literally
+  true. The general lesson is to guard the input, not a derived product:
+  `lambda * t` destroys the sign information the guard needs, while
+  `gte(t, 0.0)` rejects `t = -1` cleanly.
+- *Two distinct diagnostics, for `count_params_finite`'s reason.* A negative
+  horizon reports `the time horizon must be non-negative`; a non-finite one
+  reports `the time horizon must be finite`. `gte(nan, 0.0)` is false, so a
+  single ordering check would have blamed the wrong cause for a NaN horizon.
+  `+inf` is refused on a measured ground: the log drift and `sigma * sqrt(t)`
+  are then both `+inf`, so `drift + vol_sqrt_t * z` is `inf - inf` = NaN for
+  every negative draw and `+inf` for every positive one. Measured at n = 8,
+  seed 7: **3 NaN and 5 `+inf`** of 8 -- NOT identical to the `t = -1` row,
+  which is NaN at all 8. The finiteness diagnostic therefore says no path value
+  would be usable rather than naming NaN.
+- *What stays admitted.* `t = 0` and `t = -0.0` are legitimate zero horizons
+  and still return s0 at every one of the nine entry points. `-0.0` is
+  precisely the value whose product let shoals#139 through the rate guard, and
+  refusing it would narrow the surface for a sign bit that changes no answer.
+  `tests/stochastic.ch` pins both as positive parity; a guard written
+  `gt(t, 0.0)` passes every negative fixture and fails those two.
+- *Scope.* The guard is threaded as a returned value rather than asserted and
+  discarded, so a dead-binding elimination cannot reach it. (Defensive: a
+  discarded `_ = checked_horizon(t)` was measured to still fire in the
+  evaluator lane, so threading is not demonstrably necessary there; it was not
+  tested in a lowered lane.) `merton_jump_slots`,
+  `sto_kou_jump_slots`, and the exported `*_sampler_log_jump_moment` functions
+  are deliberately unchanged. In the nine guarded samplers, where the horizon
+  IS checked upstream, the only remaining routes to a `-0.0` rate are a zero
+  horizon or a zero lambda, and both were measured to give the correct
+  zero-jump answer. The two moment functions are not guarded, so a negative
+  horizon reaches their `-0.0` rate directly; measured, they return 0.0, which
+  is that same correct zero-jump answer. The two
+  `gte(rate, zero)` clauses are the only guards in the module keying on a
+  product's sign, and their existing fixtures (`lambda = -1, t = 1`) still
+  report the rate diagnostic unchanged.
+
 - **`Shoals.Dupire.du_cubic_log_moneyness_interp` accepted unsorted grid axes
   and returned a silently wrong implied vol** (shoals#123). Both axes must now
   be strictly increasing: the function rejects `strikes` or `times` that are
