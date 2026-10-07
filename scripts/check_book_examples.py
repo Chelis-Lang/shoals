@@ -29,20 +29,29 @@ Blocks that declare `@property` or `type` items are compiled with
 `chelis check` instead of evaluated. Blocks that cannot be evaluated on their
 own (they read a name the page never defines) are reported and fail the run.
 
+Speed: the fragments of a page run in one `chelis eval` (a page that does
+not evaluate as a whole is re-run block by block, so a failure is still
+attributed to its block), pages run in parallel (`--jobs`, default the CPU
+count), and one warm-up evaluation first fills the compiled-package cache the
+others reuse.
+
 A failure means the site page is wrong, or the API changed without a book
 update: fix the chelis.ch page and re-render the book.
 
-Usage: check_book_examples.py [--chelis PATH] [--page NAME] [--keep]
+Usage: check_book_examples.py [--chelis PATH] [--page NAME] [--jobs N] [--keep]
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -268,29 +277,49 @@ def matches(got: list[float], want: list[str], kind: str) -> bool:
 def parse_eval(stdout: str) -> dict[str, str]:
     values: dict[str, str] = {}
     for line in stdout.splitlines():
-        m = re.match(r"^(\w+) = (.*)$", line)
+        m = re.match(r"^([\w.]+) = (.*)$", line)
         if m:
             values[m.group(1)] = m.group(2)
     return values
 
 
+@dataclass
+class Fragment:
+    """A fragment block made ready to run: its program and the values to compare."""
+    block: Block
+    helpers: list[str]  # top-level `def`s the block and its page context declare
+    body: list[str]  # statements in evaluation order: page context, then the block
+    targets: list[tuple[str, Stmt]]  # names the block binds, with their statements
+    shown: list[tuple[str, Stmt, tuple[list[str], str]]]  # values the book shows
+    imports: list[str]
+
+
 class Checker:
-    def __init__(self, chelis: str, names: dict[str, str], headers: dict[str, str], dep_headers: dict[str, str]):
-        self.dep_headers = dep_headers
+    """Checks one page. Pages are independent, so they run in parallel."""
+
+    def __init__(self, chelis: str, names: dict[str, str], headers: dict[str, str],
+                 dep_headers: dict[str, str], work: Path):
         self.chelis = chelis
         self.names = names
         self.headers = headers
+        self.dep_headers = dep_headers
+        self.work = work
         self.failures: list[str] = []
-        self.counts = {"signatures": 0, "dependency signatures": 0, "fragments": 0,
-                       "programs": 0, "compiled": 0, "values": 0, "outputs": 0, "skipped": 0}
+        self.notes: list[str] = []
+        self.counts = {"blocks": 0, "signatures": 0, "dependency signatures": 0, "fragments": 0,
+                       "programs": 0, "compiled": 0, "values": 0, "outputs": 0, "skipped": 0,
+                       "evals": 0, "isolated": 0}
         self.serial = 0
+        self.seconds = 0.0
 
     def run(self, args: list[str]) -> subprocess.CompletedProcess[str]:
+        if args and args[0] in ("eval", "check"):
+            self.counts["evals"] += 1
         return subprocess.run([self.chelis, *args], cwd=REPO, capture_output=True, text=True)
 
     def write(self, text: str) -> Path:
         self.serial += 1
-        path = WORK / f"example_{self.serial}.ch"
+        path = self.work / f"example_{self.serial}.ch"
         path.write_text(text)
         # generated files are formatted rather than exempted from the style gate
         self.run(["fmt", "--inplace", str(path.relative_to(REPO))])
@@ -317,19 +346,33 @@ class Checker:
                     f"{block.page}:{st.line}: signature differs from {where}\n  book:   {normalize(st.text)}\n"
                     f"  source: {source}")
 
-    def check_block(self, block: Block, earlier: list[Stmt]) -> None:
+    def check_page(self, page: Path) -> None:
+        fragments: list[Fragment] = []
+        earlier: list[Stmt] = []
+        for block in read_blocks(page):
+            block.stmts = statements(block)
+            self.counts["blocks"] += 1
+            frag = self.check_block(block, earlier)
+            if frag:
+                fragments.append(frag)
+            earlier += [s for s in block.stmts if s.binds or (s.text.startswith("def ") and re.search(r"\s=\s", s.text))]
+        if fragments:
+            self.run_fragments(page.name, fragments)
+
+    def check_block(self, block: Block, earlier: list[Stmt]) -> Fragment | None:
+        """Check a signature, program or compiled block now; return a fragment to run."""
         stmts = block.stmts
         if not stmts:
-            return
+            return None
         if all(s.text.startswith(("def ", "type ")) for s in stmts) and not any(
                 s.text.startswith("def ") and re.search(r"\s=\s", s.text) for s in stmts):
             self.check_signatures(block)
-            return
+            return None
         text = "\n".join(s.text for s in stmts)
         if re.search(r"(?m)^(import|module)\s", text):
             self.counts["programs"] += 1
             self.evaluate(block, text, program=True)
-            return
+            return None
         if re.search(r"(?m)^(@property|type)\b", text):
             self.counts["compiled"] += 1
             defined = {m.group(1) for m in re.finditer(r"(?m)^def\s+(\w+)", text)}
@@ -342,9 +385,13 @@ class Checker:
                 score = None
             if score != 1:
                 self.failures.append(f"{block.page}:{block.line}: `chelis check` score {score}\n{r.stdout[-800:]}{r.stderr[-800:]}")
-            return
+            return None
+        return self.prepare_fragment(block, earlier)
 
-        # a fragment: pull in the earlier statements on this page it reads
+    def prepare_fragment(self, block: Block, earlier: list[Stmt]) -> Fragment | None:
+        stmts = block.stmts
+        text = "\n".join(s.text for s in stmts)
+        # pull in the earlier statements on this page the block reads
         own = {s.binds for s in stmts if s.binds} | {m.group(1) for s in stmts for m in [re.match(r"^def\s+(\w+)", s.text)] if m}
         needed: list[Stmt] = []
         want = set(IDENT.findall(re.sub(r'"[^"]*"', "", text))) - own
@@ -355,19 +402,20 @@ class Checker:
                 want |= set(IDENT.findall(st.text)) - {name}
                 want.discard(name)
         clash = {s.binds for s in needed if s.binds} & {s.binds for s in stmts if s.binds}
-        context = []
+        helpers: list[str] = []
+        body: list[str] = []
         for s in needed:
             text_c = s.text
             for name in clash:
                 text_c = re.sub(rf"\b{name}\b", f"{name}_from_page", text_c)
-            context.append(text_c)
-        body: list[str] = context
+            (helpers if text_c.startswith("def ") else body).append(text_c)
         targets: list[tuple[str, Stmt]] = []
-        for i, st in enumerate(stmts):
-            if st.binds or st.text.startswith("def "):
+        for st in stmts:
+            if st.text.startswith("def "):
+                helpers.append(st.text)
+            elif st.binds:
                 body.append(st.text)
-                if st.binds:
-                    targets.append((st.binds, st))
+                targets.append((st.binds, st))
             else:
                 # Chelis does not accept an expression on its own at the top
                 # level ("expected Eq"), so a reader who copies it gets a
@@ -375,23 +423,18 @@ class Checker:
                 self.failures.append(
                     f"{block.page}:{st.line}: bare top-level expression; bind it to a name "
                     f"(`name = ...`) so the example parses\n  {st.text.splitlines()[0]}")
-        program = "\n".join(body)
+        program = "\n".join(helpers + body)
         defined = {s.binds for s in needed + stmts if s.binds}
         defined |= {m.group(1) for m in re.finditer(r"(?m)^def\s+(\w+)", program)}
-        defined |= {n for n, _ in targets}
         defined |= {f"{n}_from_page" for n in clash}
         free = re.sub(r"\b[A-Za-z_]\w*\s*:(?!:)", " ", re.sub(r'"[^"]*"', "", program))
         unknown = sorted(w for w in set(IDENT.findall(free)) - KEYWORDS - defined - set(self.names)
                          if w[0].islower() and w not in BUILTINS and not re.match(r"^\d", w))
         if unknown:
             self.counts["skipped"] += 1
-            print(f"skip {block.page}:{block.line}: reads names the page does not define: {', '.join(unknown)}")
-            return
+            self.notes.append(f"skip {block.page}:{block.line}: reads names the page does not define: {', '.join(unknown)}")
+            return None
         self.counts["fragments"] += 1
-        src = "\n".join(imports_for(program, self.names, defined)) + "\n" + program + "\n"
-        values = self.evaluate(block, src, program=False)
-        if values is None:
-            return
         shown: list[tuple[str, Stmt, tuple[list[str], str]]] = []
         target_names = {n for n, _ in targets}
         for name, st in targets:
@@ -407,12 +450,73 @@ class Checker:
             exp = expected_numbers(st.comment)
             if exp:
                 shown.append((name, st, exp))
-        for name, st, exp in shown:
-            self.counts["values"] += 1
-            got = values.get(name)
-            if got is None or not matches(numbers(got), *exp):
-                self.failures.append(
-                    f"{block.page}:{st.line}: `{name}` evaluates to {got}, the book shows `-- {st.comment}`")
+        return Fragment(block, helpers, body, targets, shown, imports_for(program, self.names, defined))
+
+    def run_fragments(self, page: str, fragments: list[Fragment]) -> None:
+        """Evaluate every fragment on a page in one `chelis eval`.
+
+        Each fragment becomes one zero-argument `def` whose body is the
+        fragment with its page context, so blocks that reuse a name do not
+        collide, and which returns the values the book shows (as a tuple when
+        there are several). Chelis evaluates every binding in a body, used or
+        not, so each statement still runs exactly once. If the page as a whole
+        does not evaluate, each fragment runs on its own so the failure is
+        attributed to its block, exactly as a reader would meet it.
+        """
+        helpers: dict[str, str] = {}
+        conflict = False
+        for frag in fragments:
+            for h in frag.helpers:
+                name = re.match(r"^def\s+(\w+)", h).group(1)
+                if helpers.setdefault(name, h) != h:
+                    conflict = True
+        imports = sorted({i for f in fragments for i in f.imports})
+        merged: dict[str, set[str]] = {}
+        for line in imports:
+            m = re.match(r"^import\s+([\w.]+)\s*\((.*)\)$", line)
+            merged.setdefault(m.group(1), set()).update(x.strip() for x in m.group(2).split(","))
+        lines = [f"import {mod} ({', '.join(sorted(ws))})" for mod, ws in sorted(merged.items())]
+        lines += list(helpers.values())
+        returned: list[list[str]] = []
+        for k, frag in enumerate(fragments):
+            bound = [n for n, _ in frag.targets]
+            # the shown values, or else the last binding (every binding is
+            # evaluated either way)
+            names = [n for n in dict.fromkeys(n for n, _, _ in frag.shown) if n in bound] or bound[-1:]
+            returned.append(names)
+            if not names:
+                continue
+            inner = "\n".join("  " + ln for st in frag.body for ln in st.splitlines())
+            result = names[0] if len(names) == 1 else f"({', '.join(names)})"
+            lines.append(f"def book_example_{k}() = {{\n{inner}\n  {result}\n}}")
+        results: list[dict[str, str] | None] = [None] * len(fragments)
+        if not conflict:
+            path = self.write("\n".join(lines) + "\n")
+            r = self.run(["eval", "--timeout", "600", "--file", str(path.relative_to(REPO))])
+            if r.returncode == 0:
+                values = parse_eval(r.stdout)
+                results = [{} for _ in fragments]
+                for k, names in enumerate(returned):
+                    for i, name in enumerate(names):
+                        key = f"book_example_{k}" if len(names) == 1 else f"book_example_{k}.{i}"
+                        parts = [v for root, v in values.items() if root == key or root.startswith(key + ".")]
+                        if parts:
+                            results[k][name] = ", ".join(parts)  # type: ignore[index]
+        for k, frag in enumerate(fragments):
+            if results[k] is None:
+                # the page did not evaluate as a whole: run this block alone
+                self.counts["isolated"] += 1
+                src = "\n".join(frag.imports + frag.helpers + frag.body) + "\n"
+                results[k] = self.evaluate(frag.block, src, program=False)
+            values = results[k]
+            if values is None:
+                continue
+            for name, st, exp in frag.shown:
+                self.counts["values"] += 1
+                got = values.get(name)
+                if got is None or not matches(numbers(got), *exp):
+                    self.failures.append(
+                        f"{frag.block.page}:{st.line}: `{name}` evaluates to {got}, the book shows `-- {st.comment}`")
 
     def evaluate(self, block: Block, src: str, program: bool) -> dict[str, str] | None:
         if program:
@@ -447,45 +551,70 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--chelis", help="chelis binary (default: chelis on PATH, the pinned toolchain in CI)")
     ap.add_argument("--page", action="append", help="only check this page (repeatable)")
+    ap.add_argument("--jobs", type=int, default=os.cpu_count() or 1, help="pages checked in parallel")
     ap.add_argument("--keep", action="store_true", help="keep the generated example files")
     args = ap.parse_args()
 
+    started = time.monotonic()
     chelis = resolve_chelis(args.chelis)
-    # building resolves the pinned dependencies and unpacks their sources,
-    # which the dependency signatures are compared with
-    r = subprocess.run([chelis, "reef", "build"], cwd=REPO, capture_output=True, text=True)
-    if r.returncode != 0:
-        sys.exit(f"check_book_examples: `chelis reef build` failed\n{r.stdout}{r.stderr}")
-    names, headers = module_exports()
-    checker = Checker(chelis, names, headers, dependency_headers())
     shutil.rmtree(WORK, ignore_errors=True)
     WORK.mkdir(parents=True)
-    total = 0
+    # One evaluation first, alone: it resolves the pinned dependencies, unpacks
+    # their sources (which the dependency signatures are compared with), and
+    # warms the compiled-package cache every later evaluation reuses. Run in
+    # parallel cold, each page would pay that cost itself.
+    warm = WORK / "warm.ch"
+    warm.write_text('import Shoals.Core (version)\nshoals_version = version()\n')
+    r = subprocess.run([chelis, "eval", "--file", str(warm.relative_to(REPO))], cwd=REPO, capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.exit(f"check_book_examples: warm-up evaluation failed\n{r.stdout}{r.stderr}")
+    print(f"warm-up: {time.monotonic() - started:.0f}s")
+    names, headers = module_exports()
+    dep_headers = dependency_headers()
+
+    pages = [p for p in sorted(BOOK.glob("*.md"))
+             if not args.page or p.name in args.page or p.stem in args.page]
+    # longest pages first, so the slowest evaluation (stochastic simulations)
+    # starts at once instead of last; results are reported in page order
+    order = sorted(pages, key=lambda p: -p.stat().st_size)
+
+    def check(page: Path) -> Checker:
+        work = WORK / page.stem
+        work.mkdir()
+        checker = Checker(chelis, names, headers, dep_headers, work)
+        began = time.monotonic()
+        checker.check_page(page)
+        checker.seconds = time.monotonic() - began
+        return checker
+
     try:
-        for page in sorted(BOOK.glob("*.md")):
-            if args.page and page.name not in args.page and page.stem not in args.page:
-                continue
-            earlier: list[Stmt] = []
-            for block in read_blocks(page):
-                block.stmts = statements(block)
-                total += 1
-                checker.check_block(block, earlier)
-                earlier += [s for s in block.stmts if s.binds or (s.text.startswith("def ") and re.search(r"\s=\s", s.text))]
+        with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
+            futures = {page: pool.submit(check, page) for page in order}
+            done = [futures[page].result() for page in pages]
     finally:
         if not args.keep:
             shutil.rmtree(WORK, ignore_errors=True)
-    if total == 0:
+    counts = {k: sum(c.counts[k] for c in done) for k in done[0].counts} if done else {}
+    failures = [f for c in done for f in c.failures]
+    for c in done:
+        for note in c.notes:
+            print(note)
+    slow = sorted(((c.seconds, p.name) for c, p in zip(done, pages)), reverse=True)[:3]
+    print("slowest pages: " + ", ".join(f"{name} {s:.0f}s" for s, name in slow))
+    if not counts or counts["blocks"] == 0:
         sys.exit(f"check_book_examples: no chelis examples found under {BOOK.relative_to(REPO)}")
-    if checker.counts["skipped"]:
-        checker.failures.append(f"{checker.counts['skipped']} blocks could not be evaluated (see `skip` lines)")
-    for f in checker.failures:
+    if counts["skipped"]:
+        failures.append(f"{counts['skipped']} blocks could not be evaluated (see `skip` lines)")
+    for f in failures:
         print(f"FAIL {f}\n")
-    c = checker.counts
-    print(f"book-examples: {total} blocks; {c['signatures']} signatures matched against the source "
+    c = counts
+    print(f"book-examples: {c['blocks']} blocks; {c['signatures']} signatures matched against the source "
           f"and {c['dependency signatures']} against the pinned dependencies; {c['fragments']} fragments and "
           f"{c['programs']} programs evaluated, {c['compiled']} compiled; {c['values']} shown values and "
-          f"{c['outputs']} shown outputs compared; {c['skipped']} blocks skipped; {len(checker.failures)} failures")
-    return 1 if checker.failures else 0
+          f"{c['outputs']} shown outputs compared; {c['skipped']} blocks skipped; {len(failures)} failures "
+          f"({c['evals']} compiler runs, {c['isolated']} blocks run alone, {len(pages)} pages on {args.jobs} workers, "
+          f"{time.monotonic() - started:.0f}s)")
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":
