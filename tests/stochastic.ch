@@ -56,6 +56,10 @@ def test_antithetic_mean_finite() -> unit ! { Test } = {
 -- a guard written as `gt(t, 0.0)`, or one that rejected the sign bit of
 -- `-0.0`, would pass every one of them while refusing a legitimate input.
 --
+-- Both tests below cover all NINE guarded entry points, so the pair pins the
+-- admitted boundary wherever the guard is installed rather than at a sample of
+-- the sites.
+--
 -- `t = 0` is a legitimate horizon: no time passes, so every terminal value is
 -- s0 exactly, up to the log/exp round trip each sampler performs. `t = -0.0`
 -- is the same horizon with its sign bit set, which is exactly the value that
@@ -95,6 +99,9 @@ def test_negative_zero_horizon_is_admitted_and_changes_no_answer() -> unit ! { T
   _ = assert_close(path_sum(sto_kou_jump_terminal(key_from_seed(7i64), zero_horizon_template(), zero_horizon_template(), s0, cast(0.05, f32), cast(0.2, f32), cast(4.0, f32), cast(0.5, f32), cast(3.0, f32), cast(4.0, f32), neg_z)), eight_s0, tol, "sto_kou_jump_terminal at t = -0.0 must return s0; this is the value whose -0.0 product let shoals#139 through the rate guard")
   legs = correlated_gbm_terminal_2d(key_from_seed(7i64), zero_horizon_template(), zero_horizon_template(), s0, cast(90.0, f32), cast(0.05, f32), cast(0.04, f32), cast(0.2, f32), cast(0.3, f32), cast(0.5, f32), neg_z)
   _ = assert_close(add(path_sum(legs.0), path_sum(legs.1)), cast(1520.0, f32), tol, "correlated_gbm_terminal_2d at t = -0.0 must return s0_x and s0_y")
-  heston_many = heston_qe_paths_terminal(key_from_seed(7i64), zero_horizon_template(), s0, cast(0.04, f32), cast(0.05, f32), cast(1.5, f32), cast(0.04, f32), cast(0.3, f32), cast(-0.5, f32), neg_z, cast(8, i64))
-  assert_close(path_sum(heston_many.0), eight_s0, tol, "heston_qe_paths_terminal at t = -0.0 must return s0 for every path")
+  _ = assert_close(path_sum(heston_qe_paths_terminal(key_from_seed(7i64), zero_horizon_template(), s0, cast(0.04, f32), cast(0.05, f32), cast(1.5, f32), cast(0.04, f32), cast(0.3, f32), cast(-0.5, f32), neg_z, cast(8, i64)).0), eight_s0, tol, "heston_qe_paths_terminal at t = -0.0 must return s0 for every path")
+  _ = assert_close(path_sum(gbm_path(key_from_seed(7i64), zero_horizon_template(), s0, cast(0.05, f32), cast(0.2, f32), neg_z)), eight_s0, tol, "gbm_path at t = -0.0 must return s0 at every step")
+  _ = assert_close(gbm_paths_antithetic_terminal_mean(key_from_seed(7i64), zero_horizon_template(), s0, cast(0.05, f32), cast(0.2, f32), neg_z), s0, tol, "gbm_paths_antithetic_terminal_mean at t = -0.0 must return s0")
+  _ = assert_close(heston_qe_terminal(key_from_seed(7i64), s0, cast(0.04, f32), cast(0.05, f32), cast(1.5, f32), cast(0.04, f32), cast(0.3, f32), cast(-0.5, f32), neg_z, cast(8, i64)).0, s0, tol, "heston_qe_terminal at t = -0.0 must return s0")
+  assert_close(exp(heston_qe_step(log(s0), cast(0.04, f32), cast(0.04, f32), cast(0.05, f32), cast(1.5, f32), cast(0.04, f32), cast(0.3, f32), cast(-0.5, f32), neg_z, cast(0.3, f32), cast(-0.2, f32), cast(0.4, f32)).0), s0, tol, "heston_qe_step at dt = -0.0 must be the identity step on log-spot")
 }

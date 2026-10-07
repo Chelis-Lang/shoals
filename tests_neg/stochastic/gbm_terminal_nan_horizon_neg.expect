@@ -1,4 +1,4 @@
-Shoals.Stochastic: the time horizon must be finite; a non-finite horizon makes the log drift and sigma * sqrt(t) non-finite, so every path value would be NaN
+Shoals.Stochastic: the time horizon must be finite; a non-finite horizon makes the log drift and sigma * sqrt(t) non-finite, so no path value would be usable
 Assumption: a non-finite time horizon names no path either. The two branches of
 checked_horizon carry DIFFERENT diagnostics on purpose, for the reason
 count_params_finite records one line above them: `gte(nan, 0.0)` is false, so a
@@ -7,9 +7,12 @@ wrong cause.
 
 `+inf` is refused on a measured ground rather than for tidiness. The log drift
 and `sigma * sqrt(t)` are then both `+inf`, so `drift + vol_sqrt_t * z` is
-`inf - inf` for every negative draw: measured on shoals@bba1a22 at n = 8,
-seed 7, gbm_terminal returned NaN for every path at t = +inf, exactly as it did
-at t = -1.
+`inf - inf` = NaN for every negative draw and `+inf` for every positive one.
+Measured on shoals@bba1a22 at s0 = 100, mu = 0.05, sigma = 0.2, n = 8, seed 7,
+gbm_terminal at t = +inf returned **3 NaN and 5 `+inf`** of 8 -- NOT NaN at
+every path. A negative horizon is the all-NaN case (8 of 8 at t = -1); `+inf`
+is not, which is why this branch's diagnostic does not name NaN. Either way no
+path value is usable, so the refusal is unchanged.
 
 Scope of this pair: all nine entry points route through the one
 checked_horizon, so these two files pin the non-finite DIAGNOSTICS, not

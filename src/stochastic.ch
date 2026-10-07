@@ -23,9 +23,12 @@ export (gbm_path, gbm_terminal, gbm_paths_antithetic_terminal_mean, merton_jump_
 -- exist. The provenance lives in the commit, the CHANGELOG, docs/src/
 -- stochastic.md, and the tests_neg/stochastic/ rationales.) Within this module the two
 -- `gte(rate, zero)` clauses are the only guards keying on a product's sign,
--- and with the horizon checked upstream the only remaining routes to a
--- `-0.0` rate are a zero horizon or a zero lambda, both of which have the
--- correct zero-jump answer.
+-- and in the nine guarded samplers below, where the horizon IS checked
+-- upstream, the only remaining routes to a `-0.0` rate are a zero horizon or
+-- a zero lambda, both of which have the correct zero-jump answer. The two
+-- exported `*_sampler_log_jump_moment` functions are NOT so guarded, so a
+-- negative horizon reaches their `-0.0` rate directly; measured, they return
+-- 0.0 there, which is the right zero-jump answer.
 --
 -- `-0.0` stays ADMITTED, deliberately: `gte(-0.0, 0.0)` is true, `sqrt(-0.0)`
 -- is `-0.0`, and the terminal value is s0 to within the log/exp round trip.
@@ -37,14 +40,18 @@ export (gbm_path, gbm_terminal, gbm_paths_antithetic_terminal_mean, merton_jump_
 -- false, so a NaN horizon would otherwise report the negative-horizon cause.
 -- `+inf` is refused on a measured ground and not for tidiness: the log drift
 -- and `sigma * sqrt(t)` are then both `+inf`, so `drift + vol_sqrt_t * z` is
--- `inf - inf` = NaN for every negative draw. The fixtures under
+-- `inf - inf` = NaN for every negative draw and `+inf` for every positive one.
+-- Measured at s0 = 100, mu = 0.05, sigma = 0.2, n = 8, seed 7 on the
+-- pre-guard tree: 3 NaN and 5 `+inf`. That is why this branch's diagnostic
+-- says "no path value would be usable" rather than naming NaN -- unlike a
+-- negative horizon, which really is NaN at every path. The fixtures under
 -- tests_neg/stochastic/ pin both diagnostics.
 def horizon_finite(t: f32) -> bool = eq(sub(t, t), cast(0.0, f32))
 -- The checked horizon, RETURNED rather than asserted, so that every caller has
 -- to consume the value. A `_ = check(t)` binding would be dead and could be
 -- eliminated before it reached the evaluated graph; threading the return value
 -- is what puts the guard in the dataflow of every sampler below.
-def checked_horizon(t: f32) -> f32 = if not(horizon_finite(t)) then fail("Shoals.Stochastic: the time horizon must be finite; a non-finite horizon makes the log drift and sigma * sqrt(t) non-finite, so every path value would be NaN") else if not(gte(t, cast(0.0, f32))) then fail("Shoals.Stochastic: the time horizon must be non-negative; sqrt of a negative horizon is NaN, so every path value would be NaN") else t
+def checked_horizon(t: f32) -> f32 = if not(horizon_finite(t)) then fail("Shoals.Stochastic: the time horizon must be finite; a non-finite horizon makes the log drift and sigma * sqrt(t) non-finite, so no path value would be usable") else if not(gte(t, cast(0.0, f32))) then fail("Shoals.Stochastic: the time horizon must be non-negative; sqrt of a negative horizon is NaN, so every path value would be NaN") else t
 def gbm_path[n](rng_key: key, template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
   z = normal_sample(rng_key, template, cast(0.0, f32), cast(1.0, f32))
   n_i = numel(copy(z))

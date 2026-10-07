@@ -385,7 +385,10 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   single ordering check would have blamed the wrong cause for a NaN horizon.
   `+inf` is refused on a measured ground: the log drift and `sigma * sqrt(t)`
   are then both `+inf`, so `drift + vol_sqrt_t * z` is `inf - inf` = NaN for
-  every negative draw, measured identical to the `t = -1` row.
+  every negative draw and `+inf` for every positive one. Measured at n = 8,
+  seed 7: **3 NaN and 5 `+inf`** of 8 -- NOT identical to the `t = -1` row,
+  which is NaN at all 8. The finiteness diagnostic therefore says no path value
+  would be usable rather than naming NaN.
 - *What stays admitted.* `t = 0` and `t = -0.0` are legitimate zero horizons
   and still return s0 at every one of the nine entry points. `-0.0` is
   precisely the value whose product let shoals#139 through the rate guard, and
@@ -393,11 +396,17 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   `tests/stochastic.ch` pins both as positive parity; a guard written
   `gt(t, 0.0)` passes every negative fixture and fails those two.
 - *Scope.* The guard is threaded as a returned value rather than asserted and
-  discarded, so it cannot be eliminated as a dead binding. `merton_jump_slots`,
+  discarded, so a dead-binding elimination cannot reach it. (Defensive: a
+  discarded `_ = checked_horizon(t)` was measured to still fire in the
+  evaluator lane, so threading is not demonstrably necessary there; it was not
+  tested in a lowered lane.) `merton_jump_slots`,
   `sto_kou_jump_slots`, and the exported `*_sampler_log_jump_moment` functions
-  are deliberately unchanged: with the horizon checked upstream, the only
-  remaining routes to a `-0.0` rate are a zero horizon or a zero lambda, and
-  both were measured to give the correct zero-jump answer. The two
+  are deliberately unchanged. In the nine guarded samplers, where the horizon
+  IS checked upstream, the only remaining routes to a `-0.0` rate are a zero
+  horizon or a zero lambda, and both were measured to give the correct
+  zero-jump answer. The two moment functions are not guarded, so a negative
+  horizon reaches their `-0.0` rate directly; measured, they return 0.0, which
+  is that same correct zero-jump answer. The two
   `gte(rate, zero)` clauses are the only guards in the module keying on a
   product's sign, and their existing fixtures (`lambda = -1, t = 1`) still
   report the rate diagnostic unchanged.
