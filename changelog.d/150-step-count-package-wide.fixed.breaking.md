@@ -1,0 +1,31 @@
+**BREAKING: `Shoals.HullWhite`, `Shoals.SabrPaths`, `Shoals.LiborMarketModel`
+and `Shoals.Trees` refuse a step count below 1** (shoals#150), on the same
+reasoning as the two `Shoals.Stochastic` entry points above. With
+`n_steps <= 0` the step range was empty, so `hw1f_path` and `hw2f_path`
+returned `r0` and `(x0, y0)`, both SABR samplers returned `f0`, and `lmm_path`
+returned the initial forward curve -- at every path, for a horizon over which
+the process really did evolve.
+
+`Shoals.Trees` failed harder and is the reason the fix is package-wide rather
+than Heston-only. With no layer to roll back, every pricer returned a flat
+`0.0` regardless of moneyness -- not the intrinsic value. Measured at
+s0 = 100, r = 0.05, q = 0, sigma = 0.2, t = 1.0: a K = 90 call priced at
+`0.0` against 16.69197 at `n_steps = 64` and an intrinsic of 10, and a K = 110
+American put priced at `0.0` against 11.964398. A negative count already
+aborted there, but with `index 0 out of bounds for list of len 0`, which names
+an index rather than the violated precondition; the guard replaces that leaked
+error with a diagnostic naming the step count.
+
+Each module carries its own check so its diagnostic names the module a caller
+invoked, following `ind_require_period`'s precedent in `Shoals.Indicators`.
+
+In `Shoals.Trees` the guard sits where `n_steps` enters the computation rather
+than at each pricer's entry, because every pricer short-circuits a sub-floor
+`sigma` to a deterministic forward price that takes no step count and returned
+14.389351 at `n_steps` 0, 64 and -8 alike. A sub-floor volatility therefore
+still prices at any step count, and `tests/step_count_parity.ch` pins that so
+a later tightening cannot quietly take it away.
+
+`Shoals.Lsm.lsm_american_put` takes a step count and is deliberately
+unchanged: it already fails loudly at `n_steps <= 0` and returns no plausible
+wrong number.
