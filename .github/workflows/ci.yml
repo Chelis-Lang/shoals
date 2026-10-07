@@ -207,7 +207,7 @@ jobs:
       - name: Restore compiled-package cache
         uses: actions/cache@v4
         with:
-          path: ~/.chelis/reef/.cache
+          path: ~/.cache/chelis
           key: book-examples-${{ env.CHELIS_VERSION }}-${{ hashFiles('reef.toml', 'src/**', 'properties/**', 'references/**', 'demos/**') }}
           restore-keys: book-examples-${{ env.CHELIS_VERSION }}-
       - name: Check book examples against the source

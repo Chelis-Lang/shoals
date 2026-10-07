@@ -310,6 +310,7 @@ class Checker:
                        "programs": 0, "compiled": 0, "values": 0, "outputs": 0, "skipped": 0,
                        "evals": 0, "isolated": 0}
         self.serial = 0
+        self.seconds = 0.0
 
     def run(self, args: list[str]) -> subprocess.CompletedProcess[str]:
         if args and args[0] in ("eval", "check"):
@@ -567,6 +568,7 @@ def main() -> int:
     r = subprocess.run([chelis, "eval", "--file", str(warm.relative_to(REPO))], cwd=REPO, capture_output=True, text=True)
     if r.returncode != 0:
         sys.exit(f"check_book_examples: warm-up evaluation failed\n{r.stdout}{r.stderr}")
+    print(f"warm-up: {time.monotonic() - started:.0f}s")
     names, headers = module_exports()
     dep_headers = dependency_headers()
 
@@ -580,7 +582,9 @@ def main() -> int:
         work = WORK / page.stem
         work.mkdir()
         checker = Checker(chelis, names, headers, dep_headers, work)
+        began = time.monotonic()
         checker.check_page(page)
+        checker.seconds = time.monotonic() - began
         return checker
 
     try:
@@ -595,6 +599,8 @@ def main() -> int:
     for c in done:
         for note in c.notes:
             print(note)
+    slow = sorted(((c.seconds, p.name) for c, p in zip(done, pages)), reverse=True)[:3]
+    print("slowest pages: " + ", ".join(f"{name} {s:.0f}s" for s, name in slow))
     if not counts or counts["blocks"] == 0:
         sys.exit(f"check_book_examples: no chelis examples found under {BOOK.relative_to(REPO)}")
     if counts["skipped"]:
