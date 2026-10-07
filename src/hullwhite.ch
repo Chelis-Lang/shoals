@@ -35,17 +35,44 @@ def hw1f_step(r: f32, a: f32, theta_bar: f32, sigma: f32, dt: f32, z: f32) -> f3
   diffusion = mul(sigma, mul(sqrt(dt), z))
   add(r, add(drift, diffusion))
 }
+-- The step count is a precondition this module did not check. With
+-- `n_steps <= 0` the step range is empty, so every per-path fold returns its
+-- initial state and the sampler returned that state unchanged for a horizon over
+-- which the process really did evolve. Measured at t = 1.0, n = 8, seed 7:
+-- `hw1f_path` at r0 = 0.03 summed its eight terminal rates to 0.24 -- r0 at
+-- every path -- for both `n_steps = 0` and `n_steps = -8`, against 0.26792958
+-- at `n_steps = 64`; `hw2f_path` at x0 = 0.02, y0 = 0.01 summed its first leg
+-- to 0.16 for `n_steps = 0` against 0.12615834 at `n_steps = 64`.
+--
+-- A finiteness check on the derived `dt = t / n_steps` would NOT catch this:
+-- `dt` is `+inf` at `n_steps = 0`, but at `n_steps <= 0` the step range is
+-- empty and `dt` has no consumer that ever runs, so nothing surfaces it.
+-- Guard the input, not the derived value.
+--
+-- `n_steps = 0` is refused rather than documented as the identity. It is a
+-- resolution parameter, not a modelled quantity: `n_steps = 1` is a crude
+-- discretisation that still draws, while `n_steps = 0` draws nothing, so zero
+-- resolution is unspecified rather than degenerate. A zero HORIZON is the
+-- separate case where the initial state genuinely is the right answer, and
+-- refusing `n_steps < 1` leaves it reachable at any valid step count.
+--
+-- Each module carries its own copy of this check so its diagnostic can name
+-- the module a caller actually invoked, following ind_require_period's
+-- precedent in Shoals.Indicators. The shared rule is documented once in
+-- docs/src/; the duplication is the message text, not the decision.
+def hw_checked_step_count(n_steps: i64) -> i64 = if lt(n_steps, cast(1, i64)) then fail(string_concat("Shoals.HullWhite: the step count must be at least 1, got ", string_concat(to_string(n_steps), "; with no steps the evolution loop never runs, so the sampler would return its initial state -- r0, or (x0, y0) for the two-factor path -- unchanged for a horizon it did not simulate"))) else n_steps
 def hw1f_path[n](rng_key: key, paths_template: tensor[n, f32], r0: f32, a: f32, theta_bar: f32, sigma: f32, t: f32, n_steps: i64) -> tensor[n, f32] = {
   n_paths = numel(copy(paths_template))
-  total = mul(n_paths, n_steps)
+  n_ok = hw_checked_step_count(n_steps)
+  total = mul(n_paths, n_ok)
   big_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), total)))
   z_t = normal_sample(rng_key, big_template, cast(0.0, f32), cast(1.0, f32))
   z_l = to_list(z_t)
-  dt = div(t, cast(n_steps, f32))
+  dt = div(t, cast(n_ok, f32))
   path_idxs = range(cast(0, i64), n_paths)
   terminal = to_tensor(map(fn (p: i64) -> {
-    base = mul(p, n_steps)
-    step_idxs = range(cast(0, i64), n_steps)
+    base = mul(p, n_ok)
+    step_idxs = range(cast(0, i64), n_ok)
     fold(fn (r: f32, i: i64) -> {
       k = add(base, i)
       z = index(z_l, k)
@@ -79,17 +106,18 @@ def hw2f_step(x: f32, y: f32, a: f32, b: f32, sigma1: f32, sigma2: f32, rho: f32
 def hw2f_path[n](rng_key: key, paths_template: tensor[n, f32], x0: f32, y0: f32, a: f32, b: f32, sigma1: f32, sigma2: f32, rho: f32, t: f32, n_steps: i64) -> (tensor[n, f32], tensor[n, f32]) = {
   (rng_draw_0, rng_draw_1) = split_key(rng_key)
   n_paths = numel(copy(paths_template))
-  total = mul(n_paths, n_steps)
+  n_ok = hw_checked_step_count(n_steps)
+  total = mul(n_paths, n_ok)
   big_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), total)))
   z1_t = normal_sample(rng_draw_0, copy(big_template), cast(0.0, f32), cast(1.0, f32))
   z2_t = normal_sample(rng_draw_1, big_template, cast(0.0, f32), cast(1.0, f32))
   z1_l = to_list(z1_t)
   z2_l = to_list(z2_t)
-  dt = div(t, cast(n_steps, f32))
+  dt = div(t, cast(n_ok, f32))
   path_idxs = range(cast(0, i64), n_paths)
   results = map(fn (p: i64) -> {
-    base = mul(p, n_steps)
-    step_idxs = range(cast(0, i64), n_steps)
+    base = mul(p, n_ok)
+    step_idxs = range(cast(0, i64), n_ok)
     fold(fn (state: (f32, f32), i: i64) -> {
       x = state.0
       y = state.1

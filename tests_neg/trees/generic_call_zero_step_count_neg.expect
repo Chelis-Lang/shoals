@@ -1,0 +1,27 @@
+Shoals.Trees: the step count must be at least 1, got 0; with no steps the backward induction has no layer to roll back, so the pricer would return 0.0 regardless of moneyness
+Assumption: a step count is a RESOLUTION parameter, and zero resolution is
+unspecified rather than degenerate. In this module the consequence is sharper
+than in the path samplers: the returned value is not the initial state but a
+flat 0.0, which is not the price of anything. A deep in-the-money option
+quoted at exactly zero with no diagnostic is a wrong answer dressed as an
+answer.
+
+Measured on the unguarded tree at s0 = 100, r = 0.05, q = 0, sigma = 0.2,
+t = 1.0: `n_steps = 0` returned 0.0 while `n_steps = 64` returned 4.764277.
+
+This entry point takes `n_steps` directly and has no sigma branch, so it
+carries the check at its own entry rather than inheriting a caller's. It is
+the site the eight European pricers delegate to, which is why a deletion from
+any one of those eight is still refused here -- and why those eight have no
+fixture of their own. The four pricers that inline their own backward
+induction do, beside this file.
+
+The guard sits where `n_steps` ENTERS the computation, inside each pricer's
+stochastic branch, and not at the pricer's entry. That placement is measured:
+every pricer short-circuits a sigma below tr_sigma_floor() to
+tr_deterministic_call/put, which takes no step count and whose answer is
+therefore independent of it. Measured at sigma = 1e-9, s0 = 100, K = 90,
+t = 1.0: `tr_crr_european_call` returned 14.389351 at `n_steps` 0, 64 and -8
+alike. An entry-level guard would refuse correct answers to validate a
+parameter that path never reads, so tests/ pins the sub-floor path at
+`n_steps = 0` from the other side.

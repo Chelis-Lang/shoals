@@ -106,6 +106,17 @@ def checked_horizon(t: f32) -> f32 = if not(horizon_finite(t)) then fail("Shoals
 -- Returned rather than asserted, for checked_horizon's reason: every use of
 -- the step count consumes the checked value, so the guard is in the dataflow
 -- rather than in a binding that could be eliminated before it is evaluated.
+--
+-- That is a DEFENSIVE choice and NOT a demonstrated necessity, on the same
+-- measured footing as checked_horizon's. A mutant that discards the result
+-- (`_ = checked_step_count(n_steps)` with raw `n_steps` downstream) was run
+-- against all four step-count fixtures and the positive case and SURVIVED all
+-- five: the guard still fires in the evaluator lane, which is the lane every
+-- test here runs in. No gate stage lowers these samplers, so the elimination
+-- hazard is untested rather than refuted. Threading costs nothing and does not
+-- depend on which lane evaluates the binding, so it stays -- but no test in
+-- this repository distinguishes the two forms, and a reader should not infer
+-- from this comment that one does.
 def checked_step_count(n_steps: i64) -> i64 = if lt(n_steps, cast(1, i64)) then fail(string_concat("Shoals.Stochastic: the step count must be at least 1, got ", string_concat(to_string(n_steps), "; with no steps the evolution loop never runs, so the sampler would return s0 and v0 unchanged for a horizon it did not simulate"))) else n_steps
 def gbm_path[n](rng_key: key, template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
   z = normal_sample(rng_key, template, cast(0.0, f32), cast(1.0, f32))

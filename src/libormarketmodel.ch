@@ -44,8 +44,39 @@ def lmm_step[k](forwards: tensor[k, f32], taus: tensor[k, f32], sigmas: tensor[k
   sqrt_dt = sqrt(dt)
   lmm_step_with_chol(forwards, tau_l, sig_l, corr_flat_l, copy(chol), dt, normals, k_dim, sqrt_dt)
 }
+-- The step count is a precondition this module did not check. With
+-- `n_steps <= 0` lmm_evolve's step range is empty, so its fold returns the
+-- initial forward curve and lmm_path returned `forwards0` unchanged for a
+-- horizon over which the curve really did evolve. Measured at a flat 3/3.5/4
+-- percent three-tenor curve, t = 1.0, n = 8, seed 7: `n_steps = 0` and
+-- `n_steps = -8` both summed the eight terminal draws of the first forward to
+-- 0.24 -- 0.03 at every path -- against 0.24871594 at `n_steps = 16`.
+--
+-- The guard goes at lmm_path's entry rather than inside lmm_evolve even
+-- though lmm_evolve owns the empty fold, because lmm_evolve also takes `dt`
+-- and `sqrt_dt` precomputed by its caller: checking there would refuse the
+-- same inputs one frame later while leaving lmm_path's own `dt` division
+-- unguarded, and lmm_evolve is exported, so it is guarded too.
+--
+-- A finiteness check on the derived `dt = t / n_steps` would NOT catch this:
+-- `dt` is `+inf` at `n_steps = 0`, but at `n_steps <= 0` the step range is
+-- empty and `dt` has no consumer that ever runs, so nothing surfaces it.
+-- Guard the input, not the derived value.
+--
+-- `n_steps = 0` is refused rather than documented as the identity. It is a
+-- resolution parameter, not a modelled quantity: `n_steps = 1` is a crude
+-- discretisation that still draws, while `n_steps = 0` draws nothing, so zero
+-- resolution is unspecified rather than degenerate. A zero HORIZON is the
+-- separate case where the initial state genuinely is the right answer, and
+-- refusing `n_steps < 1` leaves it reachable at any valid step count.
+--
+-- Each module carries its own copy of this check so its diagnostic can name
+-- the module a caller actually invoked, following ind_require_period's
+-- precedent in Shoals.Indicators. The shared rule is documented once in
+-- docs/src/; the duplication is the message text, not the decision.
+def lmm_checked_step_count(n_steps: i64) -> i64 = if lt(n_steps, cast(1, i64)) then fail(string_concat("Shoals.LiborMarketModel: the step count must be at least 1, got ", string_concat(to_string(n_steps), "; with no steps the evolution loop never runs, so the sampler would return the initial forward curve unchanged for a horizon it did not simulate"))) else n_steps
 def lmm_evolve[k](rng_key: key, forwards: tensor[k, f32], tau_l: List[f32], sig_l: List[f32], corr_flat_l: List[f32], chol: &tensor[k, k, f32], dt: f32, n_steps: i64, k_dim: i64, sqrt_dt: f32) -> tensor[k, f32] = {
-  step_idxs = range(cast(0, i64), n_steps)
+  step_idxs = range(cast(0, i64), lmm_checked_step_count(n_steps))
   out = fold(fn (state: (key, tensor[k, f32]), s: i64) -> {
     (draw_key, next_key) = split_key(state.0)
     template = scale_vec(copy(state.1), cast(0.0, f32))
@@ -57,7 +88,8 @@ def lmm_evolve[k](rng_key: key, forwards: tensor[k, f32], tau_l: List[f32], sig_
 }
 def lmm_path[k, n](rng_key: key, paths_template: tensor[n, f32], forwards0: tensor[k, f32], taus: tensor[k, f32], sigmas: tensor[k, f32], corr: tensor[k, k, f32], t: f32, n_steps: i64, forward_idx: i64) -> tensor[n, f32] = {
   k_dim = len(to_list(copy(forwards0)))
-  dt = div(t, cast(n_steps, f32))
+  n_ok = lmm_checked_step_count(n_steps)
+  dt = div(t, cast(n_ok, f32))
   sqrt_dt = sqrt(dt)
   chol = cholesky_n(copy(corr))
   tau_l = to_list(copy(taus))
@@ -68,7 +100,7 @@ def lmm_path[k, n](rng_key: key, paths_template: tensor[n, f32], forwards0: tens
   result = fold(fn (state: (key, List[f32]), placeholder: f32) -> {
     (path_key, next_key) = split_key(state.0)
     f0 = copy(forwards0)
-    terminal = lmm_evolve(path_key, f0, tau_l, sig_l, corr_flat_l, copy(chol), dt, n_steps, k_dim, sqrt_dt)
+    terminal = lmm_evolve(path_key, f0, tau_l, sig_l, corr_flat_l, copy(chol), dt, n_ok, k_dim, sqrt_dt)
     (next_key, append(state.1, index(to_list(terminal), forward_idx)))
   }, (rng_key, []), pl)
   to_tensor(result.1)
