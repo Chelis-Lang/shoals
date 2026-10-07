@@ -161,6 +161,6 @@ The independent amount reduces exposure only in that third case. The
 `_path` form applies the same rule to every entry:
 
 ```chelis
-csa_collateralized_exposure_path(to_tensor([cast(-3.0, f32), cast(1.5, f32), cast(2.3, f32), cast(10.0, f32)]), cast(2.0, f32), cast(0.5, f32), cast(1.0, f32), cast(0.02, f32))
+collateralized = csa_collateralized_exposure_path(to_tensor([cast(-3.0, f32), cast(1.5, f32), cast(2.3, f32), cast(10.0, f32)]), cast(2.0, f32), cast(0.5, f32), cast(1.0, f32), cast(0.02, f32))
 -- [0.0, 1.5, 2.3, 1.1599998]
 ```

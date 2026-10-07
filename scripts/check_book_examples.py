@@ -13,7 +13,9 @@ blocks come in three shapes, and each is checked:
   Each block is evaluated with `chelis eval --file` in a generated file that
   imports the names the block uses and prepends the earlier statements on the
   same page that define names the block reads (a fragment may continue its
-  page). The block must evaluate without error. A trailing `-- N` comment
+  page). Every statement must be a binding or a `def`: a bare top-level
+  expression does not parse in Chelis and fails the check. The block must
+  evaluate without error. A trailing `-- N` comment
   (also `-- x == N`, `-- x ~ N` and `-- [a, b, ...]`) is the value shown to
   the reader, and the evaluated value must contain those numbers: to the
   digits shown for `~`, and to the last digit shown (half a unit) otherwise.
@@ -367,9 +369,12 @@ class Checker:
                 if st.binds:
                     targets.append((st.binds, st))
             else:
-                name = f"example_value_{i}"
-                body.append(f"{name} = {st.text}")
-                targets.append((name, st))
+                # Chelis does not accept an expression on its own at the top
+                # level ("expected Eq"), so a reader who copies it gets a
+                # parse error: the book must bind it to a name
+                self.failures.append(
+                    f"{block.page}:{st.line}: bare top-level expression; bind it to a name "
+                    f"(`name = ...`) so the example parses\n  {st.text.splitlines()[0]}")
         program = "\n".join(body)
         defined = {s.binds for s in needed + stmts if s.binds}
         defined |= {m.group(1) for m in re.finditer(r"(?m)^def\s+(\w+)", program)}
