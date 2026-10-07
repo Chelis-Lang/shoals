@@ -1,8 +1,0 @@
-[book]
-title = "Shoals"
-language = "en"
-authors = ["The Shoals authors"]
-src = "src"
-
-[output.html]
-git-repository-url = "https://github.com/Chelis-Lang/shoals"

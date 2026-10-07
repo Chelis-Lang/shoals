@@ -34,7 +34,7 @@ export (EmaSeed, SeedFirstValue, SeedSma, Alpha, AlphaSpan, AlphaWilder, Smoothi
 -- they are limitations rather than conventions: `DdofSample` with n = 1
 -- divides by zero, a negative Bollinger `k` swaps the bands, and a
 -- non-finite input is position-dependent in the rolling min/max fold.
--- Inputs are assumed finite. See docs/src/indicators.md.
+-- Inputs are assumed finite. See docs/book/src/indicators.md.
 --
 -- Keeping `None` to one meaning is what lets the internal representation
 -- carry a leading warm-up count rather than arbitrary holes.

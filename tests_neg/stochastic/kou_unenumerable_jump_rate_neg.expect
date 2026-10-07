@@ -37,4 +37,4 @@ jump-diffusion calibration -- a 2000-path mean is 0.0927 against an advertised
 105.13. That is the compensated model at zeta = 10, not a defect of the
 enumeration, and it is identical before and after shoals#132 because the old
 drift subtracted the same lambda_jump * t * zeta. The caution that belongs to
-it is the E[S_t^2] one in docs/src/stochastic.md, not this cap.
+it is the E[S_t^2] one in docs/book/src/stochastic.md, not this cap.

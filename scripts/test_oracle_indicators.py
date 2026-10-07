@@ -116,7 +116,7 @@ class AnalyticIdentities(unittest.TestCase):
 
 
 class WarmupLengths(unittest.TestCase):
-    """The lengths docs/src/indicators.md and §2.15.4 publish, across many n
+    """The lengths docs/book/src/indicators.md and §2.15.4 publish, across many n
     rather than the single period the fixture happens to use."""
 
     def setUp(self):

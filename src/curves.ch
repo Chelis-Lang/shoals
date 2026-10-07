@@ -46,7 +46,7 @@ def custom_curve(label: string) -> CurveKind = Custom { label }
 -- open question in this module -- it simply was not enforced on the entry
 -- points that take the times directly. Reject rather than re-sort: re-sorting
 -- would answer a different question from the one the caller asked, and
--- `docs/src/curves.md` already records that decision for the bootstrap ("It
+-- `docs/book/src/curves.md` already records that decision for the bootstrap ("It
 -- never snaps a schedule or re-sorts pillars").
 --
 -- Index of the first pillar time that does not exceed its predecessor, or -1
@@ -518,7 +518,7 @@ def cur_full_jacobian_rows(instruments: List[Instrument], m_len: i64) -> List[Li
 -- arithmetic can still produce one that is not: a zero-coupon at a subnormal
 -- tenor gives `neg(div(1.0, mul(t, p)))` = -inf, and `cur_dot_l_j` then turns
 -- that into NaN for a later row. That is unchanged from `130d235` and is the
--- numerical NaN `docs/src/curves.md` distinguishes from this structural one;
+-- numerical NaN `docs/book/src/curves.md` distinguishes from this structural one;
 -- the deleted `eq(r_new, r_new)` branches never guarded it, only the solved
 -- rate.
 def bootstrap_grad_full_jacobian[m](paths_template: &tensor[m, f32], instruments: List[Instrument]) -> tensor[m, m, f32] = {
