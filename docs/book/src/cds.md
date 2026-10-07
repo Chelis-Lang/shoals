@@ -37,8 +37,8 @@ curve = hazard_curve_from_pillars(
   to_tensor([cast(1.0, f32), cast(3.0, f32), cast(5.0, f32)]),
   to_tensor([cast(0.01, f32), cast(0.02, f32), cast(0.03, f32)])
 )
-q4 = cds_survival_from_hazards(curve, cast(4.0, f32))  // 0.9231163 = exp(-(0.01 + 0.02 * 2 + 0.03))
-q7 = cds_survival_from_hazards(curve, cast(7.0, f32))  // 0.8436648
+q4 = cds_survival_from_hazards(curve, cast(4.0, f32))  -- 0.9231163 = exp(-(0.01 + 0.02 * 2 + 0.03))
+q7 = cds_survival_from_hazards(curve, cast(7.0, f32))  -- 0.8436648
 ```
 
 ## Valuation
@@ -66,9 +66,9 @@ premium leg is silently 0; a recovery above 1 makes the protection leg
 negative.
 
 ```chelis
-prem = cds_premium_leg_value(cast(0.01, f32), cast(5.0, f32), cast(4, i64), curve, cast(0.03, f32))  // 0.044187766
-prot = cds_protection_leg_value(cast(5.0, f32), cast(0.4, f32), curve, cast(0.03, f32))            // 0.057317026
-pv = cds_pv(cast(0.01, f32), cast(5.0, f32), cast(4, i64), cast(0.4, f32), curve, cast(0.03, f32))  // 0.01312926
+prem = cds_premium_leg_value(cast(0.01, f32), cast(5.0, f32), cast(4, i64), curve, cast(0.03, f32))  -- 0.044187766
+prot = cds_protection_leg_value(cast(5.0, f32), cast(0.4, f32), curve, cast(0.03, f32))            -- 0.057317026
+pv = cds_pv(cast(0.01, f32), cast(5.0, f32), cast(4, i64), cast(0.4, f32), curve, cast(0.03, f32))  -- 0.01312926
 ```
 
 ## Bootstrapping from par spreads
@@ -98,7 +98,7 @@ boot = cds_bootstrap_hazards(
   to_tensor([cast(1.0, f32), cast(3.0, f32), cast(5.0, f32)]),
   cast(0.4, f32), cast(0.03, f32), cast(4, i64)
 )
-// hazards [0.009949725, 0.0201197, 0.025517497]
+-- hazards [0.009949725, 0.0201197, 0.025517497]
 ```
 
 The module generates no calendar payment schedule, no IMM dates, and no

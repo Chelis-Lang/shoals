@@ -30,7 +30,7 @@ and value back. For example:
 ```chelis
 d = date(cast(2025, i64), cast(6, i64), cast(15, i64))
 q = make_quote(Bid, cast(100.5, f32), d)
-v = quote_value(q)  // v == 100.5
+v = quote_value(q)  -- v == 100.5
 ```
 
 ## Bar
@@ -52,7 +52,7 @@ constructs one; the `md_bar_*` accessors read each field. For example:
 
 ```chelis
 b = make_bar(d, cast(100.0, f32), cast(101.0, f32), cast(99.5, f32), cast(100.5, f32), cast(1000.0, f32))
-h = md_bar_high(b)  // h == 101.0
+h = md_bar_high(b)  -- h == 101.0
 ```
 
 ## Snapshot
@@ -78,5 +78,5 @@ s = make_snapshot(d, [("SPX", make_quote(Mid, cast(5000.0, f32), d))])
 found = match snapshot_lookup(s, "SPX") with {
   | Some(_) => true
   | None => false
-}  // found == true
+}  -- found == true
 ```

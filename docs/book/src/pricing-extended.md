@@ -36,7 +36,7 @@ factor:
 
 ```chelis
 px = bachelier_call(cast(100.0, f32), cast(100.0, f32), cast(10.0, f32), cast(1.0, f32), cast(1.0, f32))
-// px == 10.0 * 0.3989423
+-- px == 10.0 * 0.3989423
 ```
 
 Bachelier call and put obey parity `c - p == df * (f - k)`.
@@ -59,7 +59,7 @@ the Black call equals the Black-Scholes call. For example:
 f = mul(cast(100.0, f32), exp(mul(cast(0.05, f32), cast(1.0, f32))))
 df = exp(neg(mul(cast(0.05, f32), cast(1.0, f32))))
 black = black_call(f, cast(100.0, f32), cast(0.2, f32), cast(1.0, f32), df)
-// black equals bs_call_scalar(100, 100, 0.05, 0.2, 1.0)
+-- black equals bs_call_scalar(100, 100, 0.05, 0.2, 1.0)
 ```
 
 Black call and put obey parity `c - p == df * (f - k)`.
@@ -77,7 +77,7 @@ reduces to Black-Scholes. For example:
 
 ```chelis
 gk = garman_kohlhagen_call(cast(1.25, f32), cast(1.3, f32), cast(0.04, f32), cast(0.0, f32), cast(0.1, f32), cast(0.5, f32))
-// gk equals bs_call_scalar(1.25, 1.3, 0.04, 0.1, 0.5)
+-- gk equals bs_call_scalar(1.25, 1.3, 0.04, 0.1, 0.5)
 ```
 
 The pair obeys parity
@@ -102,7 +102,7 @@ correlation one) the option is worthless. For example:
 
 ```chelis
 px = margrabe_exchange_call(cast(100.0, f32), cast(100.0, f32), cast(0.2, f32), cast(0.2, f32), cast(1.0, f32), cast(1.0, f32))
-// px == 0.0
+-- px == 0.0
 ```
 ## Exchange option with yields
 

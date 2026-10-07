@@ -41,9 +41,9 @@ observed = to_tensor([cast(1.0, f32), cast(2.0, f32), cast(3.0, f32)])
 predicted = to_tensor([cast(1.1, f32), cast(2.2, f32), cast(2.7, f32)])
 weights = to_tensor([cast(1.0, f32), cast(1.0, f32), cast(1.0, f32)])
 res = weighted_squared_residuals(observed, predicted, weights)
-// [0.010000004, 0.040000018, 0.089999974]
+-- [0.010000004, 0.040000018, 0.089999974]
 v = vega_weighted_squared_residuals(observed, predicted, to_tensor([cast(0.0, f32), cast(0.001, f32), cast(2.0, f32)]))
-// [0.0, 40000.01, 0.022499993]
+-- [0.0, 40000.01, 0.022499993]
 ```
 
 ## Loss
@@ -69,7 +69,7 @@ zero, the function uses a zero step before clamping. For example:
 
 ```chelis
 step = lm_bounded_step_scalar(cast(1.0, f32), cast(0.0, f32), cast(0.001, f32), cast(0.5, f32), cast(0.0, f32), cast(1.0, f32))
-// step == 0.5 (no residual, no move)
+-- step == 0.5 (no residual, no move)
 ```
 
 A proposed step that overshoots a bound is clamped to that bound, and a

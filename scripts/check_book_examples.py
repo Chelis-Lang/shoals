@@ -9,12 +9,14 @@ blocks come in three shapes, and each is checked:
   `references/`, `demos/`, exported or not) or an export of a dependency at
   the version reef.toml pins, whitespace normalized. A name found in neither
   fails.
-- Fragments: statements such as `px = bs_call_scalar(...)  // 10.450583`.
+- Fragments: statements such as `px = bs_call_scalar(...)  -- 10.450583`.
   Each block is evaluated with `chelis eval --file` in a generated file that
   imports the names the block uses and prepends the earlier statements on the
   same page that define names the block reads (a fragment may continue its
-  page). The block must evaluate without error. A trailing `// N` comment
-  (also `// x == N`, `// x ~ N` and `// [a, b, ...]`) is the value shown to
+  page). Every statement must be a binding or a `def`: a bare top-level
+  expression does not parse in Chelis and fails the check. The block must
+  evaluate without error. A trailing `-- N` comment
+  (also `-- x == N`, `-- x ~ N` and `-- [a, b, ...]`) is the value shown to
   the reader, and the evaluated value must contain those numbers: to the
   digits shown for `~`, and to the last digit shown (half a unit) otherwise.
   Comments that start with words are explanations and are not compared.
@@ -60,7 +62,7 @@ KEYWORDS = {
 
 @dataclass
 class Stmt:
-    text: str  # Chelis text with `//` comments removed
+    text: str  # Chelis text with `--` comments removed
     comment: str  # trailing comment text, if any
     binds: str | None  # name bound at top level, if any
     line: int
@@ -109,7 +111,7 @@ def split_comment(line: str) -> tuple[str, str]:
     for i, ch in enumerate(line):
         if ch == '"':
             in_str = not in_str
-        elif not in_str and line.startswith("//", i):
+        elif not in_str and line.startswith("--", i):
             return line[:i].rstrip(), line[i + 2:].strip()
     return line.rstrip(), ""
 
@@ -134,7 +136,7 @@ def statements(block: Block) -> list[Stmt]:
             comments.append(comment)
         depth += sum(code.count(c) for c in "([{") - sum(code.count(c) for c in ")]}")
         nxt = block.lines[n + 1] if n + 1 < len(block.lines) else ""
-        continues = depth > 0 or nxt.startswith(("  ", "|")) and not nxt.startswith("  //")
+        continues = depth > 0 or nxt.startswith(("  ", "|")) and not nxt.startswith("  --")
         if not continues:
             text = "\n".join(buf)
             m = re.match(r"^([a-z_][A-Za-z0-9_]*)\s*=(?!=)", text)
@@ -367,9 +369,12 @@ class Checker:
                 if st.binds:
                     targets.append((st.binds, st))
             else:
-                name = f"example_value_{i}"
-                body.append(f"{name} = {st.text}")
-                targets.append((name, st))
+                # Chelis does not accept an expression on its own at the top
+                # level ("expected Eq"), so a reader who copies it gets a
+                # parse error: the book must bind it to a name
+                self.failures.append(
+                    f"{block.page}:{st.line}: bare top-level expression; bind it to a name "
+                    f"(`name = ...`) so the example parses\n  {st.text.splitlines()[0]}")
         program = "\n".join(body)
         defined = {s.binds for s in needed + stmts if s.binds}
         defined |= {m.group(1) for m in re.finditer(r"(?m)^def\s+(\w+)", program)}
@@ -407,7 +412,7 @@ class Checker:
             got = values.get(name)
             if got is None or not matches(numbers(got), *exp):
                 self.failures.append(
-                    f"{block.page}:{st.line}: `{name}` evaluates to {got}, the book shows `// {st.comment}`")
+                    f"{block.page}:{st.line}: `{name}` evaluates to {got}, the book shows `-- {st.comment}`")
 
     def evaluate(self, block: Block, src: str, program: bool) -> dict[str, str] | None:
         if program:

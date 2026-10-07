@@ -12,7 +12,7 @@ business-day rules from `Std.Datetime.Business`.
 ## Calendar tenors
 
 ```chelis
-type Tenor    // opaque: a positive Std.Datetime.Period
+type Tenor    -- opaque: a positive Std.Datetime.Period
 
 def tenor_days(n: i64) -> Tenor
 def tenor_weeks(n: i64) -> Tenor
@@ -42,12 +42,12 @@ followed by D, W, M or Y*.
 For example:
 
 ```chelis
-tenor_apply(tenor_months(3i64), date(2025i64, 6i64, 15i64), RejectInvalidDay)
-// 2025-09-15, 92 days later
-tenor_apply(tenor_months(1i64), date(2025i64, 1i64, 31i64), ClampToMonthEnd)
-// 2025-02-28
-tenor_apply(tenor_years(1i64), date(2024i64, 2i64, 29i64), ClampToMonthEnd)
-// 2025-02-28
+in_three_months = tenor_apply(tenor_months(3i64), date(2025i64, 6i64, 15i64), RejectInvalidDay)
+-- 2025-09-15, 92 days later
+end_of_february = tenor_apply(tenor_months(1i64), date(2025i64, 1i64, 31i64), ClampToMonthEnd)
+-- 2025-02-28
+leap_anniversary = tenor_apply(tenor_years(1i64), date(2024i64, 2i64, 29i64), ClampToMonthEnd)
+-- 2025-02-28
 ```
 
 ## Business-day tenors and spot lags
@@ -56,9 +56,9 @@ tenor_apply(tenor_years(1i64), date(2024i64, 2i64, 29i64), ClampToMonthEnd)
 type BusinessDayTenor =
   | BusinessDayTenor { lag: i64, length: i64 }
 
-def overnight() -> BusinessDayTenor            // lag 0, length 1
-def tomorrow_next() -> BusinessDayTenor        // lag 1, length 1
-def spot_next(spot_days: i64) -> BusinessDayTenor  // lag spot_days, length 1
+def overnight() -> BusinessDayTenor            -- lag 0, length 1
+def tomorrow_next() -> BusinessDayTenor        -- lag 1, length 1
+def spot_next(spot_days: i64) -> BusinessDayTenor  -- lag spot_days, length 1
 def business_day_tenor_dates(t: BusinessDayTenor, trade: Date, calendar: BusinessCalendar, start: NonBusinessStart) -> (Date, Date)
 
 type SpotLag
@@ -136,12 +136,12 @@ silently dropping one, or if a date lies outside the calendar's horizon.
 For example:
 
 ```chelis
-schedule_unadjusted(date(2025i64, 1i64, 31i64), date(2025i64, 5i64, 31i64), tenor_months(1i64), NoStub, false, ClampToMonthEnd)
-// 31 Jan, 28 Feb, 31 Mar, 30 Apr, 31 May
+monthly_dates = schedule_unadjusted(date(2025i64, 1i64, 31i64), date(2025i64, 5i64, 31i64), tenor_months(1i64), NoStub, false, ClampToMonthEnd)
+-- 31 Jan, 28 Feb, 31 Mar, 30 Apr, 31 May
 
-schedule_unadjusted(date(2025i64, 1i64, 15i64), date(2025i64, 12i64, 31i64), tenor_months(3i64), ShortInitial, false, ClampToMonthEnd)
-// 15 Jan, then 31 Mar, 30 Jun, 30 Sep, 31 Dec anchored at the end
+long_stub_dates = schedule_unadjusted(date(2025i64, 1i64, 15i64), date(2025i64, 12i64, 31i64), tenor_months(3i64), ShortInitial, false, ClampToMonthEnd)
+-- 15 Jan, then 31 Mar, 30 Jun, 30 Sep, 31 Dec anchored at the end
 
-schedule(date(2025i64, 5i64, 4i64), date(2025i64, 8i64, 4i64), tenor_months(1i64), NoStub, false, ClampToMonthEnd, us_federal(), Following)
-// 5 May, 4 Jun, 7 Jul, 4 Aug: Sunday 4 May and the 4 July holiday roll forward
+adjusted_dates = schedule(date(2025i64, 5i64, 4i64), date(2025i64, 8i64, 4i64), tenor_months(1i64), NoStub, false, ClampToMonthEnd, us_federal(), Following)
+-- 5 May, 4 Jun, 7 Jul, 4 Aug: Sunday 4 May and the 4 July holiday roll forward
 ```

@@ -24,8 +24,8 @@ standard deviation `sigma`, defined to be zero for non-positive `x`.
 infinity. For example:
 
 ```chelis
-p = lognormal_pdf(cast(1.0, f32), cast(0.0, f32), cast(1.0, f32))  // p ~ 0.398942
-c = lognormal_cdf(cast(1.0, f32), cast(0.0, f32), cast(1.0, f32))  // c == 0.5
+p = lognormal_pdf(cast(1.0, f32), cast(0.0, f32), cast(1.0, f32))  -- p ~ 0.398942
+c = lognormal_cdf(cast(1.0, f32), cast(0.0, f32), cast(1.0, f32))  -- c == 0.5
 ```
 
 ## Student-t
@@ -57,7 +57,7 @@ The approximation also needs `nu > 0.75`, below which its square root is
 of a negative number and it returns NaN. For example:
 
 ```chelis
-p = student_t_pdf(cast(0.0, f32), cast(5.0, f32))  // p ~ 0.379607
+p = student_t_pdf(cast(0.0, f32), cast(5.0, f32))  -- p ~ 0.379607
 ```
 
 ## Bivariate normal
@@ -74,7 +74,7 @@ def bvn_pdf(x: f32, y: f32, mu_x: f32, mu_y: f32, sigma_x: f32, sigma_y: f32, rh
 
 ```chelis
 p = bvn_pdf(cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(1.0, f32), cast(1.0, f32), cast(0.0, f32))
-// p ~ 0.159155
+-- p ~ 0.159155
 ```
 
 Selected density and lognormal-CDF inputs are compared with textbook
@@ -125,9 +125,9 @@ def dist_mvn_sample_one[d](rng_key: key, template: tensor[d, f32], mu: tensor[d,
 
 ```chelis
 cov = reshape(to_tensor([cast(4.0, f32), cast(2.0, f32), cast(2.0, f32), cast(3.0, f32)]), [cast(2, i64), cast(2, i64)])
-lower = dist_mvn_factor(cov)  // [[2.0, 0.0], [1.0, 1.4142135]]
+lower = dist_mvn_factor(cov)  -- [[2.0, 0.0], [1.0, 1.4142135]]
 x = dist_mvn_sample_one(key_from_seed(1i64), to_tensor([cast(0.0, f32), cast(0.0, f32)]), to_tensor([cast(1.0, f32), cast(2.0, f32)]), lower)
-// [1.3352878, 1.6313807]
+-- [1.3352878, 1.6313807]
 ```
 
 The factorization does not check its input. A covariance that is not

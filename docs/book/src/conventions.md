@@ -11,7 +11,7 @@ A tensor can be built from a list:
 
 ```chelis
 spots = to_tensor([cast(80.0, f32), cast(100.0, f32), cast(120.0, f32)])
-// tensor(shape=[3], data=[80.0, 100.0, 120.0]): a tensor[3, f32]
+-- tensor(shape=[3], data=[80.0, 100.0, 120.0]): a tensor[3, f32]
 ```
 
 `call_prices(spots, ...)` then returns a `tensor[3, f32]` of the same
@@ -34,7 +34,7 @@ reproducible draw:
 
 ```chelis
 mc_px = mc_call_price(key_from_seed(42i64), template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
-// 10.531636 with the 20,000-path template above; the closed form is 10.450583
+-- 10.531636 with the 20,000-path template above; the closed form is 10.450583
 ```
 
 Import `Shoals.Pricing.mc_call_price` in your module. Deriving a new key

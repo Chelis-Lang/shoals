@@ -28,8 +28,8 @@ For example, on the integer losses `0..100`:
 
 ```chelis
 losses = to_tensor(map(fn (i: i64) -> cast(cast(i, i32), f32), range(cast(0, i64), cast(101, i64))))
-v = mc_var(losses, cast(0.95, f32))                  // v == 95.0
-es = mc_expected_shortfall(losses, cast(0.95, f32))  // es == 97.5 (mean of 95..100)
+v = mc_var(losses, cast(0.95, f32))                  -- v == 95.0
+es = mc_expected_shortfall(losses, cast(0.95, f32))  -- es == 97.5 (mean of 95..100)
 ```
 
 On the same sample `expected_shortfall_frtb_975(losses)` is `99.0`, the mean
@@ -52,7 +52,7 @@ alone. For example:
 ```chelis
 shifts = to_tensor([cast(-0.02, f32), cast(-0.01, f32), cast(0.0, f32), cast(0.01, f32), cast(0.02, f32)])
 pnls = scenario_pnl_grid(cast(100.0, f32), shifts, cast(50.0, f32))
-// the zero-shift entry is 100.0, the +0.02 entry is 101.0
+-- the zero-shift entry is 100.0, the +0.02 entry is 101.0
 ```
 
 ## Kupiec backtest
@@ -71,13 +71,13 @@ are defined:
 
 ```chelis
 stat = kupiec_pof_statistic_simple(cast(5, i64), cast(100, i64), cast(0.05, f32))
-// -0.0: observed rate equals expected
+-- -0.0: observed rate equals expected
 none = kupiec_pof_statistic_simple(cast(0, i64), cast(250, i64), cast(0.01, f32))
-// 5.025163: no violations, -2 * 250 * ln(0.99)
+-- 5.025163: no violations, -2 * 250 * ln(0.99)
 ten = kupiec_pof_statistic_simple(cast(10, i64), cast(250, i64), cast(0.01, f32))
-// 12.9554825: above 3.841, rejects the 99% VaR
+-- 12.9554825: above 3.841, rejects the 99% VaR
 empty = kupiec_pof_statistic_simple(cast(0, i64), cast(0, i64), cast(0.05, f32))
-// 0.0: no observations
+-- 0.0: no observations
 ```
 
 `expected_rate` must lie strictly between 0 and 1: at 0 or 1 a logarithm

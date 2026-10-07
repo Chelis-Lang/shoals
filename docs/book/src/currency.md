@@ -41,7 +41,7 @@ def money_currency(m: Money) -> Currency
 
 ```chelis
 m = usd(cast(12.5, f32))
-v = money_value(m)  // v == 12.5
+v = money_value(m)  -- v == 12.5
 ```
 
 ## Non-negative money
@@ -58,7 +58,7 @@ read the wrapped amount and currency. For example:
 
 ```chelis
 checked = money_non_negative(eur(cast(-0.01, f32)))
-v = money_non_negative_value(checked)  // v == 0.0
+v = money_non_negative_value(checked)  -- v == 0.0
 ```
 
 ## Conversion and arithmetic
@@ -75,10 +75,10 @@ carry the same currency, keeping that currency; a mismatch fails. For example:
 
 ```chelis
 converted = convert(usd(cast(100.0, f32)), GBP, cast(0.8, f32))
-v = money_value(converted)  // v == 80.0
+v = money_value(converted)  -- v == 80.0
 
 total = money_add(usd(cast(10.0, f32)), usd(cast(2.5, f32)))
-t = money_value(total)  // t == 12.5
+t = money_value(total)  -- t == 12.5
 ```
 
 Subtraction may produce a negative amount; use `money_non_negative` if you

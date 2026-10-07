@@ -103,9 +103,9 @@ interpolated linearly in `ln S` at `s0`.
 
 ```chelis
 pc = pde_european_call_cn(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.2, f32), cast(1.0, f32), cast(201, i64), cast(100, i64), cast(4.0, f32))
-// 10.446156 (Black-Scholes 10.450583)
+-- 10.446156 (Black-Scholes 10.450583)
 pap = pde_american_put_cn(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.2, f32), cast(1.0, f32), cast(201, i64), cast(100, i64), cast(4.0, f32))
-// 6.078748
+-- 6.078748
 ```
 
 The European put at the same settings is `5.568951`. Choose `s_max_mult`
@@ -198,7 +198,7 @@ has `c = 0.025`, `y = 0.02`, and 60 periods:
 
 ```chelis
 pv = fi_bond_general(cast(0.025, f32), cast(0.02, f32), cast(60, i64))
-// 1.1738045
+-- 1.1738045
 ```
 
 `fi_bond2(0.05, 0.04)` is `1.0188609` and `fi_df2(0.04)` is `0.92455626`.
