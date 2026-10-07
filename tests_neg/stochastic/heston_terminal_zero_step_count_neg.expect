@@ -1,0 +1,38 @@
+Shoals.Stochastic: the step count must be at least 1, got 0; with no steps the evolution loop never runs, so the sampler would return s0 and v0 unchanged for a horizon it did not simulate
+Assumption: a step count is a RESOLUTION parameter, and zero resolution is
+unspecified rather than degenerate. That is what separates it from the time
+horizon, where `t = 0` stays admitted because s0 genuinely is the terminal
+value of a zero-length evolution. Over `t = 1.0` the process really did
+evolve, so returning s0 asserts an event of probability zero -- a wrong answer
+dressed as an answer, which is the failure mode this repository files bugs
+about.
+
+Measured on the unguarded tree at s0 = 100, v0 = 0.04, t = 1.0, seed 7:
+`n_steps = 0` returned 100.00001 for the terminal spot and 0.04 for the
+terminal variance, `n_steps = -8` returned the same, and `n_steps = 64`
+returned 146.3306. The control matters: it shows a probe can tell the cases
+apart, so the first two rows are not an artifact of an assertion's tolerance.
+
+Why the horizon guard could not cover this: checked_horizon validates `t`, and
+`t = 1.0` is legal. `dt = t / n_steps` is `+inf` at `n_steps = 0`, but at
+`n_steps <= 0` the step range is empty and `dt` has no consumer that ever
+runs, so a finiteness check on `dt` would surface nothing. The guard has to
+key on `n_steps` itself. Guarding the INPUT rather than a derived value is the
+horizon guard's own lesson arriving from the other side: there the derived
+value was a product that destroyed a sign, here it is a quotient whose
+non-finiteness is unreachable.
+
+What this fixture does NOT assert: it does not pin the negative step count,
+which has its own file for its own warrant, and it does not pin what stays
+admitted. `n_steps = 1` is the extremal admitted value and is pinned by
+tests/stochastic.ch; without that positive case a guard shifted up to
+`n_steps < 2` would pass every negative fixture here while refusing a valid
+input. The integer domain makes that boundary exact in both directions, with
+nothing between 0 and 1, so no subnormal argument is needed or possible.
+
+Deleting the checked_step_count call from THIS sampler does not make the
+fixture pass: the assertion is one that s0 also fails, so the file would then
+fail on the assertion rather than on the refusal, `--expect neg` would see the
+wrong text, and it would report WRONG-DIAGNOSTIC. Deleting the guard from
+heston_qe_paths_terminal leaves this fixture green, which is why there is one
+file per entry point rather than one for the module.
