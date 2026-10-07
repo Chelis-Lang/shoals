@@ -4,11 +4,11 @@
 The book (docs/book/src) is rendered from the chelis.ch docs. Its ```chelis
 blocks come in three shapes, and each is checked:
 
-- Signature blocks: `def name(...) -> T` lines without a body. Each one that
-  names a Shoals function must equal that function's declaration in this
-  checkout (`src/`, `properties/`, `references/`, `demos/`), whitespace
-  normalized. Signatures of functions from other packages are counted as
-  skipped.
+- Signature blocks: `def name(...) -> T` lines without a body. Each must
+  equal a declaration of that name in this checkout (`src/`, `properties/`,
+  `references/`, `demos/`, exported or not) or an export of a dependency at
+  the version reef.toml pins, whitespace normalized. A name found in neither
+  fails.
 - Fragments: statements such as `px = bs_call_scalar(...)  // 10.450583`.
   Each block is evaluated with `chelis eval --file` in a generated file that
   imports the names the block uses and prepends the earlier statements on the
@@ -25,7 +25,7 @@ blocks come in three shapes, and each is checked:
 
 Blocks that declare `@property` or `type` items are compiled with
 `chelis check` instead of evaluated. Blocks that cannot be evaluated on their
-own (they read a name the page never defines) are skipped and counted.
+own (they read a name the page never defines) are reported and fail the run.
 
 A failure means the site page is wrong, or the API changed without a book
 update: fix the chelis.ch page and re-render the book.
@@ -152,6 +152,10 @@ def module_exports() -> tuple[dict[str, str], dict[str, str]]:
     for d in SOURCE_DIRS:
         for path in sorted((REPO / d).rglob("*.ch")):
             text = path.read_text()
+            # every declaration, exported or not, is a header a book
+            # signature can be compared with
+            for m in re.finditer(r"^def\s+(\w+)(.*?)\s=\s", text, re.M):
+                headers.setdefault(m.group(1), normalize(f"def {m.group(1)}{m.group(2)}"))
             mod = re.search(r"^module\s+([\w.]+)", text, re.M)
             exp = re.search(r"^export\s*\(([^)]*)\)", text, re.M | re.S)
             if not mod or not exp:
@@ -159,9 +163,6 @@ def module_exports() -> tuple[dict[str, str], dict[str, str]]:
             exported = {e.strip() for e in exp.group(1).split(",") if e.strip()}
             for e in exported:
                 names.setdefault(e, mod.group(1))
-            for m in re.finditer(r"^def\s+(\w+)(.*?)\s=\s", text, re.M):
-                if m.group(1) in exported:
-                    headers.setdefault(m.group(1), normalize(f"def {m.group(1)}{m.group(2)}"))
     # names the book uses from Std, Nautilus and Shoreleave, learned from the
     # import lines of this repository's own tests and sources
     for d in ("tests", "tests-manual", *SOURCE_DIRS):
@@ -172,6 +173,33 @@ def module_exports() -> tuple[dict[str, str], dict[str, str]]:
                     if e and not m.group(1).startswith("Shoals.Tests"):
                         names.setdefault(e, m.group(1))
     return names, headers
+
+
+def dependency_headers() -> dict[str, str]:
+    """name -> declaration header for every export of the pinned dependencies.
+
+    Reef unpacks each installed package's source under its registry cache;
+    only the versions this checkout's reef.toml pins are read.
+    """
+    import os
+    import tomllib
+    pins = {name: str(spec["version"]).lstrip("=") for name, spec in
+            tomllib.loads((REPO / "reef.toml").read_text()).get("dependencies", {}).items()
+            if isinstance(spec, dict) and "version" in spec}
+    home = Path(os.environ.get("CHELIS_REEF_HOME") or Path.home() / ".chelis" / "reef")
+    headers: dict[str, str] = {}
+    for manifest in sorted(home.glob("cache/*/reef.toml")):
+        pkg = tomllib.loads(manifest.read_text()).get("package", {})
+        if pins.get(pkg.get("name")) != pkg.get("version"):
+            continue
+        for path in sorted((manifest.parent / "src").rglob("*.ch")):
+            text = path.read_text()
+            exp = re.search(r"^export\s*\(([^)]*)\)", text, re.M | re.S)
+            exported = {e.strip() for e in exp.group(1).split(",")} if exp else set()
+            for m in re.finditer(r"^def\s+(\w+)(.*?)\s=\s", text, re.M):
+                if m.group(1) in exported:
+                    headers.setdefault(m.group(1), normalize(f"def {m.group(1)}{m.group(2)}"))
+    return headers
 
 
 def normalize(sig: str) -> str:
@@ -245,12 +273,13 @@ def parse_eval(stdout: str) -> dict[str, str]:
 
 
 class Checker:
-    def __init__(self, chelis: str, names: dict[str, str], headers: dict[str, str]):
+    def __init__(self, chelis: str, names: dict[str, str], headers: dict[str, str], dep_headers: dict[str, str]):
+        self.dep_headers = dep_headers
         self.chelis = chelis
         self.names = names
         self.headers = headers
         self.failures: list[str] = []
-        self.counts = {"signatures": 0, "signatures skipped": 0, "fragments": 0,
+        self.counts = {"signatures": 0, "dependency signatures": 0, "fragments": 0,
                        "programs": 0, "compiled": 0, "values": 0, "outputs": 0, "skipped": 0}
         self.serial = 0
 
@@ -270,14 +299,21 @@ class Checker:
             m = re.match(r"^def\s+(\w+)", st.text)
             if not m:
                 continue
-            if m.group(1) not in self.headers:
-                self.counts["signatures skipped"] += 1
-                continue
-            self.counts["signatures"] += 1
-            if normalize(st.text) != self.headers[m.group(1)]:
+            name = m.group(1)
+            if name in self.headers:
+                source, where = self.headers[name], "this checkout"
+                self.counts["signatures"] += 1
+            elif name in self.dep_headers:
+                source, where = self.dep_headers[name], "the pinned dependency"
+                self.counts["dependency signatures"] += 1
+            else:
                 self.failures.append(
-                    f"{block.page}:{st.line}: signature differs from the source\n  book:   {normalize(st.text)}\n"
-                    f"  source: {self.headers[m.group(1)]}")
+                    f"{block.page}:{st.line}: `{name}` is declared neither in this checkout nor in a pinned dependency")
+                continue
+            if normalize(st.text) != source:
+                self.failures.append(
+                    f"{block.page}:{st.line}: signature differs from {where}\n  book:   {normalize(st.text)}\n"
+                    f"  source: {source}")
 
     def check_block(self, block: Block, earlier: list[Stmt]) -> None:
         stmts = block.stmts
@@ -409,8 +445,14 @@ def main() -> int:
     ap.add_argument("--keep", action="store_true", help="keep the generated example files")
     args = ap.parse_args()
 
+    chelis = resolve_chelis(args.chelis)
+    # building resolves the pinned dependencies and unpacks their sources,
+    # which the dependency signatures are compared with
+    r = subprocess.run([chelis, "reef", "build"], cwd=REPO, capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.exit(f"check_book_examples: `chelis reef build` failed\n{r.stdout}{r.stderr}")
     names, headers = module_exports()
-    checker = Checker(resolve_chelis(args.chelis), names, headers)
+    checker = Checker(chelis, names, headers, dependency_headers())
     shutil.rmtree(WORK, ignore_errors=True)
     WORK.mkdir(parents=True)
     total = 0
@@ -429,11 +471,13 @@ def main() -> int:
             shutil.rmtree(WORK, ignore_errors=True)
     if total == 0:
         sys.exit(f"check_book_examples: no chelis examples found under {BOOK.relative_to(REPO)}")
+    if checker.counts["skipped"]:
+        checker.failures.append(f"{checker.counts['skipped']} blocks could not be evaluated (see `skip` lines)")
     for f in checker.failures:
         print(f"FAIL {f}\n")
     c = checker.counts
     print(f"book-examples: {total} blocks; {c['signatures']} signatures matched against the source "
-          f"({c['signatures skipped']} from other packages skipped); {c['fragments']} fragments and "
+          f"and {c['dependency signatures']} against the pinned dependencies; {c['fragments']} fragments and "
           f"{c['programs']} programs evaluated, {c['compiled']} compiled; {c['values']} shown values and "
           f"{c['outputs']} shown outputs compared; {c['skipped']} blocks skipped; {len(checker.failures)} failures")
     return 1 if checker.failures else 0

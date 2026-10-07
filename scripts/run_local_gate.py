@@ -175,7 +175,7 @@ def main() -> int:
         "--full",
         action="store_true",
         help="also run the nightly-CI stages (unit suite, heavy suite, "
-        "prove gate, package-prove latency oracle) ; required once at a pin "
+        "prove gate, package-prove latency oracle); required once at a pin "
         "bump / before a release tag",
     )
     args = parser.parse_args()
