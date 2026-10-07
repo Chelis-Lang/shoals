@@ -15,12 +15,12 @@ The manifest names models, the properties checked for them, the expected verific
 
 ## Pricing and Greeks
 
-`Shoals.Pricing` exports scalar and tensor Black-Scholes prices, a tensor-valued f64 entry for verification, seeded Monte Carlo pricing, and automatic-differentiation Greeks. The call Greeks are compared on selected inputs with finite differences of `bs_call_scalar`. The scalar pricer and `bs_call_wire_f64` use different normal-CDF approximations, so agreement tests give bounds rather than identity. For the API and numerical limits, see [Pricing](src/pricing.md) and [Scope and limitations](src/scope.md).
+`Shoals.Pricing` exports scalar and tensor Black-Scholes prices, a tensor-valued f64 entry for verification, seeded Monte Carlo pricing, and automatic-differentiation Greeks. The call Greeks are compared on selected inputs with finite differences of `bs_call_scalar`. The scalar pricer and `bs_call_wire_f64` use different normal-CDF approximations, so agreement tests give bounds rather than identity. For the API and numerical limits, see [Pricing](book/src/pricing.md) and [Scope and limitations](book/src/scope.md).
 
 The composite property checks under `Shoals.Properties.Composites` use contracts on `Std.Contracts.normal_cdf`. Their structural result applies to that contracted f32 CDF. The shipped pricer uses its own f64 CDF; `tests/composites_binding.ch` compares representative prices. That comparison does not turn the structural result into a global theorem about the shipped pricer.
 
 ## Risk and demonstrations
 
-The manifest separates parametric Gaussian and historical empirical-quantile VaR/expected-shortfall checks. Each family has sampled confidence-monotonicity, dominance, and positive-loss properties. `properties/` contains the checkable predicates and `demos/` contains wrong models and controls. See [Property specifications](src/properties.md) and [Counterexample demos](src/demos.md) for interpretation.
+The manifest separates parametric Gaussian and historical empirical-quantile VaR/expected-shortfall checks. Each family has sampled confidence-monotonicity, dominance, and positive-loss properties. `properties/` contains the checkable predicates and `demos/` contains wrong models and controls. See [Property specifications](book/src/properties.md) and [Counterexample demos](book/src/demos.md) for interpretation.
 
 For the exact release method, constraints, dependency edges, and test inputs, inspect the manifest and the targeted checks in `scripts/prove_gate.py`. Do not infer a stronger result from a green test than its recorded method supports.

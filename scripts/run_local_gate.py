@@ -56,8 +56,11 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
       fail-closed paths, sweep-length integrity, and the CI wiring itself.
       Positive controls are included deliberately, since a guard that always
       fails would satisfy every negative test.
-  18. ``scripts/check_book.py docs/src README.md`` — the user-book lint (CI's
-      ``book`` job also runs ``mdbook build docs``).
+  18. ``scripts/check_book.py docs/book/src README.md`` — the user-book lint (CI's
+      ``book`` job also runs ``mdbook build docs/book``).
+  19. ``scripts/check_book_examples.py`` — book signatures against the source,
+      fragments evaluated with the pinned compiler and their shown values
+      compared (several minutes).
 
 ``--full`` appends the stages CI runs in ``.github/workflows/nightly.yml``
 (scheduled, NOT per-PR) — run this at least once at a pin bump
@@ -172,7 +175,7 @@ def main() -> int:
         "--full",
         action="store_true",
         help="also run the nightly-CI stages (unit suite, heavy suite, "
-        "prove gate, package-prove latency oracle) — required once at a pin "
+        "prove gate, package-prove latency oracle) ; required once at a pin "
         "bump / before a release tag",
     )
     args = parser.parse_args()
@@ -259,8 +262,12 @@ def main() -> int:
             ["python3", "scripts/test_oracle_erf64_accuracy.py"],
         ),
         (
-            "book lint (docs/src + README)",
-            ["python3", "scripts/check_book.py", "docs/src", "README.md"],
+            "book lint (docs/book/src + README)",
+            ["python3", "scripts/check_book.py", "docs/book/src", "README.md"],
+        ),
+        (
+            "book examples against the source",
+            ["python3", "scripts/check_book_examples.py"],
         ),
     ]
     nightly_stages: list[tuple[str, list[str]]] = [

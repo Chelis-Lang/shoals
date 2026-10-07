@@ -50,7 +50,6 @@ from `Std.Datetime`.
   capital adjustment helpers.
 - **Currency-tagged money.** Runtime-tagged `Money` with same-currency
   arithmetic.
-
 - **Lattices, PDEs, and early exercise.** CRR, Tian, Jarrow-Rudd, and
   trinomial trees (`Shoals.Trees`), Crank-Nicolson and ADI finite
   differences (`Shoals.Pde`), Longstaff-Schwartz (`Shoals.Lsm`), and

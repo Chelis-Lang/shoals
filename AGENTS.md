@@ -427,7 +427,7 @@ with a recorded reason.
 
 ## Book
 
-`docs/` is the user-facing book for this shell. chelis.ch mirrors it
+`docs/book/` is the user-facing book for this shell. chelis.ch mirrors it
 page for page (https://chelis.ch/docs/shoals/), and the chelis.ch text is
 canonical: book pages are rendered from the site by the website's
 `scripts/sync_books.py`, so edit prose on the site and re-render, or make the
@@ -446,4 +446,6 @@ status words (planned, not yet, stub, phase, milestone), "see the source" in
 place of documentation, em-dashes, and the word "load-bearing".
 `scripts/check_book.py` enforces the mechanical part in CI.
 
-A change that alters the public API updates the book in the same PR.
+A change that alters user-visible behavior says so in its changelog entry.
+The book documents the latest release: the chelis.ch page and this book take
+the change when that release is documented.

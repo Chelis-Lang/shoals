@@ -9,7 +9,7 @@ the re-probe trigger. `Shoals.Indicators` therefore ships its own
 `ind_rolling_sum` / `ind_rolling_mean` / `ind_rolling_std` /
 `ind_rolling_min` / `ind_rolling_max` / `ind_shift` / `ind_diff`, marked with
 the `ind_` prefix as a borrowed layer (shoals#83,
-spec/shoals_quant_surface.md §2.15.3, docs/src/indicators.md §Rolling layer).
+spec/shoals_quant_surface.md §2.15.3, docs/book/src/indicators.md §Rolling layer).
 
 DE-NARROWING, and the branch matters because the two upstream fixes are not
 interchangeable:

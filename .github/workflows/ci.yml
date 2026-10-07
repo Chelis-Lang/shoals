@@ -153,13 +153,15 @@ jobs:
       # this per-PR job set, minus the CI-only `conform bump-check` — a
       # stale local origin/main would make that step false-fail).
 
-  # The user book (docs/) mirrors https://chelis.ch/docs/shoals/. Cheap and
-  # toolchain-free: build it and lint the book and README. There is no
-  # executable book-example validator yet; the examples are excerpts of the
-  # tests/ suite that nightly runs.
+  # The user book (docs/book) mirrors https://chelis.ch/docs/shoals/. Build
+  # it, lint the book and README against the writing standard, and check
+  # every book example against this checkout with the pinned toolchain
+  # (signatures against the source, fragments evaluated and their shown
+  # values compared).
   book:
-    name: book (mdbook build + lint)
+    name: book (mdbook build, lint, examples)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -168,9 +170,39 @@ jobs:
         with:
           tool: mdbook@0.5.2
       - name: Build mdBook
-        run: mdbook build docs
+        run: mdbook build docs/book
       - name: Lint book and README
-        run: python3 scripts/check_book.py docs/src README.md
+        run: python3 scripts/check_book.py docs/book/src README.md
+
+      - name: Extract dependency versions from reef.toml
+        run: |
+          set -euo pipefail
+          for dep in nautilus coral shoreleave; do
+            v=$(grep "^$dep" reef.toml | grep -oP 'version\s*=\s*"=?\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+            [ -n "$v" ] || { echo "no $dep version in reef.toml" >&2; exit 1; }
+            echo "$(echo "$dep" | tr a-z A-Z)_TAG=v$v" >> "$GITHUB_ENV"
+          done
+      - name: Install chelis toolchain (cached)
+        id: chelis
+        uses: ./.github/actions/install-chelis
+        with:
+          chelis-tag: ${{ env.CHELIS_TAG }}
+          chelis-version: ${{ env.CHELIS_VERSION }}
+          gh-token: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+          reef-cache-key: nautilus-${{ env.NAUTILUS_TAG }}-coral-${{ env.CORAL_TAG }}-shoreleave-${{ env.SHORELEAVE_TAG }}
+      - name: Install released dependencies
+        if: steps.chelis.outputs.reef-cache-hit != 'true'
+        timeout-minutes: 5
+        env:
+          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+        run: |
+          set -euo pipefail
+          chelis reef install --from-github "chelis-lang/nautilus@${NAUTILUS_TAG}"
+          chelis reef install --from-github "chelis-lang/coral@${CORAL_TAG}"
+          chelis reef install --from-github "chelis-lang/shoreleave@${SHORELEAVE_TAG}"
+      - name: Check book examples against the source
+        run: python3 scripts/check_book_examples.py
 
   # Offline manifest validation (no toolchain): schema/pin freshness + every
   # invariant/control/output-fn/precondition resolves to real sources.

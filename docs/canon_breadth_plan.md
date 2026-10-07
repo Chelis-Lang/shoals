@@ -68,7 +68,7 @@ trigger "induction tier". Author `fi_bond_general` in `src/fixedincome.ch`.
 
 Author `demos/realism.ch` with 200-step CRR, 60-period bond, 10K-path MC —
 practitioner-scale characterization demos asserting convergence to known
-references. Update `docs/src/demos.md`.
+references. Update `docs/book/src/demos.md`.
 
 ## Discipline
 

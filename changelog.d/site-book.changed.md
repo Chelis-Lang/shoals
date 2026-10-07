@@ -1,4 +1,4 @@
-The user book in `docs/` is now rendered from the Shoals pages on
+The user book in `docs/book/` (moved from `docs/`) is now rendered from the Shoals pages on
 https://chelis.ch/docs/shoals/, which are canonical. It adds pages for
 lattices, PDEs and early exercise and for rate and volatility models, and
 expands the CDS, risk, calendar and XVA pages. The package verification

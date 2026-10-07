@@ -80,8 +80,28 @@ WRAPPED_MARKER = re.compile(r"^\d+\.\s")
 LIST_LINE = re.compile(r"^\s*(?:\d+\.|[-+*])\s|^\s*[|#>]|^\s{2,}")
 
 
+def fence_defects(text: str) -> list[tuple[int, str, str]]:
+    """A closing fence followed by text does not close the block, so the rest
+    of the page renders as code."""
+    found, fence = [], None
+    for number, line in enumerate(text.splitlines(), 1):
+        m = FENCE.match(line)
+        if not m:
+            continue
+        if fence is None:
+            fence = m.group(1)
+        elif m.group(1) == fence:
+            rest = line.strip()[3:].strip()
+            if rest:
+                found.append((number, "fence close carries text", line.strip()[:30]))
+            fence = None
+    if fence is not None:
+        found.append((len(text.splitlines()), "unclosed code fence", fence))
+    return found
+
+
 def lint_text(text: str) -> list[tuple[int, str, str]]:
-    found = []
+    found = fence_defects(text)
     previous = ""
     for number, line in prose_lines(text):
         if WRAPPED_MARKER.match(line) and previous.strip() and not LIST_LINE.match(previous) \
@@ -113,6 +133,8 @@ def main() -> int:
     if not paths:
         import json
         app = Path(__file__).resolve().parents[2] / "apps/chelis-site/src"
+        if not (app / "data/books.json").exists():
+            parser.error("give the book's src directory (and README.md) to lint")
         books = json.loads((app / "data/books.json").read_text())["shells"].values()
         paths = [app / "content/docs" / b["siteDir"] for b in books]
     errors = lint_paths(paths)

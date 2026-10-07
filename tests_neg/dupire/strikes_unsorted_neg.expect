@@ -17,7 +17,7 @@ Nautilus does not disclose the precondition at the version this repo pins.
 all. The sentence "fits a natural cubic spline through sorted knots" arrives
 only in `v0.7.47`. Even there it would be a statement to a caller of Nautilus:
 nothing on `du_cubic_log_moneyness_interp` passes it on, and `Shoals.Dupire`
-has no page in `docs/src/` at all.
+has no page in `docs/book/src/` at all.
 
 The guard reports the first violated comparison, which for an exchanged pair
 is the second member of it: 110.0 at index 3 rather than 120.0 at index 2. The

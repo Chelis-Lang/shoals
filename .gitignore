@@ -17,4 +17,4 @@ __pycache__/
 .reef-write.lock
 .*.reef-tmp-*
 .*.reef-backup-*
-docs/book/
+docs/book/book/
