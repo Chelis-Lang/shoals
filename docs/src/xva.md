@@ -16,11 +16,11 @@ def discount_factor_constant_rate(r: f32, t: f32) -> f32
 ```
 
 `survival_probability_constant_hazard` is `exp(-hazard * t)`, the
-probability of surviving to time `t` under a constant hazard rate. It is one
-at time zero and decreases with time. `default_probability_in_interval` is
+probability of surviving to time `t` under a constant nonnegative hazard rate.
+It is one at time zero and does not increase with time. `default_probability_in_interval` is
 the probability of defaulting in `[t_start, t_end]`, the difference of the
 survival probabilities at the two endpoints. `discount_factor_constant_rate`
-is `exp(-r * t)`. From `tests/xva.ch`:
+is `exp(-r * t)`. For example:
 
 ```chelis
 s = survival_probability_constant_hazard(cast(0.02, f32), cast(1.0, f32))  // exp(-0.02)
@@ -39,8 +39,7 @@ def netted_exposure_2_deals[n](deal_a: tensor[n, f32], deal_b: tensor[n, f32]) -
 `expected_positive_exposure` is the mean over the sample of the positive
 part of each exposure, and `expected_negative_exposure` is the mean of the
 negative part. `netted_exposure_2_deals` adds two exposure tensors
-pointwise, the netting of two deals under a single agreement. From
-`tests/xva.ch`:
+pointwise, the netting of two deals under a single agreement. For example:
 
 ```chelis
 exposures = to_tensor([cast(-10.0, f32), cast(5.0, f32), cast(-3.0, f32), cast(20.0, f32)])
@@ -63,15 +62,19 @@ contributions. `dva_constant_hazard` is the symmetric debit valuation
 adjustment computed from the expected negative exposure and the
 institution's own hazard and recovery.
 
-From `tests/xva.ch`, the CVA is zero when there is no default risk, when
-recovery is full (a recovery rate of one), or when the exposure is zero, and
-it increases with the hazard rate:
+With finite intermediate values, CVA is zero when hazard is zero, recovery is one, or
+every exposure is zero. The example below uses exposures of 10, 15, and 12
+at years 1, 2, and 3:
 
 ```chelis
 time_grid = to_tensor([cast(1.0, f32), cast(2.0, f32), cast(3.0, f32)])
 epe = to_tensor([cast(10.0, f32), cast(15.0, f32), cast(12.0, f32)])
 cva = cva_constant_hazard(time_grid, epe, cast(0.05, f32), cast(0.4, f32), cast(0.03, f32))
 ```
+
+CVA is not generally increasing in hazard for a varying exposure profile.
+Raising hazard moves default probability toward earlier intervals; a profile
+with exposure concentrated later can therefore produce a smaller CVA.
 
 A negative expected negative exposure yields a positive DVA, since the
 institution gains on its own default.

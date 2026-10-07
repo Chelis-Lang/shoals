@@ -2,28 +2,24 @@
 
 Shoals is a quantitative-finance library for the
 [Chelis](https://github.com/Chelis-Lang/chelis) programming language. It
-ships as a reef package under the `Shoals` module prefix and gives you
+is available as a Reef package under the `Shoals` module prefix. It provides
 closed-form option pricers, Greeks, Monte Carlo engines, yield-curve and
 volatility-surface tooling, risk measures, date and calendar arithmetic,
 an order book, and a small set of finance-specific distributions.
 
 The library is written entirely in Chelis. Numerical primitives that are
 not finance-specific (the normal distribution, special functions,
-statistics, interpolation) come from the upstream `Nautilus` library, and
-the standard date type comes from `Std.Datetime`. Shoals layers the finance
-semantics on top: Black-Scholes, the FX and forward pricers, SVI vol
-surfaces, sensitivity operators on curves, XVA aggregators, and so on.
+statistics, interpolation) come from `Nautilus`, and the date type comes
+from `Std.Datetime`.
 
-## What is in the box
-
-The chapters introduce the main modules and point to their source tests:
+## Modules
 
 - **Pricing.** Black-Scholes call and put, vectorized price tensors, and a
   Monte Carlo engine driven by explicit random keys.
 - **Greeks.** Finite-difference first- and second-order Greeks, analytic
   Greek references for cross-checking, and pathwise / likelihood-ratio
   estimators for the digital payoff family.
-- **Extended pricers.** Bachelier (normal underlying), Black (forward), 
+- **Extended pricers.** Bachelier (normal underlying), Black (forward),
   Garman-Kohlhagen (FX), and Margrabe (exchange).
 - **Volatility surface.** SVI total-variance parameterization, implied
   vol, surface shifts, a SABR approximation, and a bisection implied-vol solver.
@@ -52,32 +48,24 @@ The chapters introduce the main modules and point to their source tests:
 - **Currency-tagged money.** Runtime-tagged `Money` with same-currency
   arithmetic.
 
-Additional modules under `src/` cover lattice and PDE pricing,
+Additional modules cover lattice and PDE pricing,
 fixed-income models, collateral agreements, credit curves, local
-volatility, Longstaff–Schwartz exercise, and specialized stochastic
-processes. Their exported definitions and `tests/` or `tests-manual/`
-files give their exact signatures and numerical domains.
+volatility, Longstaff-Schwartz exercise, and specialized stochastic
+processes. The module guides describe their public functions and numerical
+domains.
 
-## Verification
-
-Shoals carries two top-level directories of comparison code:
-
-- `references/` holds textbook-formula implementations for selected
-  quantities (Black-Scholes, its Greeks, Vasicek, historical VaR, vanilla
-  Monte Carlo, distributions, and day-count conventions).
-- `properties/` holds checks for finance relationships such as put-call
-  parity, finite-difference Greek agreement, Monte Carlo reproducibility,
-  and comparisons with textbook formulas. Tests exercise selected inputs.
+## Comparisons and supported domains
 
 The [Reference oracles](references.md) and
-[Property specifications](properties.md) chapters describe both. The
-[Scope and limitations](scope.md) chapter is the honest account of where
-the surface stops.
+[Property specifications](properties.md) chapters describe
+comparisons with standard formulas and finance relationships. The
+[Scope and limitations](scope.md) chapter summarizes the supported
+models and numerical domains.
 
-## How to read this book
+## Start with a pricing call
 
 Start with [Getting started](getting-started.md) for the build commands and
 a first pricing call, then read
-[Working with tensors and effects](conventions.md) to understand the small
-number of Chelis idioms the examples lean on. After that the module
-chapters stand on their own and can be read in any order.
+[Working with tensors and keys](conventions.md) for tensor
+ownership and reproducible random calls. Each module chapter includes its public
+functions and examples.

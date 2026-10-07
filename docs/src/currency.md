@@ -37,8 +37,7 @@ def money_currency(m: Money) -> Currency
 ```
 
 `usd`, `gbp`, and `eur` construct money in the respective currency.
-`money_value` reads the amount and `money_currency` the currency tag. From
-`tests/currencytag.ch`:
+`money_value` reads the amount and `money_currency` the currency tag. For example:
 
 ```chelis
 m = usd(cast(12.5, f32))
@@ -55,7 +54,7 @@ def money_non_negative_currency(m: NonNegativeMoney) -> Currency
 
 `money_non_negative` clamps a money's amount at zero and wraps it, keeping
 the currency. `money_non_negative_value` and `money_non_negative_currency`
-read the wrapped amount and currency. From `tests/currencytag.ch`:
+read the wrapped amount and currency. For example:
 
 ```chelis
 checked = money_non_negative(eur(cast(-0.01, f32)))
@@ -72,8 +71,7 @@ def money_sub(lhs: Money, rhs: Money) -> Money
 
 `convert` multiplies the amount by `rate` and retags it with the target
 currency. `money_add` and `money_sub` add and subtract two amounts when they
-carry the same currency, keeping that currency; a mismatch fails. From
-`tests/currencytag.ch`:
+carry the same currency, keeping that currency; a mismatch fails. For example:
 
 ```chelis
 converted = convert(usd(cast(100.0, f32)), GBP, cast(0.8, f32))

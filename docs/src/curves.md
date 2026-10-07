@@ -46,8 +46,7 @@ def curve_kind[n](curve: YieldCurve[n]) -> CurveKind
 
 `yield_curve_from_pillars` builds an untagged curve (a `Custom` kind with
 the label `"untagged"`). `yield_curve_tagged` builds a curve with an
-explicit kind. `curve_kind` reads the kind back. From `tests/curves.ch` and
-`tests/curves_ops.ch`:
+explicit kind. `curve_kind` reads the kind back. For example:
 
 ```chelis
 curve = yield_curve_from_pillars(
@@ -67,84 +66,47 @@ times:
 Shoals.Curves.yield_curve_from_pillars: pillar times must be strictly increasing: index 2 has time 2.0, which does not exceed time 3.0 at index 1
 ```
 
-`rate_at` reads the pillars through
-`Nautilus.Interpolation.linear_interp_sorted`, which brackets a query by
-traversal order and interpolates across whichever consecutive pair straddles
-it. Unsorted pillars therefore interpolate over the wrong interval and return a
-wrong rate with no trap and no `NaN`: the same three `(time, rate)` pairs in a
-different order answered `rate_at(curve, 1.5)` as 0.025 instead of 0.035, and
-that wrong rate propagates through `discount_factor` into every discounted
-price (shoals#119). A repeated time, and a `NaN` time among two or more
-pillars, are rejected by the same comparison — the requirement is strict
-ordering, not non-decreasing order. A single-pillar curve has no pair to
-compare, so a lone `NaN` time is accepted and reads flat; that is a
-non-finite-pillar question rather than an ordering one, and this guard does not
-reach it.
+`rate_at` uses `Nautilus.Interpolation.linear_interp_sorted`, which brackets
+a query in traversal order. Without the ordering guard, reordering the example's
+pairs can change the rate at `1.5` from `0.035` to `0.025`, changing every
+price discounted at that rate. The constructors reject duplicate times and
+NaN times among two or more pillars. They do not sort the supplied pairs.
 
-This is the precondition the instrument bootstrap already enforces (below),
-under the same decision not to re-sort: a reordering is a different question
-from the one the caller asked. The guard is on the four entry points that take
-pillar times as arguments — `yield_curve_from_pillars`, `yield_curve_tagged`,
-`bootstrap_zero_from_par`, and `curve_basis_from_pillars`.
+The same guard applies to `bootstrap_zero_from_par` and
+`curve_basis_from_pillars`. It checks adjacent ordering, not finiteness:
+a single-pillar curve has no pair to compare, so a lone NaN time is accepted
+and the curve reads flat.
 
-### The rule belongs to the type, not to the four entry points
+### Reading opaque curves
 
-`YieldCurve` and `CurveBasis` are **opaque**
-(`spec/02-surf-syntax.md` P16): constructible and inspectable only inside
-`Shoals.Curves`. That is what makes the guarantee total rather than
-best-effort. Guarding four producers is not enough on its own, because a
-consumer could write the record literal itself and reach the same wrong answer
-past every guard:
+`YieldCurve` and `CurveBasis` are opaque. Outside `Shoals.Curves`, use the
+constructors above instead of record literals. Direct construction is rejected:
 
 ```text
 record construction of opaque type `YieldCurve` outside its defining module `Shoals.Curves`
 ```
 
-With the representation sealed, a value can only originate from an in-module
-producer, and every in-module producer either runs the strictly-increasing
-guard on caller-supplied times, or reuses the times of a curve that already
-passed it — the five sensitivity shifts below, and `bootstrap_multi_curve`,
-whose pillars are instrument tenors the bootstrap already requires to be
-increasing. **So every `YieldCurve` and `CurveBasis` value in existence has
-readable pillars, by induction over the producers.** The compiler checks the
-first clause of that induction and enumerates the escape points it has to
-cover; that every producer guards or passes through guarded times is a reading
-of the ten construction sites, not something the checker verifies. Note also
-that the induction is about ordering alone — it does not make pillar times
-finite, per the single-pillar `NaN` admission above.
-
-Opacity closes record *patterns* as well as construction, because `@opaque`
-closes both together and hiding the representation is the point. It is not what
-defends the ordering rule: a field-by-field rebuild has to go back through a
-producer, and the producer guard rejects it — measured, with
-`curve_pillars` and nothing else, the rebuild compiles and then fails with
-`pillar times must be strictly increasing`. The sanctioned readers are
-`curve_kind`, `rate_at` and friends, and:
+Record patterns are also unavailable outside the module. Use `curve_kind`,
+`rate_at`, or the pillar readers:
 
 ```chelis
 def curve_pillars[n](curve: YieldCurve[n]) -> (tensor[n, f32], tensor[n, f32])
 def basis_pillars[n](basis: CurveBasis[n]) -> (tensor[n, f32], tensor[n, f32])
 ```
 
-Both tensors come back together because a caller that wants one usually wants
-both. There is no linearity reason: auto-borrow reads two single-field readers
-off one curve without a `copy`, and `copy` does not accept this type at all
-(`copy requires tensor input`). Naming the type in a signature or annotation is
-unaffected — `c: YieldCurve[3]` still compiles outside the module.
+Each returns the times and rates together. You may name `YieldCurve[3]` in a
+signature or annotation; opacity restricts access to its representation, not
+use of the type. `copy` accepts tensors, not curve values.
 
-The ordering rule is enforced by the producers rather than declared as an
-`@invariant` on the type, which would also have it discharged per producer by
-`chelis prove`. It is **not expressible at this pin at all**, which the
-compiler reports three ways at once for `YieldCurve`: `kind: CurveKind` is a
-multi-variant ADT and both tensor fields have symbolic extents, so all three
-fall outside the V1 invariant value class (scalar primitives, *fixed-shape*
-numeric tensors, or nested single-variant records of those); and `index` is
-outside the invariant predicate grammar. The grammar blocker is the decisive
-one — it admits no indexing at any extent, so pairwise ordering cannot be
-written even for a fixed-extent, single-variant wrapper. The compiler
-accordingly emits a permanent advisory `opaque-without-invariant` note for both
-types, which is expected here rather than a gap to close; it is advisory, and
-`chelis lint --check` exits 0.
+Rebuilding a curve from its pillars goes through the same constructor checks.
+Sensitivity shifts preserve the existing times; `bootstrap_multi_curve` checks
+the ordering of instrument tenors. These are runtime guards, not a proof of
+pillar ordering by the type checker. They do not establish finiteness: the
+single-pillar `NaN` case above still applies.
+
+The invariant predicate syntax does not support indexing, so it cannot express
+pairwise pillar ordering. Both types therefore carry an advisory
+`opaque-without-invariant` lint note. It does not fail `chelis lint --check`.
 
 ## Interpolation and discount factors
 
@@ -163,7 +125,7 @@ exponentiates. `nss_rate` evaluates the Nelson-Siegel-Svensson functional
 form directly from its six parameters, independent of any pillar set.
 `discount_factor` returns `exp(-rate_at(curve, t) * t)`.
 
-From `tests/curves.ch`, linear interpolation at the midpoint and the
+For example, linear interpolation at the midpoint and the
 discount factor at a pillar:
 
 ```chelis
@@ -171,7 +133,7 @@ r = rate_at(curve, cast(1.5, f32))         // r == 0.035
 d = discount_factor(curve, cast(2.0, f32)) // d == exp(-0.08)
 ```
 
-From `tests/curves_ops.ch`, the NSS rate tends to `beta0 + beta1` as the
+For example, the NSS rate tends to `beta0 + beta1` as the
 maturity goes to zero and to `beta0` at long horizons:
 
 ```chelis
@@ -187,10 +149,9 @@ def bootstrap_zero_from_par[n](times: tensor[n, f32], par_yields: tensor[n, f32]
 
 `bootstrap_zero_from_par` builds a zero curve from a set of par yields in
 the single-curve case, with one coupon per pillar at integer-year spacing.
-The resulting curve reprices the par bonds to par. Its `times` are the pillars
-of the curve it returns and carry the strictly-increasing requirement above;
-here it binds twice over, because the present value of the fixed leg is
-accumulated pillar by pillar in the order given. From `tests/curves.ch`:
+The resulting curve reprices the par bonds to par. Supply strictly increasing
+times: the bootstrap accumulates fixed-leg present values in pillar order.
+For example:
 
 ```chelis
 times = to_tensor([cast(1.0, f32), cast(2.0, f32)])
@@ -219,15 +180,10 @@ def bootstrap_multi_curve[n](instruments: List[Instrument], times_template: tens
 instrument, in list order, and returns the pillar times and rates.
 `bootstrap_multi_curve` wraps the same result as a `YieldCurve`.
 
-`times_template` carries only the result's extent: a list's length is not a
-type-level value, so the template is what supplies the `n` in
-`YieldCurve[n]`, and none of its *values* are read. It must therefore have
-exactly one entry per instrument. A mismatch is a runtime `fail` naming
-`Shoals.Curves.bootstrap_multi_curve` and reporting both counts (`template has
-3 entries for 2 instruments`); previously it was accepted and the
-returned value declared an extent it did not carry, so a consumer that
-trusted `n` either trapped on a pillar that was never there or silently
-missed one (shoals#113).
+`times_template` supplies the `n` in `YieldCurve[n]`; its values are ignored.
+Its length must equal the instrument count. A mismatch raises a runtime `fail`
+naming `Shoals.Curves.bootstrap_multi_curve` and reporting both counts, for
+example `template has 3 entries for 2 instruments`.
 
 - A deposit is simple interest: `DF(t) = 1 / (1 + rate * t)`.
 - A zero-coupon price is the discount factor at its tenor.
@@ -249,47 +205,28 @@ instrument's tenor does not exceed every earlier pillar (instruments must be
 listed in strictly increasing tenor). It never snaps a schedule or re-sorts
 pillars.
 
-**The instrument bootstrap never returns a sentinel.** Every pillar
-`bootstrap_multi` returns is a finite zero rate; everything else is a `fail`.
-The qualifier is load-bearing and the unqualified sentence is false: the
-`bootstrap_zero_from_par` above still answers a non-positive par price with a
-`NaN` rate, unchanged, and shoals#76 had to narrow exactly this wording once
-before for exactly that reason. The search bracket is
-`[-0.5, 2.0]` and belongs to this module rather than to
-`Nautilus.Roots.brent`, so when `brent` cannot return a rate it is this module
-that says why. The three diagnostics classify that outcome, each reporting the
-repricing residual at both endpoints and the offending instrument's tenor and
-quote:
+`bootstrap_multi` returns finite zero rates or raises a runtime `fail`.
+This contract applies to the instrument bootstrap; `bootstrap_zero_from_par`
+can return a NaN rate for a non-positive par price.
+
+The instrument bootstrap searches `[-0.5, 2.0]` using `Nautilus.Roots.brent`.
+If the solver returns NaN, Shoals reports the instrument's tenor and quote,
+the repricing residuals at both endpoints, and one of three diagnostics:
 
 - a quote whose zero rate lies outside the bracket leaves the residual the
   same sign at both endpoints, and fails with *no zero rate for this
   instrument in the search bracket `[-0.5, 2.0]`*;
-- a residual that is not finite at an endpoint fails with *the repricing
-  residual is not finite over the search bracket*. Reachable two ways: a
-  long-dated swap whose `exp(0.5 * tenor)` overflows `f32` — about 177 years
-  and up, which `instrument_validate` does not bound — or, through
-  `fd_bump_pillar_rate` and the gradient entry points, earlier pillars the
-  caller supplied carrying a `NaN`. The clause is *the bracket cannot be
-  searched*, not *there is no root*: a root may exist and be unreachable;
-- a bracketed solve that exhausts its hundred iterations fails with *did not
-  converge*. This is the residual case, reached only when neither of the
-  above holds. No input is known to produce it, and nothing tests it; it
-  exists so that the postcondition below is total.
+- a non-finite endpoint residual fails with *the repricing residual is not
+  finite over the search bracket*. A long-dated swap can overflow
+  `exp(0.5 * tenor)` at about 177 years; `instrument_validate` does not cap
+  maturity. Caller-supplied NaN earlier pillars can also cause this through
+  `fd_bump_pillar_rate` and the gradient entry points. A root may exist even
+  though this bracket cannot be searched in f32;
+- a failed solve with finite, sign-changing endpoint residuals reports *did
+  not converge*. The solver allows one hundred iterations. This diagnostic
+  has no known triggering input in the documented tests.
 
-Those are a total classification, so the postcondition is that
-`bootstrap_multi` returns finite pillars or fails. `brent` is called first and
-with the same arguments it has always had, and the endpoints are read only to
-explain a `NaN` it has already returned — so every quote that solved before
-still solves and returns the same rate.
-
-Previously all three came back as a `NaN` pillar that `instrument_validate`
-accepted and `rate_at`, `discount_factor` and the implicit-function-theorem
-gradients then propagated, so a downstream price could be `NaN` far from the
-instrument that caused it, and callers had to test `eq(z, z)` on every pillar
-(shoals#79). Widening the bracket is a separate question and is not what
-changed: a quote outside it is rejected, not re-solved.
-
-From `tests/curves_bootstrap_schedule.ch`, a gapped annual strip:
+For example, a gapped annual strip:
 
 ```chelis
 insts = [
@@ -309,15 +246,10 @@ instrument quotes, over the same coupon schedule and interpolation. FRAs and
 futures are not instruments here, and the solve is sequential rather than
 joint; see [Scope and limitations](scope.md).
 
-`bootstrap_grad_full_jacobian`'s `paths_template` carries only the result's
-extent, exactly as `times_template` does for `bootstrap_multi_curve`, and must
-likewise have one entry per instrument. Either mismatch direction is a runtime
-`fail` reporting both counts (`template has 3 entries for 2 instruments`);
-both previously returned a full matrix of `NaN`, which nothing distinguished
-from a Jacobian whose entries were `NaN` for a numerical reason (shoals#79).
-An invalid instrument likewise fails, through the bootstrap's own diagnostic,
-rather than being reported as that matrix. Neither function uses a `NaN`
-result as a signal any more.
+`bootstrap_grad_full_jacobian` also requires its `paths_template` to have
+one entry per instrument. A template that is too short or too long raises a
+runtime `fail` reporting both counts. Invalid instruments use the bootstrap's
+diagnostic. These input errors do not return a NaN-filled Jacobian.
 
 ### Basis spreads
 
@@ -326,13 +258,10 @@ and interpolate a spread curve. `discount_factor_with_basis` applies that
 spread to a supplied domestic zero curve, and is the only function in this
 section that reads a domestic curve.
 
-No function here calibrates a basis curve against a domestic curve
-(shoals#117). Build the spread curve from its pillars with
-`curve_basis_from_pillars` — market basis quotes *are* those pillars, and
-carry the same strictly-increasing requirement as a zero curve's — and
-apply it with `discount_factor_with_basis`. There is deliberately no
-separate quotes-to-curve entry point: without a basis-swap solve it would
-be the same operation under a second name.
+Build the spread curve from market basis pillars with
+`curve_basis_from_pillars`, using strictly increasing times, then apply it
+with `discount_factor_with_basis`. These functions do not calibrate a basis
+curve against a domestic curve or solve basis-swap quotes.
 
 ## Sensitivity shifts
 
@@ -352,7 +281,7 @@ at the midpoint the applied shift is the average of the two. `butterfly`
 applies `wing_delta` at the ends and `body_delta` in the middle, scaled by
 distance from the midpoint. `scale_rates` multiplies every rate by `factor`.
 
-From `tests/curves_ops.ch`, a parallel shift lifts every pillar by the same
+For example, a parallel shift lifts every pillar by the same
 amount and a key-rate shift moves only the chosen pillar:
 
 ```chelis

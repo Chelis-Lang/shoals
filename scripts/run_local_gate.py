@@ -56,6 +56,8 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
       fail-closed paths, sweep-length integrity, and the CI wiring itself.
       Positive controls are included deliberately, since a guard that always
       fails would satisfy every negative test.
+  18. ``scripts/check_book.py docs/src README.md`` — the user-book lint (CI's
+      ``book`` job also runs ``mdbook build docs``).
 
 ``--full`` appends the stages CI runs in ``.github/workflows/nightly.yml``
 (scheduled, NOT per-PR) — run this at least once at a pin bump
@@ -255,6 +257,10 @@ def main() -> int:
         (
             "accuracy-floor oracle mutation tests (shoals#64)",
             ["python3", "scripts/test_oracle_erf64_accuracy.py"],
+        ),
+        (
+            "book lint (docs/src + README)",
+            ["python3", "scripts/check_book.py", "docs/src", "README.md"],
         ),
     ]
     nightly_stages: list[tuple[str, list[str]]] = [

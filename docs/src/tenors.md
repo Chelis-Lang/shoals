@@ -2,7 +2,8 @@
 
 Modules: `Shoals.Tenor`, `Shoals.Schedule`.
 
-A tenor is a calendar period, so a month is a month and not thirty days.
+A calendar tenor represents a `Std.Datetime` period, with months measured
+by the calendar.
 Money-market tenors such as overnight are counted in business days instead.
 A schedule steps from a fixed anchor by whole tenors and can then roll each
 date in a business calendar. Dates and periods come from `Std.Datetime`, and
@@ -35,7 +36,7 @@ anything else, including a sign, a space, a lowercase unit, and `ON`, `TN`,
 or `SN`, which are not calendar tenors. `try_parse_tenor` returns `None`
 instead of failing.
 
-From `tests/tenor.ch`:
+For example:
 
 ```chelis
 tenor_apply(tenor_months(3i64), date(2025i64, 6i64, 15i64), RejectInvalidDay)
@@ -74,7 +75,7 @@ A spot lag follows the two-calendar form of OpenGamma Strata's
 `DaysAdjustment`: `lagged_date` counts `days` business days in
 `count_calendar`, then rolls the result in `adjust_calendar`. Counting from
 a non-business trade date, the first step lands on the next business day.
-From `tests/tenor.ch`, two Japanese bank days from 2 July 2025 reach 4 July,
+For example, two Japanese bank days from 2 July 2025 reach 4 July,
 which the US federal roll moves to 7 July; from 30 December 2025 the Japanese
 year-end closures move the count to 6 January 2026, where a US count reaches
 2 January. A negative lag fails, and so does a date outside either
@@ -103,7 +104,7 @@ strictly increasing. Each date is the anchor plus k whole tenors, never the
 previous date plus one tenor, so a day of month clamped in February does not
 drift into the following months. A final stub anchors at `start` and an
 initial stub at `end`. A short stub keeps the irregular period on its own; a
-long stub merges it into the neighbouring regular period. `NoStub` requires
+long stub merges it into the neighboring regular period. `NoStub` requires
 the tenor to divide the span exactly and fails otherwise. With
 `end_of_month` true, a month-end anchor and a whole-month tenor keep every
 date on its month end, and the month end decides the day, so `overflow`
@@ -121,7 +122,7 @@ and a stub when rejected. A start that is not before the end fails.
 `roll`. It fails if two dates roll onto the same business day, rather than
 silently dropping one, or if a date lies outside the calendar's horizon.
 
-From `tests/schedule.ch`:
+For example:
 
 ```chelis
 schedule_unadjusted(date(2025i64, 1i64, 31i64), date(2025i64, 5i64, 31i64), tenor_months(1i64), NoStub, false, ClampToMonthEnd)
@@ -133,13 +134,3 @@ schedule_unadjusted(date(2025i64, 1i64, 15i64), date(2025i64, 12i64, 31i64), ten
 schedule(date(2025i64, 5i64, 4i64), date(2025i64, 8i64, 4i64), tenor_months(1i64), NoStub, false, ClampToMonthEnd, us_federal(), Following)
 // 5 May, 4 Jun, 7 Jul, 4 Aug: Sunday 4 May and the 4 July holiday roll forward
 ```
-
-## Removed tenor API
-
-`TenorUnit`, `tenor`, `days_n`, `weeks_n`, `months_n`, `years_n`,
-`days_per_unit`, `tenor_to_days`, and `parse_unit_suffix` are removed: they measured a month as
-30 days and a year as 365. Use `tenor_days`, `tenor_weeks`, `tenor_months`,
-and `tenor_years`, and `tenor_period` where a `Period` is needed. The
-calendar-day `overnight()`, `tomorrow_next()`, and `spot_next()` tenors and
-the `ON`, `TN`, and `SN` spellings of `parse_tenor` are replaced by the
-business-day tenors above. `tenor_apply` now takes a `DayOverflow`.

@@ -12,42 +12,6 @@ double-exponential jump helpers. Random draws take an explicit `key` argument;
 length, or the number of terminal draws, is the length of a template
 tensor you supply.
 
-## The time horizon
-
-Every sampler in this module requires a time horizon that is **finite and
-non-negative**, and refuses anything else at its entry rather than returning a
-value. This holds at all nine entry points -- `gbm_path`, `gbm_terminal`,
-`gbm_paths_antithetic_terminal_mean`, `merton_jump_terminal`,
-`sto_kou_jump_terminal`, `correlated_gbm_terminal_2d`, `heston_qe_terminal`,
-`heston_qe_paths_terminal`, and `heston_qe_step` (whose per-step `dt` is a
-horizon for this purpose). There are two diagnostics:
-
-```text
-Shoals.Stochastic: the time horizon must be non-negative; ...
-Shoals.Stochastic: the time horizon must be finite; ...
-```
-
-They are distinct because `gte(nan, 0.0)` is false, so a single ordering check
-would report a NaN horizon as a negative one and name the wrong cause.
-
-`t = 0` is admitted and returns `s0`. So is `t = -0.0`, which is the same
-horizon with its sign bit set: `sqrt(-0.0)` is `-0.0`, and no answer changes.
-
-The guard lives at each sampler's entry and keys on `t` itself, not on a
-product containing it (shoals#139). That placement matters. A negative horizon
-makes `sigma * sqrt(t)` NaN, which is a precondition of the **diffusion** and
-not of any jump count -- so the jump-count guard described under Merton below,
-which refuses a negative Poisson rate `lambda * t`, cannot see it at
-`lambda = 0`: `0.0 * -1.0` is `-0.0`, whose sign bit is set but which compares
-`>= 0.0` as true in IEEE 754, and at `lambda = 0` there is genuinely no Poisson
-law to be negative. Guarding the input rather than the product is what closes
-that gap, and the same reasoning applies to any guard that tests a product, sum
-or quotient rather than its operands.
-
-A horizon of `+inf` is refused on the same ground rather than for tidiness: the
-log drift and `sigma * sqrt(t)` are then both `+inf`, so
-`drift + vol_sqrt_t * z` is `inf - inf` for every negative draw, which is NaN.
-
 ## Geometric Brownian motion
 
 ```chelis
@@ -62,16 +26,16 @@ def gbm_paths_antithetic_terminal_mean[n](rng_key: key, template: tensor[n, f32]
 `gbm_paths_antithetic_terminal_mean` pairs each draw with its antithetic
 and returns the mean terminal value, which reduces variance.
 
-From `tests/stochastic.ch`, a fifty-step path is strictly positive and
-bit-exactly reproducible with a key derived from a fixed seed:
+For a fifty-step path, repeated calls with keys derived from the same seed
+and the same inputs produce the same values:
 
 ```chelis
 template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(50, i64))))
 path = gbm_path(key_from_seed(7i64), template, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
 ```
 
-The terminal draws have mean near `s0 * exp(mu * t)` and variance near the
-lognormal theory, both verified in the test suite at twenty thousand draws.
+The terminal draws have theoretical mean `s0 * exp(mu * t)`; a finite sample
+varies around that value.
 
 ## Merton jump-diffusion
 
@@ -86,7 +50,7 @@ model with normally distributed log jumps. It subtracts the diffusion
 correction and the expected jump contribution
 `lambda * (exp(jump_mean + 0.5 * jump_vol^2) - 1)`. This gives that model
 an expected terminal value of `s0 * exp(mu * t)`. With `lambda` zero it
-reduces to the plain GBM drift. From `tests/stochastic_extended.ch`:
+reduces to the plain GBM drift:
 
 ```chelis
 d = merton_compensated_drift(cast(0.05, f32), cast(0.2, f32), cast(0.0, f32), cast(-0.1, f32), cast(0.1, f32))
@@ -105,7 +69,7 @@ internally at the same length.
 One f32 limit is worth knowing and is not specific to this sampler. The mean
 log offset of a compensated path is `lambda * t * (jump_mean + 1 - w)` with
 `w = exp(jump_mean + 0.5 * jump_vol^2)`, and by Jensen that is at most zero for
-every parameter — so the failure mode is one-sided. Whenever the gap is large
+every parameter, so the failure mode is one-sided. Whenever the gap is large
 enough the whole terminal distribution sits below f32's smallest subnormal and
 every path reads as `0.0`, even though the mean of the model is still
 `s0 * exp(mu * t)`.
@@ -117,38 +81,29 @@ representable terminal value needs about an 18-sigma jump draw (that figure
 moves with the jump count and with `s0`). But `jump_vol = 0` reaches it too,
 through a large negative `jump_mean`: `lambda = 3000, jump_mean = -50` also
 gives `0.0` on every path. And it is reachable well inside ordinary
-parameters — `lambda = 200, jump_vol = 1.0, jump_mean = 0` at `s0 = 100` leaves
-the large majority of paths at zero. The exact count is seed-dependent and is
-not quoted here; the mechanism is not.
-
-This is the distribution being unrepresentable in f32, not a defect in the
-compensator. Every case above gives the identical result on the previous
-implementation, from the identical drift, and the drift expression it comes
-from is unchanged since Shoals 0.4.0.
+parameters: `lambda = 200, jump_vol = 1.0, jump_mean = 0` at `s0 = 100` leaves
+the large majority of paths at zero. This is the distribution being
+unrepresentable in f32, not a defect in the compensator.
 
 `merton_sampler_log_jump_moment` returns `log E[exp(J)]` for that aggregate
 log jump `J`, which is what `merton_jump_terminal` subtracts from the log
 drift. Subtracting the sampled law's own exponential moment is what makes the
-terminal mean exact, rather than subtracting a closed form that has to be kept
-in step with the sampler by hand. It converges to
+terminal mean exact. It converges to
 `lambda * t * (exp(jump_mean + 0.5 * jump_vol^2) - 1)`, so
 `merton_compensated_drift(mu, sigma, lambda, jump_mean, jump_vol) * t` and
 `(mu - 0.5 * sigma^2) * t - merton_sampler_log_jump_moment(lambda, jump_mean, jump_vol, t)`
-agree to within the 1e-5 relative tolerance asserted in
-`tests/stochastic_extended.ch`, over `lambda * t` from 0.3 to 20 and both signs
-of `jump_mean`. That file pins both the agreement and the moment itself against
-the closed form at those intensities and at three more that stress the f32
-exponent range. The agreement is loosest at the small-`lambda * t` end of that
-band, and outside it the two forms diverge further:
-for a very small `lambda * t` the enumerated moment is a `log(1 + x)` with `x`
-below f32 epsilon, and for a very small `jump_mean` it is the CLOSED form that
-loses the digits, to cancellation in `exp(jump_mean) - 1`. The absolute
-log-drift difference stays small either way.
-The slot table is sized on `lambda * t * exp(jump_mean + 0.5 * jump_vol^2)`,
-and an intensity whose table would exceed the slot cap is refused rather than
-truncated. A negative `lambda * t` is refused too: it names no Poisson law.
+agree to within a 1e-5 relative tolerance over `lambda * t` from 0.3 to 20
+and both signs of `jump_mean`. Outside that band the two forms diverge
+further: for a very small `lambda * t` the enumerated moment is a
+`log(1 + x)` with `x` below f32 epsilon, and for a very small `jump_mean` it
+is the closed form that loses the digits, to cancellation in
+`exp(jump_mean) - 1`. The absolute log-drift difference stays small either
+way. The slot table is sized on
+`lambda * t * exp(jump_mean + 0.5 * jump_vol^2)`, and an intensity whose table
+would exceed the slot cap is refused rather than truncated. A negative
+`lambda * t` is refused too: it names no Poisson law.
 
-From `tests/stochastic_extended.ch`:
+For example:
 
 ```chelis
 template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
@@ -166,7 +121,7 @@ def correlated_gbm_terminal_2d[n](rng_key: key, template_x: tensor[n, f32], temp
 `cholesky_2x2_lower` returns the lower-triangular Cholesky factor
 `(l11, l21, l22)` of a two-by-two covariance matrix given as
 `sigma_xx`, `sigma_xy`, `sigma_yy`. Reconstructing `L L^T` recovers the
-covariance. From `tests/stochastic_extended.ch`:
+covariance:
 
 ```chelis
 out = cholesky_2x2_lower(cast(4.0, f32), cast(2.0, f32), cast(3.0, f32))
@@ -188,53 +143,7 @@ out = correlated_gbm_terminal_2d(key_from_seed(13i64), template_x, template_y, c
 
 `heston_qe_step`, `heston_qe_terminal`, and `heston_qe_paths_terminal`
 implement a quadratic-exponential Heston step and keyed terminal draws.
+`sto_kou_compensator`, `sto_kou_jump_sample`, and `sto_kou_jump_terminal`
+provide double-exponential jump calculations and keyed terminal draws.
 These are model-specific approximations; use the corresponding source
 tests and [Scope and limitations](scope.md) to check parameter assumptions.
-
-## Kou jump-diffusion
-
-```chelis
-def sto_kou_compensator(p: f32, eta_up: f32, eta_dn: f32) -> f32
-def sto_kou_jump_sample(p: f32, eta_up: f32, eta_dn: f32, u_branch: f32, e_size: f32) -> f32
-def sto_kou_sampler_log_jump_moment(lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> f32
-def sto_kou_jump_terminal[n](rng_key: key, paths_template: tensor[n, f32], jumps_template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> tensor[n, f32]
-```
-
-The jump size `Y` is double-exponential: upward with probability `p` and
-magnitude `Exp(eta_up)`, downward otherwise with magnitude `Exp(eta_dn)`.
-`sto_kou_compensator` returns `zeta = E[exp(Y)] - 1`, which exists only for
-`eta_up > 1`; below that the up-jump moment integral diverges and the function
-returns a NaN sentinel.
-
-`sto_kou_jump_terminal` samples the model. It draws the jump count `N` from an
-enumerated Poisson law over a finite slot table, then adds the first `N` of
-that path's pre-drawn double-exponential jumps, so the aggregate log jump is a
-genuine compound Poisson sum. The table is sized on the exponentially tilted
-mean `lambda_jump * t * max(1, 1 + zeta)` -- the multiplier is floored at one,
-so a negative `zeta` sizes the table on the plain rate rather than shrinking it
--- plus a seven-standard-deviation margin and twelve absolute slots. An
-intensity whose table would exceed the slot cap is refused rather than silently
-truncated.
-
-`sto_kou_sampler_log_jump_moment` returns `log E[exp(J)]` for that aggregate
-log jump, which is exactly what `sto_kou_jump_terminal` subtracts from the log
-drift. The terminal mean is therefore `s0 * exp(mu * t)` by construction. For
-an untruncated Poisson count that moment equals `lambda_jump * t * zeta`
-exactly, because `E[w^N] = exp(rate * (w - 1))` with `w = 1 + zeta`; the
-function adds the enumeration correction so the identity survives truncation.
-
-Two cautions, both load-bearing:
-
-- The mean identity is exact, but `E[S_t^2]` is finite only for `eta_up > 2`.
-  At `eta_up = 2` the terminal second moment diverges, so a Monte-Carlo
-  terminal mean has no usable standard error there. Verify a drift against
-  `sto_kou_sampler_log_jump_moment` rather than against a sample mean.
-- Kou pays the slot bound harder than Merton does. Merton aggregates its `N`
-  jumps in closed form as a single Gaussian, so a slot costs one table entry.
-  Kou's jump sizes have no such form, so every slot is also a per-path draw
-  and a fold step. The twelve absolute slots in the bound therefore set a
-  floor of twelve draws per path even at a near-zero intensity, where the
-  older thinned sampler budgeted one. At `lambda_jump * t = 0.19` with
-  `zeta = 2` the table is 17 slots, so a low-intensity call costs about 17x
-  the per-path draws it used to. This buys the count law and is not tunable
-  without reintroducing the truncation the bound exists to prevent.

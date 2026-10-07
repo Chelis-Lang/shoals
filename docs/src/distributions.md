@@ -19,8 +19,7 @@ def lognormal_cdf(x: f32, mu: f32, sigma: f32) -> f32
 
 `lognormal_pdf` is the density of a lognormal whose log has mean `mu` and
 standard deviation `sigma`, defined to be zero for non-positive `x`.
-`lognormal_cdf` is the cumulative, also zero for non-positive `x`. From
-`tests/distributions.ch`:
+`lognormal_cdf` is the cumulative, also zero for non-positive `x`. For example:
 
 ```chelis
 p = lognormal_pdf(cast(1.0, f32), cast(0.0, f32), cast(1.0, f32))  // p ~ 0.398942
@@ -39,7 +38,7 @@ def student_t_cdf_approx(x: f32, nu: f32) -> f32
 composed over `Nautilus.Special.log_gamma` for the normalizing constant. It
 is symmetric about zero. `student_t_cdf_exact` delegates to
 `Nautilus.Distributions.student_t_cdf`. `student_t_cdf_approx` is a
-normal-based approximation. From `tests/distributions.ch`:
+normal-based approximation. For example:
 
 ```chelis
 p = student_t_pdf(cast(0.0, f32), cast(5.0, f32))  // p ~ 0.379607
@@ -54,7 +53,7 @@ def bvn_pdf(x: f32, y: f32, mu_x: f32, mu_y: f32, sigma_x: f32, sigma_y: f32, rh
 `bvn_pdf` is the bivariate-normal density at `(x, y)` with means
 `(mu_x, mu_y)`, standard deviations `(sigma_x, sigma_y)`, and correlation
 `rho`. At the origin under independent unit normals it equals
-`1 / (2 * pi)`. From `tests/distributions.ch`:
+`1 / (2 * pi)`. For example:
 
 ```chelis
 p = bvn_pdf(cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(1.0, f32), cast(1.0, f32), cast(0.0, f32))

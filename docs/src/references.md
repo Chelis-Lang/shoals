@@ -1,12 +1,9 @@
 # Reference oracles
 
 The `references/` directory holds textbook-formula implementations of the
-quantities the optimized library computes. They live under the
-`Shoals.References` module prefix and exist to be the ground truth that the
-library is checked against. They are written for clarity, following the
-closed-form definitions directly, and are not the code paths you call in
-production. Use them when you want to confirm a result by an independent
-route, or read them to see the formula a Shoals function implements.
+quantities the library computes, under the `Shoals.References` module prefix.
+Use them to cross-check a result or inspect the formula a Shoals function
+implements. Their definitions favor clarity over production performance.
 
 ## Black-Scholes
 
@@ -95,12 +92,11 @@ Reference values for `Shoals.Date.year_fraction`, as a day count or as an
 exact fraction `(numerator, denominator)` in lowest terms. They compute an
 exact proleptic-Gregorian day number of their own rather than calling
 `Std.Datetime.date_days_until`, so they check `Shoals.Date` against an
-independently derived calendar. They also state ISDA differently from the
-subject: the reference clamps every calendar year to the interval and sums
-the pieces, where `Shoals.Date` counts a whole interior year as exactly 1 and
-divides only the head and tail stubs. Agreement is therefore a real
-cross-check of the year-boundary handling rather than a restatement. The
-reference keeps a per-year loop; its spans are test-sized.
+independently derived calendar. The ISDA reference clamps every calendar
+year to the interval and sums the pieces. `Shoals.Date` counts a whole
+interior year as exactly 1 and divides only the head and tail stubs, so the
+two implementations exercise different year-boundary calculations.
+The reference loops over years in the test interval.
 
 The fixed values in `tests/date.ch` come from published sources: the ACT/ACT
 examples of ISDA's 1999 paper on ACT/ACT under EMU, the ISDA 2006 §4.16

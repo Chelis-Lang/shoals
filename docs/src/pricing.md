@@ -5,9 +5,9 @@ Module: `Shoals.Pricing`.
 This module provides the Black-Scholes call and put in closed form,
 vectorized price tensors over a set of spots, gradient-derived sensitivity
 vectors, and a Monte Carlo call pricer that takes an explicit random key.
-The `f32` scalar calls use an `f64` pricing body with this module's own
-normal-CDF approximation. The approximation loses relative precision in the
-far negative tail. See [Scope and limitations](scope.md) for numerical bounds.
+The `f32` scalar calls use an `f64` pricing body with Chelis's
+`standard_normal_cdf`, then round the result to `f32`.
+See [Scope and limitations](scope.md) for numerical bounds.
 
 ## Closed-form scalars
 
@@ -22,7 +22,7 @@ non-dividend-paying underlying. The arguments are spot `s`, strike `k`,
 the continuously compounded risk-free rate `r`, volatility `sigma`, and
 time to maturity `t` in years.
 
-From `tests/pricing.ch`, a one-year at-the-money call and put:
+A one-year at-the-money call and put:
 
 ```chelis
 px = bs_call_scalar(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
@@ -39,10 +39,8 @@ These two satisfy put-call parity: `c - p == s - k * exp(-r * t)`.
 `bs_call_f64_vector` prices matched `f64` tensors of spots, strikes, rates,
 volatilities, and maturities. `bs_call_wire_f64` is a separate pure-tensor
 entry with explicit tensor inputs for its normal-CDF coefficients. It uses
-an Abramowitz–Stegun approximation, while the scalar kernel uses Chelis's
-`standard_normal_cdf`, so callers should not expect identical values. The source
-test compares selected rows within `1e-5 + 1e-8 * abs(expected)`.
-`scripts/validate_bs_wire_root.py` checks the compiler-produced graph.
+an Abramowitz-Stegun approximation, while the scalar kernel uses Chelis's
+`standard_normal_cdf`, so callers should not expect identical values.
 
 ## Vectorized prices
 
@@ -57,7 +55,7 @@ def put_total[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> f
 spots, holding strike, rate, volatility, and maturity fixed. `call_total`
 and `put_total` sum the resulting prices to a single `f32`.
 
-From `tests/pricing.ch`:
+For example:
 
 ```chelis
 spots = to_tensor([cast(80.0, f32), cast(100.0, f32), cast(120.0, f32)])
@@ -104,8 +102,7 @@ diverge:
 | `vannas_call` | `0` | `0` | `0` |
 | `vegas_call`, `rhos_call`, `volgas_call` | `0` | `0` | `0` |
 
-Each value is the limit of the closed form, and you can check the table from
-here:
+The closed-form limits follow from the payoff and its derivatives:
 
 - At `t = 0` the price is the payoff `max(s - k, 0)`. Delta is its first
   derivative, a step; gamma is its second, a spike at the strike and zero
@@ -113,13 +110,13 @@ here:
 - Above the strike the price is `s - k * exp(-r * t)`, so `dC/dt` is
   `r * k * exp(-r * t)` and theta, which is `-dC/dt`, is `-r * k`. Volatility
   does not enter it.
-- Below the strike the price is zero in a neighbourhood, so every sensitivity
+- Below the strike the price is zero in a neighborhood, so every sensitivity
   there is zero.
 - Delta at the strike is `0.5` because `d1 = (r + sigma^2/2) * sqrt(t) / sigma`
   tends to zero, so `N(d1)` tends to `N(0)`. It is the limit in time, not a
   midpoint convention.
 - Vanna is `-n(d1) * d2 / sigma`. At the strike `n(d1)` tends to `n(0)`, which
-  is not zero, but `d2` tends to zero, so vanna does too — it is zero across
+  is not zero, but `d2` tends to zero, so vanna does too. It is zero across
   the whole surface at expiry.
 - Vega, rho and volga each carry a `sqrt(t)` or `t` factor.
 - Put delta follows from the call by put-call parity: differentiating it in the
@@ -128,10 +125,9 @@ here:
 
 Gamma at the strike grows like `n(d1) / (s * sigma * sqrt(t))` and theta like
 `-s * sigma * n(d1) / (2 * sqrt(t))`, where `n` is the standard normal density,
-so both grow without bound as `t` falls to zero. **The infinities represent that
-divergence; they are not values the quantities take.** Gamma at expiry is a Dirac
-delta, which has no value at a point, so `+inf` is a reporting choice — made
-because it keeps the sign and can be tested for, where `NaN` can be neither.
+so both grow without bound as `t` falls to zero. The infinities report that
+divergence. Gamma at expiry is a Dirac delta, with no pointwise value;
+the returned `+inf` preserves the sign of the diverging limit.
 
 If you aggregate a Greek vector, test for finiteness rather than for `NaN`: a
 `x == x` check is true for an infinity and will pass it through.
@@ -148,13 +144,13 @@ estimate. The number of paths is the length of the `template` tensor. The
 function takes a `key` as its first argument. Derive a reproducible key with
 `key_from_seed`.
 
-From `tests/pricing.ch`, a twenty-thousand-path estimate of the ATM call:
+For example, estimate an at-the-money call with twenty thousand paths:
 
 ```chelis
 template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
 mc_px = mc_call_price(key_from_seed(42i64), template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
 ```
 
-The source test checks a two-percent tolerance at this path count.
+Monte Carlo error depends on the number of paths and the selected seed.
 Running the same call twice with keys derived from the same seed and the same
 other inputs returns identical values.

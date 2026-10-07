@@ -153,6 +153,25 @@ jobs:
       # this per-PR job set, minus the CI-only `conform bump-check` — a
       # stale local origin/main would make that step false-fail).
 
+  # The user book (docs/) mirrors https://chelis.ch/docs/shoals/. Cheap and
+  # toolchain-free: build it and lint the book and README. There is no
+  # executable book-example validator yet; the examples are excerpts of the
+  # tests/ suite that nightly runs.
+  book:
+    name: book (mdbook build + lint)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install mdBook
+        uses: taiki-e/install-action@v2
+        with:
+          tool: mdbook@0.5.2
+      - name: Build mdBook
+        run: mdbook build docs
+      - name: Lint book and README
+        run: python3 scripts/check_book.py docs/src README.md
+
   # Offline manifest validation (no toolchain): schema/pin freshness + every
   # invariant/control/output-fn/precondition resolves to real sources.
   contract-gate:

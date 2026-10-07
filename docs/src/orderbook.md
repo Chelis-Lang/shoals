@@ -33,7 +33,7 @@ def add_ask(book: OrderBook, price: f32, qty: f32) -> OrderBook
 
 `add_bid` inserts a bid into the descending-price list, and `add_ask`
 inserts an ask into the ascending-price list, each preserving the sort. Both
-return a new book. From `tests/orderbook.ch`:
+return a new book. For example:
 
 ```chelis
 book = empty_book()
@@ -62,8 +62,8 @@ it returns NaN when the total quantity is zero. The module sorts supplied
 orders but does not match them or validate price and quantity.
 `total_bid_qty` and `total_ask_qty` sum the quantities on each side.
 
-From `tests/orderbook.ch`, the best bid of the three-order book above is
-`100`, and a one-tick spread reads as expected:
+For example, the best bid of the three-order book above is
+`100`. Adding an ask at `101` gives a spread of `1`:
 
 ```chelis
 best = best_bid(b3)  // best price == 100.0

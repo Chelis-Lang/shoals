@@ -1,10 +1,11 @@
 # Working with tensors and keys
 
-The module chapters show short excerpts from Shoals source and tests. They are call examples, not standalone files. [Getting started](getting-started.md) gives a complete command to run a source test.
+Use Shoals as a Reef dependency, as described in
+[Getting started](getting-started.md).
 
 ## Types and tensors
 
-Chelis makes element types explicit. Most finance amounts in Shoals are `f32`; the pricing module also exports `f64` kernels. Indices, lengths, and seeds are `i64`. Existing Shoals tests write `cast(100.0, f32)` and `cast(3, i64)`.
+Chelis makes element types explicit. Most finance amounts in Shoals are `f32`; the pricing module also exports `f64` kernels. Indices, lengths, and seeds are `i64`. Use explicit casts for numeric literals, such as `cast(100.0, f32)` and `cast(3, i64)`.
 
 A tensor can be built from a list:
 
@@ -29,7 +30,7 @@ when you want a reproducible draw:
 mc_px = mc_call_price(key_from_seed(42i64), template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
 ```
 
-The complete test imports `Shoals.Pricing.mc_call_price`. Deriving a new key
+Import `Shoals.Pricing.mc_call_price` in your module. Deriving a new key
 from the same seed and using the same inputs gives the same result. Split a key
 when a computation needs independent draws. Monte Carlo accuracy is statistical
 and depends on the number of paths.
@@ -37,7 +38,8 @@ and depends on the number of paths.
 ## Records and purity
 
 Shoals uses algebraic data types with named fields, such as
-`Order { price, qty }` and `YieldCurve { kind, times, rates }`. Public
-accessors often let you read fields without a pattern match. Simulation
+`Order { price, qty }`. For opaque types such as `YieldCurve`, use the
+public constructors and accessors described in [Yield curves](curves.md).
+Simulation
 functions are pure calls whose results depend on their explicit keys and
 other inputs.

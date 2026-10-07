@@ -21,7 +21,7 @@ the empirical VaR and expected shortfall at the confidence level, delegating
 to `historical_var` and `historical_cvar`. `expected_shortfall_frtb_975` is
 the FRTB-IMA expected shortfall fixed at the 97.5% level.
 
-From `tests/riskext.ch`, on the integer losses `0..100`:
+For example, on the integer losses `0..100`:
 
 ```chelis
 losses = to_tensor(map(fn (i: i64) -> cast(cast(i, i32), f32), range(cast(0, i64), cast(101, i64))))
@@ -41,8 +41,7 @@ def scenario_pnl_grid[m](base_value: f32, scenario_shifts: tensor[m, f32], pnl_p
 ```
 
 `scenario_pnl_grid` applies a linear PnL sensitivity to a tensor of scenario
-shifts: each output entry is `base_value + pnl_per_unit_shift * shift`. From
-`tests/riskext.ch`:
+shifts: each output entry is `base_value + pnl_per_unit_shift * shift`. For example:
 
 ```chelis
 shifts = to_tensor([cast(-0.02, f32), cast(-0.01, f32), cast(0.0, f32), cast(0.01, f32), cast(0.02, f32)])
@@ -60,7 +59,7 @@ def kupiec_pof_statistic_simple(num_violations: i64, total_observations: i64, ex
 likelihood-ratio statistic for VaR backtesting. It compares the observed
 exception rate `num_violations / total_observations` to the expected rate.
 When the observed rate equals the expected rate the statistic is zero; when
-it is far from expected the statistic grows. From `tests/riskext.ch`:
+it is far from expected the statistic grows. For example:
 
 ```chelis
 stat = kupiec_pof_statistic_simple(cast(5, i64), cast(100, i64), cast(0.05, f32))

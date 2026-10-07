@@ -24,11 +24,9 @@ type DayCount =
 def year_fraction(start: Date, end: Date, convention: DayCount) -> YearFraction
 ```
 
-Each convention has one published definition, and its name says which.
-Names that libraries use for different rules, such as "ACT/365" or
-"30/360 ISDA", are not conventions here. An input a convention needs beyond
-the two dates is a field of its variant, so the convention cannot be
-requested without it.
+The variants select specific published definitions: `ActualOver365Fixed`
+means ACT/365 Fixed, and `ThirtyEOver360Isda` means 30E/360 ISDA.
+Inputs beyond the two accrual dates are required fields of the variant.
 
 | Variant | Convention | Definition |
 |---|---|---|
@@ -51,7 +49,7 @@ fails when an accrual date lies outside the calendar's horizon.
 ACT/ACT AFB is not provided: its treatment of 29 February in a period
 longer than a year is disputed between sources.
 
-From `tests/date.ch`, with the expected values as exact fractions:
+For example, with the expected values as exact fractions:
 
 ```chelis
 // ISDA's worked example: 61 days of a 365-day year
@@ -86,24 +84,8 @@ It is opaque, so every value comes from `year_fraction` and is reduced.
 when the numerator's magnitude or the denominator exceeds 2^53, where the
 integer-to-float casts would no longer be exact. `year_fraction_to_f32`
 returns the f32 nearest the exact fraction. It rounds the f64 quotient a
-second time, which the comment in `src/date.ch` proves correct whenever the
+second time, which gives the nearest f32 whenever the
 denominator is below 2^29 and the magnitude below 2^24, and it fails outside
 those bounds rather than risk a double rounding. Every convention stays
 inside both bounds for ordinary inputs; only an ACT/ACT ICMA frequency in the
 millions reaches them.
-
-## Removed date helpers
-
-The generic date helpers Shoals used to carry are removed in favour of the
-standard library:
-
-| Removed | Replacement |
-|---|---|
-| `Act360`, `Act365`, `ThirtyThreeSixty`, `ActActIsda`, `ActActIcma` | `ActualOver360`, `ActualOver365Fixed`, `ThirtyEOver360` (what `ThirtyThreeSixty` computed), `ActualActualIsda`, `ActualActualIcma` |
-| `year_fraction(...) -> f64` | `year_fraction(...) -> YearFraction`, then `year_fraction_to_f64` or `year_fraction_to_f32` |
-| `is_weekend` | `Std.Datetime.date_weekday`, or `Std.Datetime.Business.is_business_day` against a calendar |
-| `date_roll_following`, `date_roll_preceding`, `date_roll_modified_following` and their `*_published` forms | `Std.Datetime.Business.business_day_roll(calendar, d, Following / Preceding / ModifiedFollowing)` |
-| `add_business_days` | `Std.Datetime.Business.business_day_offset(calendar, d, n, start)`, where `start` states what a non-business start date does |
-| `add_months` | `Std.Datetime.date_add_months(d, n, overflow)` with an explicit `DayOverflow` |
-| `days_in_month` | `Std.Datetime.days_in_month` |
-| `schedule_from_tenor`, `schedule_from_tenor_calendar` | `Shoals.Schedule.schedule_unadjusted` and `schedule`; see [Tenors and schedules](tenors.md) |

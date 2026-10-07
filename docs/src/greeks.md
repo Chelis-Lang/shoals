@@ -26,16 +26,16 @@ bumps maturity, each by `h`, and forms a central difference. The theta
 functions return the negative of the maturity derivative, so a long option
 that decays in time reports a negative theta.
 
-From `tests/greeks.ch`, an at-the-money call delta with a bump of `0.01`:
+For example, estimate an at-the-money call delta with a bump of `0.01`:
 
 ```chelis
 fd = fd_delta_call(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32), cast(0.01, f32))
 ```
 
-For the positive inputs exercised in the tests, call delta is in `[0, 1]`,
-put delta is in `[-1, 0]`, and they differ by approximately one. Call
-and put vega agree within the test tolerance. At the tested points,
-call rho is positive, put rho negative, and call theta negative.
+For standard positive Black-Scholes inputs, call delta is in `[0, 1]`,
+put delta is in `[-1, 0]`, and they differ by one. Call and put vega are
+equal. With positive spot, strike, rate, volatility, and maturity, call rho
+is positive, put rho is negative, and call theta is negative.
 
 ## Second-order finite-difference Greeks
 
@@ -50,7 +50,7 @@ def fd_volga_call(s: f32, k: f32, r: f32, sigma: f32, t: f32, h: f32) -> f32
 cross derivative of delta with respect to volatility and so takes two bump
 sizes, one for spot (`h_s`) and one for volatility (`h_v`).
 
-From `tests/greeks.ch`:
+For example:
 
 ```chelis
 g = fd_gamma_call(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32), cast(0.5, f32))
@@ -71,8 +71,8 @@ These are the closed-form Black-Scholes sensitivities. `analytic_delta_call`
 is `N(d1)`, `analytic_delta_put` is `N(d1) - 1`, `analytic_vega_call` is
 `s * phi(d1) * sqrt(t)`, and `analytic_gamma_call` is
 `phi(d1) / (s * sigma * sqrt(t))`. `n_pdf` is the standard normal density.
-The test suite uses these to confirm the finite-difference Greeks agree
-with the closed forms. From `tests/greeks.ch`:
+For example, compare a finite-difference estimate with the closed-form
+delta at a representative input:
 
 ```chelis
 fd = fd_delta_call(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32), cast(0.01, f32))
@@ -89,8 +89,8 @@ def lr_digital_call_delta(s_terminal: f32, k: f32, s0: f32, sigma: f32, t: f32, 
 
 `pathwise_smooth_call_terminal_delta` is the pathwise delta estimator for a
 single terminal price on a smooth call payoff: in the money it returns
-`df * s_terminal / s0`, and out of the money it returns zero. From
-`tests/greeks.ch`, an in-the-money single path:
+`df * s_terminal / s0`, and out of the money it returns zero.
+For an in-the-money single path:
 
 ```chelis
 d = pathwise_smooth_call_terminal_delta(cast(120.0, f32), cast(100.0, f32), cast(0.95, f32), cast(100.0, f32))

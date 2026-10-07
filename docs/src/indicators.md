@@ -159,11 +159,9 @@ recomputes each window. Factor that cost into long series or large windows.
 
 ## Tensor inputs
 
-Every function above also accepts a `tensor[n, f64]` series. The tensor form's
-name is the list name with `tensor_` prepended, so you can derive it instead of
-looking it up: `sma` has `tensor_sma`, and `ind_rolling_mean` has
-`tensor_ind_rolling_mean`. Every list function on this page has one, the rolling
-and lag functions included.
+Every function above has a `tensor[n, f64]` form named by adding `tensor_`
+to the list function's name: `sma` has `tensor_sma`, and `ind_rolling_mean`
+has `tensor_ind_rolling_mean`. This includes the rolling and lag functions.
 
 ```text
 def tensor_sma[n](xs: tensor[n, f64], window: i64) -> List[Option[f64]]
@@ -186,8 +184,7 @@ list forms do. `tensor_crossover` and `tensor_crossunder` return
 and leading-`None` counts in [Reading a result](#reading-a-result) apply
 unchanged, so a tensor input adds no warm-up rules of its own.
 
-No tensor form returns a tensor; the results are lists on both surfaces.
-`spec/shoals_quant_surface.md` §2.15.5 records why.
+The tensor forms return lists with the same optional values as the list forms.
 
 The scalar and convention arguments follow the list form's, in the same order
 and with the same meaning, so `Ddof`, `Smoothing`, `EmaSeed` and `Alpha`
@@ -198,7 +195,7 @@ variable in the tensor signature. Widths with another name are unchanged, so
 
 Length agreement is stronger here than on the list surface. One `[n]` covers
 every series a call takes, so a multi-series call such as `tensor_atr` cannot be
-given mismatched lengths in the first place -- on the list surface that is a trap
+given mismatched lengths in the first place. On the list surface that is a trap
 checked at run time.
 
 ### Crossings need an explicit warm-up
@@ -249,40 +246,6 @@ negative volume, a negative `ind_shift` lag, and an `ind_diff` lag below 1. On
 the tensor crossing forms it also traps a negative warm-up and a warm-up greater
 than the series length; a warm-up equal to the length is legal.
 
-## Source and checks
-
-The implementation is in `src/indicators.ch`, with the contract in
-`spec/shoals_quant_surface.md` §2.15. [`tests/indicators.ch`](../../tests/indicators.ch)
-checks selected output values, warm-up positions, convention differences,
-and the defined edge cases. [`properties/indicators.ch`](../../properties/indicators.ch)
-checks analytic identities, including constant-series EMA, ramp SMA,
-Bollinger width, and the population-to-sample deviation ratio. It checks
-absence of look-ahead by perturbing the last input for `ema` and `rsi`;
-that executable check covers those two functions. The implementation uses
-current and earlier input indices for the other operations.
-
-[`tests/indicators_tensor.ch`](../../tests/indicators_tensor.ch) checks each
-tensor form against its list counterpart for exact equality, and
-`scripts/check_tensor_surface_parity.py` reports on the correspondence between
-the two surfaces; it reads the module's export list, so it proves that every
-list function has a tensor counterpart and no counterpart is unexported.
-
-[`references/indicators.ch`](../../references/indicators.ch) computes a
-first-value-seeded EMA by a geometric-weight sum for comparison with the
-recursive implementation. `scripts/oracle_indicators.py` independently
-calculates figures used in `tests/indicators.ch`; the figures are copied
-into the Chelis tests, so rerun the script and compare its output with
-those assertions when changing a kernel. See [Properties](properties.md)
-and [Reference oracles](references.md) for the book's wider checking
-approach.
-
-### Oracle self-check
-
-Run `python3 scripts/test_oracle_indicators.py` from the Shoals root when
-changing `scripts/oracle_indicators.py` and before copying a new oracle
-figure into `tests/indicators.ch`. Success is exit status 0 with a final
-`ORACLE SELF-CHECK: PASS` line. This manual check exercises the Python
-oracle's alphas, analytic identities, warm-up counts for selected periods,
-and defined cases. It does not compare the script's printed decimals with
-the values copied into the Chelis tests; that comparison is a separate
-step.
+See [Property specifications](properties.md) for the financial
+relationships stated by this library and [Scope and limitations](scope.md)
+for input assumptions and limits.

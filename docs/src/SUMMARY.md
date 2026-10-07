@@ -1,12 +1,9 @@
 # Summary
 
-[Introduction](introduction.md)
+[Introduction](index.md)
 
 - [Getting started](getting-started.md)
 - [Working with tensors and keys](conventions.md)
-
-# Module reference
-
 - [Pricing](pricing.md)
 - [Greeks](greeks.md)
 - [Extended pricers](pricing-extended.md)
@@ -26,14 +23,7 @@
 - [Calibration](modelfit.md)
 - [XVA](xva.md)
 - [Currency-tagged money](currency.md)
-
-# Verification
-
 - [Reference oracles](references.md)
 - [Property specifications](properties.md)
-- [Counterexample demos](demos.md)
-
-# Reference material
-
+- [Counterexample examples](demos.md)
 - [Scope and limitations](scope.md)
-- [Package verification manifest](import-surface.md)

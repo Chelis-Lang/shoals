@@ -14,7 +14,7 @@ def clamp_to_bounds(x: f32, lo: f32, hi: f32) -> f32
 ```
 
 `clamp_to_bounds` projects `x` into `[lo, hi]`, returning `lo` below the
-range, `hi` above it, and `x` unchanged inside. From `tests/modelfit.ch`,
+range, `hi` above it, and `x` unchanged inside. For example,
 `clamp_to_bounds(5.0, 0.0, 1.0) == 1.0`.
 
 ## Residuals
@@ -29,7 +29,7 @@ def vega_weighted_squared_residuals[n](observed: tensor[n, f32], predicted: tens
 point, and `weighted_absolute_residuals` returns `weight * |observed - predicted|`.
 `vega_weighted_squared_residuals` weights each squared residual by the
 inverse square of the point's vega, so points with smaller vega receive more
-weight (and a zero vega contributes no weight). From `tests/modelfit.ch`:
+weight (and a zero vega contributes no weight). For example:
 
 ```chelis
 observed = to_tensor([cast(1.0, f32), cast(2.0, f32), cast(3.0, f32)])
@@ -57,8 +57,7 @@ def lm_bounded_step_scalar(jtj: f32, jtr: f32, lambda: f32, current: f32, lo: f3
 parameter: it computes `step = jtr / (jtj + lambda)`, moves the current
 value to `current - step`, and projects the result into `[lo, hi]`. The
 damping `lambda` attenuates the step. If `jtj + lambda` is exactly
-zero, the function uses a zero step before clamping. From
-`tests/modelfit.ch`:
+zero, the function uses a zero step before clamping. For example:
 
 ```chelis
 step = lm_bounded_step_scalar(cast(1.0, f32), cast(0.0, f32), cast(0.001, f32), cast(0.5, f32), cast(0.0, f32), cast(1.0, f32))
@@ -73,5 +72,4 @@ larger `lambda` produces a smaller, more conservative move.
 The module also exports `lm_bounded_nparam` and `bfgs_bounded_nparam` for
 bounded vector parameters, `multi_target_fit`, SABR initializers, and
 two-stage pipeline helpers. Their callbacks, shapes, bounds, and stopping
-settings are explicit. See `src/modelfit.ch` and the corresponding
-`tests-manual/` cases for complete signatures and numerical examples.
+settings are explicit.

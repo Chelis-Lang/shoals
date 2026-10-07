@@ -1,12 +1,9 @@
 # Property specifications
 
-The `properties/` directory holds finance checks. Many are ordinary
-Chelis functions that return a `bool` for one set of inputs under the
-`Shoals.Properties` module prefix. The runtime suite calls them on
-selected inputs. A passing test establishes that result for those inputs;
-read a property's formula and assumptions before applying it elsewhere.
-Other files contain `@property` declarations run through a separate
-prover.
+Shoals includes finance properties that state relationships among its
+calculations. Some are evaluated at selected inputs; others are checked by a
+prover. A result applies only to its stated assumptions and method. Read the
+property's formula before applying it to a different model or input range.
 
 ## Pricing properties
 
@@ -104,9 +101,9 @@ not a tolerance.
 - `additive_under_isda(a, b, c)`: the ACT/ACT ISDA fraction over `a..c` is
   the exact sum of those over `a..b` and `b..c`.
 
-These are driven at concrete inputs from `tests/date.ch`. Nothing else in the
-repository calls the `properties/` surface, so a property with no test beside it
-is compiled and never executed.
+These properties describe calendar and tenor relationships. They do not imply
+that `make_bar` validates market-data ordering; its input checks are described
+in [Scope and limitations](scope.md).
 
 ## Tenor properties
 
@@ -114,8 +111,7 @@ Module: `Shoals.Properties.Tenor`.
 
 - `schedule_is_increasing_and_bounded(start, end, months)`: a short-final
   schedule of whole-month tenors starts at `start`, ends at `end`, and is
-  strictly increasing, whatever the day of month. `tests/schedule.ch` drives
-  it.
+  strictly increasing, whatever the day of month.
 
 ## Market-data properties
 
@@ -128,21 +124,5 @@ Module: `Shoals.Properties.MarketData`.
   `make_bar` does not enforce that ordering.
 - `snapshot_empty_has_no_quote(d, key)`: an empty snapshot returns no quote.
 
-## How the properties run
-
-The runtime test suite calls these property functions on fixed input grids
-and asserts they return true. `tests/properties.ch` drives the pricing,
-no-arbitrage, and Greek properties; `tests/distributions.ch` drives the
-distribution properties; and the date, tenor, curve, market-data, and
-vol-surface properties are exercised through their respective test modules.
-The properties are written as plain boolean functions, which is the form the
-test suite consumes. See [Scope and limitations](scope.md) for what this
-form does and does not cover.
-
-The `@property` corpus has a separate release gate. Its VaR/expected-
-shortfall entries cover confidence monotonicity, shortfall dominance, and
-positive-loss behavior for both Gaussian parametric and empirical measures.
-The manifest reports `fuzz_validated` for these entries, with 25 accepted
-samples at each of seeds 0, 1, and 2, plus controls that detect wrong
-results. This is sampled evidence. The method and pinned release identity
-are in the [verification manifest](import-surface.md).
+See [Scope and limitations](scope.md) for a description of what
+these properties do and do not establish.

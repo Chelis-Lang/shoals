@@ -25,7 +25,7 @@ def quote_value(q: Quote) -> f32
 
 A `Quote` carries a side (bid, ask, mid, or last), a value, and an as-of
 date. `make_quote` constructs one; `quote_side` and `quote_value` read the side
-and value back. From `tests/marketdata.ch`:
+and value back. For example:
 
 ```chelis
 d = date(cast(2025, i64), cast(6, i64), cast(15, i64))
@@ -48,8 +48,7 @@ def md_bar_volume(b: Bar) -> f32
 ```
 
 A `Bar` is an open-high-low-close-volume record with an as-of date. `make_bar`
-constructs one; the `md_bar_*` accessors read each field. From
-`tests/marketdata.ch`:
+constructs one; the `md_bar_*` accessors read each field. For example:
 
 ```chelis
 b = make_bar(d, cast(100.0, f32), cast(101.0, f32), cast(99.5, f32), cast(100.5, f32), cast(1000.0, f32))
@@ -69,7 +68,7 @@ def snapshot_lookup(s: Snapshot, key: string) -> Option[Quote]
 A `Snapshot` is an as-of date and a list of keyed quotes. `make_snapshot`
 constructs one from a list of `(key, quote)` pairs. `snapshot_lookup` scans
 the list for a key and returns `Some(quote)` if found or `None` if absent.
-From `tests/marketdata.ch`:
+For example:
 
 ```chelis
 s = make_snapshot(d, [("SPX", make_quote(Mid, cast(5000.0, f32), d))])

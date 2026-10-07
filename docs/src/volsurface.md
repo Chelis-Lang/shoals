@@ -16,8 +16,7 @@ type SVI =
 
 The SVI parameters are `a` (the vertical level), `b` (the slope of the
 wings), `rho` (the rotation, or skew), `m` (the horizontal translation),
-and `sigma` (the smoothness of the curvature near the money). From
-`tests/volsurface.ch`, a flat surface and a downward-skewed smile:
+and `sigma` (the smoothness of the curvature near the money). For example, a flat surface and a downward-skewed smile:
 
 ```chelis
 def flat_svi() -> SVI = SVI { a: cast(0.04, f32), b: cast(0.0, f32), rho: cast(0.0, f32), m: cast(0.0, f32), sigma: cast(0.1, f32) }
@@ -36,7 +35,7 @@ def vs_implied_vol(p: SVI, k: f32, t: f32) -> f32
 `sqrt(max(w, 0) / t)`, clamping negative variance to zero. Supply `t > 0`;
 the function does not validate its input.
 
-From `tests/volsurface.ch`, a flat surface has total variance equal to `a`
+For example, a flat surface has total variance equal to `a`
 at the money and constant across strikes, and its implied vol at one year
 is `sqrt(a / t)`:
 
@@ -64,7 +63,7 @@ adds to `b`. `parallel_shift_atm_iv` is the structured shift that lifts the
 at-the-money implied volatility by exactly `delta_iv`, recomputing the level
 parameter so the change to total variance is consistent at maturity `t`.
 
-From `tests/volsurface.ch`:
+For example:
 
 ```chelis
 p = smile_svi()
@@ -84,7 +83,7 @@ def is_iv_solver_failed(iv: f32) -> bool
 `implied_vol_from_call` inverts the Black-Scholes call to find the
 volatility that reproduces `target_price`. It calls `implied_vol_bisect`
 with a search bracket of `0.0001` to `5.0`, sixty iterations, and a price
-tolerance of `0.000001`. From `tests/volsurface.ch`, the solver round-trips
+tolerance of `0.000001`. For example, the solver round-trips
 a Black-Scholes price back to its volatility:
 
 ```chelis
