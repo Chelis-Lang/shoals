@@ -14,9 +14,18 @@ type SVI =
   | SVI { a: f32, b: f32, rho: f32, m: f32, sigma: f32 }
 ```
 
-The SVI parameters are `a` (the vertical level), `b` (the slope of the
-wings), `rho` (the rotation, or skew), `m` (the horizontal translation),
-and `sigma` (the smoothness of the curvature near the money). For example, a flat surface and a downward-skewed smile:
+This is Gatheral's raw SVI parameterization of total implied variance
+`w = sigma_iv^2 * t` at log-moneyness `k`:
+
+`w(k) = a + b * (rho * (k - m) + sqrt((k - m)^2 + sigma^2))`
+
+`a` sets the vertical level, `b` the slope of the wings, `rho` the skew,
+`m` the horizontal translation, and `sigma` the curvature near the money.
+The parameters are admissible when `b >= 0`, `|rho| < 1`, `sigma > 0`, and
+`a + b * sigma * sqrt(1 - rho^2) >= 0`, which keeps `w` nonnegative at every
+strike. Nothing checks these conditions, and they do not rule out calendar
+or butterfly arbitrage across maturities. For example, a flat surface and a
+downward-skewed smile:
 
 ```chelis
 def flat_svi() -> SVI = SVI { a: cast(0.04, f32), b: cast(0.0, f32), rho: cast(0.0, f32), m: cast(0.0, f32), sigma: cast(0.1, f32) }
@@ -45,8 +54,9 @@ w = vs_total_variance(p, cast(0.0, f32))      // w == 0.04
 iv = vs_implied_vol(p, cast(0.0, f32), cast(1.0, f32))  // iv == 0.2
 ```
 
-The example's left wing has higher total variance than its at-the-money
-value; the skew can make the two wings behave differently.
+For `smile_svi()`, `w(0) = 0.060000002`, `w(-0.2) = 0.096721366`, and
+`w(0.2) = 0.07272136`: with `rho = -0.3` the left wing rises faster than
+the right.
 
 ## Surface shifts
 
@@ -89,13 +99,25 @@ a Black-Scholes price back to its volatility:
 ```chelis
 price = bs_call_scalar(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
 iv = implied_vol_from_call(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(1.0, f32), price)
-// iv == 0.2
+// price == 10.450583, iv == 0.19999999
 ```
 
-`implied_vol_bisect` exposes the full bisection with an explicit bracket,
-iteration cap, and tolerance. It requires a strict sign change across the
-bracket; even an exact target at an endpoint fails that test. On failure it
-returns a NaN sentinel.
+`implied_vol_bisect` exposes the full bisection. It first requires
+`C(vol_lo) - target` and `C(vol_hi) - target` to have strictly opposite
+signs, where `C` is `bs_call_scalar`; otherwise, including an exact target at
+an endpoint, it returns the NaN sentinel at once. The bracket may be given
+in either order. Each of the `max_iters` iterations halves the bracket and
+stops early when `|C(mid) - target| < tol`, so `tol` is an absolute price
+tolerance, not a volatility tolerance.
+
+Running out of iterations is not reported. The function returns the last
+midpoint, however far from the root. For the at-the-money target
+`10.450583` above and the bracket `[0.0001, 5.0]`, 5 iterations return
+`0.15634687` instead of `0.2`, and `max_iters = 0` returns `0.5`, a
+placeholder that is not a midpoint of the bracket. Sixty iterations narrow
+a bracket of width 5 below `f32` resolution, so with the default cap the
+result is as close as `f32` allows even when the price tolerance is never
+met.
 `bracket_brackets_root` reports whether a `[vol_lo, vol_hi]` pair brackets
 the target, and `is_iv_solver_failed` tests the returned value for the NaN
 sentinel:
@@ -118,7 +140,26 @@ def vs_sabr_shift_rho(p: SABR, d: f32) -> SABR
 def vs_sabr_shift_nu(p: SABR, d: f32) -> SABR
 ```
 
-The two implied-vol functions evaluate a Hagan-style SABR expansion for
-an off-ATM strike or at the money. They do not calibrate parameters or
-enforce `f > 0`, `k > 0`, `alpha > 0`, or `|rho| < 1`; supply admissible
-values. The shift functions change one parameter at a time.
+The two implied-vol functions evaluate the Hagan, Kumar, Lesniewski, and
+Woodward (2002) lognormal expansion: `vs_sabr_implied_vol` the general-strike
+formula, with the `z / x(z)` factor and the `(1 - beta)^2 / 24` and
+`(1 - beta)^4 / 1920` log-moneyness corrections, and
+`vs_sabr_atm_implied_vol` its at-the-money limit. Below `|z| < 1e-7` the
+general formula drops the `z / x(z)` factor, so it meets the ATM value
+continuously. They return a Black (lognormal) volatility for forward `f`,
+strike `k`, and maturity `t` in years.
+
+```chelis
+p = SABR { alpha: cast(0.035, f32), beta: cast(0.5, f32), rho: cast(-0.2, f32), nu: cast(0.4, f32) }
+otm = vs_sabr_implied_vol(p, cast(0.03, f32), cast(0.035, f32), cast(1.0, f32))  // 0.19355083
+atm = vs_sabr_atm_implied_vol(p, cast(0.03, f32), cast(1.0, f32))               // 0.20428286
+```
+
+The parameter domain is `alpha > 0`, `0 <= beta <= 1`, `|rho| < 1`,
+`nu >= 0`, `f > 0`, `k > 0`, and `t >= 0`; nothing enforces it, and
+outside it the formulas return NaN or meaningless values. The expansion is
+an asymptotic approximation in `nu^2 * t`: its accuracy degrades for long
+maturities, large `nu`, and strikes far from the forward, where it can also
+imply a negative density. The functions do not calibrate parameters; see
+[Calibration](modelfit.md) for SABR starting points. The shift
+functions change one parameter at a time.

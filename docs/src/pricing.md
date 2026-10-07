@@ -36,11 +36,37 @@ These two satisfy put-call parity: `c - p == s - k * exp(-r * t)`.
 
 ## Tensor-valued f64 entry
 
-`bs_call_f64_vector` prices matched `f64` tensors of spots, strikes, rates,
-volatilities, and maturities. `bs_call_wire_f64` is a separate pure-tensor
-entry with explicit tensor inputs for its normal-CDF coefficients. It uses
-an Abramowitz-Stegun approximation, while the scalar kernel uses Chelis's
-`standard_normal_cdf`, so callers should not expect identical values.
+```chelis
+def bs_call_f64_vector[n](spots: tensor[n, f64], strikes: tensor[n, f64], rates: tensor[n, f64], sigmas: tensor[n, f64], times: tensor[n, f64]) -> tensor[n, f64]
+def bs_call_wire_f64[n](s: tensor[n, f64], k: tensor[n, f64], r: tensor[n, f64], sigma: tensor[n, f64], t: tensor[n, f64], half: tensor[n, f64], inv_sqrt_2: tensor[n, f64], a1: tensor[n, f64], a2: tensor[n, f64], a3: tensor[n, f64], a4: tensor[n, f64], a5: tensor[n, f64], p: tensor[n, f64], two_over_sqrt_pi: tensor[n, f64], small: tensor[n, f64]) -> tensor[n, f64]
+```
+
+`bs_call_f64_vector` prices row `i` as `bs_call_f64(spots[i], strikes[i],
+rates[i], sigmas[i], times[i])`, so each contract carries its own terms:
+
+```chelis
+vec = bs_call_f64_vector(
+  to_tensor([cast(100.0, f64), cast(90.0, f64)]),
+  to_tensor([cast(100.0, f64), cast(100.0, f64)]),
+  to_tensor([cast(0.05, f64), cast(0.05, f64)]),
+  to_tensor([cast(0.2, f64), cast(0.2, f64)]),
+  to_tensor([cast(1.0, f64), cast(0.5, f64)])
+)
+// [10.450583572185565, 2.34942829541399]
+```
+
+`bs_call_wire_f64` is the same call price written with tensor operations
+only, for consumers that need a pure tensor graph. It evaluates the normal
+CDF with the Abramowitz-Stegun erf approximation 7.1.26, whose constants it
+takes as inputs, each a tensor of length `n` repeating one value:
+`half = 0.5`, `inv_sqrt_2 = 0.7071067811865476`, `a1 = 0.254829592`,
+`a2 = -0.284496736`, `a3 = 1.421413741`, `a4 = -1.453152027`,
+`a5 = 1.061405429`, `p = 0.3275911`,
+`two_over_sqrt_pi = 1.1283791670955126`, and `small = 0.00001` (below
+`|x| < small` it uses the linear term of erf). That approximation has
+absolute error up to about `1.5e-7` in erf, so its prices match
+`bs_call_f64` closely but not exactly. Other coefficient values give a
+different function, unchecked.
 
 ## Vectorized prices
 
@@ -60,7 +86,7 @@ For example:
 ```chelis
 spots = to_tensor([cast(80.0, f32), cast(100.0, f32), cast(120.0, f32)])
 prices = call_prices(spots, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
-// prices are approximately 1.8594, 10.4506, 26.169
+// [1.8594197, 10.450583, 26.169044]
 ```
 
 `call_total(spots, ...)` equals the sum of the entries of
@@ -138,19 +164,22 @@ If you aggregate a Greek vector, test for finiteness rather than for `NaN`: a
 def mc_call_price[n](rng_key: key, template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> f32
 ```
 
-`mc_call_price` simulates terminal prices under geometric Brownian motion,
-takes the discounted mean of the call payoff, and returns the Monte Carlo
-estimate. The number of paths is the length of the `template` tensor. The
-function takes a `key` as its first argument. Derive a reproducible key with
-`key_from_seed`.
+`mc_call_price` draws one standard normal `z` per path, sets
+`S_T = s0 * exp((r - sigma^2 / 2) * t + sigma * sqrt(t) * z)`, and returns
+`exp(-r * t)` times the mean of `max(S_T - k, 0)`. The number of paths is
+the length of `template`; its values are ignored. An empty template divides
+by zero paths and returns NaN. The function takes a `key` as its first
+argument; derive a reproducible key with `key_from_seed`.
 
 For example, estimate an at-the-money call with twenty thousand paths:
 
 ```chelis
 template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
 mc_px = mc_call_price(key_from_seed(42i64), template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
+// 10.531636 (closed form 10.450583)
 ```
 
-Monte Carlo error depends on the number of paths and the selected seed.
+The standard error of the estimate is about `14.7 / sqrt(paths)` here, `0.10`
+at twenty thousand paths, so a different seed moves the result by that much.
 Running the same call twice with keys derived from the same seed and the same
 other inputs returns identical values.

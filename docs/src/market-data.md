@@ -66,8 +66,11 @@ def snapshot_lookup(s: Snapshot, key: string) -> Option[Quote]
 ```
 
 A `Snapshot` is an as-of date and a list of keyed quotes. `make_snapshot`
-constructs one from a list of `(key, quote)` pairs. `snapshot_lookup` scans
-the list for a key and returns `Some(quote)` if found or `None` if absent.
+constructs one from a list of `(key, quote)` pairs without checking for
+repeated keys. `snapshot_lookup` scans the list in order and returns
+`Some(quote)` for the first pair whose key matches, or `None` if no key
+matches; a later pair with the same key is never returned. Key comparison
+is exact and case-sensitive.
 For example:
 
 ```chelis

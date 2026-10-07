@@ -31,20 +31,30 @@ def empirical_loss_quantile[n](losses: tensor[n, f32], q: f32) -> f32
 ```
 
 `historical_var` is the empirical quantile of the loss sample at the
-confidence level, computed by `Nautilus.Stats.quantile_vec`.
-`historical_cvar` is the mean of all losses at or above that quantile (the
-tail mean). `empirical_loss_quantile` is the raw empirical quantile at an
-arbitrary level `q`, the same primitive `historical_var` uses.
+confidence level, computed by `Nautilus.Stats.quantile_vec`: sort the `n`
+losses, take position `confidence * (n - 1)`, and interpolate linearly
+between the two order statistics around it (the convention of NumPy's
+default `quantile`). `historical_cvar` is the mean of all losses at or
+above that quantile (the tail mean). `empirical_loss_quantile` is the same
+quantile at an arbitrary level `q`.
 
-The empirical measures are exercised through the
-[extended risk](risk-extended.md) module, whose `mc_var` and
-`mc_expected_shortfall` delegate to `historical_var` and `historical_cvar`.
 On the integer losses `0..100`, the 95% historical VaR is `95` and the 95%
-historical CVaR is the tail mean `97.5`.
+historical CVaR is the tail mean `97.5`. On `[1, 2, 3, 4]` the 50% quantile
+sits halfway between 2 and 3: `2.5`. The
+[extended risk](risk-extended.md) functions `mc_var` and
+`mc_expected_shortfall` return exactly these two numbers.
 
-Use a nonempty sample and a confidence level strictly between zero and
-one. The parametric and empirical families have separate sampled
-coherence checks for confidence monotonicity, expected-shortfall dominance,
-and positivity on positive-loss inputs. Their reported `fuzz_validated`
-results describe accepted samples, not global proofs. See
-[Property specifications](properties.md).
+## Invalid inputs
+
+None of these functions fails on bad input; each returns a number, so
+validate before calling.
+
+| Input | Historical measures | Parametric measures |
+|---|---|---|
+| confidence outside `[0, 1]` | clamped to `[0, 1]`: at `1.5` the VaR of `0..100` is `100.0` | NaN |
+| confidence exactly `0` or `1` | the sample minimum or maximum | VaR `-inf` at `0` and `inf` at `1` |
+| empty sample | `0.0` | NaN (mean of nothing) |
+| one loss | that loss | NaN: the standard deviation divides by `n - 1` |
+
+Use a sample of at least two losses and a confidence strictly between zero
+and one.

@@ -1,9 +1,11 @@
 # Property specifications
 
-Shoals includes finance properties that state relationships among its
-calculations. Some are evaluated at selected inputs; others are checked by a
-prover. A result applies only to its stated assumptions and method. Read the
-property's formula before applying it to a different model or input range.
+Each property below is an exported function that returns `bool`: call it
+with your own inputs to check that a finance relationship holds there before
+you rely on it. For example,
+`put_call_parity_holds(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))`
+is `true` when the call minus the put is within `0.001` of
+`s - k * exp(-r * t)`. A `true` covers the point you passed, not every input.
 
 ## Pricing properties
 
@@ -14,8 +16,10 @@ Module: `Shoals.Properties.Pricing`.
 - `call_price_nonneg` and `put_price_nonneg`: check non-negative prices.
 - `call_bounded_by_spot(s, k, r, sigma, t)`: checks that the call price
   does not exceed spot at the supplied point.
-- `matches_textbook_reference` and `matches_textbook_reference_put`: the
-  optimized scalars agree with the `Shoals.References.BlackScholes` oracles.
+- `matches_textbook_reference` and `matches_textbook_reference_put`:
+  `bs_call_scalar` and `bs_put_scalar` are within `5e-5` of the textbook
+  formulas in [Reference oracles](references.md) at the supplied
+  point.
 - `mc_matches_textbook_mc_reference(template, s0, k, r, sigma, t)`: under a
   shared seed the optimized Monte Carlo agrees with the scalar Monte Carlo
   reference to within five percent.
@@ -27,7 +31,9 @@ Module: `Shoals.Properties.NoArbitrage`.
 - `bull_spread_nonneg(s, k_low, k_high, r, sigma, t)`: checks that a
   lower-strike call costs at least as much as a higher-strike call.
 - `butterfly_nonneg(s, k, h, r, sigma, t)`: checks that
-  `c(k - h) - 2 c(k) + c(k + h)` is non-negative within a small tolerance.
+  `c(k - h) - 2 c(k) + c(k + h) >= -0.001`, an absolute price tolerance.
+Use `0 < h < k`; a `false` means the call prices are not convex in strike
+at that point by more than 0.001.
 
 ## Greek properties
 
@@ -123,6 +129,52 @@ Module: `Shoals.Properties.MarketData`.
   `md_bar_open_in_high_low_range`: check a supplied bar's OHLC ordering.
   `make_bar` does not enforce that ordering.
 - `snapshot_empty_has_no_quote(d, key)`: an empty snapshot returns no quote.
+
+## Signatures
+
+Every property returns `bool`:
+
+```chelis
+def put_call_parity_holds(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool
+def call_price_nonneg(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool
+def put_price_nonneg(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool
+def call_bounded_by_spot(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool
+def matches_textbook_reference(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool
+def matches_textbook_reference_put(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool
+def bull_spread_nonneg(s: f32, k_low: f32, k_high: f32, r: f32, sigma: f32, t: f32) -> bool
+def butterfly_nonneg(s: f32, k: f32, h: f32, r: f32, sigma: f32, t: f32) -> bool
+def mc_matches_textbook_mc_reference[n](template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool
+def same_literal_seed_same_price[n](template: tensor[n, f32], s: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool
+def mc_within_5pct_of_analytic[n](template: tensor[n, f32], s: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool
+def fd_delta_in_unit_range_for_call(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool
+def fd_delta_matches_analytic(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool
+def vega_nonneg(s: f32, k: f32, r: f32, sigma: f32, t: f32) -> bool
+def parallel_shift_uniformly_lifts(c: YieldCurve[3], delta: f32, probe_t: f32) -> bool
+def parallel_shift_zero_is_identity(c: YieldCurve[3], probe_t: f32) -> bool
+def twist_at_midpoint_is_average(c: YieldCurve[3], short_d: f32, long_d: f32, t_mid: f32) -> bool
+def key_rate_shift_localized_at_unmoved_pillar(c: YieldCurve[3], pillar_idx: i64, delta: f32, far_t: f32) -> bool
+def scale_rates_linear(c: YieldCurve[3], factor: f32, probe_t: f32) -> bool
+def vs_total_variance_nonneg_for_atm(p: SVI) -> bool
+def vs_implied_vol_matches_sqrt_variance(p: SVI, k: f32, t: f32) -> bool
+def implied_vol_round_trip(spot: f32, strike: f32, r: f32, t: f32, sigma_true: f32) -> bool
+def lognormal_pdf_matches_textbook(x: f32, mu: f32, sigma: f32) -> bool
+def lognormal_cdf_matches_textbook(x: f32, mu: f32, sigma: f32) -> bool
+def student_t_pdf_matches_textbook(x: f32, nu: f32) -> bool
+def bvn_pdf_matches_textbook(x: f32, y: f32, mu_x: f32, mu_y: f32, sigma_x: f32, sigma_y: f32, rho: f32) -> bool
+def lognormal_pdf_nonneg(x: f32, mu: f32, sigma: f32) -> bool
+def student_t_pdf_symmetric_at_zero(nu: f32, dx: f32) -> bool
+def actual_matches_reference(start: Date, end: Date) -> bool
+def isda_matches_reference(start: Date, end: Date) -> bool
+def icma_matches_reference(start: Date, end: Date, period_start: Date, period_end: Date, frequency: i64) -> bool
+def whole_isda_year_is_exactly_one(year: i64) -> bool
+def additive_under_isda(a: Date, b: Date, c: Date) -> bool
+def schedule_is_increasing_and_bounded(start: Date, end: Date, months: i64) -> bool
+def quote_round_trip(side: Side, value: f32, d: Date) -> bool
+def md_bar_high_gte_low(b: Bar) -> bool
+def md_bar_close_in_high_low_range(b: Bar) -> bool
+def md_bar_open_in_high_low_range(b: Bar) -> bool
+def snapshot_empty_has_no_quote(d: Date, key: string) -> bool
+```
 
 See [Scope and limitations](scope.md) for a description of what
 these properties do and do not establish.

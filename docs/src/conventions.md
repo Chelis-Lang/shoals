@@ -11,7 +11,11 @@ A tensor can be built from a list:
 
 ```chelis
 spots = to_tensor([cast(80.0, f32), cast(100.0, f32), cast(120.0, f32)])
+// tensor(shape=[3], data=[80.0, 100.0, 120.0]): a tensor[3, f32]
 ```
+
+`call_prices(spots, ...)` then returns a `tensor[3, f32]` of the same
+length, one price per spot (see [Pricing](pricing.md)).
 
 A Monte Carlo function uses the length of a template tensor to set its path count:
 
@@ -23,11 +27,14 @@ template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast
 
 ## Keyed randomness
 
-Simulation functions take an explicit `key`. Derive one from an `i64` seed
-when you want a reproducible draw:
+Simulation functions take an explicit `key`. `key_from_seed(seed: i64) -> key`
+and `split_key(k: key) -> (key, key)` are Chelis builtins, available
+without an import. Derive a key from an `i64` seed when you want a
+reproducible draw:
 
 ```chelis
 mc_px = mc_call_price(key_from_seed(42i64), template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
+// 10.531636 with the 20,000-path template above; the closed form is 10.450583
 ```
 
 Import `Shoals.Pricing.mc_call_price` in your module. Deriving a new key

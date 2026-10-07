@@ -33,7 +33,11 @@ def add_ask(book: OrderBook, price: f32, qty: f32) -> OrderBook
 
 `add_bid` inserts a bid into the descending-price list, and `add_ask`
 inserts an ask into the ascending-price list, each preserving the sort. Both
-return a new book. For example:
+return a new book. Orders carry no timestamp, and a new order goes ahead of
+any orders already at its price, so at one price the most recent order is
+at the head. Bidding 5 at 100 and then 7 at 100 makes the 7 the best bid.
+The sort assumes ordinary prices: inserting a NaN price keeps only the new
+order and drops the rest of that side. For example:
 
 ```chelis
 book = empty_book()

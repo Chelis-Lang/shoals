@@ -20,15 +20,16 @@ from `Std.Datetime`.
   Greek references for cross-checking, and pathwise / likelihood-ratio
   estimators for the digital payoff family.
 - **Extended pricers.** Bachelier (normal underlying), Black (forward),
-  Garman-Kohlhagen (FX), and Margrabe (exchange).
+  Garman-Kohlhagen (FX), Margrabe and Stulz (exchange), and digital options.
 - **Volatility surface.** SVI total-variance parameterization, implied
   vol, surface shifts, a SABR approximation, and a bisection implied-vol solver.
 - **Stochastic processes.** Geometric Brownian motion paths and terminals,
-  antithetic variates, Merton jump-diffusion, and correlated two-asset GBM.
+  antithetic variates, Merton and Kou jump-diffusion, Heston
+  quadratic-exponential simulation, and correlated two-asset GBM.
 - **Risk.** Parametric and historical value-at-risk and conditional VaR.
 - **Extended risk.** Monte Carlo VaR and expected shortfall, an FRTB-IMA
   expected-shortfall helper, a scenario PnL grid, and the Kupiec
-  proportion-of-failures backtest statistic.
+  proportion-of-failures, Christoffersen, and Acerbi-Szekely backtests.
 - **Yield curves.** Linear, spline, log-linear, and Nelson-Siegel-Svensson
   interpolation, discount factors, a single-curve par bootstrap, a
   deposit/zero-coupon/par-swap instrument bootstrap with IFT sensitivities, curve-kind
@@ -40,19 +41,34 @@ from `Std.Datetime`.
 - **Market data.** Quote, bar, and snapshot record types.
 - **Order book.** A price-priority limit order book with best bid and ask,
   spread, and volume-weighted average price.
-- **Distributions.** Lognormal, Student-t, and bivariate-normal densities.
-- **Calibration.** Weighted residuals, sum-of-squared-errors loss, and a
-  bound-clamped Levenberg-Marquardt step.
+- **Distributions.** Lognormal, Student-t, and bivariate-normal densities,
+  gamma, beta, chi-squared, exponential, uniform, and Poisson wrappers, and
+  a multivariate-normal sampler.
+- **Calibration.** Weighted residuals, sum-of-squared-errors loss, and
+  bounded Levenberg-Marquardt and BFGS fits.
 - **XVA.** Exposure aggregation, netting, CVA and DVA, plus funding and
   capital adjustment helpers.
 - **Currency-tagged money.** Runtime-tagged `Money` with same-currency
   arithmetic.
 
-Additional modules cover lattice and PDE pricing,
-fixed-income models, collateral agreements, credit curves, local
-volatility, Longstaff-Schwartz exercise, and specialized stochastic
-processes. The module guides describe their public functions and numerical
-domains.
+- **Lattices, PDEs, and early exercise.** CRR, Tian, Jarrow-Rudd, and
+  trinomial trees (`Shoals.Trees`), Crank-Nicolson and ADI finite
+  differences (`Shoals.Pde`), Longstaff-Schwartz (`Shoals.Lsm`), and
+  fixed-coupon bond prices (`Shoals.FixedIncome`).
+- **Rate and volatility models.** One- and two-factor Hull-White
+  short-rate models (`Shoals.HullWhite`), the LIBOR market model and HJM drift
+  (`Shoals.LiborMarketModel`), SABR paths (`Shoals.SabrPaths`), Heston
+  Fourier pricers (`Shoals.Heston`), and Dupire local volatility
+  (`Shoals.Dupire`).
+- **Credit default swaps.** Hazard curves, CDS legs, and a par-spread
+  bootstrap (`Shoals.Cds`).
+- **Quasi-random points.** Sobol and Halton sequences and variance-reduction
+  estimators (`Shoals.Rng`), in the stochastic-processes chapter.
+- **Collateral.** CSA threshold, minimum transfer, and haircut
+  (`Shoals.Csa`), in the XVA chapter.
+
+Each module chapter gives its public functions with their signatures, input
+domains, and failure behavior.
 
 ## Comparisons and supported domains
 

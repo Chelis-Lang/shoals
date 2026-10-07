@@ -2,24 +2,104 @@
 
 Module: `Shoals.Cds`.
 
-`HazardCurve[n]` stores `n` elapsed year times and their piecewise hazard
-rates as `f32` tensors. The times are measured from the valuation origin;
-they are not calendar dates. Use `Shoals.Date.year_fraction` with a chosen
-day-count convention when deriving them from dates.
+This module values a single-name credit default swap from a piecewise-constant
+hazard curve, and bootstraps that curve from par spreads. Times are elapsed
+years from the valuation date as `f32`, not calendar dates; derive them with
+`Shoals.Date.year_fraction` under the day count the contract uses. Spreads,
+hazards, rates, and recovery are decimals (`0.01` is 100 basis points), and
+every value is per unit of notional.
 
-`hazard_curve_from_pillars(times, hazards)` requires strictly increasing
-times. It fails at the first duplicate or out-of-order pair, naming its index
-and both values. It does not reorder caller-supplied pillars; a caller that
-needs sorting must keep each time paired with its hazard. `cds_bootstrap_hazards` applies the
-same check to its supplied tenors before solving any pillar.
+## Hazard curves
 
-`HazardCurve` is opaque. Construct it through one of those two functions and
-use `hazard_curve_pillars(curve)` to read its `(times, hazards)` tensors.
-Consumers cannot create a record literal that bypasses the ordering check.
+```chelis
+def hazard_curve_from_pillars[n](times: tensor[n, f32], hazards: tensor[n, f32]) -> HazardCurve[n]
+def hazard_curve_pillars[n](curve: HazardCurve[n]) -> (tensor[n, f32], tensor[n, f32])
+def cds_survival_from_hazards[n](curve: HazardCurve[n], t: f32) -> f32
+```
 
-`cds_survival_from_hazards(curve, t)` integrates the piecewise hazards to `t`
-and returns `exp(-integral)`. `cds_premium_leg_value`,
-`cds_protection_leg_value`, and `cds_pv` use the same curve. The premium grid
-uses the supplied payment frequency; the protection leg uses monthly steps.
-These functions use elapsed year times, a constant discount rate, and the
-caller-supplied recovery. They do not generate a calendar payment schedule.
+`hazards[i]` is the constant default intensity on the interval ending at
+`times[i]`: the first applies from time 0 to `times[0]`, and the last
+continues past the final pillar. `cds_survival_from_hazards(curve, t)` is
+`exp(-integral of the hazard from 0 to t)`.
+
+`hazard_curve_from_pillars` requires strictly increasing times. It fails at
+the first duplicate or out-of-order pair, naming its index and both values.
+It does not reorder pillars, and it does not check the hazards: a negative
+hazard gives a survival probability above one. Pillar times should be
+positive; a pillar at or before 0 covers no time. Survival at any `t <= 0`
+is 1. With no pillars the curve has
+zero hazard and every survival probability is 1. `HazardCurve` is opaque, so
+the only ways to build one are this constructor and `cds_bootstrap_hazards`;
+read it back with `hazard_curve_pillars`.
+
+```chelis
+curve = hazard_curve_from_pillars(
+  to_tensor([cast(1.0, f32), cast(3.0, f32), cast(5.0, f32)]),
+  to_tensor([cast(0.01, f32), cast(0.02, f32), cast(0.03, f32)])
+)
+q4 = cds_survival_from_hazards(curve, cast(4.0, f32))  // 0.9231163 = exp(-(0.01 + 0.02 * 2 + 0.03))
+q7 = cds_survival_from_hazards(curve, cast(7.0, f32))  // 0.8436648
+```
+
+## Valuation
+
+```chelis
+def cds_premium_leg_value[n](spread: f32, t_maturity: f32, n_premiums_per_year: i64, hazards: HazardCurve[n], r: f32) -> f32
+def cds_protection_leg_value[n](t_maturity: f32, recovery: f32, hazards: HazardCurve[n], r: f32) -> f32
+def cds_pv[n](spread: f32, t_maturity: f32, n_premiums_per_year: i64, recovery: f32, hazards: HazardCurve[n], r: f32) -> f32
+```
+
+Discounting uses `exp(-r * t)` with one continuously compounded rate `r`.
+
+- The premium leg pays on the grid `k / n_premiums_per_year` for
+  `k = 1 .. trunc(t_maturity * n_premiums_per_year)`. Each payment is
+  `spread * dt * DF(t_k) * Q(t_k)`, where `dt` is the time since the previous
+  payment. There is no accrued premium on default, and a maturity that is not
+  a whole number of periods drops the final stub.
+- The protection leg uses a monthly grid to `t_maturity` and sums
+  `(1 - recovery) * DF(midpoint) * (Q(t_{k-1}) - Q(t_k))`.
+- `cds_pv` is protection minus premium: the value to the protection buyer.
+
+Nothing is validated. Supply `t_maturity > 0`, `n_premiums_per_year >= 1`,
+and `0 <= recovery <= 1`. A frequency of 0 builds no payment dates, so the
+premium leg is silently 0; a recovery above 1 makes the protection leg
+negative.
+
+```chelis
+prem = cds_premium_leg_value(cast(0.01, f32), cast(5.0, f32), cast(4, i64), curve, cast(0.03, f32))  // 0.044187766
+prot = cds_protection_leg_value(cast(5.0, f32), cast(0.4, f32), curve, cast(0.03, f32))            // 0.057317026
+pv = cds_pv(cast(0.01, f32), cast(5.0, f32), cast(4, i64), cast(0.4, f32), curve, cast(0.03, f32))  // 0.01312926
+```
+
+## Bootstrapping from par spreads
+
+```chelis
+def cds_bootstrap_hazards[n](spreads: tensor[n, f32], tenors: tensor[n, f32], recovery: f32, r: f32, n_premiums_per_year: i64) -> HazardCurve[n]
+```
+
+`cds_bootstrap_hazards` takes par spreads (positive decimals per year) at
+strictly increasing positive tenors, with `0 <= recovery < 1` and
+`n_premiums_per_year >= 1`, and
+solves one hazard per tenor, in order, holding the earlier hazards fixed, so
+that `cds_pv` at that tenor is zero. It checks tenor ordering before solving
+any pillar and fails the same way as `hazard_curve_from_pillars`, naming
+`Shoals.Cds.cds_bootstrap_hazards`.
+
+Each pillar is solved by Brent's method over hazards in `[1e-6, 2.0]`, to a
+tolerance of `1e-6` within 100 iterations. A spread whose hazard falls
+outside that bracket does not fail: its hazard comes back NaN, and so does
+every later pillar that depends on it. Spreads `[0.006, 5.0]` at tenors
+`[1, 3]` return hazards `[0.009949725, NaN]`. Check the result for NaN
+before using the curve.
+
+```chelis
+boot = cds_bootstrap_hazards(
+  to_tensor([cast(0.006, f32), cast(0.01, f32), cast(0.012, f32)]),
+  to_tensor([cast(1.0, f32), cast(3.0, f32), cast(5.0, f32)]),
+  cast(0.4, f32), cast(0.03, f32), cast(4, i64)
+)
+// hazards [0.009949725, 0.0201197, 0.025517497]
+```
+
+The module generates no calendar payment schedule, no IMM dates, and no
+upfront fee; supply those terms through the times and spread you pass.

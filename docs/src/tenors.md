@@ -33,8 +33,11 @@ because a month step from the 31st has no day-31 answer in a shorter month:
 `parse_tenor` accepts exactly one or more ASCII digits with a value of at
 least 1 followed by `D`, `W`, `M`, or `Y`, such as `3M` or `10Y`. It fails on
 anything else, including a sign, a space, a lowercase unit, and `ON`, `TN`,
-or `SN`, which are not calendar tenors. `try_parse_tenor` returns `None`
-instead of failing.
+or `SN`, which are not calendar tenors. A count too large for `i64`, such
+as `99999999999999999999D`, is rejected the same way. `try_parse_tenor`
+returns `None` instead of failing, and `parse_tenor` fails with
+*Shoals.Tenor.parse_tenor: domain: "..." is not a count of at least 1
+followed by D, W, M or Y*.
 
 For example:
 
@@ -73,11 +76,19 @@ the caller states the spot lag. Over the 4 July 2025 holiday in
 
 A spot lag follows the two-calendar form of OpenGamma Strata's
 `DaysAdjustment`: `lagged_date` counts `days` business days in
-`count_calendar`, then rolls the result in `adjust_calendar`. Counting from
-a non-business trade date, the first step lands on the next business day.
+`count_calendar`, then rolls the result in `adjust_calendar` under `roll`,
+one of `Unadjusted`, `Following`, `Preceding`, `ModifiedFollowing`, or
+`ModifiedPreceding` from `Std.Datetime.Business`. Counting from a
+non-business trade date, the first step lands on the next business day. A
+zero-day lag counts nothing: the trade date itself is rolled in
+`adjust_calendar`, so from Saturday 5 July 2025 in `us_federal()` a
+`Following` roll gives Monday 7 July and a `Preceding` roll gives
+Thursday 3 July.
 For example, two Japanese bank days from 2 July 2025 reach 4 July,
-which the US federal roll moves to 7 July; from 30 December 2025 the Japanese
-year-end closures move the count to 6 January 2026, where a US count reaches
+which the US federal roll moves to 7 July. From 30 December 2025,
+`two_calendar_lag(2i64, japan_bank(), us_federal(), Following)` reaches
+6 January 2026 because of the Japanese year-end closures, while
+`two_calendar_lag(2i64, us_federal(), us_federal(), Following)` reaches
 2 January. A negative lag fails, and so does a date outside either
 calendar's horizon.
 

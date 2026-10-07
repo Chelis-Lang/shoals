@@ -47,10 +47,8 @@ the order stated below. A window longer than the available series can leave
 all its entries `None`. For crossing signals, `None` also means that the
 current or previous pair is unavailable.
 
-The source uses a leading warm-up count internally and masks those positions
-at the public boundary. Derived calculations add their own warm-up to their
-inputs'. For example, `true_range` needs the previous close, so its first
-entry is `None`; Wilder ATR then needs `n` available true-range values and
+Derived calculations add their own warm-up to their inputs'. For example,
+`true_range` needs the previous close, so its first entry is `None`; Wilder ATR then needs `n` available true-range values and
 has `n` leading `None` entries. A recursive EMA starts after its input's
 warm-up.
 
@@ -80,9 +78,7 @@ the signal line. Exact counts for the MACD line follow its chosen seed and
 
 ## Indicator functions
 
-The declarations below reproduce the exported parameter and return types in
-`src/indicators.ch`; definition bodies are omitted. Every period and
-convention argument shown is required.
+Every period and convention argument shown is required.
 
 ```text
 def sma(xs: List[f64], n: i64) -> List[Option[f64]]
@@ -205,9 +201,18 @@ carry a mask. Their tensor forms therefore take each side's warm-up as a
 required `i64`: the number of leading entries the producing indicator left
 without a valid value.
 
-```text
-tensor_crossover(fast_tensor, 9, slow_tensor, 25)
+```chelis
+fast = to_tensor([cast(1.0, f64), cast(1.0, f64), cast(3.0, f64), cast(3.0, f64), cast(1.0, f64)])
+slow = to_tensor([cast(2.0, f64), cast(2.0, f64), cast(2.0, f64), cast(2.0, f64), cast(2.0, f64)])
+crossed = tensor_crossover(fast, cast(1, i64), slow, cast(0, i64))
+// [None, None, Some(true), Some(false), Some(false)]
 ```
+
+`fast` declares one warm-up entry, so index 0 is unavailable and index 1,
+whose previous pair includes index 0, is `None` too. The fast series moves
+from at or below 2 to above it at index 2. With a fast warm-up of `0` the
+same inputs give `[None, Some(false), Some(true), Some(false), Some(false)]`:
+index 0 still has no previous pair.
 
 Pass the warm-up the producing indicator actually has. A warm-up of `0` declares
 every entry valid; a warm-up equal to the series length declares none valid,
@@ -241,6 +246,8 @@ depending on its position in the window. Two other cases need care:
   the deviation is positive.
 
 These are reported values or ordering effects, not `None` warm-up entries.
+An empty input series is not an error: `sma`, the recursive `ema`, and the
+cumulative `cumulative_vwap` each return an empty list.
 The module traps a period below 1, unequal lengths in multi-series calls,
 negative volume, a negative `ind_shift` lag, and an `ind_diff` lag below 1. On
 the tensor crossing forms it also traps a negative warm-up and a warm-up greater
