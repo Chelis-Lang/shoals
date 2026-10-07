@@ -10,8 +10,8 @@ import Shoals.Stochastic (heston_qe_paths_terminal)
 -- assertion rather than on the refusal, and `--expect neg` checks the
 -- diagnostic text, not merely that something failed.
 def template() -> tensor[8, f32] = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(8, i64))))
-def finite_count[n](xs: tensor[n, f32]) -> f32 = tensor_to_scalar(sum(cast(eq(copy(xs), xs), f32), 0))
+def non_nan_count[n](xs: tensor[n, f32]) -> f32 = tensor_to_scalar(sum(cast(eq(copy(xs), xs), f32), 0))
 def test_neg_heston_paths_negative_horizon() -> unit ! { Test } = {
   out = heston_qe_paths_terminal(key_from_seed(7i64), template(), cast(100.0, f32), cast(0.04, f32), cast(0.05, f32), cast(1.5, f32), cast(0.04, f32), cast(0.3, f32), cast(-0.5, f32), cast(-1.0, f32), cast(8, i64))
-  assert_true(eq(finite_count(out.0), cast(8.0, f32)), "should not reach here: unguarded this returned NaN for every one of the eight terminal spots, via dt = t / n_steps")
+  assert_true(eq(non_nan_count(out.0), cast(8.0, f32)), "should not reach here: unguarded this returned NaN for every one of the eight terminal spots, via dt = t / n_steps")
 }

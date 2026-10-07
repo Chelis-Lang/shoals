@@ -9,7 +9,7 @@ t = -1.0: it pins the guard's LOWER BOUNDARY, and nothing else in the suite
 does. The positive-parity tests in tests/stochastic.ch pin t = 0 and t = -0.0
 from above; the negative fixtures pin t = -1.0 from below; the interval between
 was untested. A red-team round measured the consequence: the mutant
-`gte(t, -0.01)` passes all 88 pre-existing negative fixtures AND both
+`gte(t, -0.01)` passes all 88 OTHER negative fixtures (11 of which this change set added) AND both
 positive-parity tests, while admitting t = -0.001 and returning NaN for all
 eight paths -- i.e. it reintroduces shoals#139 in full with a green suite. Any
 threshold in (-0.125, 0) survived that suite.

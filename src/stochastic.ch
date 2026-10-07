@@ -51,6 +51,13 @@ def horizon_finite(t: f32) -> bool = eq(sub(t, t), cast(0.0, f32))
 -- to consume the value. A `_ = check(t)` binding would be dead and could be
 -- eliminated before it reached the evaluated graph; threading the return value
 -- is what puts the guard in the dataflow of every sampler below.
+--
+-- That is a DEFENSIVE choice, not a demonstrated necessity, and the
+-- distinction is measured: a discarded `_ = checked_horizon(t)` with raw `t`
+-- downstream was observed to still fire in the evaluator lane, which is the
+-- lane every test here runs in. No gate stage lowers these samplers, so the
+-- hazard is untested rather than refuted. Threading costs nothing and does not
+-- depend on which lane evaluates the binding, so it stays.
 def checked_horizon(t: f32) -> f32 = if not(horizon_finite(t)) then fail("Shoals.Stochastic: the time horizon must be finite; a non-finite horizon makes the log drift and sigma * sqrt(t) non-finite, so no path value would be usable") else if not(gte(t, cast(0.0, f32))) then fail("Shoals.Stochastic: the time horizon must be non-negative; sqrt of a negative horizon is NaN, so every path value would be NaN") else t
 def gbm_path[n](rng_key: key, template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
   z = normal_sample(rng_key, template, cast(0.0, f32), cast(1.0, f32))

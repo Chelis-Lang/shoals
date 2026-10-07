@@ -10,8 +10,8 @@ import Shoals.Stochastic (correlated_gbm_terminal_2d)
 -- assertion rather than on the refusal, and `--expect neg` checks the
 -- diagnostic text, not merely that something failed.
 def template() -> tensor[8, f32] = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(8, i64))))
-def finite_count[n](xs: tensor[n, f32]) -> f32 = tensor_to_scalar(sum(cast(eq(copy(xs), xs), f32), 0))
+def non_nan_count[n](xs: tensor[n, f32]) -> f32 = tensor_to_scalar(sum(cast(eq(copy(xs), xs), f32), 0))
 def test_neg_correlated_gbm_2d_negative_horizon() -> unit ! { Test } = {
   legs = correlated_gbm_terminal_2d(key_from_seed(7i64), template(), template(), cast(100.0, f32), cast(90.0, f32), cast(0.05, f32), cast(0.04, f32), cast(0.2, f32), cast(0.3, f32), cast(0.5, f32), cast(-1.0, f32))
-  assert_true(eq(add(finite_count(legs.0), finite_count(legs.1)), cast(16.0, f32)), "should not reach here: unguarded this returned NaN for all sixteen values across both correlated legs")
+  assert_true(eq(add(non_nan_count(legs.0), non_nan_count(legs.1)), cast(16.0, f32)), "should not reach here: unguarded this returned NaN for all sixteen values across both correlated legs")
 }
