@@ -1,14 +1,14 @@
 schema = "3"
 [package]
 name = "shoals"
-version = "0.24.14"
-compiler = "=0.19.0"
+version = "0.24.15"
+compiler = "=0.19.1"
 module_prefix = "Shoals"
 additional_sources = ["properties", "references", "demos"]
 resolver = "2"
 
 [dependencies]
 chelis-std = { version = "=0.4.0" }
-nautilus = { version = "=0.7.49" }
-coral = { version = "=0.7.46" }
-shoreleave = { version = "=0.1.1" }
+nautilus = { version = "=0.7.50" }
+coral = { version = "=0.7.47" }
+shoreleave = { version = "=0.1.2" }

@@ -1,7 +1,7 @@
 # Shoals Upstream Bugs
 
 Tracked upstream chelis issues and capability gaps that affect Shoals, per the
-[downstream shell repo contract](https://github.com/Chelis-Lang/chelis/blob/v0.19.0/spec/design/shell_repo_contract.md) §4.
+[downstream shell repo contract](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/design/shell_repo_contract.md) §4.
 The reachability map these entries lean on — what the proof stack can and cannot
 discharge for finance at this pin — is `research/proof-infra/report.md`; keep
 entries consistent with it.
@@ -124,6 +124,12 @@ in code that is CLOSED upstream but not sitting in §Archived.
       Shoals#111 owns the remaining hosted timeout and a measured
       `--batch-mode file` comparison on the 2-vCPU runner. Keep the raised
       budget until that issue's suite measurement shows it can be lowered.
+    - **Re-probe 2026-10-06 on Chelis 0.19.1: still blocking.** The 0.19.1
+      checker fix for long list literals (chelis#2975) is in this release. On
+      one 10-core machine, the 54 files and 522 tests ran back to back:
+      `--batch-mode auto` 305s wall and 339s user, `--batch-mode file` 158s
+      wall and 401s user. Both legs report `522 passed, 0 failed`. `auto`
+      does not beat `file`, so the nightly budget stays raised.
 
 - **The proof gate checks the pinned finance surface.** Economic and dynamic
   programming properties reach the SMT tier without a transcendental contract.
