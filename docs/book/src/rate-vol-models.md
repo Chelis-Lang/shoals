@@ -41,9 +41,9 @@ constant mean-reversion level `theta_bar`.
 
 ```chelis
 p = hw1f_bond_price(cast(0.0, f32), cast(5.0, f32), cast(0.03, f32), cast(0.1, f32), cast(0.01, f32))
-// 0.8899547
+-- 0.8899547
 r1 = hw1f_step(cast(0.03, f32), cast(0.1, f32), cast(0.04, f32), cast(0.01, f32), cast(0.25, f32), cast(1.0, f32))
-// 0.03525
+-- 0.03525
 ```
 
 From `r0 = 0.03` toward `theta_bar = 0.04` with `a = 0.1`,
@@ -90,7 +90,7 @@ taus = to_tensor([cast(0.5, f32), cast(0.5, f32)])
 sigs = to_tensor([cast(0.2, f32), cast(0.2, f32)])
 corr = reshape(to_tensor([cast(1.0, f32), cast(0.9, f32), cast(0.9, f32), cast(1.0, f32)]), [cast(2, i64), cast(2, i64)])
 stepped = lmm_step(copy(fwd), copy(taus), copy(sigs), copy(corr), cast(0.25, f32), to_tensor([cast(0.5, f32), cast(-0.5, f32)]))
-// [0.03137598, 0.035643026]
+-- [0.03137598, 0.035643026]
 ```
 
 With 500 paths of 10 steps over half a year, the terminal-measure
@@ -170,9 +170,9 @@ def heston_put_lewis_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32
 
 ```chelis
 cm = heston_call_carr_madan_panels(cast(100.0, f32), cast(100.0, f32), cast(1.0, f32), cast(0.05, f32), cast(0.04, f32), cast(1.5, f32), cast(0.04, f32), cast(0.5, f32), cast(-0.7, f32), cast(1.5, f32), cast(100.0, f32), cast(20, i64))
-// 10.055485
+-- 10.055485
 lp = heston_call_lipton_panels(cast(100.0, f32), cast(100.0, f32), cast(1.0, f32), cast(0.05, f32), cast(0.04, f32), cast(1.5, f32), cast(0.04, f32), cast(0.5, f32), cast(-0.7, f32), cast(100.0, f32), cast(20, i64))
-// 10.055477
+-- 10.055477
 ```
 
 `heston_call_lewis_panels` and `heston_put_lewis_panels` agree with the
@@ -212,7 +212,7 @@ prices calls with `du_bs_call_q`, the Black-Scholes call with dividend yield
 
 ```chelis
 flat = du_local_vol_from_iv_surface(fn (m: f32, t: f32) -> cast(0.2, f32), cast(100.0, f32), cast(0.05, f32), cast(0.0, f32), cast(100.0, f32), cast(1.0, f32), cast(1.0, f32), cast(0.01, f32))
-// 0.20001782
+-- 0.20001782
 ```
 
 `du_cubic_log_moneyness_interp` reads an implied volatility from a grid:
@@ -228,5 +228,5 @@ sk = to_tensor([cast(80.0, f32), cast(100.0, f32), cast(120.0, f32)])
 ts = to_tensor([cast(0.5, f32), cast(1.0, f32)])
 grid = reshape(to_tensor([cast(0.25, f32), cast(0.2, f32), cast(0.18, f32), cast(0.24, f32), cast(0.2, f32), cast(0.19, f32)]), [cast(2, i64), cast(3, i64)])
 iv = du_cubic_log_moneyness_interp(sk, ts, grid, cast(100.0, f32), cast(90.0, f32), cast(0.75, f32))
-// 0.21845599
+-- 0.21845599
 ```

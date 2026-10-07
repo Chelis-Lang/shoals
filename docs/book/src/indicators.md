@@ -205,7 +205,7 @@ without a valid value.
 fast = to_tensor([cast(1.0, f64), cast(1.0, f64), cast(3.0, f64), cast(3.0, f64), cast(1.0, f64)])
 slow = to_tensor([cast(2.0, f64), cast(2.0, f64), cast(2.0, f64), cast(2.0, f64), cast(2.0, f64)])
 crossed = tensor_crossover(fast, cast(1, i64), slow, cast(0, i64))
-// [None, None, Some(true), Some(false), Some(false)]
+-- [None, None, Some(true), Some(false), Some(false)]
 ```
 
 `fast` declares one warm-up entry, so index 0 is unavailable and index 1,

@@ -70,12 +70,12 @@ For example, the best bid of the three-order book above is
 `100`. Adding an ask at `101` gives a spread of `1`:
 
 ```chelis
-best = best_bid(b3)  // best price == 100.0
+best = best_bid(b3)  -- best price == 100.0
 
 book = empty_book()
 b = add_bid(book, cast(100.0, f32), cast(5.0, f32))
 ba = add_ask(b, cast(101.0, f32), cast(5.0, f32))
-spread = bid_ask_spread(ba)  // spread == 1.0
+spread = bid_ask_spread(ba)  -- spread == 1.0
 ```
 
 A two-level book has a volume-weighted average price across both sides:
@@ -84,5 +84,5 @@ A two-level book has a volume-weighted average price across both sides:
 book = empty_book()
 b = add_bid(book, cast(100.0, f32), cast(10.0, f32))
 ba = add_ask(b, cast(101.0, f32), cast(5.0, f32))
-v = vwap(ba)  // (100*10 + 101*5) / 15
+v = vwap(ba)  -- (100*10 + 101*5) / 15
 ```

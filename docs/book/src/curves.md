@@ -54,8 +54,8 @@ curve = yield_curve_from_pillars(
   to_tensor([cast(0.03, f32), cast(0.04, f32), cast(0.045, f32)])
 )
 tagged = yield_curve_tagged(sofr(), to_tensor([cast(1.0, f32)]), to_tensor([cast(0.04, f32)]))
-kind = curve_kind(tagged)            // Sofr
-flat = rate_at(tagged, cast(7.0, f32))  // 0.04: one pillar reads flat
+kind = curve_kind(tagged)            -- Sofr
+flat = rate_at(tagged, cast(7.0, f32))  -- 0.04: one pillar reads flat
 ```
 
 Rates are continuously compounded zero rates as decimals (`0.04` is 4%), and
@@ -156,11 +156,11 @@ the `beta1` and `beta2` terms (the example parameters with `tau1 = 0` give
 For example, on the three-pillar curve above:
 
 ```chelis
-r = rate_at(curve, cast(1.5, f32))             // 0.035
-s = spline_rate_at(curve, cast(1.5, f32))      // 0.03546875
-l = log_linear_rate_at(curve, cast(1.5, f32))  // 0.034641013
-early = rate_at(curve, cast(0.5, f32))         // 0.03, flat before the first pillar
-d = discount_factor(curve, cast(2.0, f32))     // 0.9231163 == exp(-0.08)
+r = rate_at(curve, cast(1.5, f32))             -- 0.035
+s = spline_rate_at(curve, cast(1.5, f32))      -- 0.03546875
+l = log_linear_rate_at(curve, cast(1.5, f32))  -- 0.034641013
+early = rate_at(curve, cast(0.5, f32))         -- 0.03, flat before the first pillar
+d = discount_factor(curve, cast(2.0, f32))     -- 0.9231163 == exp(-0.08)
 ```
 
 For example, the NSS rate tends to `beta0 + beta1` as the
@@ -168,9 +168,9 @@ maturity goes to zero and to `beta0` at long horizons:
 
 ```chelis
 r = nss_rate(cast(0.04, f32), cast(-0.02, f32), cast(0.01, f32), cast(0.0, f32), cast(1.0, f32), cast(2.0, f32), cast(0.0, f32))
-// 0.02 (beta0 + beta1)
+-- 0.02 (beta0 + beta1)
 r30 = nss_rate(cast(0.04, f32), cast(-0.02, f32), cast(0.01, f32), cast(0.0, f32), cast(1.0, f32), cast(2.0, f32), cast(30.0, f32))
-// 0.039666668, approaching beta0
+-- 0.039666668, approaching beta0
 ```
 
 ## Bootstrapping
@@ -198,7 +198,7 @@ For semiannual or gapped instruments use `bootstrap_multi` below. A
 times = to_tensor([cast(1.0, f32), cast(2.0, f32)])
 pars = to_tensor([cast(0.05, f32), cast(0.06, f32)])
 par_curve = bootstrap_zero_from_par(times, pars)
-// rates [0.048790097, 0.058554675]; the two-year par bond reprices to 1.0
+-- rates [0.048790097, 0.058554675]; the two-year par bond reprices to 1.0
 ```
 
 ### Instrument bootstrap
@@ -277,7 +277,7 @@ insts = [
   cur_par_swap(cast(10.0, f32), cast(0.0468, f32), cast(1, i64))
 ]
 rates = bootstrap_multi(insts).1
-// 10y zero rate ~0.0460236
+-- 10y zero rate ~0.0460236
 ```
 
 ### Quote sensitivities
@@ -308,11 +308,11 @@ insts = [
   cur_par_swap(cast(3.0, f32), cast(0.05, f32), cast(1, i64))
 ]
 diag = bootstrap_grad_at_solution(insts)
-// [0.9615385, 0.9809815, 1.0079565]
+-- [0.9615385, 0.9809815, 1.0079565]
 tmpl = to_tensor([cast(0.0, f32), cast(0.0, f32), cast(0.0, f32)])
 jac = bootstrap_grad_full_jacobian(tmpl, insts)
-// rows [0.9615385, 0.0, 0.0], [-0.021743337, 0.9809815, 0.0],
-//      [-0.016273007, -0.033038095, 1.0079565]
+-- rows [0.9615385, 0.0, 0.0], [-0.021743337, 0.9809815, 0.0],
+--      [-0.016273007, -0.033038095, 1.0079565]
 ```
 
 A `paths_template` whose length differs from the instrument count raises a
@@ -340,8 +340,8 @@ curves may have different pillars.
 
 ```chelis
 basis = curve_basis_from_pillars(to_tensor([cast(1.0, f32), cast(5.0, f32)]), to_tensor([cast(0.001, f32), cast(0.003, f32)]))
-s3 = basis_spread_at(basis, cast(3.0, f32))                 // 0.0019999999
-dfb = discount_factor_with_basis(curve, basis, cast(2.0, f32))  // 0.92035115 == exp(-(0.04 + 0.0015) * 2)
+s3 = basis_spread_at(basis, cast(3.0, f32))                 -- 0.0019999999
+dfb = discount_factor_with_basis(curve, basis, cast(2.0, f32))  -- 0.92035115 == exp(-(0.04 + 0.0015) * 2)
 ```
 
 These functions do not calibrate a basis curve against a domestic curve or
@@ -380,6 +380,6 @@ For example, a parallel shift lifts every pillar by the same
 amount and a key-rate shift moves only the chosen pillar:
 
 ```chelis
-shifted = parallel_shift(curve, cast(0.001, f32))      // every rate +10bp
-kr = key_rate_shift(curve, cast(1, i64), cast(0.005, f32))  // only the 2y pillar +50bp
+shifted = parallel_shift(curve, cast(0.001, f32))      -- every rate +10bp
+kr = key_rate_shift(curve, cast(1, i64), cast(0.005, f32))  -- only the 2y pillar +50bp
 ```

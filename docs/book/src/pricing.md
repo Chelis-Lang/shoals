@@ -26,10 +26,10 @@ A one-year at-the-money call and put:
 
 ```chelis
 px = bs_call_scalar(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
-// px is approximately 10.4506
+-- px is approximately 10.4506
 
 pp = bs_put_scalar(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
-// pp is approximately 5.5735
+-- pp is approximately 5.5735
 ```
 
 These two satisfy put-call parity: `c - p == s - k * exp(-r * t)`.
@@ -52,7 +52,7 @@ vec = bs_call_f64_vector(
   to_tensor([cast(0.2, f64), cast(0.2, f64)]),
   to_tensor([cast(1.0, f64), cast(0.5, f64)])
 )
-// [10.450583572185565, 2.34942829541399]
+-- [10.450583572185565, 2.34942829541399]
 ```
 
 `bs_call_wire_f64` is the same call price written with tensor operations
@@ -86,7 +86,7 @@ For example:
 ```chelis
 spots = to_tensor([cast(80.0, f32), cast(100.0, f32), cast(120.0, f32)])
 prices = call_prices(spots, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
-// [1.8594197, 10.450583, 26.169044]
+-- [1.8594197, 10.450583, 26.169044]
 ```
 
 `call_total(spots, ...)` equals the sum of the entries of
@@ -176,7 +176,7 @@ For example, estimate an at-the-money call with twenty thousand paths:
 ```chelis
 template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(20000, i64))))
 mc_px = mc_call_price(key_from_seed(42i64), template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
-// 10.531636 (closed form 10.450583)
+-- 10.531636 (closed form 10.450583)
 ```
 
 The standard error of the estimate is about `14.7 / sqrt(paths)` here, `0.10`

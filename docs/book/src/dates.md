@@ -52,24 +52,24 @@ longer than a year is disputed between sources.
 For example, with the expected values as exact fractions:
 
 ```chelis
-// ISDA's worked example: 61 days of a 365-day year
-// plus 121 days of a 366-day year.
+-- ISDA's worked example: 61 days of a 365-day year
+-- plus 121 days of a 366-day year.
 f = year_fraction(date(2003i64, 11i64, 1i64), date(2004i64, 5i64, 1i64), ActualActualIsda)
-// year_fraction_numerator(f) == 66491, year_fraction_denominator(f) == 133590
+-- year_fraction_numerator(f) == 66491, year_fraction_denominator(f) == 133590
 
-// A full regular semi-annual ICMA period is exactly one half.
+-- A full regular semi-annual ICMA period is exactly one half.
 icma = ActualActualIcma { reference_start: date(2003i64, 11i64, 1i64), reference_end: date(2004i64, 5i64, 1i64), frequency: 2i64 }
-half = year_fraction(date(2003i64, 11i64, 1i64), date(2004i64, 5i64, 1i64), icma)  // 1/2
+half = year_fraction(date(2003i64, 11i64, 1i64), date(2004i64, 5i64, 1i64), icma)  -- 1/2
 
-// 1 to 8 July 2025 has four business days in the US federal government
-// calendar: 4/252 = 1/63.
+-- 1 to 8 July 2025 has four business days in the US federal government
+-- calendar: 4/252 = 1/63.
 bus = year_fraction(date(2025i64, 7i64, 1i64), date(2025i64, 7i64, 8i64), Business252 { calendar: us_federal() })
 ```
 
 ## Year fractions and float conversion
 
 ```chelis
-type YearFraction    // opaque
+type YearFraction    -- opaque
 
 def year_fraction_numerator(f: YearFraction) -> i64
 def year_fraction_denominator(f: YearFraction) -> i64

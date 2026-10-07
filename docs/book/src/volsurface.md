@@ -50,8 +50,8 @@ is `sqrt(a / t)`:
 
 ```chelis
 p = flat_svi()
-w = vs_total_variance(p, cast(0.0, f32))      // w == 0.04
-iv = vs_implied_vol(p, cast(0.0, f32), cast(1.0, f32))  // iv == 0.2
+w = vs_total_variance(p, cast(0.0, f32))      -- w == 0.04
+iv = vs_implied_vol(p, cast(0.0, f32), cast(1.0, f32))  -- iv == 0.2
 ```
 
 For `smile_svi()`, `w(0) = 0.060000002`, `w(-0.2) = 0.096721366`, and
@@ -78,7 +78,7 @@ For example:
 ```chelis
 p = smile_svi()
 shifted = parallel_shift_atm_iv(p, cast(0.01, f32), cast(1.0, f32))
-// the ATM implied vol of shifted is 0.01 above that of p
+-- the ATM implied vol of shifted is 0.01 above that of p
 ```
 
 ## Implied-vol solver
@@ -99,7 +99,7 @@ a Black-Scholes price back to its volatility:
 ```chelis
 price = bs_call_scalar(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
 iv = implied_vol_from_call(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(1.0, f32), price)
-// price == 10.450583, iv == 0.19999999
+-- price == 10.450583, iv == 0.19999999
 ```
 
 `implied_vol_bisect` exposes the full bisection. It first requires
@@ -124,7 +124,7 @@ sentinel:
 
 ```chelis
 iv = implied_vol_bisect(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(1.0, f32), cast(200.0, f32), cast(0.0001, f32), cast(5.0, f32), cast(60, i64), cast(0.000001, f32))
-failed = is_iv_solver_failed(iv)  // true: 200.0 is not a reachable call price here
+failed = is_iv_solver_failed(iv)  -- true: 200.0 is not a reachable call price here
 ```
 
 ## SABR approximation
@@ -151,8 +151,8 @@ strike `k`, and maturity `t` in years.
 
 ```chelis
 p = SABR { alpha: cast(0.035, f32), beta: cast(0.5, f32), rho: cast(-0.2, f32), nu: cast(0.4, f32) }
-otm = vs_sabr_implied_vol(p, cast(0.03, f32), cast(0.035, f32), cast(1.0, f32))  // 0.19355083
-atm = vs_sabr_atm_implied_vol(p, cast(0.03, f32), cast(1.0, f32))               // 0.20428286
+otm = vs_sabr_implied_vol(p, cast(0.03, f32), cast(0.035, f32), cast(1.0, f32))  -- 0.19355083
+atm = vs_sabr_atm_implied_vol(p, cast(0.03, f32), cast(1.0, f32))               -- 0.20428286
 ```
 
 The parameter domain is `alpha > 0`, `0 <= beta <= 1`, `|rho| < 1`,

@@ -35,14 +35,14 @@ and the same inputs produce the same values:
 ```chelis
 template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(50, i64))))
 path = gbm_path(key_from_seed(7i64), template, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
-// 50 entries; the last, the price at t = 1, is 125.43696
+-- 50 entries; the last, the price at t = 1, is 125.43696
 ```
 
 A four-step path from the same key, at times 0.25, 0.5, 0.75, and 1.0:
 
 ```chelis
 four = gbm_path(key_from_seed(7i64), to_tensor([cast(0.0, f32), cast(0.0, f32), cast(0.0, f32), cast(0.0, f32)]), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
-// [91.785385, 100.61438, 121.286125, 100.84691]
+-- [91.785385, 100.61438, 121.286125, 100.84691]
 ```
 
 The terminal draws have theoretical mean `s0 * exp(mu * t)`; a finite sample
@@ -68,7 +68,7 @@ reduces to the plain GBM drift:
 
 ```chelis
 d = merton_compensated_drift(cast(0.05, f32), cast(0.2, f32), cast(0.0, f32), cast(-0.1, f32), cast(0.1, f32))
-// d == 0.05 - 0.5 * 0.2 * 0.2
+-- d == 0.05 - 0.5 * 0.2 * 0.2
 ```
 
 `merton_jump_terminal` samples that model. It draws the jump count from the
@@ -134,7 +134,7 @@ A 5000-path sample:
 template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
 jumps_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
 paths = merton_jump_terminal(key_from_seed(7i64), template, jumps_template, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(0.3, f32), cast(-0.1, f32), cast(0.15, f32), cast(1.0, f32))
-// sample mean 104.80676; model mean 100 * exp(0.05) = 105.127
+-- sample mean 104.80676; model mean 100 * exp(0.05) = 105.127
 ```
 
 ## Two-asset correlated GBM
@@ -154,7 +154,7 @@ number (`(1.0, 2.0, NaN)` for `(1, 2, 1)`), and `sigma_xx = 0` divides by zero:
 
 ```chelis
 out = cholesky_2x2_lower(cast(4.0, f32), cast(2.0, f32), cast(3.0, f32))
-// out == (2.0, 1.0, sqrt(2.0))
+-- out == (2.0, 1.0, sqrt(2.0))
 ```
 
 `correlated_gbm_terminal_2d` draws correlated terminal pairs for two assets
@@ -167,8 +167,8 @@ near `s0 * exp(mu * t)`:
 template_x = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
 template_y = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
 out = correlated_gbm_terminal_2d(key_from_seed(13i64), template_x, template_y, cast(100.0, f32), cast(50.0, f32), cast(0.04, f32), cast(0.06, f32), cast(0.2, f32), cast(0.3, f32), cast(0.5, f32), cast(1.0, f32))
-// out.0 is the X terminal tensor, out.1 the Y terminal tensor
-// sample means 104.01002 and 52.85399; model means 104.081 and 53.092
+-- out.0 is the X terminal tensor, out.1 the Y terminal tensor
+-- sample means 104.01002 and 52.85399; model means 104.081 and 53.092
 ```
 
 ## Heston
@@ -205,7 +205,7 @@ module does not check the Feller condition, `|rho| <= 1`, or `n_steps > 0`.
 ```chelis
 hpt = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(2000, i64))))
 hes = heston_qe_paths_terminal(key_from_seed(11i64), hpt, cast(100.0, f32), cast(0.04, f32), cast(0.05, f32), cast(1.5, f32), cast(0.04, f32), cast(0.5, f32), cast(-0.7, f32), cast(1.0, f32), cast(50, i64))
-// mean S_T 104.77467, mean v_T 0.041197665
+-- mean S_T 104.77467, mean v_T 0.041197665
 ```
 
 ## Kou double-exponential jumps
@@ -252,7 +252,7 @@ sample variance does not converge.
 kpt = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
 kjt = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))
 kou = sto_kou_jump_terminal(key_from_seed(5i64), kpt, kjt, cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32), cast(0.4, f32), cast(10.0, f32), cast(5.0, f32), cast(1.0, f32))
-// 5000 paths: sample mean 104.68485; model mean 105.127
+-- 5000 paths: sample mean 104.68485; model mean 105.127
 ```
 
 ## Quasi-random points and variance reduction
@@ -282,9 +282,9 @@ no point sits at the origin.
 
 ```chelis
 sob = to_list(sobol_points(cast(4, i64), cast(2, i64)))
-// [0.0, 0.0, 0.5, 0.5, 0.25, 0.75, 0.75, 0.25]
+-- [0.0, 0.0, 0.5, 0.5, 0.25, 0.75, 0.75, 0.25]
 hal = to_list(halton_points(cast(4, i64), cast(2, i64)))
-// [0.5, 0.33333334, 0.25, 0.6666667, 0.75, 0.11111111, 0.125, 0.44444445]
+-- [0.5, 0.33333334, 0.25, 0.6666667, 0.75, 0.11111111, 0.125, 0.44444445]
 ```
 
 `sobol_point_runtime_at(d, i)` and `sobol_dim_runtime(d, template)` read one

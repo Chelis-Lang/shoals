@@ -26,9 +26,9 @@ survival probabilities at the two endpoints. `discount_factor_constant_rate`
 is `exp(-r * t)`. For example:
 
 ```chelis
-s = survival_probability_constant_hazard(cast(0.02, f32), cast(1.0, f32))  // exp(-0.02)
+s = survival_probability_constant_hazard(cast(0.02, f32), cast(1.0, f32))  -- exp(-0.02)
 p = default_probability_in_interval(cast(0.03, f32), cast(0.0, f32), cast(5.0, f32))
-// p == 1 - survival(5.0)
+-- p == 1 - survival(5.0)
 ```
 
 ## Exposure and netting
@@ -46,8 +46,8 @@ pointwise, the netting of two deals under a single agreement. For example:
 
 ```chelis
 exposures = to_tensor([cast(-10.0, f32), cast(5.0, f32), cast(-3.0, f32), cast(20.0, f32)])
-epe = expected_positive_exposure(exposures)  // (5 + 20) / 4 == 6.25
-ene = expected_negative_exposure(exposures)  // (-10 - 3) / 4
+epe = expected_positive_exposure(exposures)  -- (5 + 20) / 4 == 6.25
+ene = expected_negative_exposure(exposures)  -- (-10 - 3) / 4
 ```
 
 ## CVA and DVA
@@ -77,7 +77,7 @@ at years 1, 2, and 3:
 time_grid = to_tensor([cast(1.0, f32), cast(2.0, f32), cast(3.0, f32)])
 epe = to_tensor([cast(10.0, f32), cast(15.0, f32), cast(12.0, f32)])
 cva = cva_constant_hazard(time_grid, epe, cast(0.05, f32), cast(0.4, f32), cast(0.03, f32))
-// 0.96757334
+-- 0.96757334
 ```
 
 CVA is not generally increasing in hazard for a varying exposure profile.
@@ -162,5 +162,5 @@ The independent amount reduces exposure only in that third case. The
 
 ```chelis
 csa_collateralized_exposure_path(to_tensor([cast(-3.0, f32), cast(1.5, f32), cast(2.3, f32), cast(10.0, f32)]), cast(2.0, f32), cast(0.5, f32), cast(1.0, f32), cast(0.02, f32))
-// [0.0, 1.5, 2.3, 1.1599998]
+-- [0.0, 1.5, 2.3, 1.1599998]
 ```

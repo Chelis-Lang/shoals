@@ -41,12 +41,12 @@ Three pricers at practitioner sizes against their closed forms, at
 
 ```chelis
 crr = tr_crr_european_call(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.0, f32), cast(0.2, f32), cast(1.0, f32), cast(200, i64))
-// 10.439744; Black-Scholes 10.450583, 0.10% apart
+-- 10.439744; Black-Scholes 10.450583, 0.10% apart
 bond = fi_bond_general(cast(0.025, f32), cast(0.02, f32), cast(60, i64))
-// 1.1738045; a 30-year 5% semiannual bond at a 4% yield, closed form 1.1738
+-- 1.1738045; a 30-year 5% semiannual bond at a 4% yield, closed form 1.1738
 template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(10000, i64))))
 mc = mc_call_price(key_from_seed(42i64), template, cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
-// 10.341786; 1.0% below Black-Scholes, within one standard error (0.147)
+-- 10.341786; 1.0% below Black-Scholes, within one standard error (0.147)
 ```
 
 The CRR error shrinks roughly in proportion to `1 / n_steps`, and the Monte

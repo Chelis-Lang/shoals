@@ -41,7 +41,7 @@ For example, estimate an at-the-money call delta with a bump of `0.01`:
 
 ```chelis
 fd = fd_delta_call(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32), cast(0.01, f32))
-// 0.6369591
+-- 0.6369591
 ```
 
 For standard positive Black-Scholes inputs, call delta is in `[0, 1]`,
@@ -66,9 +66,9 @@ For example:
 
 ```chelis
 g = fd_gamma_call(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32), cast(0.5, f32))
-// 0.018764496
+-- 0.018764496
 v = fd_vanna_call(cast(100.0, f32), cast(105.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32), cast(0.01, f32), cast(0.001, f32))
-// 0.19073485
+-- 0.19073485
 ```
 
 ## Analytic Greek references
@@ -93,7 +93,7 @@ delta at a representative input:
 ```chelis
 fd = fd_delta_call(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32), cast(0.01, f32))
 an = analytic_delta_call(cast(100.0, f32), cast(100.0, f32), cast(0.05, f32), cast(0.2, f32), cast(1.0, f32))
-// fd == 0.6369591, an == 0.6368306
+-- fd == 0.6369591, an == 0.6368306
 ```
 
 ## Pathwise and likelihood-ratio estimators
@@ -110,7 +110,7 @@ For an in-the-money single path:
 
 ```chelis
 d = pathwise_smooth_call_terminal_delta(cast(120.0, f32), cast(100.0, f32), cast(0.95, f32), cast(100.0, f32))
-// 1.14 == 0.95 * 1.2
+-- 1.14 == 0.95 * 1.2
 ```
 
 `lr_digital_call_delta` is the likelihood-ratio delta estimator for a
@@ -126,5 +126,5 @@ Average the estimator over many paths to estimate delta:
 
 ```chelis
 d = lr_digital_call_delta(cast(120.0, f32), cast(100.0, f32), cast(100.0, f32), cast(0.2, f32), cast(1.0, f32), cast(0.95, f32))
-// 0.048051372
+-- 0.048051372
 ```

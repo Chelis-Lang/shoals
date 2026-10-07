@@ -16,7 +16,7 @@ import Std.Datetime.Business (Following, business_day_roll)
 import Shoreleave.UsFederal (us_federal)
 
 rolled = business_day_roll(us_federal(), date(2025i64, 7i64, 4i64), Following)
-// Monday 2025-07-07: 4 July is a US federal holiday
+-- Monday 2025-07-07: 4 July is a US federal holiday
 ```
 
 ## Which calendar to use
