@@ -21,6 +21,11 @@ SMOKE_PROPERTIES = {
     "pde": ("spread_expiry_matches_intrinsic",),
 }
 FAMILIES = {
+    "countcontracts": (
+        "spread_expiry_unused_invalid_counts",
+        "heston_one_panel_single_rule_equivalence",
+        "cds_annual_premium_identity",
+    ),
     "hestonlewis": (
         "heston_lewis_carr_madan_agreement",
         "heston_lewis_put_call_parity",

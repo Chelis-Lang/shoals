@@ -1,6 +1,7 @@
 module Shoals.Heston
 import Nautilus.Integrate (gauss_legendre_10)
 export (heston_charfn, heston_call_carr_madan, heston_call_carr_madan_panels, heston_put_carr_madan_panels, heston_call_lewis_panels, heston_put_lewis_panels, heston_call_lipton_panels, heston_put_lipton_panels)
+def heston_checked_panel_count(count: i64) -> i64 = if lt(count, 1i64) then fail(string_concat("Shoals.Heston: n_panels must be at least 1; received ", to_string(count))) else count
 def heston_pi_const() -> f32 = cast(3.14159265358979, f32)
 def heston_half_pi() -> f32 = div(heston_pi_const(), cast(2.0, f32))
 def cadd(a: (f32, f32), b: (f32, f32)) -> (f32, f32) = (add(a.0, b.0), add(a.1, b.1))
@@ -84,8 +85,9 @@ def heston_call_carr_madan(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32,
   if gt(raw_price, cast(0.0, f32)) then raw_price else cast(0.0, f32)
 }
 def gauss_legendre_panels(f: f32 -> f32, a: f32, b: f32, n_panels: i64) -> f32 = {
-  panel_width = div(sub(b, a), cast(n_panels, f32))
-  idxs = range(cast(0, i64), n_panels)
+  n_panels_ok = heston_checked_panel_count(n_panels)
+  panel_width = div(sub(b, a), cast(n_panels_ok, f32))
+  idxs = range(cast(0, i64), n_panels_ok)
   parts = map(fn (i: i64) -> {
     sub_a = add(a, mul(cast(i, f32), panel_width))
     sub_b = add(sub_a, panel_width)

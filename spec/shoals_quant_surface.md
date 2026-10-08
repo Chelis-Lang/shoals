@@ -262,7 +262,11 @@ GBM paths. Extensions:
   with the early-exercise comparison. AD through trees uses
   pathwise-where-smooth + likelihood-ratio at the exercise boundary.
 - **PDE methods:** Crank-Nicolson with Rannacher smoothing at the
-  payoff discontinuity; ADI for two-dimensional problems (multi-asset
+  payoff discontinuity. The vanilla finite-difference drivers require
+  `n_x>=3` and `n_t>=1`; the two endpoints surround at least one
+  interior unknown. This requirement does not apply to the exported
+  Thomas solver, which retains valid one- and two-equation systems.
+  ADI for two-dimensional problems (multi-asset
   or local vol + stochastic vol). The European spread-call surface
   `pde_spread_option_adi` prices `max(S1-S2-K,0)` in log coordinates with
   the complete correlated-GBM operator, including
@@ -275,7 +279,8 @@ GBM paths. Extensions:
   is `max(S1*exp(-q1*tau)-S2*exp(-q2*tau)-K*exp(-r*tau),0)`.
   These far-field boundaries are approximate; spatial, temporal, and
   domain refinement are separate acceptance checks. At `T=0`, the
-  public function returns the intrinsic payoff directly. The existing
+  public function returns the intrinsic payoff directly without validating
+  unused grid or time-step counts. The existing
   `f32` signature and bilinear log-grid interpolation are retained.
   Finite positive spots, nonnegative volatilities and time, correlation
   in `[-1,1]`, `n_x1,n_x2>=3`, and `n_t>=1` define the numerical input
@@ -352,7 +357,9 @@ GBM paths. Extensions:
   This normalization applies at every positive strike, independently of
   the forward. The corresponding put follows put-call parity. Finite
   quadrature approximations are checked with explicit truncation and
-  discretization tolerances.
+  discretization tolerances. Every panel-based call or put requires
+  `n_panels>=1`; the single-panel minimum uses the same ten-point rule
+  as the non-panel Carr-Madan call.
 
 Each pricer is AD-compatible if the underlying primitives are; the
 challenges are at discontinuities (early exercise, digital payoffs).
@@ -453,10 +460,15 @@ function. The module surface:
   handling. Variation and initial-margin haircut models.
 - **Default modeling:** credit curves (CDS-implied survival
   probabilities), default probability term structure, stochastic and
-  deterministic recovery rates.
+  deterministic recovery rates. CDS premium grids require
+  `n_premiums_per_year>=1`; premium valuation, CDS PV, and nonempty
+  hazard bootstraps inherit that frequency check. An empty hazard
+  bootstrap constructs an empty curve without consuming the frequency.
 - **XVA aggregation:** integrate exposure with default probabilities
   to compute CVA / DVA / FVA / KVA. Wrong-way risk via correlated
-  default and exposure paths.
+  default and exposure paths. The exported
+  `xva_cva_wwr_constant_hazard` requires `n_paths>=1` before generating
+  sampled exposures or averaging their contributions.
 - **XVA sensitivities:** gradients with respect to market parameters.
   Production today uses bumping (finite differences) because AD
   through the full XVA computation is fragile. Replacing bumping with
@@ -927,8 +939,8 @@ exit checkpoints.
 
 ## Bounded numerical regression properties
 
-The Heston Lewis, Longstaff-Schwartz regression, spread ADI, and jump-moment
-regressions include literal Chelis `@property` declarations. The optional local
+The Heston Lewis, Longstaff-Schwartz regression, spread ADI, jump-moment,
+and computational-count regressions include literal Chelis `@property` declarations. The optional local
 `scripts/check_pricing_fix_properties.py` runner checks each file at seeds 0,
 1, and 2. Every positive property must accept 25 samples at the fuzz tier;
 every corrupted twin must fail with an in-domain counterexample. Missing,
@@ -942,3 +954,11 @@ independent numerical references. They do not establish global proofs or
 change the consumer invariant manifest's proof tiers. The full numerical
 runner is local-only, outside CI and release acceptance; no passing result is
 implied by adding its declarations or classifier tests.
+
+Count refusals name the owning module, parameter, minimum and received count,
+for example `Shoals.Pde: n_x must be at least 3; received 2`. Private checked-count
+helpers return the validated integer, which the computation consumes.
+`properties/countcontracts.ch` contains three positive/corrupted pairs for
+spread expiry with unused invalid counts, one-panel Carr-Madan equivalence,
+and annual CDS premium identity. They belong to the optional full property
+runner; the CI `--smoke` selection is unchanged.

@@ -38,6 +38,8 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   so finite volatility with a tiny horizon preserves representable effective
   variance. Simulated spots still round to `f32`; invalid outputs fail and
   finite exponential underflow remains valid (shoals#163).
+- Reject invalid PDE grid/time-step counts, Heston panel counts, CDS premium
+  frequency and exported WWR path counts with explicit diagnostics (shoals#166).
 
 ### Changed
 

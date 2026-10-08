@@ -3,6 +3,7 @@ import Nautilus.Distributions (gamma_sample, normal_sample, normal_cdf)
 import Nautilus.Interpolation (linear_interp_sorted)
 import Shoals.Cds (HazardCurve, hazard_curve_from_pillars, hazard_curve_pillars, cds_survival_from_hazards)
 export (survival_probability_constant_hazard, default_probability_in_interval, expected_positive_exposure, expected_negative_exposure, netted_exposure_2_deals, cva_constant_hazard, dva_constant_hazard, discount_factor_constant_rate, fva, kva, xva_cva_wwr_constant_hazard, xva_cva_stochastic_hazard)
+def xva_checked_path_count(count: i64) -> i64 = if lt(count, 1i64) then fail(string_concat("Shoals.Xva: n_paths must be at least 1; received ", to_string(count))) else count
 def survival_probability_constant_hazard(hazard: f32, t: f32) -> f32 = exp(neg(mul(hazard, t)))
 def default_probability_in_interval(hazard: f32, t_start: f32, t_end: f32) -> f32 = sub(survival_probability_constant_hazard(hazard, t_start), survival_probability_constant_hazard(hazard, t_end))
 def discount_factor_constant_rate(r: f32, t: f32) -> f32 = exp(neg(mul(r, t)))
@@ -146,12 +147,13 @@ def xva_cva_stochastic_hazard[n, m](time_grid: tensor[m, f32], epe: tensor[m, f3
   }
 }
 def xva_cva_wwr_constant_hazard[n](rng_key: key, time_grid: tensor[n, f32], epe: tensor[n, f32], hazard: f32, recovery: f32, discount_rate: f32, rho: f32, n_paths: i64) -> f32 = {
+  n_paths_ok = xva_checked_path_count(n_paths)
   (rng_draw_0, rng_draw_1) = split_key(rng_key)
   zero_f = cast(0.0, f32)
   one_f = cast(1.0, f32)
   eta_e = cast(0.5, f32)
   lgd = sub(one_f, recovery)
-  template = to_tensor(map(fn (i: i64) -> zero_f, range(cast(0, i64), n_paths)))
+  template = to_tensor(map(fn (i: i64) -> zero_f, range(cast(0, i64), n_paths_ok)))
   z_e_t = normal_sample(rng_draw_0, copy(template), zero_f, one_f)
   z_d_t = normal_sample(rng_draw_1, template, zero_f, one_f)
   ts_l = to_list(copy(time_grid))
@@ -172,7 +174,7 @@ def xva_cva_wwr_constant_hazard[n](rng_key: key, time_grid: tensor[n, f32], epe:
       mul(lgd, mul(exposure, df_tau))
     } else zero_f
   }, pairs)
-  n_f = cast(n_paths, f32)
+  n_f = cast(n_paths_ok, f32)
   sum_contribs = fold(fn (a: f32, v: f32) -> add(a, v), zero_f, contribs)
   div(sum_contribs, n_f)
 }

@@ -1,5 +1,6 @@
 module Shoals.Pde
 export (pde_european_call_cn, pde_european_put_cn, pde_american_put_cn, pde_spread_option_adi, pde_thomas_solve)
+def pde_checked_count(parameter: string, count: i64, minimum: i64) -> i64 = if lt(count, minimum) then fail(string_concat("Shoals.Pde: ", string_concat(parameter, string_concat(" must be at least ", string_concat(to_string(minimum), string_concat("; received ", to_string(count))))))) else count
 def pde_zero() -> f32 = cast(0.0, f32)
 def pde_one() -> f32 = cast(1.0, f32)
 def pde_half() -> f32 = cast(0.5, f32)
@@ -183,28 +184,30 @@ def pde_interp_at_s0(xs: List[f32], v: List[f32], s0: f32, n_x: i64) -> f32 = {
   w_lo |> mul(v_lo) |> add(mul(w_hi, v_hi))
 }
 def pde_vanilla_driver(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_x: i64, n_t: i64, s_max_mult: f32, is_call: bool, is_american: bool) -> f32 = {
-  grid_params = pde_log_grid_params(s0, s_max_mult, n_x)
+  n_x_ok = pde_checked_count("n_x", n_x, 3i64)
+  n_t_ok = pde_checked_count("n_t", n_t, 1i64)
+  grid_params = pde_log_grid_params(s0, s_max_mult, n_x_ok)
   x_min = grid_params.0
   dx = grid_params.1
-  xs = pde_grid_x(x_min, dx, n_x)
-  n_xm1 = sub(n_x, cast(1, i64))
+  xs = pde_grid_x(x_min, dx, n_x_ok)
+  n_xm1 = sub(n_x_ok, cast(1, i64))
   s_max = xs |> index(n_xm1) |> exp
   op_coeffs = pde_op_coeffs(sigma, r, q, dx)
   a_coef = op_coeffs.0
   b_coef = op_coeffs.1
   c_coef = op_coeffs.2
   v_init = if is_call then pde_payoff_call(xs, k) else pde_payoff_put(xs, k)
-  dt = div(t, cast(n_t, f32))
+  dt = div(t, cast(n_t_ok, f32))
   step_idxs = 0
-    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(n_t)))
+    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(n_t_ok)))
   v_final = fold(fn (v_acc: List[f32], n: i64) -> {
     tau_next = mul(cast(add(n, cast(1, i64)), f32), dt)
     bc_pair_next = if is_american then pde_bc_american_put(k) else if is_call then pde_bc_call(s_max, k, r, q, tau_next) else pde_bc_put(k, r, tau_next)
     is_rannacher = lt(n, cast(2, i64))
-    v_cont = pde_step_vanilla(v_acc, a_coef, b_coef, c_coef, dt, n_x, bc_pair_next, is_rannacher)
+    v_cont = pde_step_vanilla(v_acc, a_coef, b_coef, c_coef, dt, n_x_ok, bc_pair_next, is_rannacher)
     if is_american then pde_apply_early_exercise_put(v_cont, xs, k) else v_cont
   }, v_init, step_idxs)
-  pde_interp_at_s0(xs, v_final, s0, n_x)
+  pde_interp_at_s0(xs, v_final, s0, n_x_ok)
 }
 def pde_european_call_cn(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_x: i64, n_t: i64, s_max_mult: f32) -> f32 = pde_vanilla_driver(s0, k, r, q, sigma, t, n_x, n_t, s_max_mult, true, false)
 def pde_european_put_cn(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_x: i64, n_t: i64, s_max_mult: f32) -> f32 = pde_vanilla_driver(s0, k, r, q, sigma, t, n_x, n_t, s_max_mult, false, false)
@@ -326,12 +329,15 @@ def pde_adi_log_half_width(sigma: f32, r: f32, q: f32, t: f32) -> f32 = {
 -- Private width inputs support domain-refinement probes without growing the
 -- public API. The wrapper always uses the automatic six-sigma widths.
 def pde_adi_spread_driver(s1_0: f32, s2_0: f32, k: f32, r: f32, q1: f32, q2: f32, sigma1: f32, sigma2: f32, rho: f32, t: f32, n_x1: i64, n_x2: i64, n_t: i64, width1: f32, width2: f32) -> f32 = {
+  n_x1_ok = pde_checked_count("n_x1", n_x1, 3i64)
+  n_x2_ok = pde_checked_count("n_x2", n_x2, 3i64)
+  n_t_ok = pde_checked_count("n_t", n_t, 1i64)
   x_min_1 = sub(log(s1_0), width1)
-  dx1 = div(mul(2.0f32, width1), cast(sub(n_x1, 1i64), f32))
+  dx1 = div(mul(2.0f32, width1), cast(sub(n_x1_ok, 1i64), f32))
   x_min_2 = sub(log(s2_0), width2)
-  dx2 = div(mul(2.0f32, width2), cast(sub(n_x2, 1i64), f32))
-  xs1 = pde_grid_x(x_min_1, dx1, n_x1)
-  xs2 = pde_grid_x(x_min_2, dx2, n_x2)
+  dx2 = div(mul(2.0f32, width2), cast(sub(n_x2_ok, 1i64), f32))
+  xs1 = pde_grid_x(x_min_1, dx1, n_x1_ok)
+  xs2 = pde_grid_x(x_min_2, dx2, n_x2_ok)
   s1s = map(fn (x: f32) -> exp(x), xs1)
   s2s = map(fn (x: f32) -> exp(x), xs2)
   raw_op1 = pde_op_coeffs(sigma1, r, q1, dx1)
@@ -341,7 +347,7 @@ def pde_adi_spread_driver(s1_0: f32, s2_0: f32, k: f32, r: f32, q1: f32, q2: f32
   op2 = (raw_op2.0, add(raw_op2.1, half_r), raw_op2.2)
   cross_coef = mul(rho, mul(sigma1, sigma2))
   v_init = pde_adi_payoff_spread_2d(xs1, xs2, k)
-  dt = div(t, cast(n_t, f32))
+  dt = div(t, cast(n_t_ok, f32))
   half_dt = mul(0.5f32, dt)
   v_final = fold(fn (v: List[List[f32]], n: i64) -> {
     tau_old = mul(cast(n, f32), dt)
@@ -350,10 +356,10 @@ def pde_adi_spread_driver(s1_0: f32, s2_0: f32, k: f32, r: f32, q1: f32, q2: f32
     if lt(n, 2i64) then {
       tau_half = add(tau_old, half_dt)
       boundary_half = pde_adi_boundary_grid(s1s, s2s, k, r, q1, q2, tau_half)
-      half = pde_adi_step(v, op1, op2, cross_coef, dx1, dx2, n_x1, n_x2, boundary_half, half_dt, true)
-      pde_adi_step(half, op1, op2, cross_coef, dx1, dx2, n_x1, n_x2, boundary_next, half_dt, true)
-    } else pde_adi_step(v, op1, op2, cross_coef, dx1, dx2, n_x1, n_x2, boundary_next, dt, false)
-  }, v_init, range(0i64, n_t))
+      half = pde_adi_step(v, op1, op2, cross_coef, dx1, dx2, n_x1_ok, n_x2_ok, boundary_half, half_dt, true)
+      pde_adi_step(half, op1, op2, cross_coef, dx1, dx2, n_x1_ok, n_x2_ok, boundary_next, half_dt, true)
+    } else pde_adi_step(v, op1, op2, cross_coef, dx1, dx2, n_x1_ok, n_x2_ok, boundary_next, dt, false)
+  }, v_init, range(0i64, n_t_ok))
   log_s1 = log(s1_0)
   log_s2 = log(s2_0)
   x1_0 = index(xs1, cast(0, i64))
@@ -364,8 +370,8 @@ def pde_adi_spread_driver(s1_0: f32, s2_0: f32, k: f32, r: f32, q1: f32, q2: f32
   pos_2_safe = if lt(raw_pos_2, pde_zero()) then pde_zero() else raw_pos_2
   pos_1_int = cast_trunc(pos_1_safe, i64)
   pos_2_int = cast_trunc(pos_2_safe, i64)
-  n_x1m2 = sub(n_x1, cast(2, i64))
-  n_x2m2 = sub(n_x2, cast(2, i64))
+  n_x1m2 = sub(n_x1_ok, cast(2, i64))
+  n_x2m2 = sub(n_x2_ok, cast(2, i64))
   i_lo = if gt(pos_1_int, n_x1m2) then n_x1m2 else pos_1_int
   j_lo = if gt(pos_2_int, n_x2m2) then n_x2m2 else pos_2_int
   i_hi = add(i_lo, cast(1, i64))
