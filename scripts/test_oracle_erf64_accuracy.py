@@ -437,6 +437,42 @@ class LeftTailRelativeEnforcement(unittest.TestCase):
         return [overrides.get(x, self.exact_at(x))
                 for x in self.mod.LEFT_TAIL_POINTS]
 
+    def test_a_nan_at_each_left_tail_point_is_rejected(self):
+        for x in self.mod.LEFT_TAIL_POINTS:
+            with self.subTest(x=x):
+                values = self.values_with({x: float("nan")})
+                _, errors = self.mod.left_tail_relative(values, self.fake)
+                self.assertEqual(len(errors), 1, errors)
+                self.assertIn(f"n_cdf64({x})", errors[0])
+                self.assertIn("nonpositive or nonfinite", errors[0])
+                self.assertIn("nan", errors[0])
+
+    def test_an_all_nan_left_tail_is_rejected(self):
+        values = [float("nan")] * len(self.mod.LEFT_TAIL_POINTS)
+        _, errors = self.mod.left_tail_relative(values, self.fake)
+        self.assertEqual(len(errors), len(self.mod.LEFT_TAIL_POINTS), errors)
+        for x, error in zip(self.mod.LEFT_TAIL_POINTS, errors, strict=True):
+            self.assertIn(f"n_cdf64({x})", error)
+            self.assertIn("nonpositive or nonfinite", error)
+
+    def test_an_infinite_left_tail_result_is_rejected(self):
+        # Infinity also exceeds the relative-error limit without isfinite.
+        # The NaN tests above distinguish removal of the finiteness guard.
+        x = self.mod.LEFT_TAIL_POINTS[3]
+        _, errors = self.mod.left_tail_relative(
+            self.values_with({x: float("inf")}), self.fake)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn(f"n_cdf64({x})", errors[0])
+        self.assertIn("nonpositive or nonfinite", errors[0])
+
+    def test_a_missing_left_tail_result_is_rejected(self):
+        x = self.mod.LEFT_TAIL_POINTS[3]
+        _, errors = self.mod.left_tail_relative(
+            self.values_with({x: None}), self.fake)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn(f"n_cdf64({x})", errors[0])
+        self.assertIn("None", errors[0])
+
     def test_correct_values_pass_and_report_a_nonzero_worst(self):
         """Positive control, and it also pins `worst_relative`. Every
         assertion below would hold vacuously against a function that always
