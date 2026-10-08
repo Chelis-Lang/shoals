@@ -190,8 +190,10 @@ With 2000 paths, seed 21, `s0 = k = 100`, `r = 0.05`, `sigma = 0.2`, and
 
 These are Monte Carlo estimates. Changing the number of dates also
 changes the simulated paths, so individual estimates need not increase
-with the number of steps or exceed an analytic European price. Compare
-several seeds and increase the path count. For this case, a refined
+with the number of steps or exceed an analytic European price. Using the
+same paths to fit and value the exercise policy also introduces regression
+bias. Several seeds help measure random variation; increase the path
+count to reduce the fitting bias. For this case, a refined
 `tr_crr_american_put` tree gives about `6.09`.
 
 Supply at least one path and one step, finite positive `s0` and `k`, a
