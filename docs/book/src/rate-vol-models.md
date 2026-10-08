@@ -175,8 +175,8 @@ lp = heston_call_lipton_panels(cast(100.0, f32), cast(100.0, f32), cast(1.0, f32
 -- 10.055477
 ```
 
-The Lewis form uses `heston_charfn(u - i/2)` with the discount factor
-`exp(-r * t) * sqrt(k)` multiplying the integral. It accepts strikes on
+The Lewis form uses `heston_charfn(u - i/2)` with the coefficient
+`exp(-r * t) * sqrt(k) / pi` multiplying the integral. It accepts strikes on
 either side of the forward. Increase both `u_max` and `n_panels` to check
 that the price has settled; the three formulas can have different
 quadrature errors at the same settings.
