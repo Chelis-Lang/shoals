@@ -2,62 +2,14 @@ module Shoals.Stochastic
 import Nautilus.Distributions (normal_sample, uniform_sample, exponential_sample)
 import Nautilus.Special (log_gamma)
 export (gbm_path, gbm_terminal, gbm_paths_antithetic_terminal_mean, merton_jump_terminal, merton_compensated_drift, merton_sampler_log_jump_moment, correlated_gbm_terminal_2d, cholesky_2x2_lower, heston_qe_step, heston_qe_terminal, heston_qe_paths_terminal, sto_kou_compensator, sto_kou_jump_sample, sto_kou_sampler_log_jump_moment, sto_kou_jump_terminal)
--- Every path sampler in this module turns its time horizon into `sqrt(t)` and
--- into a log drift proportional to t, so a horizon that is not finite and
--- non-negative yields NaN for every path with no diagnostic. That is a
--- precondition of the DIFFUSION, which is why it is checked here and not in
--- merton_jump_slots or sto_kou_jump_slots: those guard `lambda * t` as a
--- Poisson rate, and `0.0 * -1.0` is `-0.0`, whose sign bit is set but which
--- compares `>= 0.0` as true in IEEE 754. A jump-count guard therefore cannot
--- see a negative horizon at lambda = 0, and it should not have to -- at
--- lambda = 0 there is no Poisson law to be negative, and the NaN comes from
--- `sqrt(t)` on the diffusion side regardless of the jump parameters.
---
--- The general lesson is to guard the INPUT, not a derived
--- product: `lambda * t` destroys the sign information the guard needs, while
--- `gte(t, 0.0)` rejects `t = -1` cleanly. (No issue number is cited here on
--- purpose: in this repository a `shoals#NNN` token in `src/` denotes a LIVE
--- narrowing that `reef conform audit` row 9 requires be covered by a
--- tests_blocked/ probe or a docs/UPSTREAM_BUGS.md entry. This guard is a fix,
--- not a workaround, so citing it here would assert a limitation that does not
--- exist. The provenance lives in the commit, the CHANGELOG, docs/book/src/
--- stochastic.md, and the tests_neg/stochastic/ rationales.) Within this module the two
--- `gte(rate, zero)` clauses are the only guards keying on a product's sign,
--- and in the nine guarded samplers below, where the horizon IS checked
--- upstream, the only remaining routes to a `-0.0` rate are a zero horizon or
--- a zero lambda, both of which have the correct zero-jump answer. The two
--- exported `*_sampler_log_jump_moment` functions are NOT so guarded, so a
--- negative horizon reaches their `-0.0` rate directly; measured, they return
--- 0.0 there, which is the right zero-jump answer.
---
--- `-0.0` stays ADMITTED, deliberately: `gte(-0.0, 0.0)` is true, `sqrt(-0.0)`
--- is `-0.0`, and the terminal value is s0 to within the log/exp round trip.
--- A zero horizon is a legitimate input, and refusing it would narrow the
--- surface for a sign bit that changes no answer.
---
--- Non-finiteness uses this module's `sub(x, x) == 0` idiom rather than an
--- ordering comparison, for count_params_finite's reason: `gte(nan, 0.0)` is
--- false, so a NaN horizon would otherwise report the negative-horizon cause.
--- `+inf` is refused on a measured ground and not for tidiness: the log drift
--- and `sigma * sqrt(t)` are then both `+inf`, so `drift + vol_sqrt_t * z` is
--- `inf - inf` = NaN for every negative draw and `+inf` for every positive one.
--- Measured at s0 = 100, mu = 0.05, sigma = 0.2, n = 8, seed 7 on the
--- pre-guard tree: 3 NaN and 5 `+inf`. That is why this branch's diagnostic
--- says "no path value would be usable" rather than naming NaN -- unlike a
--- negative horizon, which really is NaN at every path. The fixtures under
--- tests_neg/stochastic/ pin both diagnostics.
+-- Samplers require a finite, non-negative horizon before forming sqrt(t).
+-- Moment functions validate horizon and intensity separately at their shared
+-- count-table entry points: multiplying two negatives or an invalid operand
+-- by zero cannot establish that either input describes a jump process.
+-- Signed zero remains a valid zero horizon or zero intensity.
 def horizon_finite(t: f32) -> bool = eq(sub(t, t), cast(0.0, f32))
--- The checked horizon, RETURNED rather than asserted, so that every caller has
--- to consume the value. A `_ = check(t)` binding would be dead and could be
--- eliminated before it reached the evaluated graph; threading the return value
--- is what puts the guard in the dataflow of every sampler below.
---
--- That is a DEFENSIVE choice, not a demonstrated necessity, and the
--- distinction is measured: a discarded `_ = checked_horizon(t)` with raw `t`
--- downstream was observed to still fire in the evaluator lane, which is the
--- lane every test here runs in. No gate stage lowers these samplers, so the
--- hazard is untested rather than refuted. Threading costs nothing and does not
--- depend on which lane evaluates the binding, so it stays.
+-- Thread the checked value into the computation so the guard stays in its
+-- dataflow. sub(x, x) distinguishes non-finite values from negative inputs.
 def checked_horizon(t: f32) -> f32 = if not(horizon_finite(t)) then fail("Shoals.Stochastic: the time horizon must be finite; a non-finite horizon makes the log drift and sigma * sqrt(t) non-finite, so no path value would be usable") else if not(gte(t, cast(0.0, f32))) then fail("Shoals.Stochastic: the time horizon must be non-negative; sqrt of a negative horizon is NaN, so every path value would be NaN") else t
 def gbm_path[n](rng_key: key, template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
   z = normal_sample(rng_key, template, cast(0.0, f32), cast(1.0, f32))
@@ -187,10 +139,17 @@ def merton_jump_slots(lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> i64
   raw = count_slot_bound(rate, log_tilt)
   if not(count_params_finite(rate, log_tilt)) then fail("Shoals.Stochastic: merton jump parameters must be finite; lambda * t and jump_mean + 0.5 * jump_vol^2 must both be representable") else if not(gte(rate, zero)) then fail("Shoals.Stochastic: merton jump rate lambda * t must be finite and non-negative") else if not(lte(raw, count_slot_cap())) then fail("Shoals.Stochastic: merton jump intensity is too large to enumerate the jump count exactly; lambda * t * exp(jump_mean + 0.5 * jump_vol^2) must leave the slot bound at or below 4096") else cast_trunc(raw, i64)
 }
+-- Validate operands before any product or zero-rate shortcut.
+def checked_jump_intensity(lambda_jump: f32) -> f32 = if and(horizon_finite(lambda_jump), gte(lambda_jump, cast(0.0, f32))) then lambda_jump else fail("Shoals.Stochastic: jump intensity must be finite and non-negative")
+def checked_jump_horizon(t: f32) -> f32 = if and(horizon_finite(t), gte(t, cast(0.0, f32))) then t else fail("Shoals.Stochastic: jump horizon must be finite and non-negative")
 -- Merton's jump-count table: count_table at Merton's rate and jump
 -- multiplier. J | N ~ Normal(N * jump_mean, N * jump_vol^2), so
 -- w = exp(jump_mean + 0.5 * jump_vol^2).
-def merton_count_table(lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> (List[f32], f32, f32) = count_table(mul(lambda, t), add(jump_mean, mul(cast(0.5, f32), mul(jump_vol, jump_vol))), merton_jump_slots(lambda, jump_mean, jump_vol, t))
+def merton_count_table(lambda: f32, jump_mean: f32, jump_vol: f32, t: f32) -> (List[f32], f32, f32) = {
+  lambda_ok = checked_jump_intensity(lambda)
+  t_ok = checked_jump_horizon(t)
+  count_table(mul(lambda_ok, t_ok), add(jump_mean, mul(cast(0.5, f32), mul(jump_vol, jump_vol))), merton_jump_slots(lambda_ok, jump_mean, jump_vol, t_ok))
+}
 -- log E[exp(J)] for the aggregate log jump J that merton_jump_terminal draws:
 -- J | N ~ Normal(N * jump_mean, N * jump_vol^2) with N the enumerated jump
 -- count, so E[exp(J)] = E[w^N] with w = exp(jump_mean + 0.5 * jump_vol^2).
@@ -408,7 +367,11 @@ def sto_kou_jump_slots(lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f3
   if not(count_params_finite(rate, log_w)) then fail("Shoals.Stochastic: kou jump parameters must be finite; lambda_jump * t must be representable and the jump multiplier 1 + sto_kou_compensator(p, eta_up, eta_dn) must be finite and positive, which requires eta_up > 1") else if not(gte(rate, zero)) then fail("Shoals.Stochastic: kou jump rate lambda_jump * t must be finite and non-negative") else if not(lte(raw, count_slot_cap())) then fail("Shoals.Stochastic: kou jump intensity is too large to enumerate the jump count exactly; lambda_jump * t * (1 + sto_kou_compensator(p, eta_up, eta_dn)) must leave the slot bound at or below 4096") else cast_trunc(raw, i64)
 }
 -- Kou's jump-count table: count_table at Kou's rate and jump multiplier.
-def sto_kou_count_table(lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> (List[f32], f32, f32) = count_table(mul(lambda_jump, t), log(add(cast(1.0, f32), sto_kou_compensator(p, eta_up, eta_dn))), sto_kou_jump_slots(lambda_jump, p, eta_up, eta_dn, t))
+def sto_kou_count_table(lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> (List[f32], f32, f32) = {
+  lambda_ok = checked_jump_intensity(lambda_jump)
+  t_ok = checked_jump_horizon(t)
+  count_table(mul(lambda_ok, t_ok), log(add(cast(1.0, f32), sto_kou_compensator(p, eta_up, eta_dn))), sto_kou_jump_slots(lambda_ok, p, eta_up, eta_dn, t_ok))
+}
 -- log E[exp(J)] for the aggregate log jump J that sto_kou_jump_terminal draws:
 -- J is the sum of N iid double-exponential jumps with N the enumerated jump
 -- count, so E[exp(J)] = E[w^N] with w = 1 + sto_kou_compensator(...).

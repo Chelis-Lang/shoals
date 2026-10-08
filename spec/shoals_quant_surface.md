@@ -220,6 +220,12 @@ needs:
   within MC noise.
 - **Jump processes:** Merton lognormal jumps, Kou double-exponential
   jumps, abstract Lévy templates.
+  Samplers and exported sampler-moment functions require finite,
+  non-negative intensity and horizon separately. Either may be zero,
+  including signed zero. A non-negative product alone does not establish
+  admissible operands. The sampler moment describes its renormalized
+  enumerated count law and retains the existing representability and
+  enumeration limits.
 - **Interest-rate models:** Hull-White one-factor and two-factor
   (Gaussian short-rate), Libor Market Model with shifted-lognormal
   drift correction, HJM framework with the no-arbitrage drift.
