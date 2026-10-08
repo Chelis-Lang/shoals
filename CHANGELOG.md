@@ -384,6 +384,12 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Kou stochastic helpers accept finite unused upward-rate placeholders when
+  the upward-jump probability is exactly zero (shoals#146). The compensator,
+  sampler moment and terminal sampler then use the pure-downward law;
+  positive probabilities still require an upward rate greater than one,
+  and non-finite placeholders remain invalid.
+
 - **BREAKING: every path sampler in `Shoals.Stochastic` refuses a time horizon
   that is not finite and non-negative** (shoals#139). A negative `t` returned
   NaN for every path value with no diagnostic. Measured on `bba1a22` at

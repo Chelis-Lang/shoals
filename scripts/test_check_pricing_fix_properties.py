@@ -31,7 +31,8 @@ def valid_records():
             if corrupt:
                 row["counterexample"] = {"lambda_jump": 0.0}
             rows.append(row)
-    rows.append({"kind": "summary", "total": 8, "passed": 4, "failed": 4,
+    count = len(FAMILIES["jumpmoments"])
+    rows.append({"kind": "summary", "total": 2 * count, "passed": count, "failed": count,
                  "errors": 0, "unsupported": 0})
     return rows
 

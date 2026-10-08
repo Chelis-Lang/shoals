@@ -1,6 +1,6 @@
 Shoals.Stochastic: kou jump parameters must be finite
 Assumption: the jump-count table needs a finite jump multiplier
-w = E[exp(Y)] = 1 + zeta, and eta_up <= 1 does not give it one -- the up-jump
+w = E[exp(Y)] = 1 + zeta, and with p > 0 eta_up <= 1 does not give it one -- the up-jump
 exponential moment integral diverges. sto_kou_compensator returns a NaN
 sentinel in that case and always has; what changed in shoals#132 is that the
 sampler no longer multiplies that NaN into its drift and returns NaN for every
