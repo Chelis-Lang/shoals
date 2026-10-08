@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.24.16] - 2026-10-08
+
+### Fixed
+
+- Corrected the Heston Lewis call normalization for strikes away from the
+  forward. Puts use the corrected call through parity (shoals#151).
+- Replaced Longstaff-Schwartz's ill-conditioned normal equations with a
+  centered, scaled `f64` QR fit. Exercise cash flows retain their stopping
+  dates and are discounted once; time-zero exercise is included (shoals#152).
+- Corrected the spread PDE's correlation term, added Craig-Sneyd correction
+  sweeps and startup damping, and updated the domain and discounted
+  boundaries (shoals#153).
+- Jump moments reject negative or non-finite intensity and horizon
+  independently, including operands hidden by multiplication by zero
+  (shoals#149).
+- Pinned NaN rejection in the normal-CDF left-tail oracle tests (shoals#142).
+  Restored broad accuracy coverage and corrected the measured error figures
+  after the original workload completed within budget (shoals#143).
+- Updated the canonical pricing docs and rendered book examples and limits.
+  Nightly and release checks run the bounded regression properties and
+  require their false controls to fail.
+
 ## [Unreleased]
 
 ### Changed

@@ -132,7 +132,7 @@ the larger of `log(2)` and
 `abs(r - q - 0.5 * sigma^2) * t + sigma^2 * t + 6 * sigma * sqrt(t)`.
 The perimeter is updated at every stage to
 `max(S1 * exp(-q1 * tau) - S2 * exp(-q2 * tau) - k * exp(-r * tau), 0)`,
-where `tau` is the elapsed pricing time from expiry. This is an
+where `tau` is the time to maturity at that stage. This is an
 asymptotic boundary approximation, so check grid convergence for the
 parameters you price.
 
@@ -166,7 +166,8 @@ def lsm_put_payoff(s: f32, k: f32) -> f32
 ```
 
 `lsm_american_put` simulates GBM paths with no dividend yield and
-allows exercise at time 0 and at each date `i * t / n_steps`. At each
+allows exercise at time 0 and at each date `i * t / n_steps`, for
+`i = 1 .. n_steps`. At each
 intermediate date it fits the discounted continuation values of the
 in-the-money paths to a quadratic in spot. Each selected cash flow is
 discounted from its exercise date once. The same paths serve for

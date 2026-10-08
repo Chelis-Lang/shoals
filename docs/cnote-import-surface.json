@@ -2,9 +2,9 @@
   "schema_id": "chelis-shell.invariant-surface",
   "schema_version": "1.0",
   "pkg": "shoals",
-  "pkg_version": "0.24.15",
+  "pkg_version": "0.24.16",
   "chelis_pin": "0.19.1",
-  "generated_note": "Producer manifest for Shoals 0.24.15 C Note characterization on Chelis 0.19.1. The release publishes the accepted manifest as shoals-0.24.15.invariants.json. The 36 active invariants declare expected proof tiers at the compiler pin. The proof gate checks compiler-owned dependency edges, proof status, tier and qualifiers, satisfying and corrupt controls, and non-vacuous preconditions. Fuzz-gated pricing and risk properties use deterministic multi-seed sampling and remain empirical observations. The put-call parity invariant relying on f32 normal-CDF reflection is deferred under chelis#3116 until the per-width contract validates.",
+  "generated_note": "Producer manifest for Shoals 0.24.16 C Note characterization on Chelis 0.19.1. The release publishes the accepted manifest as shoals-0.24.16.invariants.json. The 36 active invariants declare expected proof tiers at the compiler pin. The proof gate checks compiler-owned dependency edges, proof status, tier and qualifiers, satisfying and corrupt controls, and non-vacuous preconditions. Fuzz-gated pricing and risk properties use deterministic multi-seed sampling and remain empirical observations. The put-call parity invariant relying on f32 normal-CDF reflection is deferred under chelis#3116 until the per-width contract validates.",
   "models": [
     {
       "id": "bs_call",
