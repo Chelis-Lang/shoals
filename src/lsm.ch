@@ -1,46 +1,75 @@
 module Shoals.Lsm
 import Nautilus.Distributions (normal_sample)
-import Nautilus.LinAlg (solve_3x3)
+export (lsm_put_payoff, lsm_polynomial_regression, lsm_american_put)
 def lsm_put_payoff(s: f32, k: f32) -> f32 = {
   diff = sub(k, s)
-  if gt(diff, cast(0.0, f32)) then diff else cast(0.0, f32)
+  if gt(diff, 0f32) then diff else 0f32
 }
-def lsm_vec3(a: f32, b: f32, c: f32) -> tensor[3, f32] = to_tensor(append(append(append([], a), b), c))
-def lsm_mat3_from_rows(r0: f32, r1: f32, r2: f32, r3: f32, r4: f32, r5: f32, r6: f32, r7: f32, r8: f32) -> tensor[3, 3, f32] = {
-  flat = append(append(append(append(append(append(append(append(append([], r0), r1), r2), r3), r4), r5), r6), r7), r8)
-  reshape(to_tensor(flat), [cast(3, i64), cast(3, i64)])
+def lsm_finite_f32(x: f32) -> bool = lte(abs(cast(x, f64)), 3.4028234663852886e38f64)
+def lsm_dot(xs: List[f64], ys: List[f64]) -> f64 = fold(fn (acc: f64, pair: (f64, f64)) -> add(acc, mul(pair.0, pair.1)), 0f64, zip(xs, ys))
+def lsm_sub_projection(v: List[f64], q: List[f64], coefficient: f64) -> List[f64] = map(fn (pair: (f64, f64)) -> sub(pair.0, mul(coefficient, pair.1)), zip(v, q))
+-- Two modified Gram-Schmidt passes. The returned projection sums belong to
+-- R; a zero q1 removes the linear direction in a rank-deficient fit.
+def lsm_orthogonalize(v: List[f64], q0: List[f64], q1: List[f64]) -> (List[f64], f64, f64) = {
+  r0 = lsm_dot(q0, v)
+  v0 = lsm_sub_projection(v, q0, r0)
+  r1 = lsm_dot(q1, v0)
+  v1 = lsm_sub_projection(v0, q1, r1)
+  correction0 = lsm_dot(q0, v1)
+  v2 = lsm_sub_projection(v1, q0, correction0)
+  correction1 = lsm_dot(q1, v2)
+  (lsm_sub_projection(v2, q1, correction1), add(r0, correction0), add(r1, correction1))
 }
-def lsm_moments_8(pairs: List[(f32, f32)]) -> (f32, f32, f32, f32, f32, f32, f32, f32) = {
-  zero = cast(0.0, f32)
-  init = (zero, zero, zero, zero, zero, zero, zero, zero)
-  fold(fn (state: (f32, f32, f32, f32, f32, f32, f32, f32), p: (f32, f32)) -> {
-    x = p.0
-    y = p.1
-    x2 = mul(x, x)
-    x3 = mul(x2, x)
-    x4 = mul(x2, x2)
-    n_next = add(state.0, cast(1.0, f32))
-    sx_next = add(state.1, x)
-    sxx_next = add(state.2, x2)
-    sxxx_next = add(state.3, x3)
-    sxxxx_next = add(state.4, x4)
-    sy_next = add(state.5, y)
-    sxy_next = add(state.6, mul(x, y))
-    sxxy_next = add(state.7, mul(x2, y))
-    (n_next, sx_next, sxx_next, sxxx_next, sxxxx_next, sy_next, sxy_next, sxxy_next)
-  }, init, pairs)
+-- Raw f32 moments around S=100 and matrix inversion destroy
+-- continuation. Fit normalized columns directly in f64; never form X'X.
+-- Result is (center, scale, c0, c1, c2), evaluated at u=(x-center)/scale.
+-- Rank uses 64 * epsilon(f64), relative to the unprojected column norm.
+def lsm_normalized_fit(pairs: List[(f64, f64)]) -> (f64, f64, f64, f64, f64) = {
+  n = len(pairs)
+  finite = fold(fn (ok: bool, pair: (f64, f64)) -> and(ok, and(lte(abs(pair.0), 1.7976931348623157e308f64), lte(abs(pair.1), 1.7976931348623157e308f64))), true, pairs)
+  if eq(n, 0i64) then fail("Shoals.Lsm: regression requires nonempty observations") else if not(finite) then fail("Shoals.Lsm: regression observations must be finite") else {
+    xs = map(fn (pair: (f64, f64)) -> pair.0, pairs)
+    ys = map(fn (pair: (f64, f64)) -> pair.1, pairs)
+    nf = cast(n, f64)
+    center = div(fold(fn (acc: f64, x: f64) -> add(acc, x), 0f64, xs), nf)
+    centered = map(fn (x: f64) -> sub(x, center), xs)
+    spread = fold(fn (acc: f64, x: f64) -> if gt(abs(x), acc) then abs(x) else acc, 0f64, centered)
+    scale = if gt(spread, 0f64) then spread else 1f64
+    us = map(fn (x: f64) -> div(x, scale), centered)
+    us2 = map(fn (u: f64) -> mul(u, u), us)
+    r00 = sqrt(nf)
+    q0 = map(fn (x: f64) -> div(1f64, r00), xs)
+    zeros = map(fn (x: f64) -> 0f64, xs)
+    linear = lsm_orthogonalize(us, q0, zeros)
+    r11 = sqrt(lsm_dot(linear.0, linear.0))
+    rank_tolerance = 1.4210854715202004e-14f64
+    linear_ok = gt(r11, mul(rank_tolerance, sqrt(lsm_dot(us, us))))
+    linear_denominator = if linear_ok then r11 else 1f64
+    q1 = map(fn (x: f64) -> if linear_ok then div(x, linear_denominator) else 0f64, linear.0)
+    quadratic = lsm_orthogonalize(us2, q0, q1)
+    r22 = sqrt(lsm_dot(quadratic.0, quadratic.0))
+    quadratic_ok = and(linear_ok, gt(r22, mul(rank_tolerance, sqrt(lsm_dot(us2, us2)))))
+    quadratic_denominator = if quadratic_ok then r22 else 1f64
+    q2 = map(fn (x: f64) -> if quadratic_ok then div(x, quadratic_denominator) else 0f64, quadratic.0)
+    c2 = if quadratic_ok then div(lsm_dot(q2, ys), quadratic_denominator) else 0f64
+    c1 = if linear_ok then div(sub(lsm_dot(q1, ys), mul(quadratic.2, c2)), linear_denominator) else 0f64
+    c0 = div(sub(sub(lsm_dot(q0, ys), mul(linear.1, c1)), mul(quadratic.1, c2)), r00)
+    (center, scale, c0, c1, c2)
+  }
 }
-def lsm_solve_regression_from_moments(n_sum: f32, sx_sum: f32, sxx_sum: f32, sxxx_sum: f32, sxxxx_sum: f32, sy_sum: f32, sxy_sum: f32, sxxy_sum: f32) -> (f32, f32, f32) = {
-  xtx = lsm_mat3_from_rows(n_sum, sx_sum, sxx_sum, sx_sum, sxx_sum, sxxx_sum, sxx_sum, sxxx_sum, sxxxx_sum)
-  xty = lsm_vec3(sy_sum, sxy_sum, sxxy_sum)
-  beta = solve_3x3(copy(xtx), copy(xty))
-  beta_l = to_list(beta)
-  (index(beta_l, cast(0, i64)), index(beta_l, cast(1, i64)), index(beta_l, cast(2, i64)))
+def lsm_fit_value(fit: (f64, f64, f64, f64, f64), x: f32) -> f64 = {
+  u = div(sub(cast(x, f64), fit.0), fit.1)
+  add(fit.2, mul(u, add(fit.3, mul(u, fit.4))))
 }
 def lsm_polynomial_regression[k](xs: tensor[k, f32], ys: tensor[k, f32]) -> (f32, f32, f32) = {
-  pairs = zip(to_list(xs), to_list(ys))
-  m = lsm_moments_8(pairs)
-  lsm_solve_regression_from_moments(m.0, m.1, m.2, m.3, m.4, m.5, m.6, m.7)
+  pairs = map(fn (pair: (f32, f32)) -> (cast(pair.0, f64), cast(pair.1, f64)), zip(to_list(xs), to_list(ys)))
+  fit = lsm_normalized_fit(pairs)
+  b2 = div(div(fit.4, fit.1), fit.1)
+  linear = div(fit.3, fit.1)
+  b1 = sub(linear, mul(mul(2f64, fit.0), b2))
+  b0 = add(sub(fit.2, mul(fit.0, linear)), mul(mul(fit.0, fit.0), b2))
+  limit = 3.4028234663852886e38f64
+  if and(lte(abs(b0), limit), and(lte(abs(b1), limit), lte(abs(b2), limit))) then (cast(b0, f32), cast(b1, f32), cast(b2, f32)) else fail("Shoals.Lsm: regression coefficients must be representable as finite f32")
 }
 def lsm_chunk_list_to_lists(flat: List[f32], chunk_size: i64) -> List[List[f32]] = {
   acc_state = fold(fn (state: (List[List[f32]], List[f32], i64), v: f32) -> {
@@ -53,73 +82,60 @@ def lsm_chunk_list_to_lists(flat: List[f32], chunk_size: i64) -> List[List[f32]]
   }, ([], [], cast(0, i64)), flat)
   acc_state.0
 }
-def lsm_american_put[n](rng_key: key, paths_template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32, n_steps: i64) -> f32 = {
-  n_paths = numel(copy(paths_template))
-  total_z = mul(n_paths, n_steps)
-  z_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), total_z)))
-  _ = paths_template
-  z_t = normal_sample(rng_key, z_template, cast(0.0, f32), cast(1.0, f32))
-  dt = div(t, cast(n_steps, f32))
-  sqrt_dt = sqrt(dt)
-  half_sigma_sq = mul(cast(0.5, f32), mul(sigma, sigma))
-  drift = mul(sub(r, half_sigma_sq), dt)
-  log_s0 = log(s0)
-  log_inc_flat = to_tensor(map(fn (zi: f32) -> add(drift, mul(sigma, mul(sqrt_dt, zi))), to_list(z_t)))
+-- One row per date, one column per path. Permute materializes the reordered
+-- data before reshape; the deterministic non-square test pins that identity.
+def lsm_step_spots[z](z_t: tensor[z, f32], s0: f32, r: f32, sigma: f32, dt: f32, n_paths: i64, n_steps: i64) -> List[List[f32]] = {
+  drift = mul(sub(r, mul(0.5f32, mul(sigma, sigma))), dt)
+  log_inc_flat = to_tensor(map(fn (zi: f32) -> add(drift, mul(sigma, mul(sqrt(dt), zi))), to_list(z_t)))
   log_inc_2d = reshape(log_inc_flat, [n_paths, n_steps])
   log_cumsum_2d = cumsum(log_inc_2d, 1)
-  log_cumsum_T = permute(log_cumsum_2d, 1, 0)
-  s_time_major_flat_l = to_list(reshape(log_cumsum_T, [total_z]))
-  s_time_major_with_s0 = map(fn (v: f32) -> exp(add(log_s0, v)), s_time_major_flat_l)
-  s_per_step = lsm_chunk_list_to_lists(s_time_major_with_s0, n_paths)
-  s_at_terminal = index(s_per_step, sub(n_steps, cast(1, i64)))
-  init_state_terminal = map(fn (s_term: f32) -> (lsm_put_payoff(s_term, k), cast(n_steps, f32)), s_at_terminal)
-  back_step_idxs_rev = map(fn (i: i64) -> sub(sub(n_steps, cast(2, i64)), i), range(cast(0, i64), sub(n_steps, cast(1, i64))))
-  final_state = fold(fn (st: List[(f32, f32)], step_idx_zero_based: i64) -> {
-    t_idx_calendar = add(step_idx_zero_based, cast(1, i64))
-    s_at_step = index(s_per_step, step_idx_zero_based)
-    triples = map(fn (entry: ((f32, f32), f32)) -> {
-      old = entry.0
-      cf = old.0
-      t_ex_f = old.1
-      s_t = entry.1
-      pay_p = lsm_put_payoff(s_t, k)
-      t_now_f = cast(t_idx_calendar, f32)
-      disc = exp(neg(mul(r, mul(dt, sub(t_ex_f, t_now_f)))))
-      y_i = mul(disc, cf)
-      (s_t, pay_p, y_i)
-    }, zip(st, s_at_step))
-    itm_pairs = fold(fn (acc: List[(f32, f32)], tr: (f32, f32, f32)) -> {
-      pay_p = tr.1
-      if gt(pay_p, cast(0.0, f32)) then append(acc, (tr.0, tr.2)) else acc
-    }, [], triples)
-    n_itm = cast(len(itm_pairs), i64)
-    if lt(n_itm, cast(4, i64)) then st else {
-      moms = lsm_moments_8(itm_pairs)
-      coeffs = lsm_solve_regression_from_moments(moms.0, moms.1, moms.2, moms.3, moms.4, moms.5, moms.6, moms.7)
-      b0 = coeffs.0
-      b1 = coeffs.1
-      b2 = coeffs.2
-      map(fn (entry: ((f32, f32), (f32, f32, f32))) -> {
-        old = entry.0
-        cf = old.0
-        t_ex_f_old = old.1
-        tr = entry.1
-        s_t = tr.0
-        pay_p = tr.1
-        if gt(pay_p, cast(0.0, f32)) then {
-          c_hat = add(b0, add(mul(b1, s_t), mul(b2, mul(s_t, s_t))))
-          if gt(pay_p, c_hat) then (pay_p, cast(t_idx_calendar, f32)) else (cf, t_ex_f_old)
-        } else (cf, t_ex_f_old)
-      }, zip(st, triples))
-    }
-  }, init_state_terminal, back_step_idxs_rev)
-  pv_list = map(fn (e: (f32, f32)) -> {
-    cf = e.0
-    t_ex_f = e.1
-    mul(exp(neg(mul(r, mul(dt, t_ex_f)))), cf)
-  }, final_state)
-  n_f = cast(n_paths, f32)
-  sum_pv = fold(fn (acc: f32, v: f32) -> add(acc, v), cast(0.0, f32), pv_list)
-  div(sum_pv, n_f)
+  log_cumsum_t = permute(log_cumsum_2d, 1, 0)
+  flat = to_list(reshape(log_cumsum_t, [mul(n_paths, n_steps)]))
+  spots = map(fn (v: f32) -> exp(add(log(s0), v)), flat)
+  finite = fold(fn (ok: bool, x: f32) -> and(ok, lsm_finite_f32(x)), true, spots)
+  if finite then lsm_chunk_list_to_lists(spots, n_paths) else fail("Shoals.Lsm: simulated spots must be finite")
 }
-export (lsm_put_payoff, lsm_polynomial_regression, lsm_american_put)
+-- Each path carries one cash flow and its exercise date, never a fitted
+-- continuation value. Keep dates integral and discount the realized flow.
+def lsm_stopping_state(s_per_step: List[List[f32]], k: f32, r: f32, dt: f32, n_steps: i64) -> List[(f64, i64)] = {
+  terminal = index(s_per_step, sub(n_steps, 1i64))
+  init = map(fn (s: f32) -> (cast(lsm_put_payoff(s, k), f64), n_steps), terminal)
+  back_steps = map(fn (i: i64) -> sub(sub(n_steps, 2i64), i), range(0i64, sub(n_steps, 1i64)))
+  fold(fn (state: List[(f64, i64)], j: i64) -> {
+    now = add(j, 1i64)
+    triples = map(fn (entry: ((f64, i64), f32)) -> {
+      old = entry.0
+      spot = entry.1
+      discount = exp(neg(mul(cast(r, f64), mul(cast(dt, f64), cast(sub(old.1, now), f64)))))
+      (spot, lsm_put_payoff(spot, k), mul(discount, old.0))
+    }, zip(state, index(s_per_step, j)))
+    itm = fold(fn (acc: List[(f64, f64)], triple: (f32, f32, f64)) -> if gt(triple.1, 0f32) then append(acc, (cast(triple.0, f64), triple.2)) else acc, [], triples)
+    if eq(len(itm), 0i64) then state else {
+      fit = lsm_normalized_fit(itm)
+      map(fn (entry: ((f64, i64), (f32, f32, f64))) -> {
+        old = entry.0
+        triple = entry.1
+        if and(gt(triple.1, 0f32), gt(cast(triple.1, f64), lsm_fit_value(fit, triple.0))) then (cast(triple.1, f64), now) else old
+      }, zip(state, triples))
+    }
+  }, init, back_steps)
+}
+def lsm_american_put[n](rng_key: key, paths_template: tensor[n, f32], s0: f32, k: f32, r: f32, sigma: f32, t: f32, n_steps: i64) -> f32 = {
+  n_paths = numel(paths_template)
+  finite = and(lsm_finite_f32(s0), and(lsm_finite_f32(k), and(lsm_finite_f32(r), and(lsm_finite_f32(sigma), lsm_finite_f32(t)))))
+  if eq(n_paths, 0i64) then fail("Shoals.Lsm: path template must be nonempty") else if not(finite) then fail("Shoals.Lsm: pricing parameters must be finite") else if not(and(gt(s0, 0f32), gt(k, 0f32))) then fail("Shoals.Lsm: spot and strike must be positive") else if lt(sigma, 0f32) then fail("Shoals.Lsm: volatility must be non-negative") else if lt(t, 0f32) then fail("Shoals.Lsm: horizon must be non-negative") else if lt(n_steps, 1i64) then fail("Shoals.Lsm: time steps must be at least one") else if eq(t, 0f32) then lsm_put_payoff(s0, k) else {
+    total_z = mul(n_paths, n_steps)
+    z_template = to_tensor(map(fn (i: i64) -> 0f32, range(0i64, total_z)))
+    z_t = normal_sample(rng_key, z_template, 0f32, 1f32)
+    dt = div(t, cast(n_steps, f32))
+    s_per_step = lsm_step_spots(z_t, s0, r, sigma, dt, n_paths, n_steps)
+    final_state = lsm_stopping_state(s_per_step, k, r, dt, n_steps)
+    total = fold(fn (acc: f64, entry: (f64, i64)) -> {
+      discount = exp(neg(mul(cast(r, f64), mul(cast(dt, f64), cast(entry.1, f64)))))
+      add(acc, mul(discount, entry.0))
+    }, 0f64, final_state)
+    continuation = div(total, cast(n_paths, f64))
+    price = if gt(cast(lsm_put_payoff(s0, k), f64), continuation) then cast(lsm_put_payoff(s0, k), f64) else continuation
+    if lte(abs(price), 3.4028234663852886e38f64) then cast(price, f32) else fail("Shoals.Lsm: price must be representable as finite f32")
+  }
+}

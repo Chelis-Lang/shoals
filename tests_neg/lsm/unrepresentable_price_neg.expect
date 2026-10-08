@@ -1,0 +1,3 @@
+Shoals.Lsm: price must be representable as finite f32
+
+shoals#152: report finite-output failure instead of a nonfinite answer.

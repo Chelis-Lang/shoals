@@ -261,7 +261,23 @@ GBM paths. Extensions:
   curves over time.
 - **Monte Carlo with regression:** Longstaff-Schwartz for American /
   Bermudan options. Polynomial regression in the continuation value
-  with documented basis-function choices. **AD approach
+  with documented basis-function choices. The American put preserves path
+  identity over exact GBM log increments and compares immediate exercise
+  with discounted continuation, including exercise at time zero. At expiry
+  it returns intrinsic value. Its continuation fit uses centered, scaled
+  columns `1, u, u²`, twice-orthogonalized modified Gram-Schmidt in `f64`,
+  and a relative rank threshold of `64 * epsilon(f64)`. Numerically dependent
+  quadratic or linear directions reduce the fit's degree, without ridge
+  regularization. The exported regression coefficients remain in the
+  caller's original `1, x, x²` basis; continuation is evaluated in the
+  normalized basis. Empty observations, nonfinite observations, or
+  coefficients unrepresentable in the return dtype are errors. The pricer
+  requires a nonempty path template, positive finite spot and strike,
+  finite rate, nonnegative finite volatility and horizon, and at least one
+  time step. Fitting and valuing the exercise policy on the same sample
+  introduces upward look-ahead bias; replicate standard error does not
+  measure that bias or basis/exercise-grid error. Finite samples need not preserve exact price monotonicity
+  across exercise grids or exceed the analytic European price. **AD approach
   (spec-pinned):** the regression coefficients at each exercise step
   are treated as outputs of an implicit problem (least-squares fit);
   gradients flow through them via implicit differentiation at the
