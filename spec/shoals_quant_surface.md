@@ -280,6 +280,14 @@ GBM paths. Extensions:
   (`Shoals.Greeks` §2.11 dispatch).
 - **Fourier methods:** Heston pricing via characteristic functions
   with Lewis or Lipton inversion; Carr-Madan FFT pricing.
+  For the log-price characteristic function
+  `phi(u) = E[exp(i*u*log(S_T))]`, the Lewis call inversion is
+  `s0 - exp(-r*t)*sqrt(k)/pi * integral_0^infinity
+  Re[exp(-i*u*log(k))*phi(u-i/2)]/(u*u+1/4) du`.
+  This normalization applies at every positive strike, independently of
+  the forward. The corresponding put follows put-call parity. Finite
+  quadrature approximations are checked with explicit truncation and
+  discretization tolerances.
 
 Each pricer is AD-compatible if the underlying primitives are; the
 challenges are at discontinuities (early exercise, digital payoffs).
