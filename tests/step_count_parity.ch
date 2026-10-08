@@ -100,3 +100,35 @@ def test_sub_floor_volatility_prices_at_any_step_count() -> unit ! { Test } = {
   _ = assert_close(tr_crr_american_put(s0, cast(110.0, f32), r, q, flat, t, zero_steps), cast(4.6352386, f32), price_tol, "a sub-floor volatility must still price the American put at n_steps = 0")
   assert_close(tr_trinomial_european_call(s0, cast(90.0, f32), r, q, flat, t, zero_steps), cast(14.389351, f32), price_tol, "a sub-floor volatility must still price the trinomial call at n_steps = 0")
 }
+-- The zero-depth rows, which pin a documented answer an earlier revision of
+-- this change destroyed.
+--
+-- `tr_binom_european_call_generic` takes its log-moves, up probability and
+-- discount factor already computed, so it never forms `dt = t / n_steps` and
+-- a depth of zero is not a division by zero for it. The terminal layer is
+-- then the single node `s0` and the price is the intrinsic value. That is the
+-- documented contract, and it is correct: measured at s0 = 100, log_u = 0.025,
+-- log_d = -0.025, p = 0.5, disc = 0.99, a depth of zero returns exactly the
+-- intrinsic at each strike.
+--
+-- A first revision of this change applied the pricers' `n_steps < 1` check
+-- here too, on the mistaken reading that the pricers' flat 0.0 came from a
+-- zero-step backward induction rather than from a non-finite `dt`. It
+-- refused all three answers below. Nothing in the negative fixture set could
+-- see that, because refusing MORE never fails a test that expects a refusal;
+-- only a positive case can. These rows are that case, and the strikes are
+-- deliberately off the money: at K = 100 = s0 the intrinsic is 0.0, which a
+-- broken implementation returning a flat zero also produces, so an
+-- at-the-money row would pass either way.
+def test_zero_depth_generic_returns_the_intrinsic() -> unit ! { Test } = {
+  s0 = cast(100.0, f32)
+  up = cast(0.025, f32)
+  down = cast(-0.025, f32)
+  prob = cast(0.5, f32)
+  disc = cast(0.99, f32)
+  depth = cast(0, i64)
+  exact = cast(0.0001, f32)
+  _ = assert_close(tr_binom_european_call_generic(s0, cast(90.0, f32), up, down, prob, disc, depth), cast(10.0, f32), exact, "a zero-depth generic lattice must return the intrinsic 10.0 at K = 90, not a flat zero")
+  _ = assert_close(tr_binom_european_call_generic(s0, cast(110.0, f32), up, down, prob, disc, depth), cast(0.0, f32), exact, "a zero-depth generic lattice must return the intrinsic 0.0 at K = 110")
+  assert_close(tr_binom_european_call_generic(s0, s0, up, down, prob, disc, depth), cast(0.0, f32), exact, "a zero-depth generic lattice must return the intrinsic 0.0 at K = s0; this row alone cannot distinguish a correct answer from a flat zero, which is why the two above are off the money")
+}

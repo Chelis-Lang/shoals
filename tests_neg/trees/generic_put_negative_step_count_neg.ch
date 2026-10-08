@@ -1,11 +1,12 @@
 module Shoals.TestsNeg.TreesGenericPutStepCount
 import Std.Test (assert_true)
 import Shoals.Trees (tr_crr_european_put)
--- Negative: a negative step count is not a quantity. At `n_steps = 0` the backward
--- induction has no layer to roll back, so this pricer returned a flat 0.0
--- regardless of moneyness -- not the intrinsic value, which would at least be
--- the limiting price of a zero-resolution lattice. tr_checked_step_count
--- refuses where the step count enters.
+-- Negative: a negative step count is not a quantity. At `n_steps = 0` this pricer forms
+-- `dt = t / n_steps`, dividing the horizon by zero; the non-finite step
+-- poisons the up and down log-moves and the terminal node prices collapse to
+-- a flat 0.0 REGARDLESS OF MONEYNESS. That is not the intrinsic value and not
+-- the price of anything. tr_checked_step_count refuses where the step count
+-- enters.
 --
 -- The assertion below is one that 0.0 ALSO fails, so deleting the guard does
 -- not make this file pass by accident: it would then fail on the assertion

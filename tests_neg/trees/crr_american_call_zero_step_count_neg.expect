@@ -1,10 +1,17 @@
-Shoals.Trees: the step count must be at least 1, got 0; with no steps the backward induction has no layer to roll back, so the pricer would return 0.0 regardless of moneyness
+Shoals.Trees: the step count must be at least 1, got 0; dt = t / n_steps divides the horizon by zero, and the resulting non-finite step makes the pricer return 0.0 regardless of moneyness
 Assumption: a step count is a RESOLUTION parameter, and zero resolution is
 unspecified rather than degenerate. In this module the consequence is sharper
-than in the path samplers: the returned value is not the initial state but a
-flat 0.0, which is not the price of anything. A deep in-the-money option
-quoted at exactly zero with no diagnostic is a wrong answer dressed as an
-answer.
+than in the path samplers: `dt = t / n_steps` divides the horizon by zero, the
+non-finite step poisons the lattice's log-moves, and the returned value is a
+flat 0.0 rather than the initial state. A deep in-the-money option quoted at
+exactly zero with no diagnostic is a wrong answer dressed as an answer.
+
+This is the PRICERS' precondition, and it is not the one the two `*_generic`
+entry points carry. They receive their log-moves already computed, never
+divide by the step count, and return the intrinsic value at a depth of zero --
+a documented and correct answer, admitted here and pinned positively in
+tests/step_count_parity.ch. An earlier revision of this change applied one
+`< 1` check to both and destroyed it.
 
 Measured on the unguarded tree at s0 = 100, r = 0.05, q = 0, sigma = 0.2,
 t = 1.0: `n_steps = 0` returned 0.0 for a K = 90 call on s0 = 100, against 16.69197 for the European sibling at `n_steps = 64` and an intrinsic value of 10.

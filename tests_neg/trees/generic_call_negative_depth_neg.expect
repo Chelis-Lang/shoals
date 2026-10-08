@@ -1,0 +1,34 @@
+Shoals.Trees: the lattice depth must not be negative, got -8; a negative depth leaves the terminal layer empty, so the backward induction has no node to read
+Assumption: the two `*_generic` entry points take their up and down log-moves,
+up probability and discount factor already computed, so they never form
+`dt = t / n_steps` and the zero case is not a division by zero for them. A
+depth of zero names the single-node lattice whose price is the intrinsic
+value. A negative depth names nothing.
+
+Measured on the unguarded tree at s0 = 100, log_u = 0.025, log_d = -0.025,
+p = 0.5, disc = 0.99: `n_steps = -8` and `n_steps = -1` both failed with
+`index 0 out of bounds for list of len 0`, while `n_steps = 0` returned
+exactly 10.0 at K = 90, 0.0 at K = 110 and 0.0 at K = 100 -- the intrinsic at
+each strike. `n_steps = 1` returned 9.930942.
+
+This is why the guard here is `< 0` and not `< 1`, and the distinction is the
+whole reason this file replaced an earlier fixture that asserted a refusal at
+`n_steps = 0`. That earlier fixture encoded a mistaken reading of the
+pricers' behaviour: the pricers return a flat 0.0 at `n_steps = 0` because
+their `dt` is non-finite, not because a zero-step backward induction is
+ill-defined. The generic's induction handles a zero-step tree correctly. The
+measurement that separates the two is the pricer and the generic at the SAME
+off-the-money strike -- 0.0 against 10.0 at K = 90. The original probe used
+K = 100 = s0, where the intrinsic is 0 and the two agree, so a constant axis
+hid the distinction.
+
+What this fixture does NOT assert: it does not pin the zero case, which is
+ADMITTED here and pinned from the other side in tests/step_count_parity.ch.
+Without that positive case a guard shifted from `< 0` to `< 1` would pass
+this fixture while destroying a documented answer, which is exactly what an
+earlier revision of this change did.
+
+The companion `*_put_generic` is not exported and is reached only through a
+pricer, whose own step-count guard fires first, so its depth check cannot be
+pinned through the public surface. That is recorded rather than claimed
+closed.
