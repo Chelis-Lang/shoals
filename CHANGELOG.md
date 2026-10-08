@@ -4,6 +4,31 @@ All notable changes to this project are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.24.17] - 2026-10-08
+
+### Fixed
+
+- Kou stochastic helpers accept finite unused upward-rate placeholders when
+  the upward-jump probability is exactly zero (shoals#146). The compensator,
+  sampler moment and terminal sampler then use the pure-downward law;
+  positive probabilities still require an upward rate greater than one,
+  and non-finite placeholders remain invalid.
+
+- Longstaff-Schwartz keeps time steps and GBM log paths in `f64` internally,
+  so finite volatility with a tiny horizon preserves representable effective
+  variance. Simulated spots still round to `f32`; invalid outputs fail and
+  finite exponential underflow remains valid (shoals#163).
+
+- Reject invalid PDE grid/time-step counts, Heston panel counts, CDS premium
+  frequency and exported WWR path counts with explicit diagnostics (shoals#166).
+
+- Corrected GBM horizon-check documentation and documented the Kou, LSM
+  and count contracts in the canonical website docs and rendered book
+  (shoals#165).
+
+Compiler and dependency pins, public signatures and recorded invariant tiers
+are unchanged. Long numerical suites remain optional local tools.
+
 ## [0.24.16] - 2026-10-08
 
 ### Fixed
@@ -31,15 +56,6 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   CI checks the short LSM and PDE expiry properties with false controls.
 
 ## [Unreleased]
-
-### Fixed
-
-- Longstaff-Schwartz keeps time steps and GBM log paths in `f64` internally,
-  so finite volatility with a tiny horizon preserves representable effective
-  variance. Simulated spots still round to `f32`; invalid outputs fail and
-  finite exponential underflow remains valid (shoals#163).
-- Reject invalid PDE grid/time-step counts, Heston panel counts, CDS premium
-  frequency and exported WWR path counts with explicit diagnostics (shoals#166).
 
 ### Changed
 
@@ -392,12 +408,6 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   decision beyond shoals#87.
 
 ### Fixed
-
-- Kou stochastic helpers accept finite unused upward-rate placeholders when
-  the upward-jump probability is exactly zero (shoals#146). The compensator,
-  sampler moment and terminal sampler then use the pure-downward law;
-  positive probabilities still require an upward rate greater than one,
-  and non-finite placeholders remain invalid.
 
 - **BREAKING: every path sampler in `Shoals.Stochastic` refuses a time horizon
   that is not finite and non-negative** (shoals#139). A negative `t` returned
