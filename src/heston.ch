@@ -122,9 +122,8 @@ def heston_put_carr_madan_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa
 }
 def heston_call_lewis_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, u_max: f32, n_panels: i64) -> f32 = {
   exp_neg_rt = exp(neg(mul(r, t)))
-  forward = div(s0, exp_neg_rt)
   log_k = log(k)
-  sqrt_forward = sqrt(forward)
+  sqrt_k = sqrt(k)
   quarter = cast(0.25, f32)
   integrand = fn (u: f32) -> {
     u_complex = (u, cast(-0.5, f32))
@@ -136,7 +135,9 @@ def heston_call_lewis_panels(s0: f32, k: f32, t: f32, r: f32, v0: f32, kappa: f3
     div(prod.0, denom)
   }
   integral_value = gauss_legendre_panels(integrand, cast(0.0, f32), u_max, n_panels)
-  correction = div(mul(mul(k, exp_neg_rt), integral_value), mul(heston_pi_const(), sqrt_forward))
+  -- heston_charfn includes log(s0) and the risk-neutral drift.
+  -- For this full log-price CF, Lewis inversion scales by sqrt(k).
+  correction = div(mul(mul(sqrt_k, exp_neg_rt), integral_value), heston_pi_const())
   raw_price = sub(s0, correction)
   if gt(raw_price, cast(0.0, f32)) then raw_price else cast(0.0, f32)
 }
