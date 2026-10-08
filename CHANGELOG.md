@@ -32,6 +32,13 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Longstaff-Schwartz keeps time steps and GBM log paths in `f64` internally,
+  so finite volatility with a tiny horizon preserves representable effective
+  variance. Simulated spots still round to `f32`; invalid outputs fail and
+  finite exponential underflow remains valid (shoals#163).
+
 ### Changed
 
 - **BREAKING: `Shoals.Stochastic.sto_kou_jump_terminal` samples a compound

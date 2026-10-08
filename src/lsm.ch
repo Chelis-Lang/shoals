@@ -6,6 +6,7 @@ def lsm_put_payoff(s: f32, k: f32) -> f32 = {
   if gt(diff, 0f32) then diff else 0f32
 }
 def lsm_finite_f32(x: f32) -> bool = lte(abs(cast(x, f64)), 3.4028234663852886e38f64)
+def lsm_finite_f64(x: f64) -> bool = lte(abs(x), 1.7976931348623157e308f64)
 def lsm_dot(xs: List[f64], ys: List[f64]) -> f64 = fold(fn (acc: f64, pair: (f64, f64)) -> add(acc, mul(pair.0, pair.1)), 0f64, zip(xs, ys))
 def lsm_sub_projection(v: List[f64], q: List[f64], coefficient: f64) -> List[f64] = map(fn (pair: (f64, f64)) -> sub(pair.0, mul(coefficient, pair.1)), zip(v, q))
 -- Two modified Gram-Schmidt passes. The returned projection sums belong to
@@ -84,20 +85,35 @@ def lsm_chunk_list_to_lists(flat: List[f32], chunk_size: i64) -> List[List[f32]]
 }
 -- One row per date, one column per path. Permute materializes the reordered
 -- data before reshape; the deterministic non-square test pins that identity.
-def lsm_step_spots[z](z_t: tensor[z, f32], s0: f32, r: f32, sigma: f32, dt: f32, n_paths: i64, n_steps: i64) -> List[List[f32]] = {
-  drift = mul(sub(r, mul(0.5f32, mul(sigma, sigma))), dt)
-  log_inc_flat = to_tensor(map(fn (zi: f32) -> add(drift, mul(sigma, mul(sqrt(dt), zi))), to_list(z_t)))
-  log_inc_2d = reshape(log_inc_flat, [n_paths, n_steps])
-  log_cumsum_2d = cumsum(log_inc_2d, 1)
-  log_cumsum_t = permute(log_cumsum_2d, 1, 0)
-  flat = to_list(reshape(log_cumsum_t, [mul(n_paths, n_steps)]))
-  spots = map(fn (v: f32) -> exp(add(log(s0), v)), flat)
-  finite = fold(fn (ok: bool, x: f32) -> and(ok, lsm_finite_f32(x)), true, spots)
-  if finite then lsm_chunk_list_to_lists(spots, n_paths) else fail("Shoals.Lsm: simulated spots must be finite")
+-- Keep dt and the entire log path in f64. Squaring a finite
+-- f32 volatility can overflow even when sigma^2 * dt is moderate; narrowing
+-- dt or accumulated logs can also destroy representable simulated spots.
+-- A finite negative log spot may legitimately underflow to zero.
+-- Check after rounding so values rounding to maximum f32 remain valid.
+def lsm_step_spots[z](z_t: tensor[z, f32], s0: f32, r: f32, sigma: f32, dt: f64, n_paths: i64, n_steps: i64) -> List[List[f32]] = {
+  sigma64 = cast(sigma, f64)
+  variance = mul(mul(sigma64, sigma64), dt)
+  drift = sub(mul(cast(r, f64), dt), mul(0.5f64, variance))
+  diffusion_scale = mul(sigma64, sqrt(dt))
+  increments = map(fn (zi: f32) -> add(drift, mul(diffusion_scale, cast(zi, f64))), to_list(z_t))
+  increments_finite = fold(fn (ok: bool, x: f64) -> and(ok, lsm_finite_f64(x)), true, increments)
+  if not(increments_finite) then fail("Shoals.Lsm: simulated log increments must be finite") else {
+    log_inc_2d = reshape(to_tensor(increments), [n_paths, n_steps])
+    log_cumsum_2d = cumsum(log_inc_2d, 1)
+    log_cumsum_t = permute(log_cumsum_2d, 1, 0)
+    flat = to_list(reshape(log_cumsum_t, [mul(n_paths, n_steps)]))
+    log_spots = map(fn (v: f64) -> add(log(cast(s0, f64)), v), flat)
+    logs_finite = fold(fn (ok: bool, x: f64) -> and(ok, lsm_finite_f64(x)), true, log_spots)
+    if not(logs_finite) then fail("Shoals.Lsm: simulated log paths must be finite") else {
+      spots = map(fn (v: f64) -> cast(exp(v), f32), log_spots)
+      finite = fold(fn (ok: bool, x: f32) -> and(ok, lsm_finite_f32(x)), true, spots)
+      if finite then lsm_chunk_list_to_lists(spots, n_paths) else fail("Shoals.Lsm: simulated spots must be finite")
+    }
+  }
 }
 -- Each path carries one cash flow and its exercise date, never a fitted
 -- continuation value. Keep dates integral and discount the realized flow.
-def lsm_stopping_state(s_per_step: List[List[f32]], k: f32, r: f32, dt: f32, n_steps: i64) -> List[(f64, i64)] = {
+def lsm_stopping_state(s_per_step: List[List[f32]], k: f32, r: f32, dt: f64, n_steps: i64) -> List[(f64, i64)] = {
   terminal = index(s_per_step, sub(n_steps, 1i64))
   init = map(fn (s: f32) -> (cast(lsm_put_payoff(s, k), f64), n_steps), terminal)
   back_steps = map(fn (i: i64) -> sub(sub(n_steps, 2i64), i), range(0i64, sub(n_steps, 1i64)))
@@ -106,7 +122,7 @@ def lsm_stopping_state(s_per_step: List[List[f32]], k: f32, r: f32, dt: f32, n_s
     triples = map(fn (entry: ((f64, i64), f32)) -> {
       old = entry.0
       spot = entry.1
-      discount = exp(neg(mul(cast(r, f64), mul(cast(dt, f64), cast(sub(old.1, now), f64)))))
+      discount = exp(neg(mul(cast(r, f64), mul(dt, cast(sub(old.1, now), f64)))))
       (spot, lsm_put_payoff(spot, k), mul(discount, old.0))
     }, zip(state, index(s_per_step, j)))
     itm = fold(fn (acc: List[(f64, f64)], triple: (f32, f32, f64)) -> if gt(triple.1, 0f32) then append(acc, (cast(triple.0, f64), triple.2)) else acc, [], triples)
@@ -127,11 +143,11 @@ def lsm_american_put[n](rng_key: key, paths_template: tensor[n, f32], s0: f32, k
     total_z = mul(n_paths, n_steps)
     z_template = to_tensor(map(fn (i: i64) -> 0f32, range(0i64, total_z)))
     z_t = normal_sample(rng_key, z_template, 0f32, 1f32)
-    dt = div(t, cast(n_steps, f32))
+    dt = div(cast(t, f64), cast(n_steps, f64))
     s_per_step = lsm_step_spots(z_t, s0, r, sigma, dt, n_paths, n_steps)
     final_state = lsm_stopping_state(s_per_step, k, r, dt, n_steps)
     total = fold(fn (acc: f64, entry: (f64, i64)) -> {
-      discount = exp(neg(mul(cast(r, f64), mul(cast(dt, f64), cast(entry.1, f64)))))
+      discount = exp(neg(mul(cast(r, f64), mul(dt, cast(entry.1, f64)))))
       add(acc, mul(discount, entry.0))
     }, 0f64, final_state)
     continuation = div(total, cast(n_paths, f64))

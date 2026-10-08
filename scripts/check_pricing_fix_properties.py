@@ -32,6 +32,8 @@ FAMILIES = {
         "lsm_degenerate_constant_fit",
         "lsm_put_payoff_bounds",
         "lsm_expiry_intrinsic",
+        "lsm_effective_variance_equivalence",
+        "lsm_extreme_one_step_replay",
     ),
     "pde": (
         "spread_expiry_matches_intrinsic",
