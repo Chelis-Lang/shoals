@@ -1,0 +1,3 @@
+Shoals.Lsm: simulated spots must be finite
+
+shoals#163: finite log paths may still require spots outside the f32 range.

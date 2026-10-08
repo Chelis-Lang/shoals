@@ -322,7 +322,14 @@ GBM paths. Extensions:
   coefficients unrepresentable in the return dtype are errors. The pricer
   requires a nonempty path template, positive finite spot and strike,
   finite rate, nonnegative finite volatility and horizon, and at least one
-  time step. Fitting and valuing the exercise policy on the same sample
+  time step. Its time step, GBM log increments, accumulated log paths, and
+  exponentiation use `f64` internally before simulated spots are rounded to
+  `f32`. Finite volatility and horizon are not rejected merely because an
+  unscaled volatility square would overflow `f32`. Nonfinite log paths,
+  simulated spots that round to nonfinite `f32`, and prices unrepresentable
+  as finite `f32` are errors. A finite negative log spot may underflow to
+  zero; expiry still returns intrinsic exactly without simulating paths.
+  Fitting and valuing the exercise policy on the same sample
   introduces upward look-ahead bias; replicate standard error does not
   measure that bias or basis/exercise-grid error. Finite samples need not preserve exact price monotonicity
   across exercise grids or exceed the analytic European price. **AD approach
