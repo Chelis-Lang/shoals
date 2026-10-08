@@ -390,6 +390,12 @@ jobs:
         if: matrix.file == 'lsm_heavy'
         run: python3 scripts/check_lsm_accuracy.py
 
+      # Shoals-only oracle: native refinement retains the fine grids and
+      # correlation endpoint checks without the evaluator's runtime cost.
+      - name: Check native spread PDE accuracy
+        if: matrix.file == 'pde_heavy'
+        run: python3 scripts/manual_gates/spread_adi_oracle.py
+
   # Surface a nightly failure as a tracking issue (opens on failure, closes
   # on green) so a red nightly is impossible to miss — scheduled-run
   # failures do not show a red status on main, which is how the heavy

@@ -262,6 +262,10 @@ def main() -> int:
             ["python3", "scripts/test_check_lsm_accuracy.py"],
         ),
         (
+            "spread PDE accuracy oracle adversarial tests",
+            ["python3", "scripts/test_spread_adi_oracle.py"],
+        ),
+        (
             "release workflow integrity tests",
             ["python3", "scripts/test_release_workflow.py"],
         ),
@@ -308,6 +312,10 @@ def main() -> int:
         (
             "native LSM accuracy against refined American trees",
             ["python3", "scripts/check_lsm_accuracy.py"],
+        ),
+        (
+            "native spread PDE accuracy and numerical mutations",
+            ["python3", "scripts/manual_gates/spread_adi_oracle.py"],
         ),
         (
             "accuracy-floor measurement (shoals#64)",

@@ -116,6 +116,12 @@ jobs:
       - name: Check native LSM accuracy against refined American trees
         run: python3 scripts/check_lsm_accuracy.py
 
+      - name: Validate the spread PDE accuracy oracle
+        run: python3 scripts/test_spread_adi_oracle.py
+
+      - name: Check native spread PDE accuracy and numerical mutations
+        run: python3 scripts/manual_gates/spread_adi_oracle.py
+
       - name: Verify package prove latency and deterministic output (chelis#924)
         env:
           GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
