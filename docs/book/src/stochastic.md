@@ -224,8 +224,11 @@ Each log jump is up with probability `p`, exponential with rate `eta_up`
 
 - `sto_kou_compensator` is `E[exp(Y)] - 1 =
   p * eta_up / (eta_up - 1) + (1 - p) * eta_dn / (eta_dn + 1) - 1`. The
-  expectation is finite only for `eta_up > 1`; at `eta_up <= 1` it returns
-  NaN. At `p = 0.4`, `eta_up = 10`, `eta_dn = 5` it is `-0.055555522`.
+  function requires `eta_up > 1`, including when `p = 0`; at
+  `eta_up <= 1` it returns NaN. For `p > 0` that bound is necessary for a
+  finite expectation. At `p = 0` the upward component is unused, but the
+  function still applies the same bound. At `p = 0.4`, `eta_up = 10`,
+  `eta_dn = 5` it is `-0.055555522`.
 - `sto_kou_jump_sample` maps a uniform `u_branch` and a unit exponential
   `e_size` to one jump: `e_size / eta_up` if `u_branch < p`, else
   `-e_size / eta_dn`.
