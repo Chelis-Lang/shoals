@@ -211,8 +211,9 @@ the result is the intrinsic payoff. Invalid inputs fail with a diagnostic.
 `lsm_polynomial_regression` returns the coefficients `(b0, b1, b2)` of
 `y = b0 + b1 * x + b2 * x^2` in the original coordinates. For
 `x = [90, 95, 100, 105, 110]` and `y = [101, 26, 1, 26, 101]`, it returns
-`(10001, -200, 1)`. Repeated spots use a constant fit; two distinct spots
-use a linear fit. Supply equal, nonempty lengths and finite observations.
+`(10001, -200, 1)`. If every spot is the same, it uses a constant fit;
+two distinct spots use a linear fit. Supply equal, nonempty lengths and
+finite observations.
 If coefficients cannot be represented in `f32`, the function fails.
 `lsm_put_payoff(s, k)` is `max(k - s, 0)`.
 
