@@ -125,6 +125,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
                 "measurement": "python3 scripts/oracle_erf64_accuracy.py --measurement",
                 "accuracy-default": "python3 scripts/oracle_erf64_accuracy.py",
                 "book-runtime": "python3 scripts/check_book_examples.py",
+                "pricing-full": "python3 scripts/check_pricing_fix_properties.py",
             }.get(command, f"python3 scripts/{command}.py")
             with self.subTest(command=command):
                 self.assertTrue(long_runtime_commands(f"on: workflow_dispatch\n  run: |\n    {example}"))
@@ -141,6 +142,12 @@ class ReleaseWorkflowTests(unittest.TestCase):
             "run: python3 scripts/oracle_erf64_accuracy.py # --transcription"))
         self.assertTrue(long_runtime_commands(
             "run: python3 scripts/oracle_erf64_accuracy.py --transcription --measurement"))
+        self.assertEqual(long_runtime_commands(
+            "run: python3 scripts/check_pricing_fix_properties.py --smoke"), [])
+        self.assertTrue(long_runtime_commands(
+            "run: python3 scripts/check_pricing_fix_properties.py # --smoke"))
+        self.assertTrue(long_runtime_commands(
+            "run: python3 scripts/check_pricing_fix_properties.py --smoke --full"))
 
     def test_default_gate_is_lean_and_extended_suite_is_optional(self) -> None:
         default = local_commands(False)
@@ -206,8 +213,9 @@ LONG_RUNTIME_PATTERNS = {
     "measurement": r'\boracle_erf64_accuracy\.py\b[^\n]*--measurement\b',
     "accuracy-default": r'\boracle_erf64_accuracy\.py\b(?![^\n]*--transcription\b)',
     "book-runtime": r'\bcheck_book_examples\.py\b(?![^\n]*--source-only\b)',
+    "pricing-full": r'\bcheck_pricing_fix_properties\.py\b(?![ \t]+--smoke[ \t]*(?:\n|$))',
     **{name: rf"(?<![\w]){re.escape(name)}\.py\b" for name in (
-        "prove_gate", "check_pricing_fix_properties", "check_lsm_accuracy",
+        "prove_gate", "check_lsm_accuracy",
         "spread_adi_oracle", "oracle_greeks_gate", "check_package_prove_latency",
         "check_release_artifact_determinism",
     )},

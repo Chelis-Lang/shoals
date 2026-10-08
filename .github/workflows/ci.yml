@@ -24,6 +24,7 @@ jobs:
   hard-rule-guard:
     name: hard-rule-guard (offline pin consistency)
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,6 +33,7 @@ jobs:
 
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -107,6 +109,10 @@ jobs:
       - name: chelis reef build
         run: chelis reef build
 
+      - name: Check expiry properties and refute their false controls
+        timeout-minutes: 3
+        run: python3 scripts/check_pricing_fix_properties.py --smoke
+
       - name: Validate Black-Scholes WireDag root (shoals#19)
         run: python3 scripts/validate_bs_wire_root.py
 
@@ -170,6 +176,7 @@ jobs:
   contract-gate:
     name: contract-gate (offline manifest validation)
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
