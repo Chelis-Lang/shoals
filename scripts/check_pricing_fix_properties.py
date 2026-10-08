@@ -11,6 +11,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLES = 25
 SEEDS = (0, 1, 2)
+# A 25-sample PDE run exceeded 1800s under shared host load while using
+# about 840s of CPU. Allow execution headroom without changing its oracle.
+RUN_TIMEOUT_SECONDS = 3600
 FAMILIES = {
     "hestonlewis": (
         "heston_lewis_carr_madan_agreement",
@@ -107,7 +110,7 @@ def main() -> int:
             print(f"Running {family}, seed {seed}, {SAMPLES} accepted samples", flush=True)
             try:
                 result = subprocess.run(command, cwd=ROOT, capture_output=True,
-                                        text=True, timeout=1800)
+                                        text=True, timeout=RUN_TIMEOUT_SECONDS)
                 prefix.with_suffix(".jsonl").write_text(result.stdout)
                 prefix.with_suffix(".stderr").write_text(result.stderr)
                 validate_run(result.stdout, result.returncode, family, seed)

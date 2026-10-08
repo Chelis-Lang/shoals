@@ -133,7 +133,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 3 * * *'
     runs-on: ubuntu-latest
     # Includes three seeds of the bounded Fourier and PDE regressions.
-    timeout-minutes: 90
+    # The PDE run alone exceeded 30 minutes under shared local CPU load.
+    timeout-minutes: 240
     steps:
       - name: Checkout
         uses: actions/checkout@v4
