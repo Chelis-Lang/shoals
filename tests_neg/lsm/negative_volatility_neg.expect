@@ -1,0 +1,4 @@
+Shoals.Lsm: volatility must be non-negative
+
+shoals#152: reject this invalid input at the public entry; removing the
+guard must fail diagnostic parity rather than silently pass this test.

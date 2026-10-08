@@ -405,8 +405,7 @@ existing Carr-Madan path. **v0.19.0**:
 `Shoals.PricingExtended.pe_margrabe_stulz` (Stulz extension at
 non-zero dividend yield) + `pe_asset_or_nothing_{call,put}` +
 `pe_cash_or_nothing_{call,put}` digital options. Per the M-F
-known limitations, LSM at the host evaluator is scoped to ≤256
-paths × ≤50 steps; tree pricers below σ < 1e-3 dispatch to a
+known limitations, tree pricers below σ < 1e-3 dispatch to a
 deterministic intrinsic shortcut (not a true degenerate-tree
 recurrence).
 
@@ -422,6 +421,17 @@ recurrence).
 
 **Acceptance:**
 - Each pricer matches the appropriate analytic limit or high-accuracy alternative (FFT vs MC Heston, trinomial vs PDE, etc.).
+- LSM (shoals#152): normalized `f64` polynomial QR, deterministic path
+  identity and stopping/discount tests, rank-deficient fits and expiry,
+  plus eight fixed-seed 4000-path, 50-date estimates against 512/1024-step
+  American trees via the native `scripts/check_lsm_accuracy.py` gate.
+  The evaluator retains the reported 2000-path, seed-21 regression.
+  Replicate dispersion measures sampling variation. Same-path fitting and
+  valuation has upward look-ahead bias, which standard error does not
+  measure; a separate 0.20 ATM / 0.25 ITM accuracy envelope and
+  `4 SE + 0.08` check constrain the observed total pricing error.
+  These are numerical tests and sampled properties, not a proof that every
+  finite estimate exceeds the European price or increases with more dates.
 - **AD verification status table** — per the matrix in §3.3:
   - Closed-form (M5.1): `composed` (analytic arithmetic) for the smooth payoffs.
   - Trees (M5.2): `unsupported` until D1 lands (control-flow over the early-exercise comparison); functional ships.

@@ -1,0 +1,4 @@
+Shoals.Lsm: spot and strike must be positive
+
+shoals#152: reject this invalid input at the public entry; removing the
+guard must fail diagnostic parity rather than silently pass this test.
