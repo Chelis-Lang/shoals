@@ -109,6 +109,21 @@ class ReleaseWorkflowTests(unittest.TestCase):
         )
         self.assertIn("python3 scripts/test_build_release_assets.py", ci)
 
+    def test_bounded_pricing_properties_gate_nightly_full_and_release(self) -> None:
+        local = (ROOT / "scripts/run_local_gate.py").read_text()
+        ci = (ROOT / ".github/workflows/ci.yml").read_text()
+        nightly = (ROOT / ".github/workflows/nightly.yml").read_text()
+        release = (ROOT / ".github/workflows/release.yml").read_text()
+        command = "python3 scripts/check_pricing_fix_properties.py"
+        self.assertNotIn(command, ci)
+        self.assertIn("python3 scripts/test_check_pricing_fix_properties.py", ci)
+        self.assertIn(command, nightly[nightly.index("  prove:"):nightly.index("  heavy:")])
+        self.assertLess(release.index(command), release.index("uses: softprops/action-gh-release@v2"))
+        per_pr, full = local.split("    nightly_stages:", 1)
+        self.assertNotIn('["python3", "scripts/check_pricing_fix_properties.py"]', per_pr)
+        self.assertIn('["python3", "scripts/check_pricing_fix_properties.py"]', full)
+        self.assertIn('["python3", "scripts/test_check_pricing_fix_properties.py"]', per_pr)
+
     def test_full_local_gate_runs_cross_registry_artifact_oracle(self) -> None:
         local = (ROOT / "scripts/run_local_gate.py").read_text()
         self.assertIn(

@@ -229,6 +229,8 @@ jobs:
         run: python3 scripts/test_build_release_assets.py
       - name: Validate the chelis#924 release oracle
         run: python3 scripts/test_check_package_prove_latency.py
+      - name: Validate bounded pricing property-result classification
+        run: python3 scripts/test_check_pricing_fix_properties.py
       - name: Validate release workflow integrity contracts
         run: python3 scripts/test_release_workflow.py
 

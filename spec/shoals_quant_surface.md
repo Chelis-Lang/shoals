@@ -875,3 +875,15 @@ pricer is a function; each calibration is an optimizer; each curve is
 a data structure with operations. See `docs/plan-quant-surface.md`
 for the milestone breakdown, work-packet allocation, and red-team
 exit checkpoints.
+
+## Bounded numerical regression properties
+
+The Heston Lewis, Longstaff-Schwartz regression, spread ADI, and jump-moment
+regressions include literal Chelis `@property` declarations. The nightly,
+full local, and release gates run each file at seeds 0, 1, and 2. Every
+positive property must accept 25 samples at the fuzz tier; every corrupted
+twin must fail with an in-domain counterexample. Missing, duplicated,
+unsupported, or erroneous records fail the gate. These bounded sampling
+checks complement unit tests and independent numerical references. They do
+not establish global proofs or change the consumer invariant manifest's
+proof tiers.

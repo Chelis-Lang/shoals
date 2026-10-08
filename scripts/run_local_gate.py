@@ -246,6 +246,10 @@ def main() -> int:
             ["python3", "scripts/test_build_release_assets.py"],
         ),
         (
+            "bounded pricing property classifier tests",
+            ["python3", "scripts/test_check_pricing_fix_properties.py"],
+        ),
+        (
             "release workflow integrity tests",
             ["python3", "scripts/test_release_workflow.py"],
         ),
@@ -302,6 +306,10 @@ def main() -> int:
             "prove_gate (canon self-audit against the release binary)",
             ["/usr/bin/env", "PROVE_GATE_FUZZ=1",
              "python3", "scripts/prove_gate.py"],
+        ),
+        (
+            "bounded pricing regressions with false controls (three seeds)",
+            ["python3", "scripts/check_pricing_fix_properties.py"],
         ),
         (
             "chelis#924 package prove latency oracle",

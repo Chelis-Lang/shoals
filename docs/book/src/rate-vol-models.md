@@ -175,12 +175,16 @@ lp = heston_call_lipton_panels(cast(100.0, f32), cast(100.0, f32), cast(1.0, f32
 -- 10.055477
 ```
 
-`heston_call_lewis_panels` and `heston_put_lewis_panels` agree with the
-other two only when the strike equals the forward `s0 * exp(r * t)`. With
-the inputs above they return `12.281982` for the call. At
-`k = 105.12711`, the forward, the Lewis call is `7.030327` and the Lipton
-call `7.024296`. Away from the forward, use the Carr-Madan or Lipton
-forms.
+The Lewis form uses `heston_charfn(u - i/2)` with the discount factor
+`exp(-r * t) * sqrt(k)` multiplying the integral. It accepts strikes on
+either side of the forward. Increase both `u_max` and `n_panels` to check
+that the price has settled; the three formulas can have different
+quadrature errors at the same settings.
+
+At the model parameters above, with `u_max = 200` and `n_panels = 100`,
+the Lewis call at strike 100 is `10.055565` and the put is `5.1785126`.
+The call prices at strikes 80, 100, and 120 agree with independently
+integrated values within `0.001` at these settings.
 
 ## Dupire local volatility
 

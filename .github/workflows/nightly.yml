@@ -132,7 +132,8 @@ jobs:
     name: prove-gate (canon self-audit)
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 3 * * *'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Includes three seeds of the bounded Fourier and PDE regressions.
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -181,6 +182,12 @@ jobs:
         env:
           PROVE_GATE_FUZZ: "1"
         run: python3 scripts/prove_gate.py
+
+      - name: Validate bounded pricing property-result classification
+        run: python3 scripts/test_check_pricing_fix_properties.py
+
+      - name: Check bounded pricing regressions and refute their false controls
+        run: python3 scripts/check_pricing_fix_properties.py
 
       - name: Verify package prove latency and deterministic output (chelis#924)
         env:

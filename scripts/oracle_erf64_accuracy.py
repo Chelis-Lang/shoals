@@ -137,7 +137,7 @@ FLOOR_CLAIM_GREP = r">=[[:space:]]*[0-9]+\.?[0-9]*[eE]-[0-9]+"
 # elements (rc=-6, "thread 'main' has overflowed its stack"), so the sweep is
 # batched. Not a kernel problem and not worked around silently: it is a real
 # evaluator limit on literal size, hit at ~4400 elements on this pin.
-BATCH = 200
+BATCH = 800
 # WHERE THE RELATIVE LEG SWEEPS, AND WHY IT STOPS WHERE IT DOES.
 #
 # The first five points are shoals#68's own table -- the magnitudes that issue
@@ -341,13 +341,21 @@ def run_transcription(verbose: bool = True) -> tuple[int, dict]:
 # --------------------------------------------------------------------------
 
 def probe_points() -> list[float]:
-    """A symmetric span plus adjacent f64 values near center and tail points."""
+    """Retain the broad historical sweep and the builtin-kernel neighborhoods."""
     pts = {i / 20.0 for i in range(-200, 201)}
     for center in (-8.0, -4.0, -1.0, -0.5, 0.5, 1.0, 4.0, 8.0):
         step = math.ulp(center)
         for offset in range(-8, 9):
             pts.add(center + offset * step)
     pts.update((-0.7170090691949448, 0.7700537662469848, -8.5, -9.0))
+    # The reduced 0.05-spaced sweep missed larger errors at -3.741111...
+    # and 0.736666... . Retain the original grid on both sides of zero.
+    historical = {6.5 * i / 900 for i in range(901)}
+    historical.update(0.507001975 + i * 2.0**-53 for i in range(-600, 601))
+    for boundary in (0.5, 4.0, 6.0):
+        historical.update(boundary + k * 2.0**-45 for k in range(-20, 21))
+    pts.update(historical)
+    pts.update(-x for x in historical)
     return sorted(pts)
 
 

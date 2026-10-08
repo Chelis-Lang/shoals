@@ -120,8 +120,10 @@ The jump count is drawn from a table of the counts `0, 1, ..., S - 1` with
 holds at most 4096 counts. A larger intensity raises a runtime `fail`
 (*merton jump intensity is too large to enumerate the jump count exactly*)
 rather than truncating the law; at `jump_vol = 0.1` and `jump_mean = 0` the
-limit is reached near `lambda * t = 3600`. A negative or non-finite
-`lambda * t`, or a non-finite `jump_mean + 0.5 * jump_vol^2`, also fails.
+limit is reached near `lambda * t = 3600`. Both `lambda` and `t` must
+be finite and non-negative, for the moment function as well as the
+sampler. Zero intensity or zero horizon gives a zero log jump moment.
+A non-finite product or `jump_mean + 0.5 * jump_vol^2` also fails.
 `merton_sampler_log_jump_moment(5000.0, 0.0, 0.1, 1.0)` fails with:
 
 ```text
@@ -241,10 +243,12 @@ The count table follows the Merton rule above with
 `w = 1 + sto_kou_compensator(p, eta_up, eta_dn)` as the jump multiplier:
 `S = trunc(x + 7 * sqrt(x) + 12)` counts with
 `x = lambda_jump * t * max(1, w)`, at most 4096, so each path draws at
-least 12 jump sizes. A larger intensity, a negative `lambda_jump * t`, or
-`eta_up <= 1` raises a runtime `fail` (for `eta_up <= 1`: *kou jump
-parameters must be finite; ... which requires eta_up > 1*); the table is
-never truncated. The terminal mean is finite for `eta_up > 1`, but
+least 12 jump sizes. Both `lambda_jump` and `t` must be finite and
+non-negative, for the moment function as well as the sampler. Zero
+intensity or zero horizon gives a zero log jump moment. A larger count
+bound, a non-finite product, or `eta_up <= 1` raises a runtime `fail`
+(for `eta_up <= 1`: *kou jump parameters must be finite; ... which
+requires eta_up > 1*); the table is never truncated. The terminal mean is finite for `eta_up > 1`, but
 `E[S_T^2]` is finite only for `eta_up > 2`, so for `1 < eta_up <= 2` a
 sample variance does not converge.
 

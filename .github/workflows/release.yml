@@ -104,6 +104,12 @@ jobs:
           PROVE_GATE_FUZZ: "1"
         run: python3 scripts/prove_gate.py
 
+      - name: Validate bounded pricing property-result classification
+        run: python3 scripts/test_check_pricing_fix_properties.py
+
+      - name: Check bounded pricing regressions and refute their false controls
+        run: python3 scripts/check_pricing_fix_properties.py
+
       - name: Verify package prove latency and deterministic output (chelis#924)
         env:
           GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}

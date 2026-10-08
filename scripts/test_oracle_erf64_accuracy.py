@@ -98,6 +98,23 @@ class Fixture:
         shutil.rmtree(self.root, ignore_errors=True)
 
 
+class AbsoluteSweepCoverage(unittest.TestCase):
+    def test_broad_grid_on_both_sides_is_retained(self):
+        points = set(load_oracle().probe_points())
+        for i in range(901):
+            x = 6.5 * i / 900
+            self.assertIn(x, points)
+            self.assertIn(-x, points)
+
+    def test_sweep_keeps_historical_dense_window_and_current_tail_coverage(self):
+        points = load_oracle().probe_points()
+        self.assertEqual(points, sorted(set(points)))
+        self.assertGreaterEqual(len(points), 4451)
+        for center in (-8.0, -4.0, -1.0, -0.5, 0.5, 1.0, 4.0, 8.0):
+            for offset in range(-8, 9):
+                self.assertIn(center + offset * math.ulp(center), points)
+
+
 class TranscriptionLeg(unittest.TestCase):
     """The leg that closes shoals#64's transcription hop."""
 
