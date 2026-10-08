@@ -28,6 +28,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   accuracy and AD references, benchmarks, and runtime book examples are now
   optional local tools. Nightly was removed. Releases still build, hash, and
   verify their actual payload and byte-identical invariant manifest.
+  CI checks the short LSM and PDE expiry properties with false controls.
 
 ## [Unreleased]
 

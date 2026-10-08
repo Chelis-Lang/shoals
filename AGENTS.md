@@ -401,6 +401,11 @@ publishing. Do not disguise long suites as smoke checks or widen hosted
 budgets. This is an intentional Shoals-only scaffolding divergence; no
 sibling-shell policy wave is authorized.
 
+The measured expiry-only property smoke is a short CI check: 25 accepted
+samples and refuted false controls at seed 0, with a 60-second ceiling per
+invocation. It returns intrinsic values without path generation or PDE time
+stepping. The full property runner remains optional locally.
+
 ## Quant Scope
 
 `spec/phase3l.md` records Shoals' local module scope, test plan, and

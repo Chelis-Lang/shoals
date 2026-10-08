@@ -119,6 +119,10 @@ def main() -> int:
         ("chelis lint --check", ["chelis", "lint", "--check", *LINT_DIRS]),
         ("chelis reef build", ["chelis", "reef", "build"]),
         (
+            "short expiry properties with false controls",
+            ["python3", "scripts/check_pricing_fix_properties.py", "--smoke"],
+        ),
+        (
             "Shoals Black-Scholes WireDag root (shoals#19)",
             ["python3", "scripts/validate_bs_wire_root.py"],
         ),

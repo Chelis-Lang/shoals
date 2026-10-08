@@ -886,8 +886,9 @@ chelis-cli side:
 - `phase3l_shoals_oracle_es_backtest` — Kupiec and Christoffersen
   tests on empirical ES with a known data-generating process.
 
-Default per-PR scope remains `chelis test tests/`; the oracles are
-manual gates exercised at milestone exits.
+CI compiles the package and runs short guards, expiry properties, and offline
+checks. The complete unit suite and numerical oracles are optional local
+tools.
 
 ## 6. Test plan extensions
 
@@ -899,9 +900,8 @@ agreement). The new module additions each carry:
 - A reference implementation under `references/` (textbook formula).
 - Property functions under `properties/` comparing optimized `src/`
   output to the reference.
-- Tests under `tests/` exercising the property bodies as ordinary
-  `Test` functions until `chelis fuzz` ships first-class `@property`
-  support.
+- Tests under `tests/` exercising regression cases as ordinary `Test`
+  functions, alongside literal `@property` declarations run by `chelis prove`.
 
 ## 7. Effort
 
@@ -919,8 +919,9 @@ regressions include literal Chelis `@property` declarations. The optional local
 1, and 2. Every positive property must accept 25 samples at the fuzz tier;
 every corrupted twin must fail with an in-domain counterexample. Missing,
 duplicated, unsupported, or erroneous records and inconsistent summaries or
-compiler exit codes fail the requested run. The optional `--smoke` selector
-checks only the LSM and spread expiry pairs at seed 0 with 25 accepted positive
+compiler exit codes fail the requested run. The short `--smoke` selector used
+by CI and the default local gate checks only the LSM and spread expiry pairs
+at seed 0 with 25 accepted positive
 samples and a 60-second ceiling per process; it does not execute path fitting
 or PDE time stepping. These bounded sampling checks complement unit tests and
 independent numerical references. They do not establish global proofs or
