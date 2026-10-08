@@ -62,6 +62,10 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
       fragments evaluated with the pinned compiler and their shown values
       compared (several minutes).
 
+The default gate also checks the bounded pricing-property classifier and
+the native LSM accuracy oracle's failure cases without running their compiler
+workloads.
+
 ``--full`` appends the stages CI runs in ``.github/workflows/nightly.yml``
 (scheduled, NOT per-PR) — run this at least once at a pin bump
 (``AGENTS.md`` §Pin Bump Checklist) or before a release tag:
@@ -95,6 +99,10 @@ real-chelis/real-SMT nightly stages do NOT run unless you pass ``--full``:
   22. ``scripts/check_release_artifact_determinism.py`` — two fresh isolated
       registries (mixed-case manual preseed versus clean canonical) must emit
       byte-identical lock, CHB, and archive payloads despite chelis#1002.
+
+Full mode also runs native LSM accuracy against refined American trees and
+the Heston, LSM, spread-PDE, and jump-moment properties at three seeds, with
+25 accepted samples per positive property and refuted false controls.
 
 Exits 0 only if all requested stages succeed.
 
