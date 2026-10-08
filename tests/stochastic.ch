@@ -105,3 +105,42 @@ def test_negative_zero_horizon_is_admitted_and_changes_no_answer() -> unit ! { T
   _ = assert_close(heston_qe_terminal(key_from_seed(7i64), s0, cast(0.04, f32), cast(0.05, f32), cast(1.5, f32), cast(0.04, f32), cast(0.3, f32), cast(-0.5, f32), neg_z, cast(8, i64)).0, s0, tol, "heston_qe_terminal at t = -0.0 must return s0")
   assert_close(exp(heston_qe_step(log(s0), cast(0.04, f32), cast(0.04, f32), cast(0.05, f32), cast(1.5, f32), cast(0.04, f32), cast(0.3, f32), cast(-0.5, f32), neg_z, cast(0.3, f32), cast(-0.2, f32), cast(0.4, f32)).0), s0, tol, "heston_qe_step at dt = -0.0 must be the identity step on log-spot")
 }
+-- Positive parity for the step-count guard. `n_steps = 1` is the EXTREMAL
+-- admitted value, and on an integer domain that makes the boundary exactly
+-- pinnable in both directions: a fixture at `n_steps = 0` kills every
+-- threshold shifted down, and this case kills every threshold shifted up,
+-- with nothing between the two to leave uncovered. The horizon guard needed a
+-- negative min subnormal to close the same family from below; a step count
+-- needs no subnormal argument because none exists.
+--
+-- Two distinct properties are asserted, and the first cannot substitute for
+-- the second. That `n_steps = 1` is ADMITTED is what a `lt(n_steps, 2)`
+-- mutant breaks; every step-count fixture under tests_neg/stochastic/ passes
+-- under that mutant while it refuses a valid input. That `n_steps = 1` DRAWS,
+-- rather than returning the initial state, is what distinguishes a real
+-- one-step discretisation from the empty-fold identity the guard refuses --
+-- without it, a mutant that admitted `n_steps = 1` and then skipped the
+-- evolution would still pass.
+--
+-- The `t = 0` rows carry the guard's own justification. Refusing `n_steps < 1`
+-- is defensible only because it takes no reachable correct answer away: a
+-- caller who wants s0 passes a zero horizon with any valid step count and
+-- still gets it. These rows pin that at the extremal step count, where it
+-- would be lost first; test_zero_horizon_is_admitted_by_every_sampler pins
+-- the same thing at n_steps = 8.
+def test_one_step_is_admitted_and_draws() -> unit ! { Test } = {
+  s0 = cast(100.0, f32)
+  eight_s0 = cast(800.0, f32)
+  tol = cast(0.01, f32)
+  one = cast(1, i64)
+  moved_at_least = cast(1.0, f32)
+  single = heston_qe_terminal(key_from_seed(7i64), s0, cast(0.04, f32), cast(0.05, f32), cast(1.5, f32), cast(0.04, f32), cast(0.3, f32), cast(-0.5, f32), cast(1.0, f32), one)
+  single_move = if lt(sub(single.0, s0), cast(0.0, f32)) then sub(s0, single.0) else sub(single.0, s0)
+  _ = assert_close(if gt(single_move, moved_at_least) then cast(1.0, f32) else cast(0.0, f32), cast(1.0, f32), cast(0.001, f32), "heston_qe_terminal at n_steps = 1 must be admitted and must draw, not return s0; measured 145.93878 at t = 1.0, seed 7, a move of 45.9")
+  many = heston_qe_paths_terminal(key_from_seed(7i64), zero_horizon_template(), s0, cast(0.04, f32), cast(0.05, f32), cast(1.5, f32), cast(0.04, f32), cast(0.3, f32), cast(-0.5, f32), cast(1.0, f32), one)
+  many_sum = path_sum(many.0)
+  many_move = if lt(sub(many_sum, eight_s0), cast(0.0, f32)) then sub(eight_s0, many_sum) else sub(many_sum, eight_s0)
+  _ = assert_close(if gt(many_move, moved_at_least) then cast(1.0, f32) else cast(0.0, f32), cast(1.0, f32), cast(0.001, f32), "heston_qe_paths_terminal at n_steps = 1 must be admitted and must draw, not return s0 at every path; measured a sum of 888.68787 against 800.0 at t = 1.0, n = 8, seed 7")
+  _ = assert_close(heston_qe_terminal(key_from_seed(7i64), s0, cast(0.04, f32), cast(0.05, f32), cast(1.5, f32), cast(0.04, f32), cast(0.3, f32), cast(-0.5, f32), cast(0.0, f32), one).0, s0, tol, "heston_qe_terminal at t = 0 must still return s0 at the extremal admitted step count; this is why refusing n_steps < 1 takes no reachable correct answer away")
+  assert_close(path_sum(heston_qe_paths_terminal(key_from_seed(7i64), zero_horizon_template(), s0, cast(0.04, f32), cast(0.05, f32), cast(1.5, f32), cast(0.04, f32), cast(0.3, f32), cast(-0.5, f32), cast(0.0, f32), one).0), eight_s0, tol, "heston_qe_paths_terminal at t = 0 must still return s0 for every path at the extremal admitted step count")
+}

@@ -11,6 +11,71 @@ def horizon_finite(t: f32) -> bool = eq(sub(t, t), cast(0.0, f32))
 -- Thread the checked value into the computation so the guard stays in its
 -- dataflow. sub(x, x) distinguishes non-finite values from negative inputs.
 def checked_horizon(t: f32) -> f32 = if not(horizon_finite(t)) then fail("Shoals.Stochastic: the time horizon must be finite; a non-finite horizon makes the log drift and sigma * sqrt(t) non-finite, so no path value would be usable") else if not(gte(t, cast(0.0, f32))) then fail("Shoals.Stochastic: the time horizon must be non-negative; sqrt of a negative horizon is NaN, so every path value would be NaN") else t
+-- The step count is a SEPARATE precondition, one parameter over from the
+-- horizon, and checked_horizon above cannot see it: `t = 1.0` is perfectly
+-- legal, and it is `n_steps` that decides whether a discretisation exists at
+-- all. With `n_steps <= 0` the step range is empty, so the fold over it
+-- returns its initial state `(log_s0, v0, v0)` unevaluated and the sampler
+-- returns `exp(log_s0)` -- s0 to within the log/exp round trip -- for a
+-- horizon over which the process really did evolve. Measured at s0 = 100,
+-- v0 = 0.04, t = 1.0, seed 7 on the unguarded tree: `n_steps = 0` and
+-- `n_steps = -8` both returned 100.00001 for the terminal spot and 0.04 for
+-- the terminal variance, while `n_steps = 64` returned 146.3306.
+--
+-- A finiteness check on `dt` is not a substitute, and the reason is narrower
+-- than it first looks. `dt = t / n_steps` is `+inf` at `n_steps = 0` and NaN
+-- at `t = 0, n_steps = 0`; the shipped code never consumes it, but ADDING a
+-- finiteness check creates the consumer, so such a check does catch
+-- `n_steps = 0`. It does not catch a NEGATIVE count: `t / -8` is finite, the
+-- fold range is still empty, and the sampler returns `(log_s0, v0, v0)`
+-- silently. Measured by building that exact mutant: the two zero fixtures
+-- died because the `dt` check fired with the wrong diagnostic, and the two
+-- negative fixtures died because it never fired at all. Guarding the INPUT
+-- covers both with one check. That is still the horizon guard's lesson from
+-- the other side -- there the derived value was a product that destroyed a
+-- sign, here it is a quotient that is only diagnostic for half the domain.
+--
+-- Zero and negative are refused TOGETHER but on different warrants, and the
+-- fixtures separate them so the zero decision can be revisited without
+-- disturbing the negative one. A negative step count is not a quantity; there
+-- is nothing to decide. A zero step count carries an identity argument -- "no
+-- steps, so no evolution, so s0" -- and that argument is REJECTED here.
+-- `n_steps` is a RESOLUTION parameter, not a modelled quantity: zero
+-- resolution is unspecified rather than degenerate, and `s0` is the terminal
+-- spot of a Heston process over a positive horizon only on an event of
+-- probability zero. `n_steps = 1` is a crude discretisation and still draws;
+-- `n_steps = 0` draws nothing.
+--
+-- This is the one axis on which the step count differs from the horizon, and
+-- the difference is the reason `t = 0` stays admitted while `n_steps = 0` does
+-- not: at `t = 0` s0 IS the right answer, which
+-- test_zero_horizon_is_admitted_by_every_sampler pins at n_steps = 8.
+-- Refusing `n_steps < 1` therefore takes away no reachable correct answer -- a
+-- caller who wants s0 passes `t = 0` with any valid step count and still gets
+-- it. Measured: `t = 0` returns 100.00001 at n_steps 1, 8 and 64 alike.
+--
+-- The integer domain makes this boundary exactly pinnable, unlike the
+-- horizon's. 1 is the extremal admitted value and 0 the extremal refused one,
+-- with nothing between them, so a positive case at `n_steps = 1` kills every
+-- upward threshold shift and a fixture at `n_steps = 0` kills every downward
+-- one. The horizon needed a negative min subnormal for the same job; here no
+-- subnormal argument exists or is needed.
+--
+-- Returned rather than asserted, for checked_horizon's reason: every use of
+-- the step count consumes the checked value, so the guard is in the dataflow
+-- rather than in a binding that could be eliminated before it is evaluated.
+--
+-- That is a DEFENSIVE choice and NOT a demonstrated necessity, on the same
+-- measured footing as checked_horizon's. A mutant that discards the result
+-- (`_ = checked_step_count(n_steps)` with raw `n_steps` downstream) was run
+-- against all four step-count fixtures and the positive case and SURVIVED all
+-- five: the guard still fires in the evaluator lane, which is the lane every
+-- test here runs in. No gate stage lowers these samplers, so the elimination
+-- hazard is untested rather than refuted. Threading costs nothing and does not
+-- depend on which lane evaluates the binding, so it stays -- but no test in
+-- this repository distinguishes the two forms, and a reader should not infer
+-- from this comment that one does.
+def checked_step_count(n_steps: i64) -> i64 = if lt(n_steps, cast(1, i64)) then fail(string_concat("Shoals.Stochastic: the step count must be at least 1, got ", string_concat(to_string(n_steps), "; with no steps the evolution loop never runs, so the sampler would return s0 and v0 unchanged for a horizon it did not simulate"))) else n_steps
 def gbm_path[n](rng_key: key, template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
   z = normal_sample(rng_key, template, cast(0.0, f32), cast(1.0, f32))
   n_i = numel(copy(z))
@@ -279,17 +344,18 @@ def heston_qe_step(log_s: f32, v: f32, min_v: f32, mu: f32, kappa: f32, theta: f
 def heston_qe_terminal(rng_key: key, s0: f32, v0: f32, mu: f32, kappa: f32, theta: f32, sigma: f32, rho: f32, t: f32, n_steps: i64) -> (f32, f32, f32) = {
   (rng_draw_0, rng_tail_0) = split_key(rng_key)
   (rng_draw_1, rng_draw_2) = split_key(rng_tail_0)
-  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), n_steps)))
+  n_ok = checked_step_count(n_steps)
+  template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), n_ok)))
   z_v_t = normal_sample(rng_draw_0, copy(template), cast(0.0, f32), cast(1.0, f32))
   z_ind_t = normal_sample(rng_draw_1, copy(template), cast(0.0, f32), cast(1.0, f32))
   u_t = uniform_sample(rng_draw_2, template, cast(0.0, f32), cast(1.0, f32))
   z_v_l = to_list(z_v_t)
   z_ind_l = to_list(z_ind_t)
   u_l = to_list(u_t)
-  dt = div(checked_horizon(t), cast(n_steps, f32))
+  dt = div(checked_horizon(t), cast(n_ok, f32))
   log_s0 = log(s0)
   init_state = (log_s0, v0, v0)
-  idxs = range(cast(0, i64), n_steps)
+  idxs = range(cast(0, i64), n_ok)
   final_state = fold(fn (state: (f32, f32, f32), i: i64) -> {
     log_s = state.0
     v = state.1
@@ -305,7 +371,8 @@ def heston_qe_paths_terminal[n](rng_key: key, paths_template: tensor[n, f32], s0
   (rng_draw_0, rng_tail_0) = split_key(rng_key)
   (rng_draw_1, rng_draw_2) = split_key(rng_tail_0)
   n_paths = numel(copy(paths_template))
-  total = mul(n_paths, n_steps)
+  n_ok = checked_step_count(n_steps)
+  total = mul(n_paths, n_ok)
   big_template = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), total)))
   z_v_t = normal_sample(rng_draw_0, copy(big_template), cast(0.0, f32), cast(1.0, f32))
   z_ind_t = normal_sample(rng_draw_1, copy(big_template), cast(0.0, f32), cast(1.0, f32))
@@ -313,13 +380,13 @@ def heston_qe_paths_terminal[n](rng_key: key, paths_template: tensor[n, f32], s0
   z_v_l = to_list(z_v_t)
   z_ind_l = to_list(z_ind_t)
   u_l = to_list(u_t)
-  dt = div(checked_horizon(t), cast(n_steps, f32))
+  dt = div(checked_horizon(t), cast(n_ok, f32))
   log_s0 = log(s0)
   path_idxs = range(cast(0, i64), n_paths)
   results = map(fn (p: i64) -> {
-    base = mul(p, n_steps)
+    base = mul(p, n_ok)
     init_state = (log_s0, v0, v0)
-    step_idxs = range(cast(0, i64), n_steps)
+    step_idxs = range(cast(0, i64), n_ok)
     final = fold(fn (state: (f32, f32, f32), i: i64) -> {
       log_s = state.0
       v = state.1

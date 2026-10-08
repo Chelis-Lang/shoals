@@ -1,0 +1,31 @@
+Shoals.Stochastic: the step count must be at least 1, got -8; with no steps the evolution loop never runs, so the sampler would return s0 and v0 unchanged for a horizon it did not simulate
+Assumption: a negative step count is not a quantity, so there is no reading on
+which an answer exists. Returning a confident s0 at every path for it is a
+wrong answer dressed as an answer. This is the unarguable half of the
+step-count precondition; the zero case is the policy question that came with
+it, and it has its own file.
+
+Measured on the unguarded tree at s0 = 100, v0 = 0.04, t = 1.0, n = 8, seed 7:
+`n_steps = -8` summed the eight terminal spots to 800.00006, i.e. s0 at every
+path -- byte-identical to `n_steps = 0` -- while `n_steps = 64` summed to
+859.222.
+
+The diagnostic names the received value rather than only the rule, because the
+step count is one of two integer quantities reaching this sampler: the path
+count arrives as the template's extent and the step count as this argument,
+and a message that states only the rule leaves a caller to work out which one
+the compiler meant.
+
+This entry point is not covered by the single-path fixture even though both
+call the same guard: it builds its own `n_paths * n_steps` draw template and
+threads its own copy of the step count through `base = p * n_steps`.
+
+What this fixture does NOT assert: it does not pin the zero step count, which
+has its own file because its refusal rests on a different warrant, and it does
+not pin what stays admitted. `n_steps = 1` is the extremal admitted value and
+is pinned by tests/stochastic.ch.
+
+Deleting the checked_step_count call from THIS sampler does not make the
+fixture pass: the assertion is one that s0 also fails, so the file would then
+fail on the assertion rather than on the refusal, `--expect neg` would see the
+wrong text, and it would report WRONG-DIAGNOSTIC.

@@ -1,0 +1,26 @@
+Shoals.Trees: the step count must be at least 1, got 0; at zero, dt = t / n_steps is non-finite and the pricer collapses to a flat 0.0 regardless of moneyness; below zero the terminal layer is empty
+Assumption: a step count is a RESOLUTION parameter, and zero resolution is
+unspecified rather than degenerate. This pricer forms `dt = t / n_steps`, so a
+zero step count divides the horizon by zero; the non-finite step poisons the
+lattice's up and down log-moves and the terminal node prices collapse to a
+flat 0.0 regardless of moneyness. The book states the same mechanism.
+
+Measured on the unguarded tree at s0 = 100, r = 0.05, q = 0, sigma = 0.2,
+t = 1.0: a K = 90 call priced at 0.0 against 16.69197 at `n_steps = 64` and an intrinsic of 10. The control matters: it shows a probe can tell the
+cases apart.
+
+This fixture exists because a per-site mutation sweep found this pricer's
+guard UNPINNED. Each European pricer and the `*_generic` it delegates to both
+carry a check, and while the generic refused `n_steps < 1` the two shadowed
+each other, so removing either alone was invisible. Narrowing the generic to
+refuse only a negative depth -- which it must, because a depth of zero is the
+documented intrinsic value -- removed that shadow and left this pricer's own
+guard as the only defence at zero, with no test behind it. Unguarding it then
+returned a flat 0.0 with no diagnostic and nothing failed. The sweep found
+that; no amount of reading would have.
+
+What this fixture does NOT assert: the two `*_generic` entry points admit a
+depth of zero and return the intrinsic, which is pinned positively in
+tests/step_count_parity.ch at two off-the-money strikes. A guard tightened
+from `< 0` to `< 1` there would destroy that documented answer while passing
+every fixture in this directory.

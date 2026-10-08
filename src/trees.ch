@@ -150,91 +150,163 @@ def tr_jr_params(r: f32, q: f32, sigma: f32, dt: f32) -> (f32, f32, f32, f32) = 
   disc = exp(neg(mul(r, dt)))
   (log_u, log_d, p, disc)
 }
+-- Two different preconditions live in this module, and conflating them
+-- destroys a documented answer. The book states both, and states them
+-- correctly; the mechanism below is its wording, not a reconstruction.
+--
+-- THE PRICERS (`tr_crr_*`, `tr_tian_*`, `tr_jr_*`, `tr_trinomial_*`) form
+-- `dt = t / n_steps`, so a zero step count divides the horizon by zero. The
+-- resulting non-finite `dt` poisons the up/down log-moves and the terminal
+-- node prices collapse to a flat 0.0 REGARDLESS OF MONEYNESS -- not to the
+-- intrinsic value, and not to the price of anything. Measured at s0 = 100,
+-- r = 0.05, q = 0, sigma = 0.2, t = 1.0 on the unguarded tree:
+-- tr_crr_european_call returned 0.0 at K = 90 against 16.69197 at
+-- `n_steps = 64` and an intrinsic of 10, and 0.0 at K = 110 against
+-- 6.023531; tr_crr_american_put returned 0.0 at K = 110 against 11.964398,
+-- for an option its holder could exercise immediately for 10. A negative
+-- count already failed, with `index 0 out of bounds for list of len 0` from
+-- the empty terminal layer: loud, but naming an index rather than the
+-- precondition a caller violated, so for a negative count the guard improves
+-- a diagnostic rather than adding one.
+--
+-- THE TWO `*_generic` ENTRY POINTS take `log_u`, `log_d`, `p` and `disc`
+-- already computed, so they never divide by the step count. For them
+-- `n_steps = 0` is a SPECIFIED AND CORRECT answer: the terminal layer is the
+-- single node `s0` and the price is the intrinsic. Measured on the unguarded
+-- tree at s0 = 100: tr_binom_european_call_generic returned exactly 10.0 at
+-- K = 90, 0.0 at K = 110 and 0.0 at K = 100 -- the intrinsic at each strike,
+-- as the book documents. A `< 1` check here would refuse a documented
+-- correct answer, so these two refuse only a NEGATIVE depth, which is the
+-- case that leaks `index 0 out of bounds for list of len 0`.
+--
+-- An earlier revision of this guard used one `< 1` check for both, on the
+-- mistaken reading that the pricers' flat 0.0 came from the backward
+-- induction having no layer to roll back. It does not: the generic's
+-- induction handles a zero-step tree correctly, and the pricers' 0.0 comes
+-- from `dt`. The measurement that separates them is the pricer and the
+-- generic at the SAME off-the-money strike: 0.0 against 10.0 at K = 90. The
+-- original probe used K = 100 = s0, where the intrinsic is 0 and the two
+-- agree, so a constant axis hid the distinction entirely.
+--
+-- `n_steps = 0` is refused for the pricers rather than documented as the
+-- identity, on Shoals.Stochastic's reasoning: a step count is a resolution
+-- parameter, not a modelled quantity, so zero resolution is unspecified
+-- rather than degenerate. That reasoning does not reach the generics, where
+-- zero steps names a well-defined one-node lattice rather than an absent
+-- discretisation.
+--
+-- The pricer guard sits where `n_steps` ENTERS the computation, inside each
+-- pricer's stochastic branch, and NOT at the pricer's entry. That placement
+-- is measured: every pricer short-circuits a sigma below tr_sigma_floor() to
+-- tr_deterministic_call/put, which takes no step count at all and whose
+-- answer is therefore independent of it. Measured at sigma = 1e-9, s0 = 100,
+-- K = 90, t = 1.0: tr_crr_european_call returned 14.389351 at `n_steps` 0, 64
+-- and -8 alike, and tr_crr_american_put at K = 110 returned 4.6352386 at both
+-- 0 and 64. An entry-level guard would refuse correct answers to validate a
+-- parameter that path never reads. tests/step_count_parity.ch pins the
+-- sub-floor path at `n_steps = 0` so a later tightening cannot quietly take
+-- them away.
+--
+-- Each module carries its own copy of its check so its diagnostic can name
+-- the module a caller actually invoked, following ind_require_period's
+-- precedent in Shoals.Indicators.
+def tr_checked_step_count(n_steps: i64) -> i64 = if lt(n_steps, cast(1, i64)) then fail(string_concat("Shoals.Trees: the step count must be at least 1, got ", string_concat(to_string(n_steps), "; at zero, dt = t / n_steps is non-finite and the pricer collapses to a flat 0.0 regardless of moneyness; below zero the terminal layer is empty"))) else n_steps
+def tr_checked_lattice_depth(n_steps: i64) -> i64 = if lt(n_steps, cast(0, i64)) then fail(string_concat("Shoals.Trees: the lattice depth must not be negative, got ", string_concat(to_string(n_steps), "; a negative depth leaves the terminal layer empty, so the backward induction has no node to read"))) else n_steps
 def tr_binom_european_call_generic(s0: f32, k: f32, log_u: f32, log_d: f32, p: f32, disc: f32, n_steps: i64) -> f32 = {
-  terminal = tr_binom_terminal_call(s0, k, log_u, log_d, n_steps)
-  step_idxs = range(tr_i0(), n_steps)
+  n_ok = tr_checked_lattice_depth(n_steps)
+  terminal = tr_binom_terminal_call(s0, k, log_u, log_d, n_ok)
+  step_idxs = range(tr_i0(), n_ok)
   final_vs = fold(fn (vs: List[f32], s: i64) -> {
-    i_to = n_steps |> sub(s) |> sub(tr_i1())
+    i_to = n_ok |> sub(s) |> sub(tr_i1())
     tr_binom_back_european(vs, i_to, disc, p)
   }, terminal, step_idxs)
   index(final_vs, tr_i0())
 }
 def tr_binom_european_put_generic(s0: f32, k: f32, log_u: f32, log_d: f32, p: f32, disc: f32, n_steps: i64) -> f32 = {
-  terminal = tr_binom_terminal_put(s0, k, log_u, log_d, n_steps)
-  step_idxs = range(tr_i0(), n_steps)
+  n_ok = tr_checked_lattice_depth(n_steps)
+  terminal = tr_binom_terminal_put(s0, k, log_u, log_d, n_ok)
+  step_idxs = range(tr_i0(), n_ok)
   final_vs = fold(fn (vs: List[f32], s: i64) -> {
-    i_to = n_steps |> sub(s) |> sub(tr_i1())
+    i_to = n_ok |> sub(s) |> sub(tr_i1())
     tr_binom_back_european(vs, i_to, disc, p)
   }, terminal, step_idxs)
   index(final_vs, tr_i0())
 }
 def tr_crr_european_call(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: i64) -> f32 =
   if lt(sigma, tr_sigma_floor()) then tr_deterministic_call(s0, k, r, q, t) else {
-    dt = div(t, cast(n_steps, f32))
+    n_ok = tr_checked_step_count(n_steps)
+    dt = div(t, cast(n_ok, f32))
     params = tr_crr_params(r, q, sigma, dt)
-    tr_binom_european_call_generic(s0, k, params.0, params.1, params.2, params.3, n_steps)
+    tr_binom_european_call_generic(s0, k, params.0, params.1, params.2, params.3, n_ok)
   }
 def tr_crr_european_put(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: i64) -> f32 =
   if lt(sigma, tr_sigma_floor()) then tr_deterministic_put(s0, k, r, q, t) else {
-    dt = div(t, cast(n_steps, f32))
+    n_ok = tr_checked_step_count(n_steps)
+    dt = div(t, cast(n_ok, f32))
     params = tr_crr_params(r, q, sigma, dt)
-    tr_binom_european_put_generic(s0, k, params.0, params.1, params.2, params.3, n_steps)
+    tr_binom_european_put_generic(s0, k, params.0, params.1, params.2, params.3, n_ok)
   }
 def tr_crr_american_call(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: i64) -> f32 =
   if lt(sigma, tr_sigma_floor()) then tr_deterministic_call(s0, k, r, q, t) else {
-    dt = div(t, cast(n_steps, f32))
+    n_ok = tr_checked_step_count(n_steps)
+    dt = div(t, cast(n_ok, f32))
     params = tr_crr_params(r, q, sigma, dt)
     log_u = params.0
     log_d = params.1
     p = params.2
     disc = params.3
-    terminal = tr_binom_terminal_call(s0, k, log_u, log_d, n_steps)
-    step_idxs = range(tr_i0(), n_steps)
+    terminal = tr_binom_terminal_call(s0, k, log_u, log_d, n_ok)
+    step_idxs = range(tr_i0(), n_ok)
     final_vs = fold(fn (vs: List[f32], s: i64) -> {
-      i_to = n_steps |> sub(s) |> sub(tr_i1())
+      i_to = n_ok |> sub(s) |> sub(tr_i1())
       tr_binom_back_american_call(vs, i_to, s0, k, log_u, log_d, disc, p)
     }, terminal, step_idxs)
     index(final_vs, tr_i0())
   }
 def tr_crr_american_put(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: i64) -> f32 =
   if lt(sigma, tr_sigma_floor()) then tr_deterministic_put(s0, k, r, q, t) else {
-    dt = div(t, cast(n_steps, f32))
+    n_ok = tr_checked_step_count(n_steps)
+    dt = div(t, cast(n_ok, f32))
     params = tr_crr_params(r, q, sigma, dt)
     log_u = params.0
     log_d = params.1
     p = params.2
     disc = params.3
-    terminal = tr_binom_terminal_put(s0, k, log_u, log_d, n_steps)
-    step_idxs = range(tr_i0(), n_steps)
+    terminal = tr_binom_terminal_put(s0, k, log_u, log_d, n_ok)
+    step_idxs = range(tr_i0(), n_ok)
     final_vs = fold(fn (vs: List[f32], s: i64) -> {
-      i_to = n_steps |> sub(s) |> sub(tr_i1())
+      i_to = n_ok |> sub(s) |> sub(tr_i1())
       tr_binom_back_american_put(vs, i_to, s0, k, log_u, log_d, disc, p)
     }, terminal, step_idxs)
     index(final_vs, tr_i0())
   }
 def tr_tian_european_call(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: i64) -> f32 =
   if lt(sigma, tr_sigma_floor()) then tr_deterministic_call(s0, k, r, q, t) else {
-    dt = div(t, cast(n_steps, f32))
+    n_ok = tr_checked_step_count(n_steps)
+    dt = div(t, cast(n_ok, f32))
     params = tr_tian_params(r, q, sigma, dt)
-    tr_binom_european_call_generic(s0, k, params.0, params.1, params.2, params.3, n_steps)
+    tr_binom_european_call_generic(s0, k, params.0, params.1, params.2, params.3, n_ok)
   }
 def tr_tian_european_put(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: i64) -> f32 =
   if lt(sigma, tr_sigma_floor()) then tr_deterministic_put(s0, k, r, q, t) else {
-    dt = div(t, cast(n_steps, f32))
+    n_ok = tr_checked_step_count(n_steps)
+    dt = div(t, cast(n_ok, f32))
     params = tr_tian_params(r, q, sigma, dt)
-    tr_binom_european_put_generic(s0, k, params.0, params.1, params.2, params.3, n_steps)
+    tr_binom_european_put_generic(s0, k, params.0, params.1, params.2, params.3, n_ok)
   }
 def tr_jr_european_call(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: i64) -> f32 =
   if lt(sigma, tr_sigma_floor()) then tr_deterministic_call(s0, k, r, q, t) else {
-    dt = div(t, cast(n_steps, f32))
+    n_ok = tr_checked_step_count(n_steps)
+    dt = div(t, cast(n_ok, f32))
     params = tr_jr_params(r, q, sigma, dt)
-    tr_binom_european_call_generic(s0, k, params.0, params.1, params.2, params.3, n_steps)
+    tr_binom_european_call_generic(s0, k, params.0, params.1, params.2, params.3, n_ok)
   }
 def tr_jr_european_put(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: i64) -> f32 =
   if lt(sigma, tr_sigma_floor()) then tr_deterministic_put(s0, k, r, q, t) else {
-    dt = div(t, cast(n_steps, f32))
+    n_ok = tr_checked_step_count(n_steps)
+    dt = div(t, cast(n_ok, f32))
     params = tr_jr_params(r, q, sigma, dt)
-    tr_binom_european_put_generic(s0, k, params.0, params.1, params.2, params.3, n_steps)
+    tr_binom_european_put_generic(s0, k, params.0, params.1, params.2, params.3, n_ok)
   }
 def tr_tri_params(r: f32, q: f32, sigma: f32, dt: f32) -> (f32, f32, f32, f32, f32) = {
   three = tr_f_three()
@@ -298,34 +370,36 @@ def tr_tri_back_american_put(vs: List[f32], i_to: i64, s0: f32, k: f32, log_u: f
 }
 def tr_trinomial_european_call(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: i64) -> f32 =
   if lt(sigma, tr_sigma_floor()) then tr_deterministic_call(s0, k, r, q, t) else {
-    dt = div(t, cast(n_steps, f32))
+    n_ok = tr_checked_step_count(n_steps)
+    dt = div(t, cast(n_ok, f32))
     params = tr_tri_params(r, q, sigma, dt)
     log_u = params.0
     p_u = params.1
     p_m = params.2
     p_d = params.3
     disc = params.4
-    terminal = tr_tri_terminal_call(s0, k, log_u, n_steps)
-    step_idxs = range(tr_i0(), n_steps)
+    terminal = tr_tri_terminal_call(s0, k, log_u, n_ok)
+    step_idxs = range(tr_i0(), n_ok)
     final_vs = fold(fn (vs: List[f32], s: i64) -> {
-      i_to = n_steps |> sub(s) |> sub(tr_i1())
+      i_to = n_ok |> sub(s) |> sub(tr_i1())
       tr_tri_back_european(vs, i_to, disc, p_u, p_m, p_d)
     }, terminal, step_idxs)
     index(final_vs, tr_i0())
   }
 def tr_trinomial_american_put(s0: f32, k: f32, r: f32, q: f32, sigma: f32, t: f32, n_steps: i64) -> f32 =
   if lt(sigma, tr_sigma_floor()) then tr_deterministic_put(s0, k, r, q, t) else {
-    dt = div(t, cast(n_steps, f32))
+    n_ok = tr_checked_step_count(n_steps)
+    dt = div(t, cast(n_ok, f32))
     params = tr_tri_params(r, q, sigma, dt)
     log_u = params.0
     p_u = params.1
     p_m = params.2
     p_d = params.3
     disc = params.4
-    terminal = tr_tri_terminal_put(s0, k, log_u, n_steps)
-    step_idxs = range(tr_i0(), n_steps)
+    terminal = tr_tri_terminal_put(s0, k, log_u, n_ok)
+    step_idxs = range(tr_i0(), n_ok)
     final_vs = fold(fn (vs: List[f32], s: i64) -> {
-      i_to = n_steps |> sub(s) |> sub(tr_i1())
+      i_to = n_ok |> sub(s) |> sub(tr_i1())
       tr_tri_back_american_put(vs, i_to, s0, k, log_u, disc, p_u, p_m, p_d)
     }, terminal, step_idxs)
     index(final_vs, tr_i0())

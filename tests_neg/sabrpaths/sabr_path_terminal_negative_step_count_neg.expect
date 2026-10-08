@@ -1,0 +1,33 @@
+Shoals.SabrPaths: the step count must be at least 1, got -8; with no steps the evolution loop never runs, so the sampler would return (f0, alpha0) unchanged for a horizon it did not simulate
+Assumption: a negative step count is not a quantity, so there is no reading on
+which an answer exists. This is the unarguable half of the step-count
+precondition; the zero case carries the identity argument and has its own
+file.
+
+Measured on the unguarded tree at f0 = 100, alpha0 = 0.2, beta = 0.5,
+rho = -0.3, nu = 0.4, t = 1.0, seed 7: `n_steps = 0` and `n_steps = -8` both
+returned 100.0 -- exactly f0 -- while `n_steps = 64` returned 100.69905. The
+control is close to f0 here, which is why it was measured rather than assumed:
+a SABR forward is a martingale, so the margin is small by construction and an
+assertion with a loose tolerance would not have separated the cases. The
+refused rows are f0 to the bit.
+
+Why a horizon check could not cover this: a step count is a separate
+precondition one parameter over, and `t = 1.0` is a perfectly legal horizon.
+A finiteness check on the derived `dt` is not a substitute either, for a
+narrower reason than it first appears: adding such a check CREATES a consumer
+for `dt`, so it does catch `n_steps = 0`, where `dt` is `+inf`. It does not
+catch a negative count, where `t / -8` is finite and the empty step range
+still returns the initial state silently. The guard has to key on `n_steps`
+itself to cover both.
+
+What this fixture does NOT assert: it does not pin the other warrant, which
+has its own file, and it does not pin what stays admitted. `n_steps = 1` is
+the extremal admitted value and is pinned in tests/. The integer domain makes
+that boundary exact in both directions, with nothing between 0 and 1, so one
+fixture here and one positive case there close the whole threshold family.
+
+This module's two samplers call the same guard but thread it separately.
+`sabr_paths_terminal` carries its own fixture, on the zero warrant; between
+the two files every entry point and every warrant in this module is covered
+at least once.

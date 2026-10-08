@@ -1,0 +1,30 @@
+Shoals.Trees: the step count must be at least 1, got 0; at zero, dt = t / n_steps is non-finite and the pricer collapses to a flat 0.0 regardless of moneyness; below zero the terminal layer is empty
+Assumption: a step count is a RESOLUTION parameter, and zero resolution is
+unspecified rather than degenerate. In this module the consequence is sharper
+than in the path samplers: `dt = t / n_steps` divides the horizon by zero, the
+non-finite step poisons the lattice's log-moves, and the returned value is a
+flat 0.0 rather than the initial state. A deep in-the-money option quoted at
+exactly zero with no diagnostic is a wrong answer dressed as an answer.
+
+This is the PRICERS' precondition, and it is not the one the two `*_generic`
+entry points carry. They receive their log-moves already computed, never
+divide by the step count, and return the intrinsic value at a depth of zero --
+a documented and correct answer, admitted here and pinned positively in
+tests/step_count_parity.ch. An earlier revision of this change applied one
+`< 1` check to both and destroyed it.
+
+Measured on the unguarded tree at s0 = 100, r = 0.05, q = 0, sigma = 0.2,
+t = 1.0: `n_steps = 0` returned 0.0 for a K = 90 call on s0 = 100 against 16.707756 at `n_steps = 64`.
+
+The trinomial lattice has its own terminal layer and its own backward
+step, so it shares no guard site with the binomial pricers.
+
+The guard sits where `n_steps` ENTERS the computation, inside each pricer's
+stochastic branch, and not at the pricer's entry. That placement is measured:
+every pricer short-circuits a sigma below tr_sigma_floor() to
+tr_deterministic_call/put, which takes no step count and whose answer is
+therefore independent of it. Measured at sigma = 1e-9, s0 = 100, K = 90,
+t = 1.0: `tr_crr_european_call` returned 14.389351 at `n_steps` 0, 64 and -8
+alike. An entry-level guard would refuse correct answers to validate a
+parameter that path never reads, so tests/ pins the sub-floor path at
+`n_steps = 0` from the other side.

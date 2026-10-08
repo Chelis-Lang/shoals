@@ -1,0 +1,28 @@
+Shoals.Stochastic: the step count must be at least 1, got -8; with no steps the evolution loop never runs, so the sampler would return s0 and v0 unchanged for a horizon it did not simulate
+Assumption: a negative step count is not a quantity, so there is no reading on
+which an answer exists. Returning a confident s0 for it is a wrong answer
+dressed as an answer. This is the unarguable half of the step-count
+precondition and the reason the defect was filed; the zero case is the policy
+question that came with it, and it has its own file.
+
+Measured on the unguarded tree at s0 = 100, v0 = 0.04, t = 1.0, seed 7:
+`n_steps = -8` returned 100.00001 for the terminal spot and 0.04 for the
+terminal variance -- byte-identical to `n_steps = 0` -- while `n_steps = 64`
+returned 146.3306.
+
+The diagnostic names the received value rather than only the rule. A step
+count is one of two integer arguments a caller passes to this sampler, and a
+message that says only "must be at least 1" leaves them to work out which
+argument the compiler meant.
+
+What this fixture does NOT assert: it does not pin the zero step count, which
+has its own file because its refusal rests on a different warrant, and it does
+not pin what stays admitted. `n_steps = 1` is the extremal admitted value and
+is pinned by tests/stochastic.ch.
+
+Deleting the checked_step_count call from THIS sampler does not make the
+fixture pass: the assertion is one that s0 also fails, so the file would then
+fail on the assertion rather than on the refusal, `--expect neg` would see the
+wrong text, and it would report WRONG-DIAGNOSTIC. Deleting the guard from
+heston_qe_paths_terminal leaves this fixture green, which is why there is one
+file per entry point rather than one for the module.

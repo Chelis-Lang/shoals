@@ -1,0 +1,25 @@
+Shoals.HullWhite: the step count must be at least 1, got 0; with no steps the evolution loop never runs, so the sampler would return its initial state -- r0, or (x0, y0) for the two-factor path -- unchanged for a horizon it did not simulate
+Assumption: a step count is a RESOLUTION parameter, and zero resolution is
+unspecified rather than degenerate. Over `t = 1.0` both factors really did
+evolve, so returning (x0, y0) at every path asserts an event of probability
+zero.
+
+Measured on the unguarded tree at x0 = 0.02, y0 = 0.01, a = 0.1, b = 0.2,
+sigma1 = 0.01, sigma2 = 0.005, rho = -0.3, t = 1.0, n = 8, seed 7:
+`n_steps = 0` summed the eight terminal x-factors to 0.16 -- x0 at every path
+-- while `n_steps = 64` summed to 0.12615834.
+
+Why a horizon check could not cover this: a step count is a separate
+precondition one parameter over, and `t = 1.0` is a perfectly legal horizon.
+A finiteness check on the derived `dt` is not a substitute either, for a
+narrower reason than it first appears: adding such a check CREATES a consumer
+for `dt`, so it does catch `n_steps = 0`, where `dt` is `+inf`. It does not
+catch a negative count, where `t / -8` is finite and the empty step range
+still returns the initial state silently. The guard has to key on `n_steps`
+itself to cover both.
+
+The negative warrant is pinned by the one-factor fixtures beside this one
+rather than duplicated here. Between the three files in this directory every
+entry point in the module and both warrants are covered at least once, which
+is what the fixture set claims; it does not claim every entry point crossed
+with every warrant.

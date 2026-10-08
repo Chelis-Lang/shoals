@@ -1,0 +1,27 @@
+Shoals.Trees: the step count must be at least 1, got 0; at zero, dt = t / n_steps is non-finite and the pricer collapses to a flat 0.0 regardless of moneyness; below zero the terminal layer is empty
+Assumption: a step count is a RESOLUTION parameter, and zero resolution is
+unspecified rather than degenerate. This pricer forms `dt = t / n_steps`, so a
+zero step count divides the horizon by zero; the non-finite step poisons the
+lattice's log-moves and the terminal node prices collapse to a flat 0.0
+regardless of moneyness. The book states the same mechanism.
+
+Measured on the unguarded tree at s0 = 100, K = 110, r = 0.05, q = 0,
+sigma = 0.2, t = 1.0: a put ten points in the money priced at 0.0 against
+10.659037 at `n_steps = 64`.
+
+This fixture closes a hole a red-team round found, and the hole is worth
+recording because a single-site unguard did NOT reveal it. Unguarding this
+pricer alone is caught, but only because the `*_generic` it delegates to then
+refuses with its own lattice-depth diagnostic, which `--expect neg` reads as
+WRONG-DIAGNOSTIC. The ZERO boundary at this site was therefore pinned only by
+the TEXT of a negative fixture, so a weakening that preserved the text was
+invisible: replacing the check with an inline `lt(n_steps, 0)` carrying the
+identical diagnostic string left the entire suite green while this pricer
+returned a flat 0.0 at `n_steps = 0`. A mutation that keeps the message is not
+the same as a mutation that removes the guard, and only a zero-step fixture at
+this exact entry point separates them.
+
+What this fixture does NOT assert: the two `*_generic` entry points admit a
+depth of zero and return the intrinsic, which is pinned positively in
+tests/step_count_parity.ch and, independently, by
+tests/tree_generic_export.ch.
