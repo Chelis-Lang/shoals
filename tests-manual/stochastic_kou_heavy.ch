@@ -29,9 +29,9 @@ def test_kou_compensator_at_unit_up_rate() -> unit ! { Test } = {
   expected = sub(add(mul(cast(0.5, f32), div(cast(2.0, f32), sub(cast(2.0, f32), cast(1.0, f32)))), mul(cast(0.5, f32), div(cast(2.0, f32), add(cast(2.0, f32), cast(1.0, f32))))), cast(1.0, f32))
   assert_close(z, expected, cast(0.00001, f32), "compensator at p=0.5 eta_up=2 eta_dn=2 = 0.5*2/1 + 0.5*2/3 - 1 = 0.3333")
 }
-def test_kou_compensator_requires_eta_up_greater_than_1() -> unit ! { Test } = {
+def test_kou_positive_probability_compensator_requires_eta_up_greater_than_1() -> unit ! { Test } = {
   z = sto_kou_compensator(cast(0.5, f32), cast(0.5, f32), cast(2.0, f32))
-  assert_true(is_nan_f32(z), "eta_up <= 1 produces NaN sentinel since the moment integral diverges")
+  assert_true(is_nan_f32(z), "With positive up probability eta_up <= 1 produces NaN since the moment integral diverges")
 }
 def test_kou_jump_density_check() -> unit ! { Test } = {
   n_paths = cast(256, i64)

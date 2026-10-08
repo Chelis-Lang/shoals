@@ -2,7 +2,7 @@ module Shoals.TestsNeg.KouDivergentJumpMultiplier
 import Std.Test (assert_true)
 import Nautilus.Stats (mean_vec)
 import Shoals.Stochastic (sto_kou_jump_terminal)
--- Negative: eta_up <= 1 makes the up-jump exponential moment integral diverge,
+-- Negative: p > 0 and eta_up <= 1 make the up-jump exponential moment integral diverge,
 -- so E[exp(Y)] does not exist, there is no jump multiplier w, and there is
 -- nothing for the drift to compensate. sto_kou_compensator has always returned
 -- a NaN sentinel here -- tests-manual/stochastic_kou_heavy.ch pins that, and

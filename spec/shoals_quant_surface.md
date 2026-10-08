@@ -226,6 +226,13 @@ needs:
   admissible operands. The sampler moment describes its renormalized
   enumerated count law and retains the existing representability and
   enumeration limits.
+  Kou's upward rate must be finite. When `p=0` exactly, including signed
+  zero, it is an unused placeholder and need not exceed one: the compensator
+  is `eta_dn/(eta_dn+1)-1` and every sampled jump is downward. When `p>0`,
+  `eta_up>1` remains necessary for a finite exponential moment; the
+  compensator returns its NaN sentinel otherwise and the sampler-moment
+  and terminal APIs refuse the divergent multiplier. Non-finite upward-rate
+  placeholders retain the sentinel/refusal behavior even at `p=0`.
 - **Interest-rate models:** Hull-White one-factor and two-factor
   (Gaussian short-rate), Libor Market Model with shifted-lognormal
   drift correction, HJM framework with the no-arbitrage drift.

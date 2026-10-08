@@ -1,0 +1,2 @@
+Shoals.Stochastic: kou jump parameters must be finite
+shoals#146: Even at zero upward probability, the unused upward-rate placeholder must remain finite.

@@ -39,6 +39,10 @@ FAMILIES = {
         "spread_bounded_input_price_bounds",
     ),
     "jumpmoments": (
+        "kou_downward_compensator",
+        "kou_downward_sample",
+        "kou_downward_moment",
+        "kou_terminal_placeholder_identity",
         "merton_zero_intensity",
         "kou_zero_horizon",
         "merton_matches_poisson_moment",

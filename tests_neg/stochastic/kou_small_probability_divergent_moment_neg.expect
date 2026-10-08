@@ -1,0 +1,2 @@
+Shoals.Stochastic: kou jump parameters must be finite
+shoals#146: Any positive upward probability retains the divergent-moment refusal at eta_up <= 1.

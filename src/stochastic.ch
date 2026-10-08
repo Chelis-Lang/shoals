@@ -338,8 +338,12 @@ def heston_qe_paths_terminal[n](rng_key: key, paths_template: tensor[n, f32], s0
   (s_t, v_t, min_v)
 }
 def sto_kou_compensator(p: f32, eta_up: f32, eta_dn: f32) -> f32 = {
+  zero = cast(0.0, f32)
   one = cast(1.0, f32)
-  if lte(eta_up, one) then div(sub(cast(0.0, f32), cast(0.0, f32)), cast(0.0, f32)) else {
+  -- Exact zero probability removes the upward component, but
+  -- an unused rate must still be finite. Any positive probability retains
+  -- the eta_up > 1 exponential-moment requirement.
+  if not(horizon_finite(eta_up)) then div(zero, zero) else if eq(p, zero) then sub(div(eta_dn, add(eta_dn, one)), one) else if lte(eta_up, one) then div(zero, zero) else {
     up_term = mul(p, div(eta_up, sub(eta_up, one)))
     dn_term = mul(sub(one, p), div(eta_dn, add(eta_dn, one)))
     sub(add(up_term, dn_term), one)
@@ -352,8 +356,8 @@ def sto_kou_jump_sample(p: f32, eta_up: f32, eta_dn: f32, u_branch: f32, e_size:
 -- log moment. That one substitution is the entire Kou/Merton difference in the
 -- count machinery; the jump SIZE law is where the two models really diverge.
 --
--- Kou's eta_up > 1 requirement arrives here as a NON-FINITE log_w rather than
--- as its own guard: eta_up <= 1 makes E[exp(Y)] divergent, sto_kou_compensator
+-- For positive p, Kou's eta_up > 1 requirement arrives as NON-FINITE log_w
+-- rather than its own guard: eta_up <= 1 makes E[exp(Y)] divergent, sto_kou_compensator
 -- returns its NaN sentinel, and count_params_finite rejects it. This sampler
 -- previously multiplied that NaN straight into its drift and returned NaN for
 -- every terminal value -- a wrong answer dressed as an answer, which is the
@@ -364,7 +368,7 @@ def sto_kou_jump_slots(lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f3
   rate = mul(lambda_jump, t)
   log_w = log(add(cast(1.0, f32), sto_kou_compensator(p, eta_up, eta_dn)))
   raw = count_slot_bound(rate, log_w)
-  if not(count_params_finite(rate, log_w)) then fail("Shoals.Stochastic: kou jump parameters must be finite; lambda_jump * t must be representable and the jump multiplier 1 + sto_kou_compensator(p, eta_up, eta_dn) must be finite and positive, which requires eta_up > 1") else if not(gte(rate, zero)) then fail("Shoals.Stochastic: kou jump rate lambda_jump * t must be finite and non-negative") else if not(lte(raw, count_slot_cap())) then fail("Shoals.Stochastic: kou jump intensity is too large to enumerate the jump count exactly; lambda_jump * t * (1 + sto_kou_compensator(p, eta_up, eta_dn)) must leave the slot bound at or below 4096") else cast_trunc(raw, i64)
+  if not(count_params_finite(rate, log_w)) then fail("Shoals.Stochastic: kou jump parameters must be finite; lambda_jump * t must be representable and the jump multiplier 1 + sto_kou_compensator(p, eta_up, eta_dn) must be finite and positive, which requires eta_up > 1 when p > 0") else if not(gte(rate, zero)) then fail("Shoals.Stochastic: kou jump rate lambda_jump * t must be finite and non-negative") else if not(lte(raw, count_slot_cap())) then fail("Shoals.Stochastic: kou jump intensity is too large to enumerate the jump count exactly; lambda_jump * t * (1 + sto_kou_compensator(p, eta_up, eta_dn)) must leave the slot bound at or below 4096") else cast_trunc(raw, i64)
 }
 -- Kou's jump-count table: count_table at Kou's rate and jump multiplier.
 def sto_kou_count_table(lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> (List[f32], f32, f32) = {
