@@ -137,8 +137,15 @@ asymptotic boundary approximation, so check grid convergence for the
 parameters you price.
 
 For `s1_0 = 100`, `s2_0 = 95`, `k = 5`, `r = 0.05`, no yields, vols
-`0.2` and `0.3`, `rho = 0.5`, and `t = 1`, a 41 x 41 grid with 50 steps
-returns `10.272353`. Independent integration gives about `10.211501`.
+`0.2` and `0.3`, `rho = 0.5`, and `t = 1`, independent integration gives
+about `10.211501`. Refining the grid and time steps gives:
+
+| Grid | Time steps | Price |
+| --- | --- | --- |
+| 41 x 41 | 50 | 10.272353 |
+| 81 x 81 | 100 | 10.228014 |
+| 161 x 161 | 200 | 10.2154875 |
+
 Increase the spatial grid and time steps together; a wider domain also
 needs more spatial points to retain the same spacing.
 
