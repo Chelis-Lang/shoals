@@ -217,123 +217,143 @@ def pde_adi_payoff_spread_2d(xs1: List[f32], xs2: List[f32], k: f32) -> List[Lis
       pde_max(sub(sub(s1, s2), k), pde_zero())
     }, xs2)
   }, xs1)
-def pde_adi_apply_1d(v_row: List[f32], a_coef: f32, b_half: f32, c_coef: f32, alpha: f32) -> List[f32] = {
-  enum_pairs = enumerate(v_row)
-  n_len = cast(len(v_row), i64)
-  n_xm1 = sub(n_len, cast(1, i64))
+-- Derivative helpers return A_j V (zero on the prescribed perimeter),
+-- rather than V + alpha*A_j V. This makes each CS coefficient explicit.
+def pde_adi_apply_1d(v_row: List[f32], a_coef: f32, b_coef: f32, c_coef: f32) -> List[f32] = {
+  n_last = sub(cast(len(v_row), i64), 1i64)
   map(fn (entry: (i64, f32)) -> {
     i = entry.0
-    vi = entry.1
-    is_lo = eq(i, cast(0, i64))
-    is_hi = eq(i, n_xm1)
-    if is_lo then vi else if is_hi then vi else {
-      vm = index(v_row, sub(i, cast(1, i64)))
-      vp = index(v_row, add(i, cast(1, i64)))
-      l_v = add(add(mul(a_coef, vm), mul(b_half, vi)), mul(c_coef, vp))
-      add(vi, mul(alpha, l_v))
+    if or(eq(i, 0i64), eq(i, n_last)) then 0.0f32 else {
+      vm = index(v_row, sub(i, 1i64))
+      vp = index(v_row, add(i, 1i64))
+      add(add(mul(a_coef, vm), mul(b_coef, entry.1)), mul(c_coef, vp))
     }
-  }, enum_pairs)
+  }, enumerate(v_row))
 }
 def pde_adi_transpose(v_2d: List[List[f32]], n_outer: i64, n_inner: i64) -> List[List[f32]] = {
-  idxs_outer = 0
-    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(n_outer)))
-  rows = map(fn (i: i64) -> index(v_2d, i), idxs_outer)
-  idxs_inner = 0
-    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(n_inner)))
-  map(fn (j: i64) -> map(fn (row: List[f32]) -> index(row, j), rows), idxs_inner)
+  rows = map(fn (i: i64) -> index(v_2d, i), range(0i64, n_outer))
+  map(fn (j: i64) -> map(fn (row: List[f32]) -> index(row, j), rows), range(0i64, n_inner))
 }
-def pde_adi_apply_along_x2_2d(v_2d: List[List[f32]], a2: f32, b2_half: f32, c2: f32, alpha: f32) -> List[List[f32]] = map(fn (row: List[f32]) -> pde_adi_apply_1d(row, a2, b2_half, c2, alpha), v_2d)
-def pde_adi_apply_along_x1_2d(v_2d: List[List[f32]], a1: f32, b1_half: f32, c1: f32, alpha: f32, n_x1: i64, n_x2: i64) -> List[List[f32]] = {
-  v_t = pde_adi_transpose(v_2d, n_x1, n_x2)
-  v_t_after = map(fn (col: List[f32]) -> pde_adi_apply_1d(col, a1, b1_half, c1, alpha), v_t)
-  pde_adi_transpose(v_t_after, n_x2, n_x1)
+def pde_adi_apply_rows(v: List[List[f32]], op: (f32, f32, f32)) -> List[List[f32]] = {
+  last = sub(cast(len(v), i64), 1i64)
+  map(fn (entry: (i64, List[f32])) -> if or(eq(entry.0, 0i64), eq(entry.0, last)) then map(fn (x: f32) -> 0.0f32, entry.1) else pde_adi_apply_1d(entry.1, op.0, op.1, op.2), enumerate(v))
 }
-def pde_adi_solve_along_x2_2d(v_2d: List[List[f32]], a2: f32, b2_half: f32, c2: f32, alpha_lhs: f32, n_x2: i64) -> List[List[f32]] = {
-  lhs_triple = pde_build_lhs(a2, b2_half, c2, alpha_lhs, n_x2)
-  lower_lhs = lhs_triple.0
-  diag_lhs = lhs_triple.1
-  upper_lhs = lhs_triple.2
-  map(fn (row: List[f32]) -> pde_thomas_solve(lower_lhs, diag_lhs, upper_lhs, row, n_x2), v_2d)
+def pde_adi_apply_x1(v: List[List[f32]], op: (f32, f32, f32), n_x1: i64, n_x2: i64) -> List[List[f32]] = {
+  cols = pde_adi_transpose(v, n_x1, n_x2)
+  pde_adi_transpose(pde_adi_apply_rows(cols, op), n_x2, n_x1)
 }
-def pde_adi_solve_along_x1_2d(v_2d: List[List[f32]], a1: f32, b1_half: f32, c1: f32, alpha_lhs: f32, n_x1: i64, n_x2: i64) -> List[List[f32]] = {
-  lhs_triple = pde_build_lhs(a1, b1_half, c1, alpha_lhs, n_x1)
-  lower_lhs = lhs_triple.0
-  diag_lhs = lhs_triple.1
-  upper_lhs = lhs_triple.2
-  v_t = pde_adi_transpose(v_2d, n_x1, n_x2)
-  v_t_after = map(fn (col: List[f32]) -> pde_thomas_solve(lower_lhs, diag_lhs, upper_lhs, col, n_x1), v_t)
-  pde_adi_transpose(v_t_after, n_x2, n_x1)
+def pde_adi_solve_rows(v: List[List[f32]], op: (f32, f32, f32), alpha: f32, n_inner: i64) -> List[List[f32]] = {
+  lhs = pde_build_lhs(op.0, op.1, op.2, alpha, n_inner)
+  last = sub(cast(len(v), i64), 1i64)
+  map(fn (entry: (i64, List[f32])) -> if or(eq(entry.0, 0i64), eq(entry.0, last)) then entry.1 else pde_thomas_solve(lhs.0, lhs.1, lhs.2, entry.1, n_inner), enumerate(v))
 }
-def pde_adi_cross_apply_2d(v_2d: List[List[f32]], cross_coef: f32, dt: f32, dx1: f32, dx2: f32, n_x1: i64, n_x2: i64) -> List[List[f32]] = {
-  n_x1m1 = sub(n_x1, cast(1, i64))
-  n_x2m1 = sub(n_x2, cast(1, i64))
-  denom = 4.0
-    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, f32) |> mul(mul(dx1, dx2))))
-  rows_enum = enumerate(v_2d)
-  map(fn (re: (i64, List[f32])) -> {
-    i = re.0
-    row_i = re.1
-    is_lo1 = eq(i, cast(0, i64))
-    is_hi1 = eq(i, n_x1m1)
-    if is_lo1 then row_i else if is_hi1 then row_i else {
-      row_p = index(v_2d, add(i, cast(1, i64)))
-      row_m = index(v_2d, sub(i, cast(1, i64)))
-      cells_enum = enumerate(row_i)
-      map(fn (ce: (i64, f32)) -> {
-        j = ce.0
-        v_here = ce.1
-        is_lo2 = eq(j, cast(0, i64))
-        is_hi2 = eq(j, n_x2m1)
-        if is_lo2 then v_here else if is_hi2 then v_here else {
-          v_pp = index(row_p, add(j, cast(1, i64)))
-          v_pm = index(row_p, sub(j, cast(1, i64)))
-          v_mp = index(row_m, add(j, cast(1, i64)))
-          v_mm = index(row_m, sub(j, cast(1, i64)))
-          cross_d2 = div(sub(add(v_pp, v_mm), add(v_pm, v_mp)), denom)
-          add(v_here, mul(dt, mul(cross_coef, cross_d2)))
+def pde_adi_solve_x1(v: List[List[f32]], op: (f32, f32, f32), alpha: f32, n_x1: i64, n_x2: i64) -> List[List[f32]] = {
+  cols = pde_adi_transpose(v, n_x1, n_x2)
+  pde_adi_transpose(pde_adi_solve_rows(cols, op, alpha, n_x1), n_x2, n_x1)
+}
+def pde_adi_add_scaled(v: List[List[f32]], w: List[List[f32]], alpha: f32) -> List[List[f32]] = map(fn (rows: (List[f32], List[f32])) -> map(fn (cells: (f32, f32)) -> add(cells.0, mul(alpha, cells.1)), zip(rows.0, rows.1)), zip(v, w))
+def pde_adi_cross(v: List[List[f32]], cross_coef: f32, dx1: f32, dx2: f32, n_x1: i64, n_x2: i64) -> List[List[f32]] = {
+  denom = mul(4.0f32, mul(dx1, dx2))
+  map(fn (entry: (i64, List[f32])) -> {
+    i = entry.0
+    if or(eq(i, 0i64), eq(i, sub(n_x1, 1i64))) then map(fn (x: f32) -> 0.0f32, entry.1) else {
+      row_p = index(v, add(i, 1i64))
+      row_m = index(v, sub(i, 1i64))
+      map(fn (cell: (i64, f32)) -> {
+        j = cell.0
+        if or(eq(j, 0i64), eq(j, sub(n_x2, 1i64))) then 0.0f32 else {
+          v_pp = index(row_p, add(j, 1i64))
+          v_pm = index(row_p, sub(j, 1i64))
+          v_mp = index(row_m, add(j, 1i64))
+          v_mm = index(row_m, sub(j, 1i64))
+          mul(cross_coef, div(sub(add(v_pp, v_mm), add(v_pm, v_mp)), denom))
         }
-      }, cells_enum)
+      }, enumerate(entry.1))
     }
-  }, rows_enum)
+  }, enumerate(v))
 }
-def pde_spread_option_adi(s1_0: f32, s2_0: f32, k: f32, r: f32, q1: f32, q2: f32, sigma1: f32, sigma2: f32, rho: f32, t: f32, n_x1: i64, n_x2: i64, n_t: i64) -> f32 = {
-  s_max_mult_1 = cast(2.0, f32)
-  s_max_mult_2 = cast(2.0, f32)
-  gp1 = pde_log_grid_params(s1_0, s_max_mult_1, n_x1)
-  gp2 = pde_log_grid_params(s2_0, s_max_mult_2, n_x2)
-  x_min_1 = gp1.0
-  dx1 = gp1.1
-  x_min_2 = gp2.0
-  dx2 = gp2.1
+def pde_adi_boundary_grid(s1s: List[f32], s2s: List[f32], k: f32, r: f32, q1: f32, q2: f32, tau: f32) -> List[List[f32]] = {
+  disc_q1 = exp(neg(mul(q1, tau)))
+  disc_q2 = exp(neg(mul(q2, tau)))
+  disc_k = mul(k, exp(neg(mul(r, tau))))
+  map(fn (s1: f32) -> {
+    s1_disc = mul(s1, disc_q1)
+    map(fn (s2: f32) -> pde_max(sub(sub(s1_disc, mul(s2, disc_q2)), disc_k), 0.0f32), s2s)
+  }, s1s)
+}
+def pde_adi_set_boundary(v: List[List[f32]], boundary: List[List[f32]], n_x1: i64, n_x2: i64) -> List[List[f32]] =
+  map(fn (entry: (i64, (List[f32], List[f32]))) -> {
+    i = entry.0
+    rows = entry.1
+    if or(eq(i, 0i64), eq(i, sub(n_x1, 1i64))) then rows.1 else map(fn (cell: (i64, (f32, f32))) -> {
+      j = cell.0
+      values = cell.1
+      if or(eq(j, 0i64), eq(j, sub(n_x2, 1i64))) then values.1 else values.0
+    }, enumerate(zip(rows.0, rows.1)))
+  }, enumerate(zip(v, boundary)))
+-- Craig-Sneyd is MCS at theta=1/2. The complete mixed derivative enters
+-- the Euler predictor, then its trapezoidal correction uses the predicted
+-- end state. Unlike applying half_dt once, its dt->0 limit is
+-- A0+A1+A2. Boundary source terms are carried by old/new perimeter values.
+def pde_adi_step(v: List[List[f32]], op1: (f32, f32, f32), op2: (f32, f32, f32), cross_coef: f32, dx1: f32, dx2: f32, n_x1: i64, n_x2: i64, boundary_next: List[List[f32]], dt: f32, damped: bool) -> List[List[f32]] = {
+  a0_v = pde_adi_cross(v, cross_coef, dx1, dx2, n_x1, n_x2)
+  a1_v = pde_adi_apply_x1(v, op1, n_x1, n_x2)
+  a2_v = pde_adi_apply_rows(v, op2)
+  alpha = if damped then dt else mul(0.5f32, dt)
+  y0_raw = pde_adi_add_scaled(pde_adi_add_scaled(pde_adi_add_scaled(v, a0_v, dt), a1_v, dt), a2_v, dt)
+  y0 = pde_adi_set_boundary(y0_raw, boundary_next, n_x1, n_x2)
+  rhs1 = pde_adi_set_boundary(pde_adi_add_scaled(y0, a1_v, neg(alpha)), boundary_next, n_x1, n_x2)
+  y1 = pde_adi_solve_x1(rhs1, op1, alpha, n_x1, n_x2)
+  rhs2 = pde_adi_set_boundary(pde_adi_add_scaled(y1, a2_v, neg(alpha)), boundary_next, n_x1, n_x2)
+  y2 = pde_adi_solve_rows(rhs2, op2, alpha, n_x2)
+  if damped then y2 else {
+    a0_y2 = pde_adi_cross(y2, cross_coef, dx1, dx2, n_x1, n_x2)
+    corrected = pde_adi_add_scaled(pde_adi_add_scaled(y0, a0_y2, alpha), a0_v, neg(alpha))
+    corrected_rhs1 = pde_adi_set_boundary(pde_adi_add_scaled(corrected, a1_v, neg(alpha)), boundary_next, n_x1, n_x2)
+    corrected_y1 = pde_adi_solve_x1(corrected_rhs1, op1, alpha, n_x1, n_x2)
+    corrected_rhs2 = pde_adi_set_boundary(pde_adi_add_scaled(corrected_y1, a2_v, neg(alpha)), boundary_next, n_x1, n_x2)
+    pde_adi_solve_rows(corrected_rhs2, op2, alpha, n_x2)
+  }
+}
+def pde_adi_log_half_width(sigma: f32, r: f32, q: f32, t: f32) -> f32 = {
+  sigma_sq = mul(sigma, sigma)
+  drift = sub(sub(r, q), mul(0.5f32, sigma_sq))
+  abs_drift = if lt(drift, 0.0f32) then neg(drift) else drift
+  moment_shift = mul(sigma_sq, t)
+  diffusion_width = mul(6.0f32, mul(sigma, sqrt(t)))
+  pde_max(log(2.0f32), add(add(mul(abs_drift, t), moment_shift), diffusion_width))
+}
+-- Private width inputs support domain-refinement probes without growing the
+-- public API. The wrapper always uses the automatic six-sigma widths.
+def pde_adi_spread_driver(s1_0: f32, s2_0: f32, k: f32, r: f32, q1: f32, q2: f32, sigma1: f32, sigma2: f32, rho: f32, t: f32, n_x1: i64, n_x2: i64, n_t: i64, width1: f32, width2: f32) -> f32 = {
+  x_min_1 = sub(log(s1_0), width1)
+  dx1 = div(mul(2.0f32, width1), cast(sub(n_x1, 1i64), f32))
+  x_min_2 = sub(log(s2_0), width2)
+  dx2 = div(mul(2.0f32, width2), cast(sub(n_x2, 1i64), f32))
   xs1 = pde_grid_x(x_min_1, dx1, n_x1)
   xs2 = pde_grid_x(x_min_2, dx2, n_x2)
-  half_r = mul(pde_half(), r)
-  op1 = pde_op_coeffs(sigma1, r, q1, dx1)
-  op2 = pde_op_coeffs(sigma2, r, q2, dx2)
-  a1 = op1.0
-  b1_full = op1.1
-  c1 = op1.2
-  a2 = op2.0
-  b2_full = op2.1
-  c2 = op2.2
-  b1_half = add(b1_full, half_r)
-  b2_half = add(b2_full, half_r)
+  s1s = map(fn (x: f32) -> exp(x), xs1)
+  s2s = map(fn (x: f32) -> exp(x), xs2)
+  raw_op1 = pde_op_coeffs(sigma1, r, q1, dx1)
+  raw_op2 = pde_op_coeffs(sigma2, r, q2, dx2)
+  half_r = mul(0.5f32, r)
+  op1 = (raw_op1.0, add(raw_op1.1, half_r), raw_op1.2)
+  op2 = (raw_op2.0, add(raw_op2.1, half_r), raw_op2.2)
   cross_coef = mul(rho, mul(sigma1, sigma2))
   v_init = pde_adi_payoff_spread_2d(xs1, xs2, k)
   dt = div(t, cast(n_t, f32))
-  half_dt = mul(pde_half(), dt)
-  step_idxs = 0
-    |> (fn (__chelis_pipe) -> (cast(__chelis_pipe, i64) |> range(n_t)))
-  v_final = fold(fn (v_acc: List[List[f32]], n: i64) -> {
-    is_rannacher = lt(n, cast(2, i64))
-    alpha_lhs_step = if is_rannacher then dt else half_dt
-    alpha_rhs_step = if is_rannacher then pde_zero() else half_dt
-    v_with_cross = pde_adi_cross_apply_2d(v_acc, cross_coef, half_dt, dx1, dx2, n_x1, n_x2)
-    rhs_a = pde_adi_apply_along_x2_2d(v_with_cross, a2, b2_half, c2, alpha_rhs_step)
-    v_half = pde_adi_solve_along_x1_2d(rhs_a, a1, b1_half, c1, alpha_lhs_step, n_x1, n_x2)
-    rhs_b = pde_adi_apply_along_x1_2d(v_half, a1, b1_half, c1, alpha_rhs_step, n_x1, n_x2)
-    pde_adi_solve_along_x2_2d(rhs_b, a2, b2_half, c2, alpha_lhs_step, n_x2)
-  }, v_init, step_idxs)
+  half_dt = mul(0.5f32, dt)
+  v_final = fold(fn (v: List[List[f32]], n: i64) -> {
+    tau_old = mul(cast(n, f32), dt)
+    tau_next = mul(cast(add(n, 1i64), f32), dt)
+    boundary_next = pde_adi_boundary_grid(s1s, s2s, k, r, q1, q2, tau_next)
+    if lt(n, 2i64) then {
+      tau_half = add(tau_old, half_dt)
+      boundary_half = pde_adi_boundary_grid(s1s, s2s, k, r, q1, q2, tau_half)
+      half = pde_adi_step(v, op1, op2, cross_coef, dx1, dx2, n_x1, n_x2, boundary_half, half_dt, true)
+      pde_adi_step(half, op1, op2, cross_coef, dx1, dx2, n_x1, n_x2, boundary_next, half_dt, true)
+    } else pde_adi_step(v, op1, op2, cross_coef, dx1, dx2, n_x1, n_x2, boundary_next, dt, false)
+  }, v_init, range(0i64, n_t))
   log_s1 = log(s1_0)
   log_s2 = log(s2_0)
   x1_0 = index(xs1, cast(0, i64))
@@ -368,3 +388,9 @@ def pde_spread_option_adi(s1_0: f32, s2_0: f32, k: f32, r: f32, q1: f32, q2: f32
   v_h = w2_lo |> mul(v_hl) |> add(mul(w2_hi, v_hh))
   w1_lo |> mul(v_l) |> add(mul(w1_hi, v_h))
 }
+def pde_spread_option_adi(s1_0: f32, s2_0: f32, k: f32, r: f32, q1: f32, q2: f32, sigma1: f32, sigma2: f32, rho: f32, t: f32, n_x1: i64, n_x2: i64, n_t: i64) -> f32 =
+  if eq(t, 0.0f32) then pde_max(sub(sub(s1_0, s2_0), k), 0.0f32) else {
+    width1 = pde_adi_log_half_width(sigma1, r, q1, t)
+    width2 = pde_adi_log_half_width(sigma2, r, q2, t)
+    pde_adi_spread_driver(s1_0, s2_0, k, r, q1, q2, sigma1, sigma2, rho, t, n_x1, n_x2, n_t, width1, width2)
+  }

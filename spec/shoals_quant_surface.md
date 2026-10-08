@@ -256,7 +256,42 @@ GBM paths. Extensions:
   pathwise-where-smooth + likelihood-ratio at the exercise boundary.
 - **PDE methods:** Crank-Nicolson with Rannacher smoothing at the
   payoff discontinuity; ADI for two-dimensional problems (multi-asset
-  or local vol + stochastic vol). **AD approach (spec-pinned):** the
+  or local vol + stochastic vol). The European spread-call surface
+  `pde_spread_option_adi` prices `max(S1-S2-K,0)` in log coordinates with
+  the complete correlated-GBM operator, including
+  `rho*sigma1*sigma2*d2V/(dx1*dx2)` and a total discount term `-r*V`.
+  It uses Craig-Sneyd ADI (the Modified Craig-Sneyd specialization at
+  `theta=1/2`); the first `min(2,n_t)` intervals each use two damped
+  Douglas half steps at `theta=1`. The symmetric log half-width for
+  axis `i` is `max(log(2), abs(r-q_i-sigma_i^2/2)*T + sigma_i^2*T +
+  6*sigma_i*sqrt(T))`. At every implicit-stage time `tau`, the perimeter
+  is `max(S1*exp(-q1*tau)-S2*exp(-q2*tau)-K*exp(-r*tau),0)`.
+  These far-field boundaries are approximate; spatial, temporal, and
+  domain refinement are separate acceptance checks. At `T=0`, the
+  public function returns the intrinsic payoff directly. The existing
+  `f32` signature and bilinear log-grid interpolation are retained.
+  Finite positive spots, nonnegative volatilities and time, correlation
+  in `[-1,1]`, `n_x1,n_x2>=3`, and `n_t>=1` define the numerical input
+  domain; finite rates, yields, and strike can be negative.
+  `tests/pde.ch` exercises both signs of correlation against independent
+  Margrabe values. `tests-manual/pde_heavy.ch` checks the documented
+  spread against the conditional-normal reference at 41x41/50.
+  The manual `scripts/manual_gates/spread_adi_oracle.py` command owns the
+  41/81/161 mesh refinement and its error ratios, with respective absolute
+  allowances 0.10/0.03/0.01. It also executes separate time/domain refinements,
+  rectangular
+  grids, high-volatility stress, near-endpoint correlations, and mixed-operator/
+  boundary mutation controls. Small mixed-term prices must also agree between
+  the evaluator and generated C. The native matrix avoids putting expensive
+  fine-grid evaluation into the evaluator budget.
+  Its success condition is an empty failure list. The heavy evaluator,
+  native matrix, and seeded property checks are opt-in local checks and
+  do not run in CI. `properties/pde.ch` states bounded expiry, exchange-oracle,
+  and price-bound claims with corrupted controls. Exchange sampling uses
+  31x31 above correlation 0.5 and 21x21 otherwise, with 20 time steps
+  and the same 0.4%-of-spot allowance across both branches;
+  seeded sampling is evidence for those declarations, not a proof of the
+  general PDE discretization. **AD approach (spec-pinned):** the
   PDE solver differentiates via reverse-mode AD through the
   time-stepping loop, with the linear solve at each step replaced by
   an implicit-differentiation hook that emits adjoint(A) * v rather
