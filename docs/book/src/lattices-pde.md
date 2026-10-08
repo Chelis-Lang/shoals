@@ -112,9 +112,9 @@ The European put at the same settings is `5.568951`. Choose `s_max_mult`
 large enough that the edges are far from the strike (4 puts them at a
 quarter and four times the spot); `s0` must be positive and
 `s_max_mult` greater than 1, since `s_max_mult = 1` collapses the grid to
-one point and divides by zero. Use `n_x >= 3` and `n_t >= 1`. None of
-this is checked: invalid grid inputs return NaN or a meaningless
-value rather than failing.
+one point and divides by zero. The pricers check `n_x >= 3` and
+`n_t >= 1`, failing with a diagnostic that names the count and its
+received value. The spot and grid-width conditions remain unchecked.
 
 ```chelis
 def pde_spread_option_adi(s1_0: f32, s2_0: f32, k: f32, r: f32, q1: f32, q2: f32, sigma1: f32, sigma2: f32, rho: f32, t: f32, n_x1: i64, n_x2: i64, n_t: i64) -> f32
@@ -151,14 +151,18 @@ needs more spatial points to retain the same spacing.
 
 Use finite positive spots, non-negative volatilities and maturity,
 `rho` in `[-1, 1]`, at least three points per axis, and at least one time
-step. At zero maturity the function returns the intrinsic payoff
-without solving the PDE. Invalid grid inputs are not checked.
+step. The spatial and time counts are checked before constructing the
+grid. At zero maturity the function returns the intrinsic payoff
+without solving the PDE or checking these unused counts. The other
+conditions remain caller obligations.
 
 `pde_thomas_solve` solves the `n_x x n_x` tridiagonal
 system with sub-diagonal `lower`, diagonal `diag`, and super-diagonal
 `upper`, each a `List[f32]` with at least `n_x` entries (`lower[0]` and
 `upper[n_x - 1]` are not read, nor are entries past `n_x`). It returns
-`n_x` values. It does not pivot. It substitutes one when a
+`n_x` values; one- and two-equation systems are valid. The PDE mesh
+minimum of three does not apply to this solver. It does not pivot. It
+substitutes one when a
 pivot's absolute magnitude is below `1e-10`, without a diagnostic, so
 near-singular systems are outside its accuracy contract. The system with
 diagonal 4, off-diagonals 1, and right-hand side `[5, 6, 5]` returns
@@ -178,7 +182,10 @@ allows exercise at time 0 and at each date `i * t / n_steps`, for
 intermediate date it fits the discounted continuation values of the
 in-the-money paths to a quadratic in spot. Each selected cash flow is
 discounted from its exercise date once. The same paths serve for
-regression and valuation.
+regression and valuation. Time steps and log paths are calculated in
+`f64`, including exponentiation, before simulated spots are rounded to
+`f32`. This avoids overflowing `sigma^2` in `f32` when a tiny horizon
+keeps the effective variance moderate.
 
 The fit centers and scales spot values, then solves the least-squares
 problem by QR in `f64`. Continuation values are evaluated in those
@@ -186,27 +193,33 @@ normalized coordinates. A rank-deficient fit uses a linear or constant
 basis. This avoids forming normal equations from spot values and their
 squares, which can lose the quadratic fit in `f32`.
 
-With 2000 paths, seed 21, `s0 = k = 100`, `r = 0.05`, `sigma = 0.2`, and
-`t = 1`, the prices are:
+With five paths, seed 17 and one exercise date, these volatility and
+horizon pairs have nearly the same effective variance `sigma^2 * t`:
 
-| Exercise steps | Price |
-| --- | --- |
-| 1 | 5.651484 |
-| 2 | 5.7318807 |
-| 10 | 6.0377645 |
-| 50 | 6.1672 |
+```chelis
+template = to_tensor([0f32, 0f32, 0f32, 0f32, 0f32])
+ordinary = lsm_american_put(key_from_seed(17i64), copy(template), 100f32, 100f32, 0f32, 1f32, 1f32, 1i64)
+extreme = lsm_american_put(key_from_seed(17i64), template, 100f32, 100f32, 0f32, 1e20f32, 1e-40f32, 1i64)
+-- both approximately 47.41; their difference is less than 0.001
+```
+
+This small sample illustrates the arithmetic comparison. Use more paths
+when estimating a price. The tiny horizon's `f32` rounding gives a small
+difference in effective variance.
 
 These are Monte Carlo estimates. Changing the number of dates also
 changes the simulated paths, so individual estimates need not increase
 with the number of steps or exceed an analytic European price. Using the
 same paths to fit and value the exercise policy also introduces regression
 bias. Several seeds help measure random variation; increase the path
-count to reduce the fitting bias. For this case, a refined
-`tr_crr_american_put` tree gives about `6.09`.
+count to reduce the fitting bias.
 
 Supply at least one path and one step, finite positive `s0` and `k`, a
 finite rate, and finite non-negative `sigma` and `t`. At zero maturity
-the result is the intrinsic payoff. Invalid inputs fail with a diagnostic.
+the result is the intrinsic payoff. Invalid inputs, non-finite simulated
+log paths, and unrepresentable spots or prices fail with a diagnostic.
+A finite negative log price may underflow to a zero spot; that rounding
+is accepted.
 
 `lsm_polynomial_regression` returns the coefficients `(b0, b1, b2)` of
 `y = b0 + b1 * x + b2 * x^2` in the original coordinates. For

@@ -130,13 +130,14 @@ gives `0.6184209`.
 
 ## Input checks
 
-None of these functions validates its inputs. Supply nonnegative, strictly
+`xva_cva_wwr_constant_hazard` requires `n_paths >= 1` and fails with a
+diagnostic naming the received count otherwise. The remaining conditions
+are caller obligations. Supply nonnegative, strictly
 increasing times (a grid point at 0 adds nothing to CVA or DVA and starts
 the FVA and KVA integrals at 0), `time_grid` and exposure tensors of the same length
 (the type requires it for each call), `0 <= recovery <= 1`, a nonnegative
-hazard, and `n_paths >= 1`. Outside that domain the result is a number
-without a diagnostic: a recovery above 1 gives a negative CVA, and
-`n_paths = 0` divides zero by zero and returns NaN. These functions do not
+hazard. An invalid recovery has no diagnostic: a recovery above 1 gives
+a negative CVA. These functions do not
 model a general portfolio netting agreement; see the next section for
 collateral.
 

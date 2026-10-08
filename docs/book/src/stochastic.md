@@ -46,9 +46,11 @@ four = gbm_path(key_from_seed(7i64), to_tensor([cast(0.0, f32), cast(0.0, f32), 
 ```
 
 The terminal draws have theoretical mean `s0 * exp(mu * t)`; a finite sample
-varies around that value. None of the GBM functions checks its inputs:
-supply `s0 > 0` (its logarithm is taken), `sigma >= 0`, and `t >= 0`. An
-empty template gives an empty result from `gbm_path` and `gbm_terminal`, and
+varies around that value. All three GBM functions require a finite,
+non-negative horizon `t` and fail with a diagnostic otherwise. Supply
+`s0 > 0` (its logarithm is taken) and `sigma >= 0`; these conditions are
+not checked. An empty
+template gives an empty result from `gbm_path` and `gbm_terminal`, and
 NaN (zero divided by zero) from `gbm_paths_antithetic_terminal_mean`.
 
 ## Merton jump-diffusion
@@ -224,10 +226,11 @@ Each log jump is up with probability `p`, exponential with rate `eta_up`
 
 - `sto_kou_compensator` is `E[exp(Y)] - 1 =
   p * eta_up / (eta_up - 1) + (1 - p) * eta_dn / (eta_dn + 1) - 1`. The
-  function requires `eta_up > 1`, including when `p = 0`; at
-  `eta_up <= 1` it returns NaN. For `p > 0` that bound is necessary for a
-  finite expectation. At `p = 0` the upward component is unused, but the
-  function still applies the same bound. At `p = 0.4`, `eta_up = 10`,
+  function requires `eta_up > 1` when `p > 0`; otherwise that expectation
+  diverges and the function returns NaN. At exactly `p = 0`, it returns
+  `eta_dn / (eta_dn + 1) - 1`. The upward rate is unused and may be any
+  finite value, including zero. A non-finite upward rate still returns
+  NaN. At `p = 0.4`, `eta_up = 10`,
   `eta_dn = 5` it is `-0.055555522`.
 - `sto_kou_jump_sample` maps a uniform `u_branch` and a unit exponential
   `e_size` to one jump: `e_size / eta_up` if `u_branch < p`, else
@@ -242,6 +245,15 @@ Each log jump is up with probability `p`, exponential with rate `eta_up`
   of paths is the length of `paths_template`; `jumps_template` must have
   the same length and its values are not used.
 
+A pure-downward jump law can use zero for the unused upward rate:
+
+```chelis
+zeta = sto_kou_compensator(0.0f32, 0.0f32, 3.0f32)
+-- -0.25
+jump = sto_kou_jump_sample(0.0f32, 0.0f32, 3.0f32, 0.4f32, 1.5f32)
+-- -0.5
+```
+
 The count table follows the Merton rule above with
 `w = 1 + sto_kou_compensator(p, eta_up, eta_dn)` as the jump multiplier:
 `S = trunc(x + 7 * sqrt(x) + 12)` counts with
@@ -249,11 +261,12 @@ The count table follows the Merton rule above with
 least 12 jump sizes. Both `lambda_jump` and `t` must be finite and
 non-negative, for the moment function as well as the sampler. Zero
 intensity or zero horizon gives a zero log jump moment. A larger count
-bound, a non-finite product, or `eta_up <= 1` raises a runtime `fail`
-(for `eta_up <= 1`: *kou jump parameters must be finite; ... which
-requires eta_up > 1*); the table is never truncated. The terminal mean is finite for `eta_up > 1`, but
-`E[S_T^2]` is finite only for `eta_up > 2`, so for `1 < eta_up <= 2` a
-sample variance does not converge.
+bound, a non-finite product, or `p > 0` with `eta_up <= 1` raises a
+runtime `fail`; the table is never truncated. For a valid downward rate,
+the terminal mean is finite when `p = 0` or `eta_up > 1`. The
+second moment is finite when `p = 0` or `eta_up > 2`. Thus, when `p > 0`
+and `1 < eta_up <= 2`, a sample variance does not converge. At `p = 0`
+there is no upward tail, and both moments are finite for `eta_dn > 0`.
 
 ```chelis
 kpt = to_tensor(map(fn (i: i64) -> cast(0.0, f32), range(cast(0, i64), cast(5000, i64))))

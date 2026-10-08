@@ -60,10 +60,10 @@ Discounting uses `exp(-r * t)` with one continuously compounded rate `r`.
   `(1 - recovery) * DF(midpoint) * (Q(t_{k-1}) - Q(t_k))`.
 - `cds_pv` is protection minus premium: the value to the protection buyer.
 
-Nothing is validated. Supply `t_maturity > 0`, `n_premiums_per_year >= 1`,
-and `0 <= recovery <= 1`. A frequency of 0 builds no payment dates, so the
-premium leg is silently 0; a recovery above 1 makes the protection leg
-negative.
+The premium leg and `cds_pv` require `n_premiums_per_year >= 1` and fail
+with a diagnostic naming the received frequency otherwise. Supply
+`t_maturity > 0` and `0 <= recovery <= 1`; these conditions are not
+checked. A recovery above 1 makes the protection leg negative.
 
 ```chelis
 prem = cds_premium_leg_value(cast(0.01, f32), cast(5.0, f32), cast(4, i64), curve, cast(0.03, f32))  -- 0.044187766
@@ -83,7 +83,9 @@ strictly increasing positive tenors, with `0 <= recovery < 1` and
 solves one hazard per tenor, in order, holding the earlier hazards fixed, so
 that `cds_pv` at that tenor is zero. It checks tenor ordering before solving
 any pillar and fails the same way as `hazard_curve_from_pillars`, naming
-`Shoals.Cds.cds_bootstrap_hazards`.
+`Shoals.Cds.cds_bootstrap_hazards`. A nonempty bootstrap also checks the
+payment frequency when it values each pillar. Empty spread and tenor
+tensors produce an empty curve without reading the frequency.
 
 Each pillar is solved by Brent's method over hazards in `[1e-6, 2.0]`, to a
 tolerance of `1e-6` within 100 iterations. A spread whose hazard falls

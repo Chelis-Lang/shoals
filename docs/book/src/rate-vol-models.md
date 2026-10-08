@@ -155,7 +155,8 @@ Supply `u_max > 0` large enough that the integrand has decayed (100 in the
 examples), `n_panels >= 1` (each panel is one 10-point rule, so the panel
 width `u_max / n_panels` should stay a few units), and for Carr-Madan a
 damping `alpha > 0` for which `E[S_T^(alpha + 1)]` is finite; 1.5 is
-typical. `n_panels = 0` integrates nothing and returns a meaningless price.
+typical. All `_panels` calls and puts check `n_panels >= 1` and fail
+with a diagnostic naming the received count otherwise.
 `heston_call_carr_madan_panels` is the Carr-Madan damped transform with
 damping `alpha` (1.5 is typical); `heston_call_lipton_panels` is the
 two-probability form `s0 * P1 - k * exp(-r * t) * P2`. Each `_panels` call
