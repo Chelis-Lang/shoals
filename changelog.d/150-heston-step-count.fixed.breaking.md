@@ -14,7 +14,9 @@ zero-length evolution, so refusing `n_steps < 1` takes no reachable correct
 answer away: a caller who wants s0 passes a zero horizon with any valid step
 count and still gets it.
 
-The horizon guard added in shoals#139 did not and could not reach this. It
-validates `t`, which is legal here, and `dt = t / n_steps` is `+inf` at
-`n_steps = 0` but has no consumer that ever runs, so a finiteness check on
-`dt` would surface nothing.
+The horizon guard added in shoals#139 did not and could not reach this: it
+validates `t`, which is legal here. A finiteness check on the derived `dt` is
+not a substitute either. Adding one would catch `n_steps = 0`, where `dt` is
+`+inf`, but not a negative count, where `t / -8` is finite and the empty step
+range still returns the initial state silently. Guarding `n_steps` itself
+covers both.

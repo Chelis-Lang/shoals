@@ -13,9 +13,12 @@ tell the cases apart, so the refused rows are not an artifact of a tolerance.
 
 Why a horizon check could not cover this: a step count is a separate
 precondition one parameter over, and `t = 1.0` is a perfectly legal horizon.
-`dt = t / n_steps` is `+inf` at `n_steps = 0`, but at `n_steps <= 0` the step
-range is empty and `dt` has no consumer that ever runs, so a finiteness check
-on `dt` would surface nothing. The guard has to key on `n_steps` itself.
+A finiteness check on the derived `dt` is not a substitute either, for a
+narrower reason than it first appears: adding such a check CREATES a consumer
+for `dt`, so it does catch `n_steps = 0`, where `dt` is `+inf`. It does not
+catch a negative count, where `t / -8` is finite and the empty step range
+still returns the initial state silently. The guard has to key on `n_steps`
+itself to cover both.
 
 What this fixture does NOT assert: it does not pin the other warrant, which
 has its own file, and it does not pin what stays admitted. `n_steps = 1` is

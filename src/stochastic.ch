@@ -70,12 +70,18 @@ def checked_horizon(t: f32) -> f32 = if not(horizon_finite(t)) then fail("Shoals
 -- `n_steps = -8` both returned 100.00001 for the terminal spot and 0.04 for
 -- the terminal variance, while `n_steps = 64` returned 146.3306.
 --
--- A finiteness check on `dt` would NOT see this, which is the horizon guard's
--- own lesson arriving from the other side. `dt = t / n_steps` is `+inf` at
--- `n_steps = 0` and NaN at `t = 0, n_steps = 0`, but at `n_steps <= 0` it has
--- no consumer that ever runs, so nothing surfaces it. Guard the INPUT, not
--- the derived value: there the derived value was a product that destroyed a
--- sign, here it is a quotient whose non-finiteness is unreachable.
+-- A finiteness check on `dt` is not a substitute, and the reason is narrower
+-- than it first looks. `dt = t / n_steps` is `+inf` at `n_steps = 0` and NaN
+-- at `t = 0, n_steps = 0`; the shipped code never consumes it, but ADDING a
+-- finiteness check creates the consumer, so such a check does catch
+-- `n_steps = 0`. It does not catch a NEGATIVE count: `t / -8` is finite, the
+-- fold range is still empty, and the sampler returns `(log_s0, v0, v0)`
+-- silently. Measured by building that exact mutant: the two zero fixtures
+-- died because the `dt` check fired with the wrong diagnostic, and the two
+-- negative fixtures died because it never fired at all. Guarding the INPUT
+-- covers both with one check. That is still the horizon guard's lesson from
+-- the other side -- there the derived value was a product that destroyed a
+-- sign, here it is a quotient that is only diagnostic for half the domain.
 --
 -- Zero and negative are refused TOGETHER but on different warrants, and the
 -- fixtures separate them so the zero decision can be revisited without

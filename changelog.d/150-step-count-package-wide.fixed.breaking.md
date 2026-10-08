@@ -6,9 +6,11 @@ returned `r0` and `(x0, y0)`, both SABR samplers returned `f0`, and `lmm_path`
 returned the initial forward curve -- at every path, for a horizon over which
 the process really did evolve.
 
-`Shoals.Trees` failed harder and is the reason the fix is package-wide rather
-than Heston-only. With no layer to roll back, every pricer returned a flat
-`0.0` regardless of moneyness -- not the intrinsic value. Measured at
+`Shoals.Trees` failed harder, and is the reason the fix reaches beyond the
+Heston pair. Its ten pricers form `dt = t / n_steps`, so a zero step count
+divides the horizon by zero; the non-finite step poisons the lattice's up and
+down log-moves and the terminal node prices collapse to a flat `0.0`
+regardless of moneyness -- not the intrinsic value. Measured at
 s0 = 100, r = 0.05, q = 0, sigma = 0.2, t = 1.0: a K = 90 call priced at
 `0.0` against 16.69197 at `n_steps = 64` and an intrinsic of 10, and a K = 110
 American put priced at `0.0` against 11.964398. A negative count already
@@ -29,3 +31,14 @@ a later tightening cannot quietly take it away.
 `Shoals.Lsm.lsm_american_put` takes a step count and is deliberately
 unchanged: it already fails loudly at `n_steps <= 0` and returns no plausible
 wrong number.
+
+Two other families are NOT covered by this change and still return a plausible
+number for a degenerate count. `Shoals.Pde`'s time-step count `n_t` is the
+same mechanism: `pde_european_call_cn` at `s0 = 100`, `K = 90`, `t = 1.0`
+returns `10.015209` at both `n_t = 0` and `n_t = -8`, against `16.730183` at
+`n_t = 20`, and `pde_american_put_cn` at `K = 110` returns `9.984791` at
+`n_t = 0` against `11.933073`. `Shoals.Heston`'s quadrature panel count
+`n_panels` behaves likewise: `heston_call_lewis_panels` returns `100.0`, the
+spot, at `n_panels = 0` against `23.196457` at 20, and
+`heston_call_carr_madan_panels` returns `0.0` against `16.986883`. Both are
+left for separate work rather than folded in here.

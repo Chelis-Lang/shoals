@@ -14,10 +14,14 @@ returned 146.3306. The control matters: it shows a probe can tell the cases
 apart, so the first two rows are not an artifact of an assertion's tolerance.
 
 Why the horizon guard could not cover this: checked_horizon validates `t`, and
-`t = 1.0` is legal. `dt = t / n_steps` is `+inf` at `n_steps = 0`, but at
-`n_steps <= 0` the step range is empty and `dt` has no consumer that ever
-runs, so a finiteness check on `dt` would surface nothing. The guard has to
-key on `n_steps` itself. Guarding the INPUT rather than a derived value is the
+`t = 1.0` is legal. A finiteness check on the derived `dt` is not a substitute
+either, though for a narrower reason than it first appears: adding such a
+check CREATES a consumer for `dt`, so it does catch `n_steps = 0`, where `dt`
+is `+inf`. It does not catch a negative count, where `t / -8` is finite and
+the empty step range still returns the initial state silently. Measured by
+building that mutant: the zero fixtures died on a wrong diagnostic and the
+negative fixtures died because the check never fired. The guard has to key on
+`n_steps` itself to cover both. Guarding the INPUT rather than a derived value is the
 horizon guard's own lesson arriving from the other side: there the derived
 value was a product that destroyed a sign, here it is a quotient whose
 non-finiteness is unreachable.

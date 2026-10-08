@@ -17,16 +17,22 @@ Measured on the unguarded tree at s0 = 100, r = 0.05, q = 0, sigma = 0.2,
 t = 1.0: `n_steps = 0` returned 0.0 while `n_steps = 64` returned 5.5424414; `n_steps = -8` aborted with `index 0 out of bounds for list of len 0`.
 
 This fixture reaches tr_crr_european_put, and it pins THAT function's guard
-site -- not tr_binom_european_put_generic's, which is what an earlier draft of
-this rationale claimed. A per-site mutation sweep refuted the claim: the two
-guards sit in series, tr_crr_european_put's own check fires first, and
-unguarding either one ALONE leaves this fixture green while unguarding both is
-killed. Two identical guards in series cannot be told apart by behaviour,
-because they emit the same diagnostic, so no fixture can pin them
-individually. Both are kept because each is independently justified -- the
-pricer's sits inside the stochastic branch for the sub-floor reason below, and
-the generic's is needed because tr_binom_european_call_generic is exported --
-and not because the suite can distinguish them. It carries the NEGATIVE
+site, not tr_binom_european_put_generic's. An earlier draft of this rationale
+claimed the two were indistinguishable because they emitted the same
+diagnostic. That was true when both were `< 1` step-count guards; it stopped
+being true in this same change set, once the generic was narrowed to a
+lattice-depth guard with its own message. Measured at this head: unguarding
+tr_crr_european_put alone IS caught here, as WRONG-DIAGNOSTIC, because the
+generic then refuses with the lattice-depth text instead. Unguarding
+tr_binom_european_put_generic alone is not caught by anything, and cannot be:
+it is not exported, and every path to it runs a pricer's step-count guard
+first.
+
+A consequence worth stating, because it is not obvious: being caught as
+WRONG-DIAGNOSTIC means the ZERO boundary at tr_crr_european_put is pinned by
+this file's TEXT rather than by its behaviour, so a weakening that preserved
+the message would survive. tr_crr_european_put therefore has its own zero-step
+fixture beside this one. It carries the NEGATIVE
 warrant: before the guard a negative step count already failed, but
 with `index 0 out of bounds for list of len 0`, which names an index rather
 than the precondition a caller violated. The guard replaces a leaked internal

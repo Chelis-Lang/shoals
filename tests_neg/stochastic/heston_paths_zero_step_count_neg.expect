@@ -10,9 +10,12 @@ Measured on the unguarded tree at s0 = 100, v0 = 0.04, t = 1.0, n = 8, seed 7:
 path, `n_steps = -8` summed to the same, and `n_steps = 64` summed to 859.222.
 
 Why the horizon guard could not cover this: checked_horizon validates `t`, and
-`t = 1.0` is legal. `dt = t / n_steps` is `+inf` at `n_steps = 0`, but at
-`n_steps <= 0` every step range is empty and `dt` has no consumer that ever
-runs, so a finiteness check on `dt` would surface nothing.
+`t = 1.0` is legal. A finiteness check on the derived `dt` is not a substitute
+either, for a narrower reason than it first appears: adding such a check
+CREATES a consumer for `dt`, so it does catch `n_steps = 0`, where `dt` is
+`+inf`. It does not catch a negative count, where `t / -8` is finite and every
+step range is still empty, so the sampler returns s0 at every path silently.
+The guard has to key on `n_steps` itself to cover both.
 
 This entry point is not covered by the single-path fixture even though both
 call the same guard. It builds its own `n_paths * n_steps` draw template and

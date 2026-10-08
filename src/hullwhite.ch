@@ -44,10 +44,16 @@ def hw1f_step(r: f32, a: f32, theta_bar: f32, sigma: f32, dt: f32, z: f32) -> f3
 -- at `n_steps = 64`; `hw2f_path` at x0 = 0.02, y0 = 0.01 summed its first leg
 -- to 0.16 for `n_steps = 0` against 0.12615834 at `n_steps = 64`.
 --
--- A finiteness check on the derived `dt = t / n_steps` would NOT catch this:
--- `dt` is `+inf` at `n_steps = 0`, but at `n_steps <= 0` the step range is
--- empty and `dt` has no consumer that ever runs, so nothing surfaces it.
--- Guard the input, not the derived value.
+-- A finiteness check on the derived `dt = t / n_steps` is not a substitute,
+-- and the reason is narrower than it first looks. Adding such a check CREATES
+-- a consumer for `dt`, so it does catch `n_steps = 0`, where `dt` is `+inf`.
+-- It does not catch a NEGATIVE count: `t / -8` is finite, the step range is
+-- still empty, and the sampler returns its initial state silently. Measured
+-- by building that exact mutant on the Heston pair: the two zero fixtures
+-- died because the `dt` check fired with the wrong diagnostic, and the two
+-- negative fixtures died because it never fired at all. Guarding the input
+-- covers both cases with one check and names the parameter the caller got
+-- wrong.
 --
 -- `n_steps = 0` is refused rather than documented as the identity. It is a
 -- resolution parameter, not a modelled quantity: `n_steps = 1` is a crude
