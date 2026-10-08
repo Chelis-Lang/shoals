@@ -11,7 +11,7 @@ The `pkg_version` and `chelis_pin` fields identify the package and compiler
 version; `reef.toml` declares this checkout's compiler and dependency versions.
 Compare those versions when checking a particular release.
 
-The manifest names models, the properties checked for them, the expected verification method, and the dependencies that the compiler must attribute to each check. The expected method is a requirement for the release gate, not a claim that every mathematical input has been proved. A `fuzz_validated` result covers accepted samples under declared seeds and constraints. Some small arithmetic models have SMT-backed results. Certified-box and global differentiation claims are separate from the sampled automatic-differentiation comparisons.
+The manifest names models, the properties checked for them, the expected verification method, and the dependencies that the compiler must attribute to each check. The expected method is enforced by the optional local characterization runner when requested, not a claim that every mathematical input has been proved. A `fuzz_validated` result covers accepted samples under declared seeds and constraints. Some small arithmetic models have SMT-backed results. Certified-box and global differentiation claims are separate from the sampled automatic-differentiation comparisons.
 
 ## Pricing and Greeks
 
@@ -23,4 +23,4 @@ The composite property checks under `Shoals.Properties.Composites` use contracts
 
 The manifest separates parametric Gaussian and historical empirical-quantile VaR/expected-shortfall checks. Each family has sampled confidence-monotonicity, dominance, and positive-loss properties. `properties/` contains the checkable predicates and `demos/` contains wrong models and controls. See [Property specifications](book/src/properties.md) and [Counterexample demos](book/src/demos.md) for interpretation.
 
-For the exact release method, constraints, dependency edges, and test inputs, inspect the manifest and the targeted checks in `scripts/prove_gate.py`. Do not infer a stronger result from a green test than its recorded method supports.
+For the recorded method, constraints, dependency edges, and test inputs, inspect the manifest and the targeted checks in `scripts/prove_gate.py`. Do not infer a stronger result from a green test than its recorded method supports.

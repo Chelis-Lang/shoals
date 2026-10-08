@@ -49,11 +49,11 @@ Current verdict for shoals#37: active at `fuzz_validated`. The parametric
 inverse-CDF and historical empirical-quantile families are distinct. Each
 covers confidence monotonicity, ES dominance, and positivity against the real
 exported bodies over 25 accepted constraint-directed samples at seeds 0, 1,
-and 2. Corrupt twins fail with in-domain witnesses. The release gate consumes
+and 2. Corrupt twins fail with in-domain witnesses. The optional local characterization runner consumes
 only compiler-owned dependency edges and requires both function edges in each
 ES/VaR relation; no dependency is reconstructed from source text.
 
-Evidence boundary: the 0.24.5 release gate reproduces these observations
+Evidence boundary: the 0.24.5 release gate reproduced these observations
 against the official, sidecar-verified Chelis 0.18.1 / Nautilus 0.7.38 /
 Coral 0.7.35 chain. The `fuzz_validated` tier is sampled characterization and
 does not promote either family to a global proof.
@@ -77,10 +77,12 @@ references. Update `docs/book/src/demos.md`.
   witness.
 - Each tier claim is backed by a dischargeability probe against the shipped
   shell corpus.
-- Nothing carries a tier the gate cannot confirm.
-- Release evidence runs against published chelis and published shell artifacts.
-  Local pre-release probes may inform preparation, but are labeled candidate
-  evidence and never satisfy the release acceptance gate.
+- Recorded tiers name their observed method and inputs. Adding a gate or a
+  declaration does not supply evidence of a new run.
+- Optional local characterization runs use published compiler/dependency
+  artifacts and name the exact Shoals source or artifact tested. Candidate and
+  published-artifact evidence remain distinct. Long characterization is not a
+  hosted, merge, or release acceptance blocker.
 
 ## Verification
 

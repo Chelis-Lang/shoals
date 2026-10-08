@@ -68,5 +68,6 @@ A non-zero exit code or a missing `PASS` line indicates regression.
 ## Status
 
 Manual gate. Not invoked by `chelis test tests/` and not run on
-every push. Run before any release tag whose pitch includes the
-"callable from Python" claim.
+every push. Run locally when choosing to refresh the
+"callable from Python" evidence, recording the exact pinned versions.
+It is an optional tool, not a push, merge, or release blocker.

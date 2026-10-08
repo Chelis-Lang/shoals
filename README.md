@@ -42,6 +42,20 @@ continues with a first pricing call.
 
 [Scope and limitations](https://chelis.ch/docs/shoals/scope/) describes numerical domains, model assumptions, and other limits.
 
+## Validation
+
+Hosted checks cover formatting, lint, compilation, short guards, offline
+contracts and oracle classifier tests, and book prose and source signatures.
+Long numerical suites and runtime book examples are optional local tools.
+This command opts in:
+
+```sh
+PATH="$PWD/.venv/bin:$PATH" python3 scripts/run_local_gate.py --full
+```
+
+They are not required before push, merge, or release. Publication builds and
+verifies the actual release assets and their hashes.
+
 ## License
 
 MIT

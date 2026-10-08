@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import subprocess
 import sys
@@ -14,6 +15,11 @@ SEEDS = (0, 1, 2)
 # A 25-sample PDE run exceeded 1800s under shared host load while using
 # about 840s of CPU. Allow execution headroom without changing its oracle.
 RUN_TIMEOUT_SECONDS = 3600
+SMOKE_TIMEOUT_SECONDS = 60
+SMOKE_PROPERTIES = {
+    "canonlsm": ("lsm_expiry_intrinsic",),
+    "pde": ("spread_expiry_matches_intrinsic",),
+}
 FAMILIES = {
     "hestonlewis": (
         "heston_lewis_carr_madan_agreement",
@@ -50,9 +56,11 @@ def integer(value: object) -> bool:
     return type(value) is int
 
 
-def validate_run(stdout: str, returncode: int, family: str, seed: int) -> None:
+def validate_run(stdout: str, returncode: int, family: str, seed: int,
+                 *, property_names: tuple[str, ...] | None = None) -> None:
     """Fail closed on missing, skipped, vacuous, or misclassified records."""
-    positives = set(FAMILIES[family])
+    positives = set(FAMILIES[family] if property_names is None else property_names)
+    require(bool(positives) and positives <= set(FAMILIES[family]), "invalid property selection")
     controls = {name + "_corrupted" for name in positives}
     expected = positives | controls
     seen: set[str] = set()
@@ -100,26 +108,37 @@ def validate_run(stdout: str, returncode: int, family: str, seed: int) -> None:
 
 
 def main() -> int:
-    output_dir = ROOT / "target/pricing-fix-properties"
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--smoke", action="store_true",
+                        help="only LSM/PDE expiry pairs at seed 0, with a 60s ceiling per process")
+    args = parser.parse_args()
+    families = SMOKE_PROPERTIES if args.smoke else FAMILIES
+    seeds = (0,) if args.smoke else SEEDS
+    timeout = SMOKE_TIMEOUT_SECONDS if args.smoke else RUN_TIMEOUT_SECONDS
+    output_dir = ROOT / "target/pricing-fix-properties" / ("smoke" if args.smoke else "full")
     output_dir.mkdir(parents=True, exist_ok=True)
-    for family in FAMILIES:
-        for seed in SEEDS:
+    for family, names in families.items():
+        for seed in seeds:
             prefix = output_dir / f"{family}-seed{seed}"
             command = ["chelis", "prove", f"properties/{family}.ch", "--tier", "fuzz-only",
                        "--samples", str(SAMPLES), "--seed", str(seed), "--json"]
+            if args.smoke:
+                # --only matches both the positive and its _corrupted twin.
+                command += ["--only", names[0]]
             print(f"Running {family}, seed {seed}, {SAMPLES} accepted samples", flush=True)
             try:
                 result = subprocess.run(command, cwd=ROOT, capture_output=True,
-                                        text=True, timeout=RUN_TIMEOUT_SECONDS)
+                                        text=True, timeout=timeout)
                 prefix.with_suffix(".jsonl").write_text(result.stdout)
                 prefix.with_suffix(".stderr").write_text(result.stderr)
-                validate_run(result.stdout, result.returncode, family, seed)
+                validate_run(result.stdout, result.returncode, family, seed, property_names=names)
             except (ValueError, subprocess.TimeoutExpired, OSError) as exc:
                 print(f"FAIL: {family}, seed {seed}: {exc}", file=sys.stderr)
                 return 1
-            print(f"PASS: {len(FAMILIES[family])} bounded regressions; "
-                  f"{len(FAMILIES[family])} false controls refuted", flush=True)
-    print("PASS: all bounded pricing regressions at three seeds (fuzz evidence)")
+            print(f"PASS: {len(names)} bounded regressions; "
+                  f"{len(names)} false controls refuted", flush=True)
+    scope = "expiry smoke at seed 0" if args.smoke else "all bounded pricing regressions at three seeds"
+    print(f"PASS: {scope} (fuzz evidence)")
     return 0
 
 

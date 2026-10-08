@@ -23,8 +23,11 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   Restored broad accuracy coverage and corrected the measured error figures
   after the original workload completed within budget (shoals#143).
 - Updated the canonical pricing docs and rendered book examples and limits.
-  Nightly and release checks run the bounded regression properties and
-  require their false controls to fail.
+  Optional local bounded-property checks require their false controls to fail.
+- Kept hosted validation fast: long numerical suites, property/proof runs,
+  accuracy and AD references, benchmarks, and runtime book examples are now
+  optional local tools. Nightly was removed. Releases still build, hash, and
+  verify their actual payload and byte-identical invariant manifest.
 
 ## [Unreleased]
 

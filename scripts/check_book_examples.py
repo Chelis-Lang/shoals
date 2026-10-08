@@ -38,7 +38,7 @@ others reuse.
 A failure means the site page is wrong, or the API changed without a book
 update: fix the chelis.ch page and re-render the book.
 
-Usage: check_book_examples.py [--chelis PATH] [--page NAME] [--jobs N] [--keep]
+Usage: check_book_examples.py [--source-only] [--chelis PATH] [--page NAME] [--jobs N] [--keep]
 """
 
 from __future__ import annotations
@@ -59,6 +59,13 @@ REPO = Path(__file__).resolve().parent.parent
 BOOK = REPO / "docs" / "book" / "src"
 WORK = REPO / ".gate-tmp" / "book-examples"
 SOURCE_DIRS = ("src", "properties", "references", "demos")
+# These book signatures belong to the pinned Shoreleave package and their
+# names are not imported by this repository's Chelis sources. The optional
+# runtime mode compares them with the installed dependency declarations.
+EXTERNAL_BOOK_DECLARATIONS = {
+    "us_federal_projected": "Shoreleave.UsFederal",
+    "try_us_federal_projected": "Shoreleave.UsFederal",
+}
 FENCE = re.compile(r"^```(\S*)\s*$")
 IDENT = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
 NUMBER = re.compile(r"-?(?:\d+\.\d+|\d+)(?:[eE][-+]?\d+)?|-?inf|NaN")
@@ -547,13 +554,60 @@ BUILTINS = {
 }
 
 
+def source_signatures(pages: list[Path]) -> int:
+    """Compare repository declarations without compiler, dependency or scratch I/O.
+
+    Known external signatures are explicitly deferred to the optional runtime
+    tool, which resolves the pinned dependencies. Unknown names fail instead
+    of being silently deferred. This mode checks no shown values.
+    """
+    names, headers = module_exports()
+    checker = Checker("", names, headers, {}, WORK)
+    deferred = 0
+    for page in pages:
+        for block in read_blocks(page):
+            stmts = statements(block)
+            if not stmts or not all(st.text.startswith(("def ", "type ")) for st in stmts):
+                continue
+            if any(st.text.startswith("def ") and re.search(r"\s=\s", st.text) for st in stmts):
+                continue
+            local = []
+            for st in stmts:
+                declaration = re.match(r"^def\s+(\w+)", st.text)
+                if not declaration:
+                    continue
+                name = declaration.group(1)
+                external = names.get(name, EXTERNAL_BOOK_DECLARATIONS.get(name, ""))
+                if name not in headers and external and not external.startswith("Shoals."):
+                    deferred += 1
+                else:
+                    local.append(st)
+            block.stmts = local
+            checker.check_signatures(block)
+    if checker.counts["signatures"] == 0:
+        checker.failures.append("no repository signatures checked")
+    for failure in checker.failures:
+        print(f"FAIL {failure}")
+    print(f"book-source: {checker.counts['signatures']} repository signatures; "
+          f"{deferred} dependency signatures deferred; {len(checker.failures)} failures; "
+          "runtime examples were not evaluated")
+    return 1 if checker.failures else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--chelis", help="chelis binary (default: chelis on PATH, the pinned toolchain in CI)")
+    ap.add_argument("--source-only", action="store_true",
+                    help="offline repository-signature checks; no compiler or runtime examples")
+    ap.add_argument("--chelis", help="chelis binary (default: chelis on PATH)")
     ap.add_argument("--page", action="append", help="only check this page (repeatable)")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 1, help="pages checked in parallel")
     ap.add_argument("--keep", action="store_true", help="keep the generated example files")
     args = ap.parse_args()
+
+    pages = [p for p in sorted(BOOK.glob("*.md"))
+             if not args.page or p.name in args.page or p.stem in args.page]
+    if args.source_only:
+        return source_signatures(pages)
 
     started = time.monotonic()
     chelis = resolve_chelis(args.chelis)

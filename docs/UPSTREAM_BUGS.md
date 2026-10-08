@@ -13,7 +13,10 @@ changelog claim is not a verification — re-probe the reproducer per-surface);
 appears; **archived** entries are historical and are not re-probed. Where a
 blocker is mechanically expressible it graduates to an executable probe under
 `tests_blocked/`; items that cannot be probed in-package are re-probed manually
-here.
+here. Long numerical/proof/performance re-probes are optional local tools,
+never hosted checks or push/merge/release blockers. Triggers identify when a
+fresh observation is useful; if an optional run is not chosen, retain its last
+observation and do not claim a fresh verdict.
 
 Suspected chelis bugs are filed in `Chelis-Lang/chelis` and cited as
 `chelis#NNN` (own-repo items as `shoals#NNN`), **never by a prose name**, so a
@@ -66,71 +69,6 @@ in code that is CLOSED upstream but not sitting in §Archived.
       not. Restore the directory afterwards. Then replace this draft path with
       the issue number everywhere it is cited.
 
-- **shoals#111 -- the nightly `tests/` suite exceeds its hosted budget.**
-  Chelis 0.18.13 includes the chelis#1391 batching fix. Shoals keeps the
-  raised hosted budget until the suite is remeasured on its runner. On one quiet
-  10-core machine with warm caches, `chelis test tests/ --timeout 1200
-  --suite-timeout 1500 --jobs auto` over the same 43 files and 371 tests went
-  from **3m01s** (0.18.5, 4m27s user) to **7m54s** (0.18.6, 9m37s user, stable
-  across four runs). `--batch-mode file` is now more than twice as fast as the
-  default on this suite (3m44s vs 7m54s), inverting what the batching
-  optimization is for. This is not a general front-end slowdown -- the opposite
-  is true at file scale on the identical corpus and machine, where
-  `chelis check src/modelfit.ch` improved 67.6s -> 31.6s and six individual
-  `chelis test <file>.ch` runs came out within noise.
-    - **Affected surface / narrowing:** the nightly `chelis test (tests/ fast
-      unit suite)` step, budgeted `--suite-timeout 1500` under
-      `timeout-minutes: 30`. The narrowing is a budget raise at that step only
-      (`--suite-timeout 2400`, `timeout-minutes: 45`), cited at the site. The
-      tested configuration is deliberately unchanged: switching the step to
-      `--batch-mode file` would be the faster fix locally, but that is a change
-      of what CI exercises and no measurement exists for the 2-vCPU hosted
-      runner, so it is not made here.
-    - **Not expressible as a `tests_blocked/` probe:** the failing surface is
-      wall-clock, not a diagnostic; an expected-to-fail `.ch` cannot express
-      it. It is re-probed by timing the suite under both `--batch-mode` values
-      at every pin bump.
-    - **Re-probe trigger:** the assigned `chelis#NNN` closing, or any release
-      note naming `chelis test` batching, `BatchScope`, or front-end scaling at
-      compilation-unit size. Re-time both batch modes on the same machine and
-      require `auto` to beat `file` again before lowering the nightly budget
-      back.
-    - **Re-probe 2026-10-04 on Chelis 0.18.11 — still blocking at that pin.**
-      chelis#1391 is CLOSED upstream, fixed by **chelis#3058**
-      (`04612253c`, batching sharded at `MAX_BATCH_FILES = 4`). The
-      `=0.18.11` pin still had the regression. Re-timed per the trigger at head `69e1e59` on
-      the release binary, the current 49 files and 549 tests, one 10-core
-      machine, both legs back to back: `--batch-mode auto` 1113s wall / 1218s
-      child CPU (1.09 cores), `--batch-mode file` 341s wall / 1264s child CPU
-      (3.71 cores) — **3.27x the wall for +3.8% CPU**, both legs
-      `549 passed, 0 failed`. `auto` does not beat `file`, so the budget does
-      not come back down.
-
-      The CPU parity is the part that carries: identical work, 3.27x the
-      wall, so this is a scheduling outcome. `--batch-mode auto` collapses
-      files into batches, which leaves `--jobs` almost no test-file workers to
-      schedule; chelis#3058's own message says the merged unit "ran in one
-      subprocess whatever `--jobs` said: the setting reached only the files
-      that had been demoted out of the batch". That fix both caps batch size
-      and extends `--jobs` to shard concurrency. The ratio is larger than the
-      2.12x recorded above, but that pair differs in file count, test count
-      and compiler release at once and isolates no cause.
-
-      No hosted measurement of `--batch-mode file` exists, on this suite or
-      any other, and none is projected here: 10-core parallelism does not
-      transfer to a 2-vCPU runner. shoals#111 owns measuring it, which one
-      `workflow_dispatch` settles.
-
-      Shoals#111 owns the remaining hosted timeout and a measured
-      `--batch-mode file` comparison on the 2-vCPU runner. Keep the raised
-      budget until that issue's suite measurement shows it can be lowered.
-    - **Re-probe 2026-10-06 on Chelis 0.19.1: still blocking.** The 0.19.1
-      checker fix for long list literals (chelis#2975) is in this release. On
-      one 10-core machine, the 54 files and 522 tests ran back to back:
-      `--batch-mode auto` 305s wall and 339s user, `--batch-mode file` 158s
-      wall and 401s user. Both legs report `522 passed, 0 failed`. `auto`
-      does not beat `file`, so the nightly budget stays raised.
-
 - **The proof gate checks the pinned finance surface.** Economic and dynamic
   programming properties reach the SMT tier without a transcendental contract.
   The structural upper-bound and delta properties use the validated normal-CDF
@@ -170,8 +108,9 @@ in code that is CLOSED upstream but not sitting in §Archived.
       adversarial pair (`scripts/check_release_artifact_determinism.py`) could
       not be re-run at this pin: it installs both dependencies from published
       GitHub releases, and Nautilus 0.7.43 / Coral 0.7.40 do not exist yet. It
-      runs at the release gate that consumes them, which is where its verdict
-      has always been taken.
+      remained the release-era evidence boundary at that time. Under the
+      2026-10-08 policy the adversarial pair is optional local evidence; hosted
+      publication still builds canonical assets and verifies their actual bytes.
     - **Re-probe trigger:** a Chelis release naming GitHub origin
       canonicalization or a chelis#1002 close. Repeat the adversarial pair
       without the reinstall workaround; remove the narrowing only when input
@@ -184,19 +123,20 @@ in code that is CLOSED upstream but not sitting in §Archived.
   `--jobs 1` and a 1500-second per-test budget. The same fixture passes
   locally in roughly 170–200 seconds, so this is not a failed numerical
   assertion and must not be represented as one.
-    - **Affected surface / narrowing:** the weekly hosted and release-equivalent
-      local heavy matrices exclude only `tests-manual/modelfit_bfgs_heavy.ch`;
-      all other reviewed manual shards remain present. The exclusion is locked
-      by `scripts/test_release_workflow.py`.
+    - **Current surface:** no hosted heavy matrix exists under Shoals's
+      2026-10-08 policy. The optional local extended suite includes
+      `tests-manual/modelfit_bfgs_heavy.ch`; the former hosted-resource
+      exclusion is removed. No fresh execution is claimed.
     - **State at pin 0.18.6 (2026-08-29):** still OPEN upstream, and the 0.18.6
       changelog names no evaluator BFGS resource work. Not locally
       reproducible by construction -- the failure is specific to a constrained
-      2-vCPU hosted runner and the fixture passes locally -- so the exclusion
-      and its `scripts/test_release_workflow.py` lock are unchanged.
+      2-vCPU hosted runner and the fixture passes locally -- so the hosted
+      exclusion was retained then.
     - **Re-probe trigger:** a chelis#408 close or a Chelis release naming
       evaluator BFGS resource usage, worker memory, or constrained-host
-      supervision. Re-enable the exact fixture on a 2-vCPU hosted runner and
-      require a complete test report before removing the exclusion.
+      supervision, or a concrete need to run on a constrained machine. A chosen
+      local constrained-machine probe must complete with a test report;
+      no hosted re-probe is authorized by the current policy.
 
 - **chelis#637 — the certified-envelope discharge cannot express
   coupled-subterm dependencies (`N(d1)`/`N(d2)`): exact BS price and Greek
@@ -241,7 +181,7 @@ in code that is CLOSED upstream but not sitting in §Archived.
       on a rational-arithmetic pricer (`properties/canontrees.ch`).
     - **Not expressible as a `tests_blocked/` probe** (prove-verdict surface;
       see `tests_blocked/README.md` §cannot-be-probed) — re-probed by
-      `scripts/prove_gate.py` and manually at every bump.
+      `scripts/prove_gate.py` when explicitly selected locally at a relevant bump.
     - **Re-probe trigger:** any chelis release note naming coupled-subterm /
       relational abstraction, whole-expression `BoxRange` interval
       evaluation, or a chelis#637 close. Re-probe by proving
@@ -347,6 +287,76 @@ in code that is CLOSED upstream but not sitting in §Archived.
       nautilus#70 and nautilus#85 are OPEN and unassigned.
 
 ## Archived
+
+- **shoals#111 -- former nightly suite hosted-budget tracking (retired).**
+  **Archived 2026-10-08 by policy:** the nightly workflow and all hosted long
+  numerical runs were removed per maintainer instruction. There is no hosted
+  suite budget to lower or hosted measurement owed. This retires the Shoals
+  policy obligation; it does not assert a compiler performance fix. The
+  following measurements and decisions are retained as historical evidence.
+  Chelis 0.18.13 includes the chelis#1391 batching fix. Shoals keeps the
+  raised hosted budget until the suite is remeasured on its runner. On one quiet
+  10-core machine with warm caches, `chelis test tests/ --timeout 1200
+  --suite-timeout 1500 --jobs auto` over the same 43 files and 371 tests went
+  from **3m01s** (0.18.5, 4m27s user) to **7m54s** (0.18.6, 9m37s user, stable
+  across four runs). `--batch-mode file` is now more than twice as fast as the
+  default on this suite (3m44s vs 7m54s), inverting what the batching
+  optimization is for. This is not a general front-end slowdown -- the opposite
+  is true at file scale on the identical corpus and machine, where
+  `chelis check src/modelfit.ch` improved 67.6s -> 31.6s and six individual
+  `chelis test <file>.ch` runs came out within noise.
+    - **Affected surface / narrowing:** the nightly `chelis test (tests/ fast
+      unit suite)` step, budgeted `--suite-timeout 1500` under
+      `timeout-minutes: 30`. The narrowing is a budget raise at that step only
+      (`--suite-timeout 2400`, `timeout-minutes: 45`), cited at the site. The
+      tested configuration is deliberately unchanged: switching the step to
+      `--batch-mode file` would be the faster fix locally, but that is a change
+      of what CI exercises and no measurement exists for the 2-vCPU hosted
+      runner, so it is not made here.
+    - **Not expressible as a `tests_blocked/` probe:** the failing surface is
+      wall-clock, not a diagnostic; an expected-to-fail `.ch` cannot express
+      it. It is re-probed by timing the suite under both `--batch-mode` values
+      at every pin bump.
+    - **Re-probe trigger:** the assigned `chelis#NNN` closing, or any release
+      note naming `chelis test` batching, `BatchScope`, or front-end scaling at
+      compilation-unit size. Re-time both batch modes on the same machine and
+      require `auto` to beat `file` again before lowering the nightly budget
+      back.
+    - **Re-probe 2026-10-04 on Chelis 0.18.11 — still blocking at that pin.**
+      chelis#1391 is CLOSED upstream, fixed by **chelis#3058**
+      (`04612253c`, batching sharded at `MAX_BATCH_FILES = 4`). The
+      `=0.18.11` pin still had the regression. Re-timed per the trigger at head `69e1e59` on
+      the release binary, the current 49 files and 549 tests, one 10-core
+      machine, both legs back to back: `--batch-mode auto` 1113s wall / 1218s
+      child CPU (1.09 cores), `--batch-mode file` 341s wall / 1264s child CPU
+      (3.71 cores) — **3.27x the wall for +3.8% CPU**, both legs
+      `549 passed, 0 failed`. `auto` does not beat `file`, so the budget does
+      not come back down.
+
+      The CPU parity is the part that carries: identical work, 3.27x the
+      wall, so this is a scheduling outcome. `--batch-mode auto` collapses
+      files into batches, which leaves `--jobs` almost no test-file workers to
+      schedule; chelis#3058's own message says the merged unit "ran in one
+      subprocess whatever `--jobs` said: the setting reached only the files
+      that had been demoted out of the batch". That fix both caps batch size
+      and extends `--jobs` to shard concurrency. The ratio is larger than the
+      2.12x recorded above, but that pair differs in file count, test count
+      and compiler release at once and isolates no cause.
+
+      No hosted measurement of `--batch-mode file` exists, on this suite or
+      any other, and none is projected here: 10-core parallelism does not
+      transfer to a 2-vCPU runner. shoals#111 owns measuring it, which one
+      `workflow_dispatch` settles.
+
+      Shoals#111 owns the remaining hosted timeout and a measured
+      `--batch-mode file` comparison on the 2-vCPU runner. Keep the raised
+      budget until that issue's suite measurement shows it can be lowered.
+    - **Re-probe 2026-10-06 on Chelis 0.19.1: still blocking.** The 0.19.1
+      checker fix for long list literals (chelis#2975) is in this release. On
+      one 10-core machine, the 54 files and 522 tests ran back to back:
+      `--batch-mode auto` 305s wall and 339s user, `--batch-mode file` 158s
+      wall and 401s user. Both legs report `522 passed, 0 failed`. `auto`
+      does not beat `file`, so the nightly budget stays raised.
 
 - **shoals#79 — `Shoals.Curves` answered a failed bootstrap with a silent `NaN`.**
   Resolved in this shell by failing loudly at the precondition instead: a quote

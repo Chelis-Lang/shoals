@@ -38,11 +38,11 @@ Run Shoals's own gate with the worktree Python 3.11 environment on PATH:
 
 ```sh
 PATH="$PWD/.venv/bin:$PATH" python3 scripts/run_local_gate.py
-PATH="$PWD/.venv/bin:$PATH" python3 scripts/run_local_gate.py --full
 ```
 
-The `--full` form adds Shoals's nightly package, manual, proof, latency,
-and release checks and is required for a pin bump. Inspect its terminal
-verdict, applicable hosted CI on the exact head, and the phase's named
-acceptance oracle before a completion claim.
+Inspect the lean gate's terminal verdict and applicable fast hosted CI on
+the exact head. `--full` opts into long local numerical, proof, benchmark and
+runtime book checks; it is not required at pin bumps or before push, merge or
+release. A numerical acceptance claim still names its executed oracle and
+inputs; an optional check that was not run supplies no new evidence.
 <!-- shell-local:end -->

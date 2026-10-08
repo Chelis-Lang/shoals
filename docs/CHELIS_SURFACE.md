@@ -874,7 +874,7 @@ Each figure is rounded down to five significant digits. It is a lower bound
 on the worst error, rather than an upper error bound or a global guarantee.
 `scripts/oracle_erf64_accuracy.py` reads this table. Its offline
 `--transcription` check requires matching figures everywhere they appear in
-the tracked tree. Its nightly `--measurement` check recomputes the errors
+the tracked tree. Its optional local `--measurement` check recomputes the errors
 and requires the published figures to match the measured maxima after
 rounding down. Missing reference dependencies fail the measurement check.
 

@@ -2,7 +2,7 @@
 """Check Shoals' `erf64`/`n_cdf64` accuracy, including left-tail relative error.
 
 Two independent legs, because they have different prerequisites and therefore
-different homes in CI:
+different execution policies:
 
 * ``--transcription`` (stdlib only, no toolchain, instant). Parses the floors
   out of the published accuracy table in ``docs/CHELIS_SURFACE.md`` and requires
@@ -11,7 +11,8 @@ different homes in CI:
   hop, and it is cheap enough for the per-PR ``contract-gate`` job.
 * ``--measurement`` (needs mpmath and the pinned ``chelis``; minutes). Measures
   the compiled kernel against a high-precision reference and requires each
-  published floor to be a TIGHT floor of what was measured.
+  published floor to be a TIGHT floor of what was measured. This is an
+  optional local tool, never a hosted or release blocker.
 
 Default runs both. Exit 0 only if every requested leg passes.
 
@@ -56,7 +57,7 @@ you like; the digits you do publish must be the measurement's.
 Usage:
     oracle_erf64_accuracy.py                  # both legs
     oracle_erf64_accuracy.py --transcription  # offline leg only (per-PR CI)
-    oracle_erf64_accuracy.py --measurement    # measured leg only (nightly CI)
+    oracle_erf64_accuracy.py --measurement    # optional local measurement
     oracle_erf64_accuracy.py --json           # machine-readable summary
 """
 

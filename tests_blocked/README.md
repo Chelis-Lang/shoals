@@ -60,8 +60,8 @@ Every other open Shoals blocker is either a **prove-lane** capability gap or a
 **tooling** defect (see §cannot-be-probed). For the prove-lane gaps: the failing surface is a `chelis prove` verdict, not a
 compile/eval diagnostic, so `chelis test --expect blocked` cannot express
 it. The prove-lane verdicts are re-probed instead by the keystone canon
-self-audit (`scripts/prove_gate.py`, run nightly in CI and at every pin
-bump), which classifies every property's verdict from `prove --json`
+self-audit (`scripts/prove_gate.py`, explicitly selected as optional local
+evidence at a relevant pin bump), which classifies every property's verdict from `prove --json`
 `proof_tier` — a blocker "flipping" there surfaces as a tier upgrade in the
 gate report.
 
@@ -99,5 +99,7 @@ gate report.
   failing surface is wall-clock (3m01s at 0.18.5 vs 7m54s at 0.18.6 over the
   same 43 files and 371 tests on one quiet machine), and an expected-to-fail
   `.ch` carries no timing oracle. Re-probed by timing `chelis test tests/`
-  under both `--batch-mode` values at every pin bump; `auto` must beat `file`
-  again before the nightly budget raise is reverted.
+  under both `--batch-mode` values when explicitly selected locally. The
+  compiler batching fix and historical measurements remain distinct from
+  shoals#111's hosted-budget obligation, retired with nightly on 2026-10-08.
+  No compiler performance fix is inferred from that policy change.

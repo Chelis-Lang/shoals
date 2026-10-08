@@ -47,17 +47,14 @@ work packets, suggested agent-team allocation, acceptance criteria
   `stable` happens module-by-module after the corresponding manual
   oracle in `phase3l_shoals_oracle_*` is green AND the AD profile
   is `composed` (not `unproven-primitive` or `unsupported`).
-- **Native testing discipline.** The lean per-PR gate is
-  `chelis fmt --check`, `chelis lint --check`, `chelis reef build`, plus the
-  offline gates. The real-chelis `chelis test tests/ --timeout 1200 --jobs
-  auto` suite runs NIGHTLY (`.github/workflows/nightly.yml`), not per-PR —
-  it is far and away the tallest slice of real-chelis wall, and it runs close
-  enough to its own 2400s suite ceiling to cross it. `nightly.yml` states the
-  measured cost, the run-to-run spread and the ceiling at the step, and is the
-  authoritative site for that figure. Heavier oracles (multi-curve
-  bootstrap, Heston QE, XVA smoke) run as manual gates at milestone exits
-  via scripts
-  under `scripts/manual_gates/`.
+- **Native testing discipline.** The lean hosted/default local gate checks
+  fmt/lint, compilation, short guards, and offline contracts/classifiers.
+  The `tests/` suite, manual numerical references, canon characterization,
+  and runtime book examples are optional local tools, selected directly or
+  with `scripts/run_local_gate.py --full`. They do not run in any hosted
+  workflow and are not required before push, merge, pin bumps, or releases.
+  Any executed evidence records the runner, pinned artifacts, and inputs;
+  unexecuted suites cannot support a new result claim.
 - **Manual-gate pattern.** Each named gate
   (`phase3l_shoals_oracle_*`) is a python script under
   `scripts/manual_gates/<gate_name>.py` that drives `chelis` from

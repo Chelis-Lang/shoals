@@ -914,11 +914,16 @@ exit checkpoints.
 ## Bounded numerical regression properties
 
 The Heston Lewis, Longstaff-Schwartz regression, spread ADI, and jump-moment
-regressions include literal Chelis `@property` declarations. The nightly,
-full local, and release gates run each file at seeds 0, 1, and 2. Every
-positive property must accept 25 samples at the fuzz tier; every corrupted
-twin must fail with an in-domain counterexample. Missing, duplicated,
-unsupported, or erroneous records fail the gate. These bounded sampling
-checks complement unit tests and independent numerical references. They do
-not establish global proofs or change the consumer invariant manifest's
-proof tiers.
+regressions include literal Chelis `@property` declarations. The optional local
+`scripts/check_pricing_fix_properties.py` runner checks each file at seeds 0,
+1, and 2. Every positive property must accept 25 samples at the fuzz tier;
+every corrupted twin must fail with an in-domain counterexample. Missing,
+duplicated, unsupported, or erroneous records and inconsistent summaries or
+compiler exit codes fail the requested run. The optional `--smoke` selector
+checks only the LSM and spread expiry pairs at seed 0 with 25 accepted positive
+samples and a 60-second ceiling per process; it does not execute path fitting
+or PDE time stepping. These bounded sampling checks complement unit tests and
+independent numerical references. They do not establish global proofs or
+change the consumer invariant manifest's proof tiers. The full numerical
+runner is local-only, outside CI and release acceptance; no passing result is
+implied by adding its declarations or classifier tests.

@@ -311,7 +311,7 @@ class MeasurementEnforcement(unittest.TestCase):
     mpmath and `chelis` are both injected, so this runs under the bare
     interpreter the per-PR job uses. `worst` is stubbed because the subject here
     is the VERDICT, not the sweep; the sweep is covered end to end by the
-    nightly measurement leg.
+    optional local measurement leg.
     """
 
     # The real measured figures, so the fixtures below are the shipped ones.
@@ -641,7 +641,7 @@ class LeftTailRelativeEnforcement(unittest.TestCase):
         rewriting `abs(got - exact) / exact` as `(exact - got) / exact` survived
         the whole suite: an overshooting kernel produces a NEGATIVE relative
         error, `negative > limit` is False, no error is recorded, and
-        `worst_relative` comes back 0.0 while the nightly leg exits green.
+        `worst_relative` comes back 0.0 while the measurement leg exits green.
 
         That is shoals#68's consequence with the sign flipped, and the fourth
         constant-axis defect found in this file -- which is why the fix is a
@@ -805,12 +805,7 @@ class FailClosed(unittest.TestCase):
         self.assertIn("SKIP", done.stdout + done.stderr)
 
     def test_greeks_gate_fails_without_chelis_when_required(self):
-        """CI declares the toolchain a prerequisite, so a SKIP there would mean
-        the gate silently stopped running -- shoals#64's third inertness.
-
-        This test is what makes the `SHOALS_ORACLE_REQUIRE_CHELIS: "1"` in
-        nightly.yml load-bearing rather than decorative.
-        """
+        """An explicitly requested local run must fail if its toolchain is absent."""
         done = subprocess.run(
             [sys.executable, "scripts/oracle_greeks_gate.py"],
             cwd=REPO_ROOT, capture_output=True, text=True, check=False,
@@ -820,17 +815,11 @@ class FailClosed(unittest.TestCase):
         self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("refusing to report success", done.stdout + done.stderr)
 
-    def test_ci_sets_the_require_flag_and_the_gate_reads_it(self):
-        """Both halves, because either alone is decorative: a renamed key in
-        the workflow, or a workflow that sets a key no code consumes, both left
-        the old file-wide assertion green."""
-        # Colon-anchored on purpose. A bare substring assertion is satisfied by
-        # `SHOALS_ORACLE_REQUIRE_CHELIS_X`, so renaming the key -- which
-        # silences the flag completely -- stayed green on the first attempt at
-        # this fix.
-        block = job_block("nightly.yml", "accuracy")
-        self.assertIn('SHOALS_ORACLE_REQUIRE_CHELIS: "1"',
-                      "\n".join(live_lines(block)))
+    def test_optional_local_gate_sets_the_require_flag_and_the_gate_reads_it(self):
+        from test_release_workflow import local_commands
+        self.assertIn(
+            ["/usr/bin/env", "SHOALS_ORACLE_REQUIRE_CHELIS=1",
+             "python3", "scripts/oracle_greeks_gate.py"], local_commands(True))
         gate = (REPO_ROOT / "scripts/oracle_greeks_gate.py").read_text()
         self.assertIn('os.environ.get("SHOALS_ORACLE_REQUIRE_CHELIS") == "1"', gate)
 
@@ -905,32 +894,16 @@ class WiredIntoCi(unittest.TestCase):
         head = (REPO_ROOT / ".github/workflows/ci.yml").read_text().split("jobs:")[0]
         self.assertIn("pull_request", head)
 
-    def test_measurement_leg_runs_nightly(self):
-        self.assertWired("nightly.yml", "accuracy",
-                         "oracle_erf64_accuracy.py --measurement")
-
-    def test_greeks_oracle_runs_nightly(self):
-        self.assertWired("nightly.yml", "accuracy", "oracle_greeks_gate.py")
-
-    def test_nightly_accuracy_job_installs_its_dependency(self):
-        """The measurement leg FAILS without mpmath, so a missing install step
-        turns the job red rather than skipping -- but red-for-the-wrong-reason
-        is still a broken gate."""
-        self.assertWired("nightly.yml", "accuracy", "requirements-oracle.txt")
-
-    def test_nightly_accuracy_job_runs_daily(self):
-        block = job_block("nightly.yml", "accuracy")
-        live = "\n".join(live_lines(block))
-        self.assertIn("0 3 * * *", live,
-                      "the accuracy job must run on the daily cadence")
-
-    def test_accuracy_failure_is_surfaced(self):
-        """A guard that runs but that nothing gates on is only marginally
-        better than one that never runs."""
-        report = job_block("nightly.yml", "report")
-        live = "\n".join(live_lines(report))
-        self.assertIn("accuracy", live)
-        self.assertIn("ACCURACY_RESULT", live)
+    def test_long_accuracy_checks_are_optional_local_only(self):
+        from test_release_workflow import local_commands, live_yaml
+        for workflow in (REPO_ROOT / ".github/workflows").glob("*.y*ml"):
+            live = live_yaml(workflow)
+            self.assertNotIn("oracle_erf64_accuracy.py --measurement", live)
+            self.assertNotRegex(live, r"(?<![\w])oracle_greeks_gate\.py\b")
+        default = local_commands(False)
+        extended = local_commands(True)
+        self.assertFalse(any("--measurement" in command for command in default))
+        self.assertIn(["python3", "scripts/oracle_erf64_accuracy.py", "--measurement"], extended)
 
     def test_local_gate_runs_both_legs(self):
         gate = (REPO_ROOT / "scripts/run_local_gate.py").read_text()

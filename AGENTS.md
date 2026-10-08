@@ -261,7 +261,7 @@ the site; an uncited narrowing is invisible to de-narrowing.
 
 - `--pins-only` — offline pin-consistency guard: the `reef.toml` compiler pin
   MUST equal the literal `CHELIS_TAG` / `CHELIS_VERSION` env pins in every
-  toolchain-installing workflow (`ci.yml`, `release.yml`, `nightly.yml`). This
+  toolchain-installing workflow (`ci.yml`, `release.yml`). This
   is the blocking `hard-rule-guard` CI job; it never touches the network. The
   literal pins exist so the guard has something to check offline — the
   reef-derived greps can't be evaluated without a checkout.
@@ -307,8 +307,10 @@ C Note is the consumer. Shoals' local obligations:
   source file, kind, and name. Structural composites require the observed edge
   to `chelis-std:Std.Contracts.normal_cdf` and deliberately do not claim an
   edge to `bs_call_scalar`. Metamorphic substitution is the complementary
-  semantic anti-vacuity check. Both gates run in CI and the
-  local gate. Every active invariant is observed against the release binary.
+  semantic anti-vacuity check. The offline contract gate runs in CI and the
+  default local gate. The proof gate is an optional local characterization
+  runner; invoking it enforces the recorded expected tiers. Manifest tiers
+  retain their recorded observations; a release does not imply a fresh run.
   The direct Black-Scholes and Black-76 call-price positivity family and the
   direct Black-Scholes spot-monotonicity/delta, vega, rho, and gamma comparisons
   run at `fuzz_validated` with corrupted twins. The Greek family uses three
@@ -330,8 +332,9 @@ C Note is the consumer. Shoals' local obligations:
 
 ## Pin Bump Checklist
 
-A pin bump is a **de-narrowing event**, not a version edit — run all of this in
-one change set (contract §7):
+A pin bump is a **de-narrowing event**, not a version edit. Apply the short
+checks and reconcile recorded evidence in one change set (contract §7); long
+numerical re-probes remain optional local tools under Shoals's CI policy:
 
 1. Update **every** pin location: `reef.toml` `compiler = "=X.Y.Z"` and the
    literal `CHELIS_TAG` / `CHELIS_VERSION` env pair in each toolchain-installing
@@ -344,9 +347,10 @@ one change set (contract §7):
    DRIFTED → investigate before re-citing.
 3. Run `python3 scripts/audit_workarounds.py` (full mode); triage every
    CLOSED/MERGED-but-still-cited subject. No silent carryover.
-4. Re-probe every `docs/UPSTREAM_BUGS.md` entry whose trigger names this
-   release, **per-surface** — a changelog claim is not a verification. Re-prove
-   the reproducer against the pinned binary.
+4. Review every `docs/UPSTREAM_BUGS.md` entry whose trigger names this
+   release, **per-surface**. Run short probes; record any long local re-probe
+   that is explicitly chosen and retain the last observation if it is not
+   rerun. A changelog claim is not verification.
 5. Refresh `docs/CHELIS_SURFACE.md`: header versions (pinned / latest upstream /
    last-refreshed) and every `@pin` / `@upstream` marker. When recording a
    sibling's release commit there, **dereference the tag** —
@@ -361,43 +365,41 @@ one change set (contract §7):
    what a reader chases and what downstream vendor reconstruction pins.
 6. Promote UPSTREAM_BUGS entries per the re-probe verdicts (→ §Archived, or back
    to §Tracking with the residue).
-7. Run the local gate before pushing: `python3 scripts/run_local_gate.py`
-   (the per-PR CI mirror: pins audit + fmt + lint + `chelis reef build` +
-   the `tests_neg/`/`tests_blocked/` expect suites + conform audit +
-   contract gate + oracle/release static tests + the offline accuracy-floor
-   transcription check; the origin-relative bump check
-   remains CI-only). At a pin bump, run it **once with `--full`** to add the
-   nightly stages (fast `tests/` suite, heavy `tests-manual/` suite,
-   prove gate, the accuracy-floor measurement leg, the AD-Greeks oracle, and
-   the chelis#924 cold/warm package-prove latency oracle) —
-   day-to-day pushes rely on nightly CI for those. The latency oracle installs
-   the just-built Shoals candidate, requires cold <=20s and warm <=5s, and
-   requires byte-identical NDJSON from both completed processes.
+7. Run the lean local gate before pushing:
+   `PATH="$PWD/.venv/bin:$PATH" python3 scripts/run_local_gate.py`.
+   It checks pins, fmt/lint, compilation, short negative/blocked guards,
+   conformance, the manifest, offline oracle/classifier units, accuracy
+   transcription, and book prose/source signatures. The origin-relative bump
+   check and mdBook build remain CI-only.
 
-   `--full` needs the oracle reference dependency once per environment. The
-   accuracy-floor measurement leg **fails** rather than skips without it
-   (shoals#64), so an absent mpmath cannot be mistaken for a pass.
-
-   **Install it into a virtualenv, not the system Python.** A bare
-   `python3 -m pip install` exits with `error: externally-managed-environment`
-   on a Homebrew or Debian/Ubuntu interpreter (PEP 668), which is most
-   workstations:
+   `--full` explicitly opts into long local numerical, proof, benchmark, and
+   runtime book checks. It is not required at pin bumps or before push, merge,
+   or release. Individual long runners remain usable. For a chosen measurement
+   run, install its reference dependency into this worktree's virtualenv:
 
    ```sh
    uv venv --python 3.11
    uv pip install -r scripts/requirements-oracle.txt
-   .venv/bin/python scripts/run_local_gate.py --full
+   PATH="$PWD/.venv/bin:$PATH" python3 scripts/run_local_gate.py --full
    ```
 
-   Run `run_local_gate.py --full` through that interpreter, because its
-   measurement stage invokes `python3` and a bare `python3` will not see the
-   venv. CI installs to the runner's Python instead, which works because the
-   GitHub `ubuntu-latest` image ships `/etc/pip.conf` with
-   `break-system-packages = true`.
+   Missing mpmath fails a requested measurement (shoals#64). Recorded evidence
+   names the exact runner, compiler, inputs, and observed result; static green
+   checks do not imply a new numerical or proof result.
 
-   **A pin bump is exactly when the measurement leg matters.** It evaluates the
-   compiled kernel through `chelis eval --json`. An unrecognised
-   `schema_version` fails loudly and names the decoder to teach.
+## Shoals CI Policy
+
+Per explicit maintainer instruction, Shoals diverges from inherited shell
+CI policy: long numerical suites, SMT/fuzz characterization, accuracy/AD
+references, latency/determinism benchmarks, and runtime book examples are
+optional local tools. They never run in CI, including scheduled, manual, or
+release workflows, and are not pre-push, merge, or release blockers. Keep
+hosted checks fast with compilation, fmt/lint, short guards, offline oracle
+classifier units, manifest/pin/source/book prose checks, and the actual
+artifact build, hashes, manifest comparison, and verification needed for
+publishing. Do not disguise long suites as smoke checks or widen hosted
+budgets. This is an intentional Shoals-only scaffolding divergence; no
+sibling-shell policy wave is authorized.
 
 ## Quant Scope
 
