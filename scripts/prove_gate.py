@@ -185,7 +185,7 @@ def run_prove(binary: str, file: str, fuzz: bool, samples: int,
     if fuzz:
         # fuzz-only, NOT auto: chelis#637 still prevents a proven discharge, so
         # fuzz-only avoids spending time on the known-unreachable SMT lane.
-        # Chelis 0.17.4 made direct-pricer sampling tractable; keep the nightly
+        # Chelis 0.17.4 made direct-pricer sampling tractable; keep the local
         # sample budget (FUZZ_SAMPLES) explicit and measured.
         cmd += ["--tier", "fuzz-only", "--samples", str(samples), "--seed", seed]
     else:
@@ -1088,9 +1088,9 @@ def check_extra_greek_fuzz_seeds(binary: str, manifest: dict, models: dict,
                                  primary_samples: int) -> bool:
     """Require the issue-38 real-pricer family to survive multiple seeds.
 
-    The primary release sweep already checks seed 0 at FUZZ_SAMPLES. Seeds 1
+    The primary local sweep already checks seed 0 at FUZZ_SAMPLES. Seeds 1
     and 2 use a bounded five-sample budget: enough to change every generated
-    point while keeping the nightly/release oracle proportional. Each run still
+    point while keeping the optional local oracle proportional. Each run still
     proves the whole source file against the real imported pricer body, and the
     normal instantiation checker re-applies tier, compiler-attribution, corrupt
     twin, and witness requirements.
@@ -1245,11 +1245,11 @@ def main() -> None:
     samples = int(os.environ.get("FUZZ_SAMPLES", DEFAULT_FUZZ_SAMPLES))
     # The direct Black-Scholes and Black-76 call-price positivity surfaces are
     # active at fuzz_validated from 0.17.4. Keep them off the default lean path;
-    # nightly/full release validation enables PROVE_GATE_FUZZ=1. No other
+    # optional local extended validation enables PROVE_GATE_FUZZ=1. No other
     # transcendental-pricer family is promoted without its own observed probe.
     include_fuzz = os.environ.get("PROVE_GATE_FUZZ") == "1"
     print(f"prove_gate: binary={binary} pin={pin} fuzz_samples={samples} "
-          f"fuzz_lane={'on' if include_fuzz else 'off (nightly)'}")
+          f"fuzz_lane={'on' if include_fuzz else 'off (opt in locally)'}")
 
     def gated(inv: dict) -> bool:
         return include_fuzz or inv["expected_tier_per_pin"].get(pin) != "fuzz_validated"
@@ -1306,7 +1306,7 @@ def main() -> None:
 
     skipped = [inv["id"] for inv in manifest["invariants"] if not gated(inv)]
     if skipped:
-        print(f"\n== fuzz lane deferred to nightly (PROVE_GATE_FUZZ=1): "
+        print(f"\n== fuzz lane disabled; opt in locally (PROVE_GATE_FUZZ=1): "
               f"{', '.join(skipped)} ==")
 
     print("\n== verifying invariants ==")

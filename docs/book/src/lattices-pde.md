@@ -121,20 +121,38 @@ def pde_spread_option_adi(s1_0: f32, s2_0: f32, k: f32, r: f32, q1: f32, q2: f32
 ```
 
 `pde_spread_option_adi` prices the European spread call
-`max(S1 - S2 - k, 0)` on a two-dimensional log grid with an ADI
-(alternating-direction implicit) scheme, applying the correlation term
-explicitly. Each axis spans a fixed factor of 2 either side of its spot.
-The grid edges are never updated: they keep the payoff, undiscounted, for
-the whole solve.
+`max(S1 - S2 - k, 0)` on a two-dimensional log grid. It uses the
+Craig-Sneyd ADI (alternating-direction implicit) scheme: the predictor
+includes the full correlation term, and a second pair of implicit
+sweeps corrects that term. The first two time intervals each use two
+damped half-steps to smooth the payoff kink.
 
-Check this pricer against simulation before relying on it. For
-`s1_0 = 100`, `s2_0 = 95`, `k = 5`, `r = 0.05`, no yields, vols `0.2` and
-`0.3`, `rho = 0.5`, `t = 1`, it returns `12.240308` on a 41 x 41 grid with
-50 steps and `12.239192` on 81 x 81 with 100 steps, so refining the grid
-does not move it. Discounting the same payoff over 20,000 paths of
-`correlated_gbm_terminal_2d` at drift `r` gives `10.390527`. The domain
-width and the edge treatment are not arguments, so no setting closes that
-gap.
+Each grid axis is centered on its initial log spot. Its half-width is
+the larger of `log(2)` and
+`abs(r - q - 0.5 * sigma^2) * t + sigma^2 * t + 6 * sigma * sqrt(t)`.
+The perimeter is updated at every stage to
+`max(S1 * exp(-q1 * tau) - S2 * exp(-q2 * tau) - k * exp(-r * tau), 0)`,
+where `tau` is the time to maturity at that stage. This is an
+asymptotic boundary approximation, so check grid convergence for the
+parameters you price.
+
+For `s1_0 = 100`, `s2_0 = 95`, `k = 5`, `r = 0.05`, no yields, vols
+`0.2` and `0.3`, `rho = 0.5`, and `t = 1`, independent integration gives
+about `10.211501`. Refining the grid and time steps gives:
+
+| Grid | Time steps | Price |
+| --- | --- | --- |
+| 41 x 41 | 50 | 10.272353 |
+| 81 x 81 | 100 | 10.228014 |
+| 161 x 161 | 200 | 10.2154875 |
+
+Increase the spatial grid and time steps together; a wider domain also
+needs more spatial points to retain the same spacing.
+
+Use finite positive spots, non-negative volatilities and maturity,
+`rho` in `[-1, 1]`, at least three points per axis, and at least one time
+step. At zero maturity the function returns the intrinsic payoff
+without solving the PDE. Invalid grid inputs are not checked.
 
 `pde_thomas_solve` solves the `n_x x n_x` tridiagonal
 system with sub-diagonal `lower`, diagonal `diag`, and super-diagonal
@@ -154,28 +172,50 @@ def lsm_polynomial_regression[k](xs: tensor[k, f32], ys: tensor[k, f32]) -> (f32
 def lsm_put_payoff(s: f32, k: f32) -> f32
 ```
 
-`lsm_american_put` applies Longstaff-Schwartz regression to an American
-put: it simulates `n_paths` GBM paths of `n_steps` exact log steps
-(no dividend), allows exercise at each step `i * t / n_steps` for
-`i = 1 .. n_steps` but not at time 0, and at each step regresses the
-discounted continuation value of the in-the-money paths on `1, S, S^2`,
-skipping the regression when fewer than four paths are in the money. The
-same paths serve for regression and valuation.
+`lsm_american_put` simulates GBM paths with no dividend yield and
+allows exercise at time 0 and at each date `i * t / n_steps`, for
+`i = 1 .. n_steps`. At each
+intermediate date it fits the discounted continuation values of the
+in-the-money paths to a quadratic in spot. Each selected cash flow is
+discounted from its exercise date once. The same paths serve for
+regression and valuation.
 
-Its results do not behave like an American price. With 2000 paths, seed 21,
-`s0 = k = 100`, `r = 0.05`, `sigma = 0.2`, `t = 1`, it returns `5.651486`
-at 1 step, `5.433401` at 2, `5.1754994` at 10, and `2.4734879` at 50.
-Adding exercise dates cannot lower an American option's value, and every
-figure past one step is below the European put `5.5735` it must exceed. Use
-`tr_crr_american_put` (`6.0867205`) or `pde_american_put_cn`
-(`6.078748`) for American puts.
+The fit centers and scales spot values, then solves the least-squares
+problem by QR in `f64`. Continuation values are evaluated in those
+normalized coordinates. A rank-deficient fit uses a linear or constant
+basis. This avoids forming normal equations from spot values and their
+squares, which can lose the quadratic fit in `f32`.
 
-`lsm_polynomial_regression` is the least-squares fit
-`y = b0 + b1 * x + b2 * x^2`, returned as `(b0, b1, b2)`; it solves the
-3 x 3 normal equations, so it needs at least three distinct `x` values. On
-`x = [1, 2, 3, 4]`, `y = [2, 5, 10, 17]` (that is, `1 + x^2`) it returns
-`(1.0, 6.1035156e-5, 1.0)`; the middle coefficient shows the `f32` error of
-the normal equations. `lsm_put_payoff(s, k)` is `max(k - s, 0)`.
+With 2000 paths, seed 21, `s0 = k = 100`, `r = 0.05`, `sigma = 0.2`, and
+`t = 1`, the prices are:
+
+| Exercise steps | Price |
+| --- | --- |
+| 1 | 5.651484 |
+| 2 | 5.7318807 |
+| 10 | 6.0377645 |
+| 50 | 6.1672 |
+
+These are Monte Carlo estimates. Changing the number of dates also
+changes the simulated paths, so individual estimates need not increase
+with the number of steps or exceed an analytic European price. Using the
+same paths to fit and value the exercise policy also introduces regression
+bias. Several seeds help measure random variation; increase the path
+count to reduce the fitting bias. For this case, a refined
+`tr_crr_american_put` tree gives about `6.09`.
+
+Supply at least one path and one step, finite positive `s0` and `k`, a
+finite rate, and finite non-negative `sigma` and `t`. At zero maturity
+the result is the intrinsic payoff. Invalid inputs fail with a diagnostic.
+
+`lsm_polynomial_regression` returns the coefficients `(b0, b1, b2)` of
+`y = b0 + b1 * x + b2 * x^2` in the original coordinates. For
+`x = [90, 95, 100, 105, 110]` and `y = [101, 26, 1, 26, 101]`, it returns
+`(10001, -200, 1)`. If every spot is the same, it uses a constant fit;
+two distinct spots use a linear fit. Supply equal, nonempty lengths and
+finite observations.
+If coefficients cannot be represented in `f32`, the function fails.
+`lsm_put_payoff(s, k)` is `max(k - s, 0)`.
 
 ## Fixed-coupon bonds
 

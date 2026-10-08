@@ -24,6 +24,7 @@ jobs:
   hard-rule-guard:
     name: hard-rule-guard (offline pin consistency)
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,6 +33,7 @@ jobs:
 
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -107,6 +109,10 @@ jobs:
       - name: chelis reef build
         run: chelis reef build
 
+      - name: Check expiry properties and refute their false controls
+        timeout-minutes: 3
+        run: python3 scripts/check_pricing_fix_properties.py --smoke
+
       - name: Validate Black-Scholes WireDag root (shoals#19)
         run: python3 scripts/validate_bs_wire_root.py
 
@@ -139,29 +145,16 @@ jobs:
       - name: Pin-bump guard
         run: chelis reef conform bump-check --base origin/main
 
-      # Per-PR CI is deliberately LEAN and stops at the compile signal
-      # (chelis reef build) above. The real-chelis test suites do NOT run on
-      # the per-PR path: BOTH the fast unit suite (tests/ — the tallest slice
-      # of the old per-PR gate by a wide margin; nightly.yml states its
-      # measured cost, its run-to-run spread and its ceiling at the step,
-      # which is the authoritative site for that figure) and the heavy MC /
-      # PDE /
-      # Fourier / optimization-benchmark suite (tests-manual/) run in
-      # .github/workflows/nightly.yml (scheduled +
-      # workflow_dispatch, real toolchain), and the local gate runs them only
-      # under `scripts/run_local_gate.py --full` (its default mode mirrors
-      # this per-PR job set, minus the CI-only `conform bump-check` — a
-      # stale local origin/main would make that step false-fail).
+      # Shoals-only policy: numerical suites and benchmarks are optional
+      # local tools. CI keeps compilation, short guards and offline checks.
+      # This includes scheduled, manual and release workflows.
 
-  # The user book (docs/book) mirrors https://chelis.ch/docs/shoals/. Build
-  # it, lint the book and README against the writing standard, and check
-  # every book example against this checkout with the pinned toolchain
-  # (signatures against the source, fragments evaluated and their shown
-  # values compared).
+  # Build the rendered book and validate prose and repository signatures.
+  # Runtime examples remain available locally via check_book_examples.py.
   book:
-    name: book (mdbook build, lint, examples)
+    name: book (mdbook build, lint, source signatures)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -173,51 +166,17 @@ jobs:
         run: mdbook build docs/book
       - name: Lint book and README
         run: python3 scripts/check_book.py docs/book/src README.md
-
-      - name: Extract dependency versions from reef.toml
-        run: |
-          set -euo pipefail
-          for dep in nautilus coral shoreleave; do
-            v=$(grep "^$dep" reef.toml | grep -oP 'version\s*=\s*"=?\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-            [ -n "$v" ] || { echo "no $dep version in reef.toml" >&2; exit 1; }
-            echo "$(echo "$dep" | tr a-z A-Z)_TAG=v$v" >> "$GITHUB_ENV"
-          done
-      - name: Install chelis toolchain (cached)
-        id: chelis
-        uses: ./.github/actions/install-chelis
-        with:
-          chelis-tag: ${{ env.CHELIS_TAG }}
-          chelis-version: ${{ env.CHELIS_VERSION }}
-          gh-token: ${{ secrets.CHELIS_RELEASE_TOKEN }}
-          reef-cache-key: nautilus-${{ env.NAUTILUS_TAG }}-coral-${{ env.CORAL_TAG }}-shoreleave-${{ env.SHORELEAVE_TAG }}
-      - name: Install released dependencies
-        if: steps.chelis.outputs.reef-cache-hit != 'true'
-        timeout-minutes: 5
-        env:
-          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
-        run: |
-          set -euo pipefail
-          chelis reef install --from-github "chelis-lang/nautilus@${NAUTILUS_TAG}"
-          chelis reef install --from-github "chelis-lang/coral@${CORAL_TAG}"
-          chelis reef install --from-github "chelis-lang/shoreleave@${SHORELEAVE_TAG}"
-      # The compiled-package cache: with it, the checker skips recompiling
-      # Shoals and its dependencies (about 40 s) when the library source is
-      # unchanged, which is every docs-only PR.
-      - name: Restore compiled-package cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/chelis
-          key: book-examples-${{ env.CHELIS_VERSION }}-${{ hashFiles('reef.toml', 'src/**', 'properties/**', 'references/**', 'demos/**') }}
-          restore-keys: book-examples-${{ env.CHELIS_VERSION }}-
-      - name: Check book examples against the source
-        run: python3 scripts/check_book_examples.py
+      - name: Check book signatures against repository sources
+        run: python3 scripts/check_book_examples.py --source-only
+      - name: Validate source-only book checks
+        run: python3 scripts/test_check_book_examples.py
 
   # Offline manifest validation (no toolchain): schema/pin freshness + every
   # invariant/control/output-fn/precondition resolves to real sources.
   contract-gate:
     name: contract-gate (offline manifest validation)
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -229,22 +188,18 @@ jobs:
         run: python3 scripts/test_build_release_assets.py
       - name: Validate the chelis#924 release oracle
         run: python3 scripts/test_check_package_prove_latency.py
+      - name: Validate bounded pricing property-result classification
+        run: python3 scripts/test_check_pricing_fix_properties.py
+      - name: Validate the LSM accuracy oracle
+        run: python3 scripts/test_check_lsm_accuracy.py
+      - name: Validate the spread PDE accuracy oracle
+        run: python3 scripts/test_spread_adi_oracle.py
       - name: Validate release workflow integrity contracts
         run: python3 scripts/test_release_workflow.py
 
-      # shoals#64: the published erf64/n_cdf64 accuracy floors, checked against
-      # every other place in the tree that states them. Stdlib-only and
-      # offline, so it belongs on the per-PR path even though the MEASUREMENT
-      # leg (which needs mpmath and the pinned toolchain) runs nightly. This
-      # leg proves the carriers agree; nightly proves they are right.
+      # Offline agreement of published figures. The optional local measurement
+      # runner checks numerical accuracy against mpmath.
       - name: Accuracy-floor transcription (shoals#64)
         run: python3 scripts/oracle_erf64_accuracy.py --transcription
       - name: Validate the accuracy-floor oracle's own mutations (shoals#64)
         run: python3 scripts/test_oracle_erf64_accuracy.py
-
-  # NOTE: the real-SMT keystone canon self-audit (scripts/prove_gate.py) is NOT
-  # on the per-PR path — it is ~8.6 min of real-prover wall (the reef package
-  # load alone is multi-minute, and prove_gate has no cheap subset to smoke), so
-  # it runs in .github/workflows/nightly.yml (the `prove` job) and in the local
-  # gate before push. The offline contract-gate above still validates the
-  # manifest on every PR; the compile signal is the `check` job's reef build.

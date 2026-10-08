@@ -861,40 +861,27 @@ tiers: **A** (type/dimension/linearity), **B** (SMT via cvc5 over the reals),
 | `to_list` / `to_tensor` over `tensor[n, f64]`, incl. a generic `[n]` ([05-OP-57]) | `@pin` | Load-bearing for all 22 `tensor_` exports of `Shoals.Indicators`: each delegates to its list counterpart over `to_list` -- one conversion per tensor series, so the multi-series forms do two or three, and the two crossing forms do none directly, reaching it through `ind_mask_tensor` (shoals#83, `spec/shoals_quant_surface.md` §2.15.5). Order and length preserved; a symbolic `[n]` composes. Distinct from the `@upstream` grad row below, which is about differentiating *through* such a body, not about the conversion. |
 | chelis-std / nautilus / coral module surface | `@pin` | Pricing, distributions, RNG, curves, dates, vol surfaces per `src/` + `references/`. |
 
-## Numerical accuracy of shell-authored kernels
+## Numerical accuracy of pricing wrappers
 
-What the kernels this shell authors actually guarantee. It exists because dtype
-is not accuracy: an `f64` signature says how the arithmetic is evaluated, not
-how good the approximation being evaluated is.
+An `f64` signature specifies arithmetic precision. It does not bound
+approximation error. The table records the largest absolute errors observed
+on the compiled `erf64` and `n_cdf64` wrappers against a 60-digit `mpmath`
+reference, using the exact binary inputs and outputs. The sweep contains
+4953 points, including the original broad grid and adjacent representable
+values near center and tail inputs.
 
-**Every figure below is measured on the compiled kernel against a high-precision
-`mpmath` reference, not derived.** Where a bound is not measured it is not
-stated.
-
-`scripts/oracle_erf64_accuracy.py` computes them, measuring in binary at
-extended precision; `erf64` and `n_cdf64` are exported so the bound can be
-measured from outside the module. **The table below is the authoritative
-publication of these figures, and the oracle reads it** — it no longer compares
-against internal constants of its own (shoals#64). Two legs check it:
-
-- Every PR runs the oracle's offline `--transcription` leg, which parses the
-  floors out of this table and requires every other place in the tracked tree
-  that states one of them to state the same number. Carriers are discovered by
-  `git grep`, so adding one needs no registration and a stale one cannot hide.
-- The nightly job runs `--measurement`, which measures the compiled kernels
-  against a 60-dps reference and requires each floor here to be a **true and
-  tight** floor: equal to the measurement truncated toward zero at that
-  figure's own significant-digit count. Publishing fewer digits is allowed;
-  publishing an understated floor (`1.0e-30` is technically a floor) is not.
-
-The division is deliberate — the offline leg proves the carriers agree, never
-that they are right, and only the nightly leg constrains the value. A missing
-`mpmath` now fails the measurement leg instead of skipping it.
+Each figure is rounded down to five significant digits. It is a lower bound
+on the worst error, rather than an upper error bound or a global guarantee.
+`scripts/oracle_erf64_accuracy.py` reads this table. Its offline
+`--transcription` check requires matching figures everywhere they appear in
+the tracked tree. Its optional local `--measurement` check recomputes the errors
+and requires the published figures to match the measured maxima after
+rounding down. Missing reference dependencies fail the measurement check.
 
 | Kernel | Approximation | Worst observed absolute error (a floor) | Method |
 |---|---|---|---|
-| `erf64` | Chelis's correctly rounded `erf` builtin | **>= 5.5177e-17** (~0.25 ulp of 1.0) | worst observed at x = -1.25 over 531 compiled samples at 60 dps |
-| `n_cdf64` | Chelis's `standard_normal_cdf` graph over correctly rounded `erfc` | **>= 7.7516e-17** (~0.35 ulp of 1.0) | worst observed near x = 1.0 over the same compiled samples at 60 dps; the separate relative leg checks the negative tail |
+| `erf64` | Chelis's correctly rounded `erf` builtin | **>= 5.5504e-17** (~0.25 ulp of 1.0) | worst observed at x = -3.741111111111111 over 4953 compiled samples at 60 dps |
+| `n_cdf64` | Chelis's `standard_normal_cdf` graph over correctly rounded `erfc` | **>= 8.4914e-17** (~0.38 ulp of 1.0) | worst observed at x = 0.7366666666666667 over the same compiled samples at 60 dps; the separate relative leg checks the negative tail |
 
 `n_cdf64` delegates to Chelis's `standard_normal_cdf`, whose graph uses
 correctly rounded `erfc` directly for the negative tail. The oracle checks

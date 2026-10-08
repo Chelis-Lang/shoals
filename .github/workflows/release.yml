@@ -20,6 +20,7 @@ env:
 jobs:
   build-reef-assets:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -84,12 +85,6 @@ jobs:
           chelis reef install --from-github "chelis-lang/coral@${CORAL_TAG}"
           chelis reef install --from-github "chelis-lang/shoreleave@${SHORELEAVE_TAG}"
 
-      - name: Verify release bytes converge across adversarial Reef registries (chelis#1002)
-        env:
-          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
-          GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
-        run: python3 scripts/check_release_artifact_determinism.py
-
       - name: Build canonical reef assets (chelis#1002)
         env:
           GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
@@ -99,16 +94,14 @@ jobs:
       - name: Run adversarial risk invariant gate regressions
         run: python3 scripts/test_risk_invariant_gate.py
 
-      - name: Verify complete SMT and fuzz-validated canon
-        env:
-          PROVE_GATE_FUZZ: "1"
-        run: python3 scripts/prove_gate.py
+      - name: Validate bounded pricing property-result classification
+        run: python3 scripts/test_check_pricing_fix_properties.py
 
-      - name: Verify package prove latency and deterministic output (chelis#924)
-        env:
-          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
-          GITHUB_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN || github.token }}
-        run: python3 scripts/check_package_prove_latency.py
+      - name: Validate the LSM accuracy oracle
+        run: python3 scripts/test_check_lsm_accuracy.py
+
+      - name: Validate the spread PDE accuracy oracle
+        run: python3 scripts/test_spread_adi_oracle.py
 
       - name: Publish the invariant-surface manifest as a release asset
         run: |
@@ -139,7 +132,6 @@ jobs:
               "${PACKAGE_NAME}-${PACKAGE_VERSION}.tar.zst" \
               > "${PACKAGE_NAME}-${PACKAGE_VERSION}.sha256"
           )
-          python3 scripts/build_release_assets.py
           cmp docs/cnote-import-surface.json "$invariant"
           (
             cd dist

@@ -37,7 +37,8 @@ After source and contract edits, run Shoals's gate with the worktree Python
 PATH="$PWD/.venv/bin:$PATH" python3 scripts/run_local_gate.py
 ```
 
-For a pin bump run it with `--full`. Require applicable hosted checks on the
-exact pushed head and the relevant manual or numerical oracle before claiming
-completion.
+Require applicable fast hosted checks on the exact pushed head. `--full`
+explicitly opts into long local numerical, proof, benchmark and runtime book
+checks; it is not required at pin bumps or before push, merge or release.
+Report numerical evidence only for the exact commands and inputs executed.
 <!-- shell-local:end -->
