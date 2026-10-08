@@ -24,3 +24,12 @@ precomputed by its caller: checking only there would refuse the same inputs
 one frame later while leaving lmm_path's own `dt` division unguarded.
 lmm_evolve is exported, so it carries the check as well, and a call that
 reaches it directly is refused at its own entry.
+
+What this fixture pins, measured rather than assumed: the PAIR, not either
+guard alone. A per-site mutation sweep unguarded lmm_path's entry and
+lmm_evolve's step range one at a time and this fixture SURVIVED both, because
+whichever guard remains still refuses; unguarding both together is killed. The
+two emit the same diagnostic, so no fixture can distinguish them. Both are
+kept because each is independently justified -- lmm_evolve is exported and
+reachable directly, and lmm_path divides by the step count before calling it
+-- and not because this fixture can tell them apart.
