@@ -1,0 +1,4 @@
+Shoals.Stochastic: jump horizon must be finite and non-negative
+shoals#149: intensity and horizon must each be finite and non-negative.
+Checking their product permits two negative inputs or hides an invalid
+operand when the other is zero. This fixture requires the operand diagnostic.
