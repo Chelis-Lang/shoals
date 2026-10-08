@@ -546,6 +546,10 @@ FD-chain gradient through curves → SABR. SQP, KKT-aware Greeks
 through the LM, and per-stage IFT composition (vs the current
 FD-bump pipeline gradient) remain M8-continuation items.
 
+The prospective Clarabel-backed bounded QP step is specified in
+[`clarabel_modelfit_cutover.md`](clarabel_modelfit_cutover.md). Its release and
+precision gates precede any change to the existing `f32` fit API.
+
 **Work packets:**
 
 | # | Packet | Agent | Output |
