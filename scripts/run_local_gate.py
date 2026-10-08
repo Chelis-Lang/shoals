@@ -250,6 +250,10 @@ def main() -> int:
             ["python3", "scripts/test_check_pricing_fix_properties.py"],
         ),
         (
+            "LSM accuracy oracle adversarial tests",
+            ["python3", "scripts/test_check_lsm_accuracy.py"],
+        ),
+        (
             "release workflow integrity tests",
             ["python3", "scripts/test_release_workflow.py"],
         ),
@@ -293,6 +297,10 @@ def main() -> int:
             )
             for stem in NIGHTLY_MANUAL_FILES
         ],
+        (
+            "native LSM accuracy against refined American trees",
+            ["python3", "scripts/check_lsm_accuracy.py"],
+        ),
         (
             "accuracy-floor measurement (shoals#64)",
             ["python3", "scripts/oracle_erf64_accuracy.py", "--measurement"],

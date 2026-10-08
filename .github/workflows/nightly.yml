@@ -384,6 +384,12 @@ jobs:
         timeout-minutes: 30
         run: chelis test "tests-manual/${{ matrix.file }}.ch" --timeout 1500 --suite-timeout 1650 --jobs 1
 
+      # Shoals-only oracle: retain the 4000-path accuracy budget while
+      # running the replicate matrix through the native backend.
+      - name: Check native LSM accuracy
+        if: matrix.file == 'lsm_heavy'
+        run: python3 scripts/check_lsm_accuracy.py
+
   # Surface a nightly failure as a tracking issue (opens on failure, closes
   # on green) so a red nightly is impossible to miss — scheduled-run
   # failures do not show a red status on main, which is how the heavy

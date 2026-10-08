@@ -124,6 +124,26 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn('["python3", "scripts/check_pricing_fix_properties.py"]', full)
         self.assertIn('["python3", "scripts/test_check_pricing_fix_properties.py"]', per_pr)
 
+    def test_lsm_accuracy_runs_in_full_nightly_and_before_publish(self) -> None:
+        local = (ROOT / "scripts/run_local_gate.py").read_text()
+        ci = (ROOT / ".github/workflows/ci.yml").read_text()
+        nightly = (ROOT / ".github/workflows/nightly.yml").read_text()
+        release = (ROOT / ".github/workflows/release.yml").read_text()
+        command = "python3 scripts/check_lsm_accuracy.py"
+        units = "python3 scripts/test_check_lsm_accuracy.py"
+        per_pr, full = local.split("    nightly_stages:", 1)
+        self.assertNotIn(command, ci)
+        self.assertIn(units, ci)
+        self.assertIn('["python3", "scripts/test_check_lsm_accuracy.py"]', per_pr)
+        self.assertNotIn('["python3", "scripts/check_lsm_accuracy.py"]', per_pr)
+        self.assertIn('["python3", "scripts/check_lsm_accuracy.py"]', full)
+        heavy = nightly[nightly.index("  heavy:"):nightly.index("  report:")]
+        step = heavy[heavy.index("      - name: Check native LSM accuracy"):]
+        self.assertIn("if: matrix.file == 'lsm_heavy'", step)
+        self.assertIn(command, step)
+        self.assertIn(units, release)
+        self.assertLess(release.index(command), release.index("uses: softprops/action-gh-release@v2"))
+
     def test_full_local_gate_runs_cross_registry_artifact_oracle(self) -> None:
         local = (ROOT / "scripts/run_local_gate.py").read_text()
         self.assertIn(
