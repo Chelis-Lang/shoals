@@ -7,8 +7,10 @@ import Shoals.Stochastic (heston_qe_terminal)
 -- horizon it never simulated. checked_step_count refuses at the entry.
 --
 -- The horizon guard cannot reach this and should not: `t = 1.0` is a
--- perfectly legal horizon, and `dt = t / n_steps` is `+inf` here but has no
--- consumer that ever runs, so a finiteness check on `dt` would see nothing.
+-- perfectly legal horizon. A finiteness check on the derived `dt` is not a
+-- substitute either, though for a narrower reason than it looks: adding one
+-- CREATES a consumer for `dt`, so it does catch `n_steps = 0`, where `dt` is
+-- `+inf`. It misses a negative count, where `t / -8` is finite.
 --
 -- This file pins the ZERO case on its own, separately from the negative one,
 -- because the two refusals rest on different warrants. A negative step count

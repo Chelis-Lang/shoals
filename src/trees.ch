@@ -210,7 +210,7 @@ def tr_jr_params(r: f32, q: f32, sigma: f32, dt: f32) -> (f32, f32, f32, f32) = 
 -- Each module carries its own copy of its check so its diagnostic can name
 -- the module a caller actually invoked, following ind_require_period's
 -- precedent in Shoals.Indicators.
-def tr_checked_step_count(n_steps: i64) -> i64 = if lt(n_steps, cast(1, i64)) then fail(string_concat("Shoals.Trees: the step count must be at least 1, got ", string_concat(to_string(n_steps), "; dt = t / n_steps divides the horizon by zero, and the resulting non-finite step makes the pricer return 0.0 regardless of moneyness"))) else n_steps
+def tr_checked_step_count(n_steps: i64) -> i64 = if lt(n_steps, cast(1, i64)) then fail(string_concat("Shoals.Trees: the step count must be at least 1, got ", string_concat(to_string(n_steps), "; at zero, dt = t / n_steps is non-finite and the pricer collapses to a flat 0.0 regardless of moneyness; below zero the terminal layer is empty"))) else n_steps
 def tr_checked_lattice_depth(n_steps: i64) -> i64 = if lt(n_steps, cast(0, i64)) then fail(string_concat("Shoals.Trees: the lattice depth must not be negative, got ", string_concat(to_string(n_steps), "; a negative depth leaves the terminal layer empty, so the backward induction has no node to read"))) else n_steps
 def tr_binom_european_call_generic(s0: f32, k: f32, log_u: f32, log_d: f32, p: f32, disc: f32, n_steps: i64) -> f32 = {
   n_ok = tr_checked_lattice_depth(n_steps)

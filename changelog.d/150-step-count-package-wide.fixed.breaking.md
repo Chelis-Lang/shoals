@@ -32,13 +32,19 @@ a later tightening cannot quietly take it away.
 unchanged: it already fails loudly at `n_steps <= 0` and returns no plausible
 wrong number.
 
-Two other families are NOT covered by this change and still return a plausible
-number for a degenerate count. `Shoals.Pde`'s time-step count `n_t` is the
+Four other count families are NOT covered by this change and still return a
+plausible number below their documented domain; they are tracked in
+shoals#166. `Shoals.Pde`'s time-step count `n_t` is the
 same mechanism: `pde_european_call_cn` at `s0 = 100`, `K = 90`, `t = 1.0`
 returns `10.015209` at both `n_t = 0` and `n_t = -8`, against `16.730183` at
 `n_t = 20`, and `pde_american_put_cn` at `K = 110` returns `9.984791` at
 `n_t = 0` against `11.933073`. `Shoals.Heston`'s quadrature panel count
 `n_panels` behaves likewise: `heston_call_lewis_panels` returns `100.0`, the
 spot, at `n_panels = 0` against `23.196457` at 20, and
-`heston_call_carr_madan_panels` returns `0.0` against `16.986883`. Both are
-left for separate work rather than folded in here.
+`heston_call_carr_madan_panels` returns `0.0` against `16.986883`. Two more
+are the same shape: `cds_pv` returns `0.05308778` at a payment frequency of
+`0` and of `-4`, against `0.009123858` at `4`, and
+`xva_cva_wwr_constant_hazard` returns `-0.0` at `n_paths = -8` against
+`0.24702658` at `64`. `Shoals.Pde` also returns a call price above the spot,
+`107.19469`, at a space grid of `n_x = 2`, below its documented minimum of 3.
+All are left for separate work rather than folded in here.

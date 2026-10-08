@@ -78,8 +78,11 @@ def lmm_step[k](forwards: tensor[k, f32], taus: tensor[k, f32], sigmas: tensor[k
 --
 -- Each module carries its own copy of this check so its diagnostic can name
 -- the module a caller actually invoked, following ind_require_period's
--- precedent in Shoals.Indicators. The shared rule is documented once in
--- docs/src/; the duplication is the message text, not the decision.
+-- precedent in Shoals.Indicators. The duplication is the message text, not
+-- the decision; the decision is stated once in the changelog fragment for
+-- this change. (The user book is NOT that place: it mirrors the published
+-- site and documents the latest release, and its Shoals pages still describe
+-- these counts as unchecked caller obligations until that release lands.)
 def lmm_checked_step_count(n_steps: i64) -> i64 = if lt(n_steps, cast(1, i64)) then fail(string_concat("Shoals.LiborMarketModel: the step count must be at least 1, got ", string_concat(to_string(n_steps), "; with no steps the evolution loop never runs, so the sampler would return the initial forward curve unchanged for a horizon it did not simulate"))) else n_steps
 def lmm_evolve[k](rng_key: key, forwards: tensor[k, f32], tau_l: List[f32], sig_l: List[f32], corr_flat_l: List[f32], chol: &tensor[k, k, f32], dt: f32, n_steps: i64, k_dim: i64, sqrt_dt: f32) -> tensor[k, f32] = {
   step_idxs = range(cast(0, i64), lmm_checked_step_count(n_steps))

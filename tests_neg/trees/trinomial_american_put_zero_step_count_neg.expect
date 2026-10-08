@@ -1,4 +1,4 @@
-Shoals.Trees: the step count must be at least 1, got 0; dt = t / n_steps divides the horizon by zero, and the resulting non-finite step makes the pricer return 0.0 regardless of moneyness
+Shoals.Trees: the step count must be at least 1, got 0; at zero, dt = t / n_steps is non-finite and the pricer collapses to a flat 0.0 regardless of moneyness; below zero the terminal layer is empty
 Assumption: a step count is a RESOLUTION parameter, and zero resolution is
 unspecified rather than degenerate. This pricer forms `dt = t / n_steps`, so a
 zero step count divides the horizon by zero; the non-finite step poisons the
@@ -10,10 +10,14 @@ sigma = 0.2, t = 1.0: a put ten points in the money priced at 0.0 against
 11.94946 at `n_steps = 64`.
 
 This fixture closes a hole a red-team round found, and the hole is worth
-recording because a single-site unguard did NOT reveal it. Unguarding this
-pricer alone is caught, but only because the `*_generic` it delegates to then
-refuses with its own lattice-depth diagnostic, which `--expect neg` reads as
-WRONG-DIAGNOSTIC. The ZERO boundary at this site was therefore pinned only by
+recording because a single-site unguard did NOT reveal it. This pricer
+delegates to no generic -- it runs tr_tri_terminal_put and
+tr_tri_back_american_put directly -- so unguarding it alone is caught by the
+leaked `index 0 out of bounds for list of len 0` from the empty terminal
+layer, which `--expect neg` reads as WRONG-DIAGNOSTIC. (The sibling fixture
+for tr_crr_european_put describes a delegating case, where the catch comes
+from the generic's lattice-depth text instead. An earlier draft of this
+rationale wrongly claimed this site delegated too.) The ZERO boundary at this site was therefore pinned only by
 the TEXT of a negative fixture, so a weakening that preserved the text was
 invisible: replacing the check with an inline `lt(n_steps, 0)` carrying the
 identical diagnostic string left the entire suite green while this pricer

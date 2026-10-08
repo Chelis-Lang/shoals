@@ -64,8 +64,11 @@ def hw1f_step(r: f32, a: f32, theta_bar: f32, sigma: f32, dt: f32, z: f32) -> f3
 --
 -- Each module carries its own copy of this check so its diagnostic can name
 -- the module a caller actually invoked, following ind_require_period's
--- precedent in Shoals.Indicators. The shared rule is documented once in
--- docs/src/; the duplication is the message text, not the decision.
+-- precedent in Shoals.Indicators. The duplication is the message text, not
+-- the decision; the decision is stated once in the changelog fragment for
+-- this change. (The user book is NOT that place: it mirrors the published
+-- site and documents the latest release, and its Shoals pages still describe
+-- these counts as unchecked caller obligations until that release lands.)
 def hw_checked_step_count(n_steps: i64) -> i64 = if lt(n_steps, cast(1, i64)) then fail(string_concat("Shoals.HullWhite: the step count must be at least 1, got ", string_concat(to_string(n_steps), "; with no steps the evolution loop never runs, so the sampler would return its initial state -- r0, or (x0, y0) for the two-factor path -- unchanged for a horizon it did not simulate"))) else n_steps
 def hw1f_path[n](rng_key: key, paths_template: tensor[n, f32], r0: f32, a: f32, theta_bar: f32, sigma: f32, t: f32, n_steps: i64) -> tensor[n, f32] = {
   n_paths = numel(copy(paths_template))

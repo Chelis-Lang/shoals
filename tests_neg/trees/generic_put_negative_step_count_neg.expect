@@ -1,4 +1,4 @@
-Shoals.Trees: the step count must be at least 1, got -8; dt = t / n_steps divides the horizon by zero, and the resulting non-finite step makes the pricer return 0.0 regardless of moneyness
+Shoals.Trees: the step count must be at least 1, got -8; at zero, dt = t / n_steps is non-finite and the pricer collapses to a flat 0.0 regardless of moneyness; below zero the terminal layer is empty
 Assumption: a step count is a RESOLUTION parameter, and zero resolution is
 unspecified rather than degenerate. In this module the consequence is sharper
 than in the path samplers: `dt = t / n_steps` divides the horizon by zero, the
