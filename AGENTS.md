@@ -235,7 +235,13 @@ holds the measurements behind these rules.
   published release tarball. CI uses the toolchain install action.
 - The local debugging fallback for `chelis test` is `--jobs 1`. Don't
   reintroduce per-file matrix sharding or chelis source checkouts
-  in CI unless a documented semantic reason appears.
+  in CI unless a documented semantic reason appears. Two Monte-Carlo tests
+  are load-sensitive -- `tests/pricing.ch::test_mc_converges_to_bs` (20K
+  paths) and `tests/libormarketmodel.ch::test_lmm_martingale_at_zero_drift`
+  (128 paths): they pass in CI and in isolation but can time out under
+  concurrent local CPU load, so run `--jobs 1` if they flake locally. This
+  is CPU contention, not a regression -- do NOT bump their statistical
+  budget (paths) to mask it.
 
 ## Capability Surface
 
