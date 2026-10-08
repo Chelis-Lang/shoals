@@ -1,0 +1,4 @@
+Shoals.Pde: n_x2 must be at least 3; received 2
+
+shoals#166: reject before division, ranges, indexing or sampling; deleting
+the guard must fail the pinned diagnostic, not merely an assertion.

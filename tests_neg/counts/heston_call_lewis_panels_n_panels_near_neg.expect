@@ -1,0 +1,4 @@
+Shoals.Heston: n_panels must be at least 1; received 0
+
+shoals#166: reject before division, ranges, indexing or sampling; deleting
+the guard must fail the pinned diagnostic, not merely an assertion.

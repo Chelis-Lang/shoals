@@ -6,6 +6,7 @@ export (HazardCurve, hazard_curve_from_pillars, hazard_curve_pillars, cds_surviv
 @opaque
 type HazardCurve[n] =
   | HazardCurve { times: tensor[n, f32], hazards: tensor[n, f32] }
+def cds_checked_premium_frequency(count: i64) -> i64 = if lt(count, 1i64) then fail(string_concat("Shoals.Cds: n_premiums_per_year must be at least 1; received ", to_string(count))) else count
 def cds_first_unsorted_time(times: List[f32]) -> i64 = fold(fn (acc: i64, j: i64) -> if gte(acc, 0i64) then acc else if gt(index(times, j), index(times, sub(j, 1i64))) then acc else j, -1i64, range(1i64, len(times)))
 def cds_unsorted_time_detail(times: List[f32], j: i64) -> string = {
   i_prev = sub(j, 1i64)
@@ -53,7 +54,8 @@ def cds_survival_from_hazards[n](curve: HazardCurve[n], t: f32) -> f32 =
   }
   }
 def cds_premium_grid(t_maturity: f32, n_premiums_per_year: i64) -> List[f32] = {
-  freq_f = cast(n_premiums_per_year, f32)
+  n_premiums_per_year_ok = cds_checked_premium_frequency(n_premiums_per_year)
+  freq_f = cast(n_premiums_per_year_ok, f32)
   dt = div(cast(1.0, f32), freq_f)
   total_f32 = mul(t_maturity, freq_f)
   total = cast_trunc(total_f32, i64)
