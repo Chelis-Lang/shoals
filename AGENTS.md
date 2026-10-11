@@ -5,7 +5,7 @@ to this file so Claude-style and Codex-style entry points do not drift.
 
 ## Repo Identity
 
-<!-- BEGIN CHELIS MANAGED BLOCK: agents-inheritance chelis@0.19.1 (sha256:577cc2c2f590f4d1) -->
+<!-- BEGIN CHELIS MANAGED BLOCK: agents-inheritance chelis@0.19.2 (sha256:abb804f16053c142) -->
 # Chelis Agent Contract
 
 Keep this file concise and relevant to every agent working in this repository.
@@ -108,7 +108,7 @@ function of those inputs, and feedback that varies between identical runs is a d
 
 ## Subagents
 
-[`docs/investigations/agent_contract_rationale.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/docs/investigations/agent_contract_rationale.md)
+[`docs/investigations/agent_contract_rationale.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/docs/investigations/agent_contract_rationale.md)
 holds the measurements behind these rules.
 
 - Every subagent prompt names the delivery mechanism and the complete expected report.
@@ -150,6 +150,34 @@ holds the measurements behind these rules.
   worktree status unless asked to retain them. Before a heavyweight cargo command it
   reports the exact command and expected weight to the orchestrator.
 
+## Book
+
+If this shell has a user-facing book (an mdBook under `docs/`): this section
+applies to it. If the shell is also published on chelis.ch
+(https://chelis.ch/docs/), chelis.ch mirrors the book page for page at
+`https://chelis.ch/docs/<package name>/` (chelis: https://chelis.ch/docs/chelis/),
+and the chelis.ch text is canonical: book pages are rendered from the site by
+the website's `scripts/sync_books.py`, so edit prose on the site and re-render,
+or make the same edit in both places in the same change.
+
+The reader is an engineer, or an AI coding agent, writing Chelis code against
+this shell. They know the domain but not this repo's internals or history, and
+they want to call the API correctly the first time. Every page teaches: what the
+API does, a runnable example with its real output, the contract (inputs, domain,
+shapes, precision, errors) and the pitfalls.
+
+Never in the book: issue or PR numbers, repo-internal paths (`spec/`, `src/`
+internals, `scripts/`, `tests/`, maintainer docs), maintainer or CI commands,
+contributor history, process talk (gates, red teams, agent instructions),
+status words (planned, not yet, stub, phase, milestone), "see the source" in
+place of documentation, em-dashes, and the word "load-bearing". In a shell
+published on chelis.ch, `scripts/check_book.py` enforces the mechanical part
+in CI.
+
+A change that alters user-visible behavior says so in its changelog entry.
+The book documents the latest release: the book, and its chelis.ch page when
+published, take the change when that release is documented.
+
 ## Pointers
 
 - **Shared skills** live in `agent-skills/`; `.claude/skills` and `.codex/skills` are
@@ -165,9 +193,9 @@ holds the measurements behind these rules.
   there. One trap it enforces at compile time: `reef setup` subprocesses the real
   `chelisup` binary, never `chelisup::install::install` in-process, because that helper
   copies `current_exe()` over the shim. Design:
-  [`spec/design/chelis_packaging_and_install.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/design/chelis_packaging_and_install.md).
+  [`spec/design/chelis_packaging_and_install.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/design/chelis_packaging_and_install.md).
 - **Downstream shells** inherit this complete contract through a stamped managed block
-  and must satisfy [`spec/design/shell_repo_contract.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/design/shell_repo_contract.md),
+  and must satisfy [`spec/design/shell_repo_contract.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/design/shell_repo_contract.md),
   shipped in the toolchain as `chelis reef conform`. Full inheritance is the default,
   but each shell decides which portions apply. Shell-owned additions stay outside the
   block and should remain when they are relevant and current. To omit an inherited

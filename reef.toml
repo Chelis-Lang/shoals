@@ -1,8 +1,8 @@
 schema = "3"
 [package]
 name = "shoals"
-version = "0.24.17"
-compiler = "=0.19.1"
+version = "0.24.18"
+compiler = "=0.19.2"
 module_prefix = "Shoals"
 additional_sources = ["properties", "references", "demos"]
 resolver = "2"

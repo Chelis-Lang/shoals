@@ -1,7 +1,7 @@
 # Shoals Upstream Bugs
 
 Tracked upstream chelis issues and capability gaps that affect Shoals, per the
-[downstream shell repo contract](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/design/shell_repo_contract.md) §4.
+[downstream shell repo contract](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/design/shell_repo_contract.md) §4.
 The reachability map these entries lean on — what the proof stack can and cannot
 discharge for finance at this pin — is `research/proof-infra/report.md`; keep
 entries consistent with it.
