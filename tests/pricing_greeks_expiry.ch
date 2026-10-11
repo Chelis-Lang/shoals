@@ -1,6 +1,6 @@
 module Shoals.Tests.PricingGreeksExpiry
 import Std.Test (assert_close, assert_true)
-import Shoals.Pricing (deltas_call, deltas_put, vegas_call, rhos_call, thetas_call, gammas_call, volgas_call, vannas_call)
+import Shoals.Pricing (bs_call_f64, deltas_call, deltas_put, vegas_call, rhos_call, thetas_call, gammas_call, volgas_call, vannas_call)
 -- shoals#101. Every exported Greek at t = 0, pinned against the limit measured
 -- by approaching expiry rather than against a transcribed decimal.
 --
@@ -23,6 +23,7 @@ def k100() -> f32 = cast(100.0, f32)
 def r5() -> f32 = cast(0.05, f32)
 def v20() -> f32 = cast(0.2, f32)
 def zero() -> f32 = cast(0.0, f32)
+def zero_f64() -> f64 = cast(0.0, f64)
 def tol() -> f32 = cast(0.0001, f32)
 -- The predicate itself needs pinning, because a predicate that cannot see what
 -- it claims to see is how this defect survived in the first place.
@@ -67,6 +68,16 @@ def test_theta_at_expiry_below_the_strike_is_zero() -> unit ! { Test } = {
 def test_theta_at_expiry_diverges_at_the_strike() -> unit ! { Test } = {
   th = to_list(thetas_call(spots3(), k100(), r5(), v20(), zero()))
   assert_true(is_neg_inf32(index(th, cast(0, i64))), "theta at t=0, s=k is -inf, and must not be NaN")
+}
+-- Direct probe for chelis#2640: do not pass through the expiry wrapper, which
+-- supplies a closed-form value and would hide the scalar AD path under test.
+def test_direct_ad_time_derivative_at_expiry_above_strike() -> unit ! { Test } = {
+  derivative = grad(fn (x: f64) -> bs_call_f64(cast(120.0, f64), cast(100.0, f64), cast(0.05, f64), cast(0.2, f64), x), wrt=x)(zero_f64())
+  assert_close(derivative, cast(5.0, f64), cast(1e-8, f64), "direct AD dC/dt at expiry above strike is r*k; theta is -r*k")
+}
+def test_direct_ad_time_derivative_at_expiry_below_strike() -> unit ! { Test } = {
+  derivative = grad(fn (x: f64) -> bs_call_f64(cast(80.0, f64), cast(100.0, f64), cast(0.05, f64), cast(0.2, f64), x), wrt=x)(zero_f64())
+  assert_close(derivative, cast(0.0, f64), cast(1e-8, f64), "direct AD dC/dt at expiry below strike is zero")
 }
 -- VANNA at t = 0 is 0 everywhere; VEGA, RHO and VOLGA were already correct.
 def test_vanna_at_expiry_is_zero_everywhere() -> unit ! { Test } = {

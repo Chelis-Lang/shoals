@@ -406,12 +406,18 @@ in code that is CLOSED upstream but not sitting in §Archived.
   reads the `shoals#101` citations in `src/pricing.ch`, and those comments explain
   two narrowings that outlive the fix, only one of which the pin bump will
   dissolve.
-    - **The theta half is chelis#2640 and does dissolve.** The shoals#88
-      denominator clamp's untaken arm is `sigma*sqrt(t)`, whose `t`-derivative is
-      `+inf` at `t = 0`; `grad` of that clamp wrt `t` is NaN at `t = 0` and `0.1`
-      at `t = 1`, measured. That is the chelis#2640 case, fixed upstream at
-      0.18.12 and not present at this pin. When the pin reaches 0.18.12, re-probe
-      whether `thetas_call`'s AD path produces `-r*k` and `0` directly.
+    - **The theta half is chelis#2640.** Chelis#2586 fixed the scalar-`if`
+      adjoint when the untaken branch has a non-finite derivative, and the fix
+      is present in the 0.19.2 release. Re-probe the scalar AD path directly,
+      without the expiry wrapper, using
+      `chelis test tests/pricing_greeks_expiry.ch` and the two
+      `test_direct_ad_time_derivative_at_expiry_*` cases. Expected evidence is
+      `dC/dt = +5` for `(s,k,r,sigma,t)=(120,100,0.05,0.2,0)` and `dC/dt = 0`
+      for `(80,100,0.05,0.2,0)`. **Status: blocked before evaluation** because
+      the published Coral 0.7.47 artifact requires Chelis 0.19.1, so Reef cannot
+      resolve the Shoals 0.19.2 package graph. The wrapper's closed-form tests
+      are not evidence for this upstream fix. Keep the scalar denominator floor
+      until these direct cases run and pass on a compatible package graph.
     - **The second-order half does NOT dissolve, and is not an upstream defect.**
       With the denominator floored, `d(d1)/ds` is `1e298`; squaring it overflows
       to `+inf`, which multiplies an underflowed second-order factor to give
@@ -424,10 +430,19 @@ in code that is CLOSED upstream but not sitting in §Archived.
       is rewritten as arithmetic. Do not simplify it.
 
 - **chelis#2640 — `grad` through a scalar `if` returned NaN when the untaken
-  branch had a non-finite derivative.** Resolved upstream by chelis#2586. The
-  former local Cody `erf64` cores used clamps to avoid that path; `erf64` now
-  delegates to the Chelis builtin. The separate denominator floor in `d1_64`
-  remains for the expiry behavior described under shoals#88 and shoals#101.
+  branch had a non-finite derivative.** Resolved upstream by chelis#2586 and
+  included in Chelis 0.19.2. On the Shoals scalar pricing surface, the direct
+  release-trigger probe is `chelis test tests/pricing_greeks_expiry.ch`, cases
+  `test_direct_ad_time_derivative_at_expiry_above_strike` and
+  `test_direct_ad_time_derivative_at_expiry_below_strike`; expected results are
+  `dC/dt = +5` and `0`, respectively. **Status: blocked before evaluation:**
+  Reef rejects published Coral 0.7.47 (`package.compiler = "=0.19.1"`) under
+  the 0.19.2 Shoals pin. The closed-form wrapper cases do not verify the direct
+  AD behavior. Keep the scalar denominator floor until both direct cases pass.
+  The former local Cody `erf64` cores used clamps to avoid this path; `erf64` now
+  delegates to the Chelis builtin. The independent WireDag denominator floor in
+  `pricing_wire_d1_f64` remains necessary for producer-clean arithmetic
+  selection and does not depend on chelis#2640.
 
 - **shoals#88 — Black-Scholes returned NaN with no remaining uncertainty, in
   both the scalar and the WireDag lane.** Resolved in this shell by flooring
@@ -437,18 +452,18 @@ in code that is CLOSED upstream but not sitting in §Archived.
   deliberate narrowing that outlives the fix: the guard **must** stay a clamp on
   the denominator and may not become a branch on the price. The binding reason is
   the **derivative** rule in the chelis#2640 entry above, not the value rule --
-  measured at this pin the rejected branch returns the correct price at every
+  measured before the 0.19.2 re-probe the rejected branch returns the correct price at every
   lane, and only its delta is NaN, because the adjoint multiplies the untaken
   arm's infinite derivative by the zero mask. Anyone who checks only the price
   will conclude the clamp is unnecessary. The hazard does not need `vmap` either:
   it reproduces under plain `grad`. The wire lane additionally cannot use a branch at all: its
   selectors are arithmetic, so it hand-rolls `abs` out of a select and the first
   `+/-inf` reaching it computes `0 * neg(inf)` -- IEEE arithmetic in this shell's
-  own select, not an upstream defect. The scalar floor may be revisited when the
-  pin reaches 0.18.12 and chelis#2640's fix lands here; the wire floor is
-  independent of any upstream state, because that lane must stay producer-clean
-  for the WireDag seam and so has no `if` available to it. Until then both are
-  load-bearing. The re-pinned WireDag receipt
+  own select, not an upstream defect. The scalar floor may be revisited when
+  chelis#2640 is re-probed and passes on the compatible 0.19.2 package graph;
+  the wire floor is independent of any upstream state, because that lane must
+  stay producer-clean for the WireDag seam and so has no `if` available to it.
+  Until then both are load-bearing. The re-pinned WireDag receipt
   (`scripts/validate_bs_wire_root.py`, root 859 / 1665 nodes) reflects the
   floor and involved no compiler change.
 
