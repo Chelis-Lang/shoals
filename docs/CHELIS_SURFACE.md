@@ -1,11 +1,11 @@
-<!-- BEGIN CHELIS MANAGED BLOCK: chelis-surface chelis@0.19.1 (sha256:9cf175d9881a9116) -->
+<!-- BEGIN CHELIS MANAGED BLOCK: chelis-surface chelis@0.19.2 (sha256:f4b95a15d63064a5) -->
 # Chelis capability surface
 
 This guide maps language operations, compiler support, and bundled `chelis-std`.
 The numbered specs decide language behavior; code and executable tests establish
 which parts the compiler implements. `chelis reef conform sync` copies this
 guide into every shell's `docs/CHELIS_SURFACE.md`
-([`spec/design/shell_repo_contract.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/design/shell_repo_contract.md) §3),
+([`spec/design/shell_repo_contract.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/design/shell_repo_contract.md) §3),
 so a shell reads the guide of the release it pins.
 
 This page describes the source tree it ships with: `main` in the compiler
@@ -18,13 +18,13 @@ If this guide disagrees with an owning source, correct the guide:
 
 | Surface | Source of truth |
 |---|---|
-| Language operations and adjoints | [`spec/05-risc-primitives.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/05-risc-primitives.md), [`spec/06-transformations.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/06-transformations.md) |
-| Syntax, types, dtypes and effects | [`spec/02-surf-syntax.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/02-surf-syntax.md), [`spec/04-type-system.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/04-type-system.md) |
+| Language operations and adjoints | [`spec/05-risc-primitives.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/05-risc-primitives.md), [`spec/06-transformations.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/06-transformations.md) |
+| Syntax, types, dtypes and effects | [`spec/02-surf-syntax.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/02-surf-syntax.md), [`spec/04-type-system.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/04-type-system.md) |
 | Builtin registration | `BUILTIN_NAMES` and `builtin_env`, `crates/chelis-types/src/builtins.rs` |
 | IR and target implementation | `RiscOp`, `crates/chelis-ir/src/dag.rs`; `crates/chelis-compiler-api/src/compiler.rs`; `crates/chelis-backend-{c,hip,metal}` |
-| Target contract | [`spec/08-backends.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/08-backends.md) and the dtype matrix in `spec/04` §1.1.3 |
+| Target contract | [`spec/08-backends.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/08-backends.md) and the dtype matrix in `spec/04` §1.1.3 |
 | Command surface | `crates/chelis-cli/src/main.rs` and its CLI integration tests |
-| Scope taxonomy (core vs std vs shell) | [`spec/design/chelis_canonical_reference.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/design/chelis_canonical_reference.md) §8.5 |
+| Scope taxonomy (core vs std vs shell) | [`spec/design/chelis_canonical_reference.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/design/chelis_canonical_reference.md) §8.5 |
 
 ---
 
@@ -77,6 +77,7 @@ are specified separately.
 | `sub` | `(&tensor[D,p], &tensor[D,p]) -> tensor[D,p]` | `(g, -g)` on floats; signed-integer forms are forward-only |
 | `mul` | `(&tensor[D,p], &tensor[D,p]) -> tensor[D,p]` | `(g*y, g*x)` |
 | `div` | `(&tensor[D,p_float], &tensor[D,p_float]) -> tensor[D,p_float]` | `(g/b, -g*y/b)`; IEEE-754, **float operands only** |
+| `pow` | `(&tensor[D,p_float], &tensor[D,p_float]) -> tensor[D,p_float]` | base `g*y*pow(x, y-1)`, or `g*y*s` where `x != 0` and `abs(y) >= 2^p` (`s` is `r/x`, or `r` with the sign of an infinite `x`), exactly zero at `y == 0`; exponent `g*r*log(x)`, exactly zero where `x == 0` or `x == +inf`; `r = pow(x, y)`; correctly rounded with the IEEE-754 `pow` special cases, **float operands only** ([05-OP-79]) |
 | `floor_div` | `(&tensor[D,p], &tensor[D,p]) -> tensor[D,p]` | **non-differentiable** — `grad` rejects; round quotient toward −∞ (Python `//`); ints and floats |
 | `trunc_div` | `(&tensor[D,p_int], &tensor[D,p_int]) -> tensor[D,p_int]` | **non-differentiable** — `grad` rejects; round toward zero (C `/`); **integer operands only** |
 | `max_elem` | `(&tensor[D,p], &tensor[D,p]) -> tensor[D,p]` | complete `g` to the exact operand selected by [05-OP-40], including its stored-bit tie rule; integer forms are forward-only |
@@ -168,7 +169,7 @@ see §6 for dtype and dynamic-extent restrictions.
 | `permute` | `(&tensor[..,p], axes: i32...) -> tensor[..,p]` | `permute(g, inverse_axes)` |
 | `expand` | `(&tensor[D,p], axis: i32, size: i64) -> tensor[D',p]` | `insert(sum(g, axis), axis, 1i64)` |
 | `insert` | `(&tensor[D,p], axis: i32, size: i64) -> tensor[D_plus,p]` | `sum(g, axis)` |
-| `pad` | `(&tensor[D,p], padding, fill) -> tensor[D',p]` | `shrink(g, inverse_padding)` |
+| `pad` | `(&tensor[D,p], padding, fill: p) -> tensor[D',p]` | `shrink(g, inverse_padding)`; `fill`, literal or runtime, receives `g` summed with every moved-`x` cell masked to +0 ([05-OP-49]) |
 | `shrink` | `(&tensor[D,p], bounds) -> tensor[D',p]` | `pad(g, inverse_bounds)` |
 | `stride` | `(&tensor[D,p], strides) -> tensor[D',p]` | [05-MOV-1]'s zero-filled inverse sampling map at the original shape |
 
@@ -233,7 +234,7 @@ its own zero rule.
 | `relu` | dedicated `RiscOp::Relu`; forward equals stored-bit `max_elem(x, 0)` | `g` only where `0 < x`; exact +0 at both zeros and NaN |
 | `sigmoid` | `recip(add(1, exp(neg(x))))` | differentiable |
 | `tanh`,`silu`,`gelu`,`gelu_tanh`,`standard_normal_cdf` | `tier2.rs` decompositions; `standard_normal_cdf` is the standard normal CDF `Phi` over `erfc`, `gelu` is exact (`x*Phi(x)`), `gelu_tanh` the tanh approximation | differentiable |
-| `matmul` | `expand`+`mul`+`sum`, pattern-matched to BLAS (`spec/05` §4.1); optional `accumulator` | differentiable |
+| `matmul` | `expand`+`mul`+`sum` (`spec/05` §4.1); the C lane computes each product inside the canonical sum without storing the expanded operands or their product, and HIP and Metal pattern-match it to BLAS; optional `accumulator` | differentiable |
 | `mean` | float-only `sum` followed by division by the selected axis extent, in canonical multi-axis order | differentiable |
 | `softmax` | max-shift + `exp` + `sum` + `div` (`spec/05` §4.2) | differentiable |
 | `layer_norm` | explicit epsilon plus mean/var normalize + affine (`spec/05` §4.4) | differentiable |
@@ -248,7 +249,7 @@ Composite recipes such as `linear`,
 (`spec/05` §3.5, §4.3–4.7) are library compositions. Use an imported definition or
 compose the underlying operations explicitly.
 
-The [`explicit_normalization.ch`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/examples/explicit_normalization.ch)
+The [`explicit_normalization.ch`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/examples/explicit_normalization.ch)
 example defines `normalize` as an ordinary function.
 
 ---
@@ -305,7 +306,7 @@ contribute to the named extent `n` check; `List[tensor[2, p]]` checks the
 literal extent of each element. This includes nested Lists, internal calls,
 and retained callable invocations. An empty List contributes no named witness.
 Eval and C enforce these checks before the function body; see
-[`list_shared_extent.ch`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/examples/list_shared_extent.ch).
+[`list_shared_extent.ch`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/examples/list_shared_extent.ch).
 The spec defines positional List cotangents for several forms. Eval/C tests
 cover selected list gradients, including
 `to_list`/`map`/`to_tensor` paths; other transforms and callback shapes
@@ -331,7 +332,9 @@ Eval handles the form. See [#2740](https://github.com/Chelis-Lang/chelis/issues/
 
 `read_file`, `write_file`, `read_lines`, `read_bytes`, `file_exists`, `list_dir`,
 `mmap_file`, `mmap_read`, `mmap_len`, `process_run`, `clock_wall_read`,
-`clock_monotonic_read`.
+`clock_monotonic_read`. The reads of an open mapping, `mmap_read`,
+`mmap_len`, `mmap_tensor`, `mmap_text`, and `mmap_sha256`, are pure: the
+`IO` effect belongs to `mmap_file`.
 
 | Name | Signature | Notes |
 |---|---|---|
@@ -339,6 +342,9 @@ Eval handles the form. See [#2740](https://github.com/Chelis-Lang/chelis/issues/
 | `process_run` | `(cmd: string, args: List[string]) -> (i64, string, string)` | argv, no shell. Eval and compiled C run it; a signal reports `-1`, and a capture that is not UTF-8 traps `IO`. |
 | `clock_wall_read` | `() -> (i64, i64)` | Host wall clock on the POSIX timescale as `(seconds, nanoseconds)` since 1970-01-01T00:00:00 UTC, from one reading; nanoseconds in `[0, 10^9)`. Eval and compiled C run it. [05-OP-75] |
 | `clock_monotonic_read` | `() -> (i64, i64)` | A clock that never runs backwards, as `(seconds, nanoseconds)` from an unspecified origin. Eval and compiled C run it. [05-OP-75] |
+| `mmap_tensor` | `(MappedFile, offset: i64, count: i64, T) -> tensor[n, T]` | `count` little-endian elements of the dtype `T`, written as the reserved fourth argument, starting at byte `offset`; bits are reinterpreted, never converted. A range past the mapping traps `Domain`, and a `bool` byte other than 0 or 1 traps `Domain` at `bool`. Eval and compiled C run it. [05-OP-80] |
+| `mmap_text` | `(MappedFile, offset: i64, length: i64) -> string` | The range's exact UTF-8 text; invalid UTF-8 fails. [05-OP-81] |
+| `mmap_sha256` | `(MappedFile, offset: i64, length: i64) -> string` | The range's SHA-256 as 64 lowercase hexadecimal characters. [05-OP-81] |
 
 String-valued path APIs cannot directly name non-UTF-8 files. `list_dir`
 preserves valid names exactly, without normalization; on conversion failure its
@@ -346,7 +352,7 @@ diagnostic identifies the directory and first invalid entry in host-name order
 using reversible byte escapes. A byte-preserving path API is not provided by
 this contract.
 
-The executable [directory listing example](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/examples/io/list_directory.ch)
+The executable [directory listing example](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/examples/io/list_directory.ch)
 prints names in that order. The fixture-based eval/C integration test is
 `crates/chelis-cli/tests/issue_1479_list_dir_lane_parity.rs`.
 
@@ -434,7 +440,7 @@ and `load` are `RiscOp` memory nodes produced during lowering. Both are document
 `cast_saturate`, `cast_wrap`, `copy`, `grad`, `vmap`, `jit`, and `realize`.
 
 ```
-Tier-1 DAG:   add sub mul div floor_div trunc_div max_elem min_elem cmplt neg recip exp log sin cos tan atan erf erfc sqrt
+Tier-1 DAG:   add sub mul div floor_div trunc_div max_elem min_elem cmplt neg recip exp log sin cos tan atan erf erfc sqrt pow
               abs floor ceil round sum count max_reduce min_reduce prod_reduce argmax_reduce
               argmin_reduce reduce_window_max reduce_window_min reduce_window_sum
               reduce_window_mean reshape permute expand insert pad shrink stride
@@ -454,7 +460,8 @@ Host lane:    cumsum sort einsum diagonal trace where clamp concat split scatter
               to_float rank shape numel tensor_to_scalar scalar_to_tensor to_tensor
               to_list
               read_file write_file read_lines read_bytes file_exists list_dir
-              mmap_file mmap_read mmap_len process_run
+              mmap_file mmap_read mmap_len mmap_tensor mmap_text mmap_sha256
+              process_run
               clock_wall_read clock_monotonic_read
               round_to
               parse_csv to_csv csv_f64s csv_ints csv_strs csv_nrows csv_cols
@@ -484,12 +491,19 @@ Each target checks whether it can lower the selected source function.
   backward DAG.
 - **Zero cotangent or barrier:** `cmplt` and comparison results, `const`,
   `load`, and the `uniform_like` template carry zero cotangent.
-  `stop_gradient` cuts a selected path. Logical operations reject `grad`
+  [05-OP-42] specifies `stop_gradient` as the barrier that cuts a selected
+  path; programs cannot call it yet (chelis#1312). Logical operations reject `grad`
   structurally.
 - **Structural rejection:** float `floor`/`ceil`/`round` and the named
   casts `cast_trunc`, `cast_saturate` and `cast_wrap` are piecewise constant; `count` and argument reductions have discrete
   outputs; replace-scatter variants reject duplicate-sensitive gradients.
-  Integer arithmetic is forward-only where its atom says so.
+  Integer arithmetic is forward-only where its atom says so. A rejection
+  applies only when the operation is active, its operands depending on a
+  differentiated parameter, and its result has a data path to the
+  differentiated output (`spec/06` §7.5): a comparison operand, a
+  `where`/`if`/`match` condition, an index, a movement bound or size, and a
+  `shape` read are control slots, so an operation read only there runs
+  forward and contributes nothing.
 - **Host values and control:** `spec/06` §2.10 defines cotangents for
   selected `List` combinators, the executed `if`/`match` branch, recursive
   trajectories, and ADT fields. Integration tests cover
@@ -503,7 +517,7 @@ mode. A non-scalar result needs an explicit seed under `spec/06` §8.3.
 `grad(f, wrt=x)` returns one selected gradient directly; multiple selected
 parameters return a tuple in authored selector order. A discrete field of
 a recursive parameter has `unit` cotangent.
-[`spec/design/differentiable_language.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/design/differentiable_language.md)
+[`spec/design/differentiable_language.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/design/differentiable_language.md)
 tracks implementation sequencing, while `spec/06` owns the language rule.
 
 ---
@@ -585,7 +599,7 @@ closure, an exact-safe int/bool/dyadic-float corpus (including signed zero),
 the sanitized runtime environment, and a queried-compiler-target check.
 It is not available as a Darwin check, and its passing verdict does not
 generalize to another hardware tuple. See
-[`manual_gates.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/docs/manual_gates.md#compiler-feature-acceptance-gates).
+[`manual_gates.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/docs/manual_gates.md#compiler-feature-acceptance-gates).
 
 An existing or substituted Nix output is a receipt from its recorded builder,
 not evidence that the current host ran the gate. To repeat on the current
@@ -646,7 +660,7 @@ before target selection.
 
 | Effect | Introduced by | Handled by |
 |---|---|---|
-| `IO` | file ops, `mmap_*`, `process_run`, `clock_*_read`, `print` | checked execution boundary / runtime |
+| `IO` | file ops, `mmap_file`, `process_run`, `clock_*_read`, `print` | checked execution boundary / runtime |
 | `Test` | `test_assert*` | test/root boundary |
 | `Accum` | internal gradient accumulation | compiler-internal |
 | `Resource(Device)` | `with device(...)` placement region | checked handler and selected target |
@@ -731,6 +745,7 @@ losses, optimizers, and training loops live in a shell, not in `chelis-std`
 | `Std.Io` | `read_text`, `write_text`, `read_trimmed_lines`, `read_head_bytes`, `exists`, `list`, `mmap_size`. |
 | `Std.Io.Csv` | `read_csv`, `try_read_csv`, `to_csv`, `try_to_csv`, `write_csv`, `try_write_csv`. These are source-defined functions, distinct from the eval-only CSV builtin family. The line-based reader and serializer do not accept CR/LF inside a cell. |
 | `Std.Io.Json` | `Json` with `JsonNull`, `JsonBool`, `JsonInt`, `JsonBigInt`, `JsonFloat`, `JsonString`, `JsonArray`, `JsonObject`; parsing, serialization, file I/O, accessors, and `try_*` forms. Integer tokens preserve the `JsonInt(i64)`/`JsonBigInt(string)` distinction instead of passing through `f64`; decimal/exponent tokens use `JsonFloat(f64, string)`, keeping the token text beside its correctly rounded `f64`. |
+| `Std.Io.Tensors` | `TensorArchive`, `open_hnw`, and `read_f64`, `read_f32`, `read_f16`, `read_bf16`, `read_i64`, `read_i32`, `read_i16`, `read_i8`, `read_bool`. Each reader takes the tensor's name and declared shape and fails unless the archive stores exactly that dtype and shape with an intact SHA-256; it returns the elements as a rank-one tensor to `reshape` under a declared type. [05-OP-82] |
 | `Std.Io.Parquet`, `Std.Io.Safetensors` | `read_parquet`/`write_parquet`; `save_tensors`/`load_tensors`. Check concrete dtype, shape, and target support for a selected call. |
 | `Std.Scalar`, `Std.Text`, `Std.Test` | Scalar `max`/`min`/`abs`; `join`; assertions, shape checks, and failure helpers. |
 | `Std.Datetime`, `Std.Datetime.Business`, `Std.Datetime.Clock`, `Std.Datetime.Columns`, `Std.Rounding`, `Std.Decimal`, `Std.Process`, `Std.Contracts` | Validated dates, times, instants, offsets, durations, periods, and date/instant columns; business-day calendars over a declared horizon; the host wall and monotonic clocks, which carry `IO`; elementwise column forms and a `Durations[n]` column; the shared rounding modes; exact 38-digit decimal arithmetic; `run`/`run_chelis`; named contract predicates. |
@@ -751,7 +766,7 @@ statically resolved axis instead.
 `@property` declarations desugar to a `bool`-returning `def` tagged
 `chelis_role: "property"`, with typed binders and optional `where` preconditions and
 `with tolerance|seed|samples|contract` metadata. The property spec lives in
-[`spec/design/chelis_property_spec.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/design/chelis_property_spec.md);
+[`spec/design/chelis_property_spec.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/design/chelis_property_spec.md);
 the executable dispatch is in `crates/chelis-prove/src/property_runner.rs`.
 
 | Tier / option | Route |
@@ -778,16 +793,16 @@ not a proof.
 
 | Doc | Why |
 |---|---|
-| [`spec/02-surf-syntax.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/02-surf-syntax.md), [`spec/03-deep-syntax.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/03-deep-syntax.md) | source syntax, canonical Surf/Deep conversion, and metadata |
-| [`spec/04-type-system.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/04-type-system.md) | dtypes, shapes, accumulators, effects, and linearity |
-| [`spec/05-risc-primitives.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/05-risc-primitives.md) | operation signatures, traps, and adjoints |
-| [`spec/06-transformations.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/06-transformations.md) | `grad`, `vmap`, and `jit` semantics |
-| [`spec/08-backends.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/08-backends.md) | backend strategy and target constraints |
-| [`spec/design/differentiable_language.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/design/differentiable_language.md) | implementation sequence for broader AD |
-| [`spec/design/rank_polymorphism.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/design/rank_polymorphism.md) | rank-polymorphic implementation |
-| [`spec/design/implicit_linearity.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/design/implicit_linearity.md) | ownership implementation |
-| [`spec/design/chelis_canonical_reference.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/design/chelis_canonical_reference.md) | core, stdlib, and shell boundary |
-| [`spec/design/shell_repo_contract.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/design/shell_repo_contract.md) | a downstream shell's required surface view |
+| [`spec/02-surf-syntax.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/02-surf-syntax.md), [`spec/03-deep-syntax.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/03-deep-syntax.md) | source syntax, canonical Surf/Deep conversion, and metadata |
+| [`spec/04-type-system.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/04-type-system.md) | dtypes, shapes, accumulators, effects, and linearity |
+| [`spec/05-risc-primitives.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/05-risc-primitives.md) | operation signatures, traps, and adjoints |
+| [`spec/06-transformations.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/06-transformations.md) | `grad`, `vmap`, and `jit` semantics |
+| [`spec/08-backends.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/08-backends.md) | backend strategy and target constraints |
+| [`spec/design/differentiable_language.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/design/differentiable_language.md) | implementation sequence for broader AD |
+| [`spec/design/rank_polymorphism.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/design/rank_polymorphism.md) | rank-polymorphic implementation |
+| [`spec/design/implicit_linearity.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/design/implicit_linearity.md) | ownership implementation |
+| [`spec/design/chelis_canonical_reference.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/design/chelis_canonical_reference.md) | core, stdlib, and shell boundary |
+| [`spec/design/shell_repo_contract.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/design/shell_repo_contract.md) | a downstream shell's required surface view |
 
 ### Deep metadata and source conversion
 

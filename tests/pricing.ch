@@ -127,11 +127,10 @@ def test_mc_converges_to_bs() -> unit ! { Test } = {
   ok = lt(rel, cast(0.02, f32))
   assert_close(if ok then cast(1.0, f32) else cast(0.0, f32), cast(1.0, f32), cast(0.001, f32), "MC within 2% of BS at 20K paths")
 }
--- chelis#2640-adjacent hazard: under `grad` an untaken arm with an unbounded
--- DERIVATIVE poisons the result, so every core must be total over the region the
--- dispatcher can hand it. The untaken arm's VALUE does not propagate at this pin;
--- an earlier revision of this comment said it did. Two distinct mechanisms, both
--- pinned below:
+-- The original inline-arm chelis#2640 AD witness is fixed at this pin.
+-- chelis#3582 tracks the separate hoisted-value boundary case at expiry.
+-- These tests pin values and Greek outputs at zero d1/d2 and tiny sigma;
+-- historical local CDF approximation paths exposed two hazards:
 --
 --   * region 3 (tail) divides by its operand twice; at ax = 0 an unclamped
 --     divisor is +inf. Reached when d1 or d2 is exactly zero -- 0.5*0.25^2

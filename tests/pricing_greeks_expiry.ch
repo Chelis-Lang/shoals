@@ -68,6 +68,10 @@ def test_theta_at_expiry_diverges_at_the_strike() -> unit ! { Test } = {
   th = to_list(thetas_call(spots3(), k100(), r5(), v20(), zero()))
   assert_true(is_neg_inf32(index(th, cast(0, i64))), "theta at t=0, s=k is -inf, and must not be NaN")
 }
+-- These are the finite right-limit values supplied by the wrappers.
+-- The minimal hoisted scalar-if residue is pinned separately in
+-- tests_blocked/ad/hoisted_scalar_if_grad.ch (chelis#3582). Direct AD of the
+-- full price at t=0 is not asserted here; its d2_64 path also executes sqrt(t).
 -- VANNA at t = 0 is 0 everywhere; VEGA, RHO and VOLGA were already correct.
 def test_vanna_at_expiry_is_zero_everywhere() -> unit ! { Test } = {
   v = to_list(vannas_call(spots3(), k100(), r5(), v20(), zero()))

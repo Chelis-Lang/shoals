@@ -1,0 +1,19 @@
+hoisted untaken arm must route exact zero cotangent
+
+Blocker: chelis#3582 is the hoisted/shared-operand residual of closed
+chelis#2640. Chelis spec/06 §2.10.1 assigns exact zero cotangent to the
+condition and untaken scalar-if arm. The inline and live-arm controls pass,
+but the hoisted x=0 derivative returns NaN at Chelis 0.19.2. The owning
+entry is in docs/UPSTREAM_BUGS.md §Actively blocking.
+
+DE-NARROWING: When a published Chelis pin makes this probe FIX-DETECTED,
+promote its three tests to tests/ and re-run the Shoals pricing expiry
+suite, including direct t=0 AD through bs_call_f64 on a compatible
+published Nautilus/Coral/Shoreleave package graph. A passing minimal
+probe alone does not prove the full price derivative: d2_64 also
+executes sqrt(t) at t=0, and its boundary derivative must be assessed
+separately. Keep the scalar denominator floor for the 0/0 price case
+and the WireDag floor for producer-clean arithmetic selection unless a
+replacement is demonstrated on both surfaces. Update the tracker from
+measured per-surface results and archive this entry only when its
+affected Shoals narrowing is retired.

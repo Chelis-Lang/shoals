@@ -43,7 +43,7 @@ bank holiday. Hong Kong has a Monday-to-Saturday business week. There is no
 Frankfurt exchange calendar: TARGET is the euro settlement calendar and stays
 open on German public holidays such as 3 October.
 
-Shoreleave 0.1.2 has no Federal Reserve or USD settlement calendar.
+Shoreleave 0.1.3 has no Federal Reserve or USD settlement calendar.
 `us_federal()` is the federal government's calendar: the legal holidays plus
 executive-order closures of federal agencies, such as 24 and 26 December
 2025, when the Federal Reserve Banks and Fedwire stayed open. `sifma()` and

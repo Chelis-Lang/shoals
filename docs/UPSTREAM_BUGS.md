@@ -1,7 +1,7 @@
 # Shoals Upstream Bugs
 
 Tracked upstream chelis issues and capability gaps that affect Shoals, per the
-[downstream shell repo contract](https://github.com/Chelis-Lang/chelis/blob/v0.19.1/spec/design/shell_repo_contract.md) §4.
+[downstream shell repo contract](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/design/shell_repo_contract.md) §4.
 The reachability map these entries lean on — what the proof stack can and cannot
 discharge for finance at this pin — is `research/proof-infra/report.md`; keep
 entries consistent with it.
@@ -25,6 +25,31 @@ mechanical staleness audit (`scripts/audit_workarounds.py`) can find them.
 in code that is CLOSED upstream but not sitting in §Archived.
 
 ## Actively blocking
+
+- **chelis#3582 — a hoisted value shared by a scalar `if` condition and its
+  untaken arm leaks a non-finite derivative.** Chelis `spec/06` §2.10.1 gives
+  the condition zero cotangent and the untaken arm exactly zero contribution.
+  The original inline-arm witness from closed chelis#2640 returns the required
+  finite gradient on 0.19.2. A dependency-free paired probe returns
+  `grad(hoisted)(0) = NaN` but `grad(inline_arm)(0) = 0`, with both forms
+  returning `0.25` at `x = 4`. The executable
+  `tests_blocked/ad/hoisted_scalar_if_grad.ch` and its sidecar pin these
+  controls; the expected-failure suite reports `OK` on 0.19.2.
+    - **Affected Shoals surface:** `src/pricing.ch` hoists
+      `den = sigma * sqrt(t)` before a scalar-`if` floor. In an isolated
+      Chelis 0.19.2 graph with published Nautilus 0.7.51, Coral 0.7.48, and
+      Shoreleave 0.1.3, direct AD of
+      `bs_call_f64` at expiry returned NaN for the above-strike and
+      below-strike time derivatives. Those values are not the finite
+      right-limit derivatives; `thetas_call` supplies the latter in closed
+      form. The whole-price result alone does not isolate chelis#3582 because
+      `d2_64` also executes `sqrt(t)` at `t = 0`.
+    - **Re-probe trigger:** a compiler release addressing chelis#3582.
+      Promote the blocked probe only after its inline, hoisted, and live-arm
+      controls pass; then recheck the full pricing AD surface on a compatible
+      published package graph. Preserve the scalar floor for the `0/0` price
+      case and the independent WireDag floor unless a replacement is proved
+      on their respective surfaces.
 
 - **chelis#1387 --
   `chelis reef conform audit` row 12 (`tests-blocked`, §5) reads an own-repo
@@ -403,15 +428,21 @@ in code that is CLOSED upstream but not sitting in §Archived.
   in this shell by supplying the `t = 0` limits in closed form in the Greek
   wrappers; `tests/pricing_greeks_expiry.ch` covers all nine cells and the
   finiteness predicate. Recorded here because §4's narrowing-coverage scanner
-  reads the `shoals#101` citations in `src/pricing.ch`, and those comments explain
-  two narrowings that outlive the fix, only one of which the pin bump will
-  dissolve.
-    - **The theta half is chelis#2640 and does dissolve.** The shoals#88
-      denominator clamp's untaken arm is `sigma*sqrt(t)`, whose `t`-derivative is
-      `+inf` at `t = 0`; `grad` of that clamp wrt `t` is NaN at `t = 0` and `0.1`
-      at `t = 1`, measured. That is the chelis#2640 case, fixed upstream at
-      0.18.12 and not present at this pin. When the pin reaches 0.18.12, re-probe
-      whether `thetas_call`'s AD path produces `-r*k` and `0` directly.
+  reads the `shoals#101` citations in `src/pricing.ch`. The comments explain
+  the theta and second-order narrowings that still require closed-form
+  expiry values at this pin.
+    - **The theta half has an active chelis#3582 residue.** Chelis#2586 fixed
+      the original inline-arm chelis#2640 witness, but a value computed before
+      the scalar `if` and shared by its condition and untaken arm still leaks
+      `0 * inf = NaN` at 0.19.2. The minimal blocked probe isolates this
+      compiler rule. On the published package graph, direct AD of
+      `bs_call_f64` returned NaN at expiry both above and below the strike.
+      The finite right-limit derivatives are `+5` and `0`, respectively;
+      `thetas_call` supplies their negatives in closed form. Direct AD of the
+      chosen price expression at the boundary is a distinct claim, and its
+      executed `d2_64` `sqrt(t)` path also needs assessment. Keep the wrapper
+      and scalar denominator floor; the wrapper tests assert the right limits,
+      not a repaired direct AD path.
     - **The second-order half does NOT dissolve, and is not an upstream defect.**
       With the denominator floored, `d(d1)/ds` is `1e298`; squaring it overflows
       to `+inf`, which multiplies an underflowed second-order factor to give
@@ -423,34 +454,37 @@ in code that is CLOSED upstream but not sitting in §Archived.
       `mask*inf + (1-mask)*0` gives `[inf, NaN, NaN]`. A test fails if the select
       is rewritten as arithmetic. Do not simplify it.
 
-- **chelis#2640 — `grad` through a scalar `if` returned NaN when the untaken
-  branch had a non-finite derivative.** Resolved upstream by chelis#2586. The
-  former local Cody `erf64` cores used clamps to avoid that path; `erf64` now
-  delegates to the Chelis builtin. The separate denominator floor in `d1_64`
-  remains for the expiry behavior described under shoals#88 and shoals#101.
+- **chelis#2640 — `grad` through a scalar `if` returned NaN when an untaken
+  inline arm had a non-finite derivative.** Resolved upstream by chelis#2586
+  and included in Chelis 0.19.2. Its original tensor witness now returns
+  `[1.0]`, and the scalar inline `sqrt(0)` control in the active chelis#3582
+  blocked probe returns `0.0`. Chelis#3582 tracks the separate hoisted-value
+  residue of the same rule. The former local Cody `erf64` cores used clamps
+  to avoid this path; `erf64` now delegates to the Chelis builtin. The
+  independent WireDag denominator floor in `pricing_wire_d1_f64` remains
+  necessary for producer-clean arithmetic selection.
 
 - **shoals#88 — Black-Scholes returned NaN with no remaining uncertainty, in
   both the scalar and the WireDag lane.** Resolved in this shell by flooring
   `sigma*sqrt(t)` in `d1_64` and `pricing_wire_d1_f64`; `tests/pricing_expiry.ch`
   covers it. Recorded here because §4's narrowing-coverage scanner reads the
   `shoals#88` citations in `src/pricing.ch`, and those comments explain a
-  deliberate narrowing that outlives the fix: the guard **must** stay a clamp on
-  the denominator and may not become a branch on the price. The binding reason is
-  the **derivative** rule in the chelis#2640 entry above, not the value rule --
-  measured at this pin the rejected branch returns the correct price at every
-  lane, and only its delta is NaN, because the adjoint multiplies the untaken
-  arm's infinite derivative by the zero mask. Anyone who checks only the price
-  will conclude the clamp is unnecessary. The hazard does not need `vmap` either:
-  it reproduces under plain `grad`. The wire lane additionally cannot use a branch at all: its
-  selectors are arithmetic, so it hand-rolls `abs` out of a select and the first
-  `+/-inf` reaching it computes `0 * neg(inf)` -- IEEE arithmetic in this shell's
-  own select, not an upstream defect. The scalar floor may be revisited when the
-  pin reaches 0.18.12 and chelis#2640's fix lands here; the wire floor is
-  independent of any upstream state, because that lane must stay producer-clean
-  for the WireDag seam and so has no `if` available to it. Until then both are
-  load-bearing. The re-pinned WireDag receipt
-  (`scripts/validate_bs_wire_root.py`, root 859 / 1665 nodes) reflects the
-  floor and involved no compiler change.
+  deliberate narrowing that outlives the fix. The scalar floor prevents
+  `0/0` at the forward strike and is retained while direct AD through the
+  hoisted denominator is blocked by chelis#3582. The local whole-price
+  boundary probe also traverses an executed `sqrt(t)` in `d2_64`, so its
+  NaN alone cannot be assigned wholly to that upstream issue or treated as
+  the finite right-limit derivative. A price-level branch would need its own
+  value and AD equivalence evidence before replacing the floor. The wire
+  lane's selectors are arithmetic, so it hand-rolls `abs` out of a select
+  and the first `+/-inf` reaching it computes `0 * neg(inf)` -- IEEE
+  arithmetic in this shell's own select, not an upstream defect. The wire
+  floor is independent of any upstream state, because that lane must stay
+  producer-clean for the WireDag seam and so has no `if` available to it.
+  Both floors remain. The historical Chelis 0.18.11 WireDag receipt
+  (root 859 / 1665 nodes) reflected the floor and involved no compiler
+  change. `scripts/validate_bs_wire_root.py` pins the current compiler's
+  schema and exact lowering separately.
 
 - **nautilus#59 — the `Nautilus.Special.erf` f64 signature barrier is
   resolved.** Nautilus 0.7.48 exports `erf` for f32 and f64, and
