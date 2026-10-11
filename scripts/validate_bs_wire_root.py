@@ -18,8 +18,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENTRY = "bs_call_wire_f64"
-EXPECTED_ENTRY_ROOT = 848
-EXPECTED_NODE_COUNT = 1643
+EXPECTED_ENTRY_ROOT = 844
+EXPECTED_NODE_COUNT = 1635
 # Schema-13 migration (Chelis 0.18.10). The 0.18.9 pin captured schema 11 with
 # entry root 770 and 1488 nodes (raw hash 955c1df6...). Under the published
 # 0.18.10 binary the same src/pricing.ch lowers to schema 13, entry root 773
@@ -79,6 +79,12 @@ EXPECTED_NODE_COUNT = 1643
 # and two independent cold lowerings produce the exact response pinned below.
 # This establishes the WireDag boundary and deterministic artifact, not a
 # general numerical or shape equivalence claim.
+# Chelis 0.19.2 emits schema 28 for the same source. Compared with the
+# published 0.19.1 binary lowering this exact source, the DAG has four fewer
+# Copy and four fewer Drop nodes; every arithmetic and other op-kind count
+# remains unchanged. The named entry remains a Copy of Sub, its 15 reachable
+# loads and tensor[n, f64] output are intact, and two independent cold
+# lowerings produce the pinned response below.
 #
 # NOTE for whoever drifts this next: the raw artifact embeds source spans, so
 # editing a COMMENT in src/pricing.ch moves this hash while leaving the graph
@@ -89,7 +95,7 @@ EXPECTED_NODE_COUNT = 1643
 # named loads and op kinds all still match. The node count is checked BEFORE the
 # hash, so a hash-only failure already tells you the count agreed. Confirm that
 # shape, then re-pin; do not go looking for a numerical regression.
-EXPECTED_RAW_SHA256 = "572716064aa636c28898df249dc6cda783fbdc75fbcb0bc72aee962f7fb88520"
+EXPECTED_RAW_SHA256 = "c172b7ffb3e08da1f0e272feeea4c1ff94413994d2c848a877b8b13c1fec861c"
 FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
 EXPECTED_LOADS = {
     "a1",
@@ -109,7 +115,7 @@ EXPECTED_LOADS = {
     "two_over_sqrt_pi",
 }
 # Exact version, checked against each published compiler during a pin bump.
-WIRE_DAG_SCHEMA_VERSION = 27
+WIRE_DAG_SCHEMA_VERSION = 28
 WIRE_OPS = {
     "add",
     "cast",

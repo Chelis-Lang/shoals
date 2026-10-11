@@ -14,6 +14,13 @@ surface remains tensor-shaped and f32-only (nautilus#70 / nautilus#85).
 Re-probe it against the next compatible Nautilus release and follow its
 sidecar before retiring Shoals's list-shaped f64 indicator layer.
 
+**`ad/hoisted_scalar_if_grad.ch`** — chelis#3582 is the residual scalar-`if`
+cotangent defect when a singular value is hoisted before the condition and
+shared with the untaken arm. Its inline and live-arm controls pass; the hoisted
+zero-branch assertion fails with NaN at Chelis 0.19.2. The sidecar separates
+this minimal compiler defect from the direct Black-Scholes boundary derivative,
+which also passes through an executed `sqrt(t)` in `d2_64`.
+
 `tests/canonical_erf.ch` checks the available `erf` and `erfc` primitives.
 Shoals's Cody kernel remains in use; any replacement must pass the numerical
 and Greek oracles.

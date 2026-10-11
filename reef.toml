@@ -9,6 +9,6 @@ resolver = "2"
 
 [dependencies]
 chelis-std = { version = "=0.4.0" }
-nautilus = { version = "=0.7.50" }
-coral = { version = "=0.7.47" }
-shoreleave = { version = "=0.1.2" }
+nautilus = { version = "=0.7.51" }
+coral = { version = "=0.7.48" }
+shoreleave = { version = "=0.1.3" }

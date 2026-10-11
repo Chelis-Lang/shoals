@@ -23,35 +23,17 @@ def n_cdf64(x: f64) -> f64 = standard_normal_cdf(x)
 -- that saturates the normal CDF identically to the +/-inf it replaces, so no
 -- currently-correct value moves.
 --
--- IT MUST BE A CLAMP ON THE DENOMINATOR, NOT A BRANCH ON THE PRICE -- and the
--- reason is the ADJOINT, not the value. Measure before changing this: the
--- untaken arm's NaN *value* does NOT propagate at this pin.
--- `vmap(if eq(x,0) then 7.0 else div(x,x))` over `[0.0, 2.0]` evaluates to
--- `[7.0, 1.0]`, and the rejected counterfactual
--- `if t = 0 then max(s-k,0) else <formula>` with an unfloored `d1` returns the
--- CORRECT PRICE at every lane. What it does not return is a usable delta: that
--- comes back NaN, because the adjoint multiplies the untaken arm's derivative
--- by the zero mask and the untaken arm's derivative is infinite. A test of the
--- price alone will therefore say the branch is fine. It is not.
---
--- The hazard is not vmap-specific either: `grad(if lt(x,1) then 2.0 else
--- sqrt(x))` at x = 0 is NaN with no `vmap` anywhere, the untaken arm's value
--- being a finite 0.0 while its derivative is infinite. This is the derivative
--- rule the chelis#2640 entry in `docs/UPSTREAM_BUGS.md` states; every Greek and
--- both f32 entry points differentiate this body, so it binds here.
---
--- THIS CLAMP IS SAFE IN THE s AND sigma DIRECTIONS ONLY, and an earlier revision
--- of this comment claimed it was safe outright. It is not. The untaken arm is
--- `den = sigma*sqrt(t)`, whose t-derivative is sigma/(2*sqrt(t)) = +inf at
--- t = 0, so differentiating wrt t at expiry is exactly the chelis#2640 case.
--- Measured: `grad` of this clamp wrt t is NaN at t = 0, and 0.1 at t = 1. wrt s
--- the untaken arm does not depend on s at all, and its sigma-derivative is
--- sqrt(t) = 0 at t = 0, so both of those directions are finite and clean
--- -- which is why delta, vega and rho are correct at t = 0 and theta was not.
--- The t = 0 Greeks are therefore supplied as closed-form limits in the wrappers
--- rather than by differentiating this body; see the shoals#101 note above
--- `const_vec`. Do not "fix" that by branching in here: a branch on t inside the
--- differentiated body reintroduces the same adjoint problem one level up.
+-- The scalar floor is retained for that 0/0 price case. Its denominator is
+-- computed before the scalar `if` and shared by the condition and else arm.
+-- At Chelis 0.19.2, the original inline-arm chelis#2640 witness is fixed, but
+-- this hoisted form still gives NaN when differentiated wrt t at t=0
+-- (chelis#3582). The paired blocked probe in tests_blocked/ad/ separates the
+-- hoisted failure from an inline scalar-if and a live-arm derivative.
+-- Differentiating the full price at expiry also executes sqrt(t) in d2_64, so
+-- the whole-body NaN alone does not isolate that upstream defect or equal the
+-- finite right-limit theta. The Greek wrappers supply those limits in closed
+-- form (shoals#101). An alternative price branch needs separate value and AD
+-- evidence before replacing this floor.
 def d1_64(s: f64, k: f64, r: f64, sigma: f64, t: f64) -> f64 = {
   num = add(log(div(s, k)), mul(add(r, mul(cast(0.5, f64), mul(sigma, sigma))), t))
   den = mul(sigma, sqrt(t))
@@ -207,24 +189,24 @@ def call_total[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> 
 def put_total[n](spots: tensor[n, f32], k: f32, r: f32, sigma: f32, t: f32) -> f32 = tensor_to_scalar(sum(put_prices(spots, k, r, sigma, t), 0))
 -- EXPIRY LIMITS FOR THE GREEK VECTORS (shoals#101).
 --
--- At t = 0 the AD path cannot produce the limits, for two measured reasons, and
--- neither is fixable by adjusting the price body:
+-- At t = 0 the present AD path does not produce these finite right limits,
+-- for two separately tracked reasons:
 --
---   1. `thetas_call` differentiates wrt t, and the shoals#88 denominator clamp's
---      UNTAKEN arm is `sigma*sqrt(t)`, whose t-derivative is sigma/(2*sqrt(t)) =
---      +inf at t = 0. chelis#2640 then poisons the result even though the
---      constant arm is the one selected. Measured: `grad` of that clamp wrt t is
---      NaN at t = 0 and 0.1 at t = 1. The clamp stays safe for the s and sigma
---      directions, which is exactly why delta, vega and rho survive at t = 0 --
---      the untaken arm does not depend on s at all, and its sigma-derivative
---      is sqrt(t), which is 0 at t = 0 rather than unbounded.
+--   1. `thetas_call` differentiates wrt t, and the shoals#88 denominator floor
+--      hoists `den = sigma*sqrt(t)` before its scalar `if`. The chelis#3582
+--      blocked probe isolates a zero cotangent leaking through that hoisted
+--      value at t=0. The full price also evaluates `sqrt(t)` in d2_64;
+--      a NaN from its direct AD does not attribute both paths to the blocker.
+--      The floor remains safe for s and sigma directions at expiry: den does
+--      not depend on s, and its sigma derivative is sqrt(0)=0.
 --   2. The second-order Greeks square a first derivative that the floor has made
 --      enormous: d(d1)/ds = 1/(s*den) is 1e298 with den floored to 1e-300, and
 --      squaring that overflows to +inf, which then multiplies an underflowed
 --      second-order factor. Measured: 0 * inf = NaN.
 --
--- So the limits are supplied in closed form HERE, in the wrappers, rather than
--- by differentiating. That is sound because nothing differentiates these
+-- The finite right limits are supplied in closed form HERE, in the wrappers.
+-- They are not claims that AD of the chosen expression exists at t=0. Nothing
+-- differentiates these
 -- wrappers: the `if` below is an ordinary scalar branch on a parameter, outside
 -- every `grad` and `vmap`, so no adjoint sees it.
 --
