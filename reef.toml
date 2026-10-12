@@ -12,3 +12,4 @@ chelis-std = { version = "=0.4.0" }
 nautilus = { version = "=0.7.55" }
 coral = { version = "=0.7.50" }
 shoreleave = { version = "=0.1.4" }
+chelis-clarabel = { version = "=0.1.0" }

@@ -1,0 +1,1 @@
+Add `Shoals.ModelFitClarabel` with an `f64` bounded Clarabel QP step and a bounded Levenberg-Marquardt fit, plus a conditional quality proof for a direct QP call. The existing `f32` ModelFit API remains available. The generic step supports evaluator and compiled-C execution; the fit uses evaluator execution while compiled-C model callbacks remain unsupported.

@@ -4,16 +4,16 @@
 
 `Shoals.ModelFit.lm_bounded_nparam` builds a damped normal matrix, solves an
 unconstrained linear system with `Nautilus.LinAlg.cg_solve`, and clamps the
-resulting parameters into their bounds. The candidate cutover uses
+resulting parameters into their bounds. `Shoals.ModelFitClarabel` uses
 `Clarabel.Qp.solve` for the **bounded quadratic step** inside that iteration.
 The nonlinear model evaluation, loss comparison, damping update, and stopping
 rule remain Shoals decisions.
 
-This is a prospective integration. `reef.toml` pins a published Chelis
-toolchain that predates the native Clarabel provider. The Shoals package and
-its tests continue to use the pinned toolchain until a compatible provider
-binary and the source-bound `chelis-clarabel` package are published. This
-document adds no runtime dependency or exported function.
+The additive `Shoals.ModelFitClarabel` module implements this subproblem with
+an `f64` solver call. Its `lm_bounded_nparam` entry point uses the step in
+a bounded Levenberg-Marquardt fit. The existing `f32` entry point remains an
+independent API. The module requires a provider-enabled Chelis toolchain and
+the source-bound `chelis-clarabel` Reef package.
 
 ## Quadratic subproblem
 
@@ -27,7 +27,7 @@ H = Jᵀ W J + lambda D
 D[i,i] = max((Jᵀ W J)[i,i], 1e-7)
 ```
 
-The proposed step `d` minimizes `0.5 dᵀ H d - gᵀ d` subject to
+The step `d` minimizes `0.5 dᵀ H d - gᵀ d` subject to
 `lo <= theta + d <= hi`. For the Clarabel API, use `P = H`, `q = -g`,
 `A = [I; -I]`, `b = [hi - theta; theta - lo]`, and
 `[NonnegativeCone(2*n)]`. This gives `A d + s = b` with `s >= 0`.
@@ -35,61 +35,89 @@ Finite `theta`, bounds, residuals, Jacobian entries, and weights are required;
 each weight is nonnegative, each lower bound is at most its upper bound, and
 `lambda` is positive. These conditions make the constructed `H` symmetric
 positive definite in exact arithmetic when `n > 0`, including rank-deficient
-Jacobians. Build the floating-point matrix symmetrically and validate it
-before the provider's symmetric-input check; mathematical symmetry alone does
-not ensure its stored entries are bitwise symmetric. A numerical rejection is
-an explicit subproblem failure. An empty parameter vector needs an explicit
-zero-dimensional case rather than a solver call whose cone partition is
-ambiguous.
+Jacobians. The implementation builds the floating-point matrix symmetrically
+and validates it before the provider's symmetric-input check; mathematical
+symmetry alone does not ensure its stored entries are bitwise symmetric. A
+numerical rejection is an explicit subproblem failure. An empty parameter
+vector is rejected before making a solver call.
 
 The change is observable even for a small convex step. For
 `H = [[2, 1], [1, 2]]`, `g = [-1, 1]`, `theta = [0, 0]`, and bounds
 `[0, 2]` on both components, the unconstrained step is `[-1, 1]`.
 Clamping it gives `[0, 1]`; the bound-constrained QP gives `[0, 0.5]`.
-The implementation must compare against the constrained result, not assert
-that the two algorithms are interchangeable.
+The coupled-step test checks the constrained result.
 
 ## API and execution boundary
 
-The first live implementation is an additive `f64` step API with an explicit
-result that distinguishes a usable `Solved` primal from every `Stopped`
-status. It must not change the existing `f32` `lm_bounded_nparam` signature
-or silently convert an `f64` result back to `f32`. A later `f64` calibration
-entry point can use the step after its model callback, Jacobian construction,
-and callers have an explicit precision contract. Merely widening the current
-`f32` Jacobian after it is computed does not make the model calculation
-`f64` accurate.
+`solve_bounded_step` exposes the `f64` QP result and keeps `Solved` distinct
+from `Stopped`. `lm_bounded_nparam` computes its model prediction and
+finite-difference Jacobian in `f64`; it does not widen an `f32` Jacobian.
+Its result distinguishes convergence, outer iteration limit, stopped solver,
+and numerical failure.
 
-On `Solved`, check the primal and diagnostics for finiteness and check bound
-violations against a caller-visible tolerance. Project only violations
-within that tolerance, report the projection size, and evaluate the actual
-nonlinear weighted loss before accepting an iterate. A projected point is a
-distinct value from Clarabel's primal and carries no exact optimizer claim.
+On `Solved`, the fit checks the primal and diagnostics for finiteness and
+checks bound violations against a caller-visible tolerance. It projects only
+violations within that tolerance, reports the largest projection size in the
+fit result, and evaluates the actual nonlinear weighted loss before accepting
+an iterate. A projected point is a distinct value from
+Clarabel's primal and carries no exact optimizer claim.
 On `Stopped`, preserve the last accepted iterate and return the solver status;
 neither a candidate vector nor a hidden `cg_solve` fallback counts as a
 successful step. The outer fit result must distinguish loss convergence,
 iteration limit, and subproblem failure.
 
 `chelis-clarabel` binds the provider to its dependency-owned `solve` source.
-Shoals must depend on the published package without copying or editing its
-`src/qp.ch`. The consuming toolchain must carry the `clarabel-provider`
-feature for evaluator and compiled-C calls. An optional pilot package in this
-repository can exercise the new path before the main Shoals manifest takes
-the dependency; its build and test route must use the released toolchain and
-must leave unrelated Shoals CI paths on their existing fast route.
+Shoals depends on the published package without copying or editing its
+`src/qp.ch`. The consuming toolchain carries the `clarabel-provider` feature
+for evaluator and compiled-C calls. The generic QP step builds through C;
+the calibration function currently requires evaluator execution because
+compiled C cannot pass its model callback through helper calls (chelis#879).
 
 ## Proof boundary
 
 `clarabel.qp.ideal_optimality` is an opt-in, exact-real assumption tied to a
-specific `Solved` call. Chelis's first lowering covers fixed literal QP
-data with zero and nonnegative cones. A calibration step constructs `H`, `g`,
-and bounds from runtime inputs, so the ideal contract does not presently
-prove general calibration results. A literal two-parameter witness can test
-the proof path and must report `proven_modulo_asserted_axiom` with
-`real_arithmetic`. Claims about returned floating-point parameters need a
-separate checked error bound; neither `Solved` nor requested tolerances
-provide one by themselves. Differentiating through the solver is a separate
-piece of work.
+specific `Solved` call. The proof example constructs a fixed-size symbolic
+positive semidefinite QP, applies its primal step through Shoals's
+`apply_two_parameter_step`, and proves that the resulting quadratic quality is at least
+that of a feasible baseline. The reversed claim is a refuted control. This
+is a downstream property of a direct solver call, not a general proof about
+the iterative fit. The proof lowerer does not resolve the generic
+`solve_bounded_step` wrapper to one solver call; proving the full fit requires
+further compiler support. The report must state
+`proven_modulo_asserted_axiom` and
+`real_arithmetic`. Claims about returned floating-point parameters require
+a separate checked error bound; neither `Solved` nor requested tolerances
+provide one by themselves. Differentiating through the solver is separate.
+
+## Executable examples
+
+`demos/clarabelmodelfit.ch` evaluates a coupled bounded QP step and fits an
+affine model using `lm_bounded_nparam`. `demos/clarabelstep.ch` checks
+interior, active lower and upper, coupled, and stopped QP results through
+compiled C. Both return `main = true` when their checks pass:
+
+```sh
+chelis eval --file demos/clarabelmodelfit.ch
+chelis build --target c --output target/clarabelstep demos/clarabelstep.ch
+target/clarabelstep/clarabelstep
+```
+
+`properties/clarabelmodelfit.ch` calls the dependency-owned solver and then
+uses `Shoals.ModelFitClarabel.apply_two_parameter_step` on its returned primal. In the
+`Solved` branch it states that the quadratic quality after the step is at
+least the quality after any feasible baseline step, for all supported
+fixed-size inputs. The proof depends on `clarabel.qp.ideal_optimality`; it is
+conditional exact-real reasoning, not a numerical guarantee about the actual
+`f64` output. `tests/clarabel_proof_reversed.ch` reverses that inequality as a
+negative control.
+
+```sh
+chelis prove properties/clarabelmodelfit.ch --tier smt-only --json
+chelis prove tests/clarabel_proof_reversed.ch --tier smt-only --json
+```
+
+The first report must contain `proven_modulo_asserted_axiom` and
+`real_arithmetic`. The reversed control must not prove.
 
 ## Cutover acceptance
 
@@ -97,16 +125,16 @@ piece of work.
    source-bound `chelis-clarabel` package. Verify the feature-bearing release
    artifact on the target platforms, then update Shoals's compiler pin and
    workflow pins through its pin-bump checklist.
-2. Add an isolated QP-step pilot with evaluator and compiled-C tests for an
+2. Test the QP step through the evaluator and compiled C for an
    interior solution, an active lower bound, an active upper bound, and the
    coupled two-parameter example above. Exercise a `Stopped` status and
    reject negative weights, reversed bounds, nonfinite inputs, and invalid
    damping. Keep the legacy `f32` path callable for comparison.
-3. Add a `f64` calibration entry point using that step. Compare accepted
-   iterates, true weighted losses, bounds, and termination statuses against
-   an independent reference on affine and nonlinear models, including
-   rank-deficient and ill-conditioned Jacobians. Run the same witnesses in
-   the evaluator and compiled C.
+3. Test the `f64` calibration entry point against independent affine and
+   nonlinear references, including rank-deficient and ill-conditioned
+   Jacobians. Validate accepted iterates, true weighted losses, bounds, and
+   termination statuses in the evaluator. Compiled-C fit parity awaits
+   chelis#879; compiled-C QP-step parity remains required here.
 4. Record the dependency resolution and nonuser CI cost before routing the
    new API into ordinary Shoals package builds. Only a later reviewed change
    can replace the existing `f32` default or retire its tests and callers.
