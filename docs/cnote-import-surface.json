@@ -4,7 +4,7 @@
   "pkg": "shoals",
   "pkg_version": "0.24.20",
   "chelis_pin": "0.19.4",
-  "generated_note": "Producer manifest for Shoals 0.24.20 on Chelis 0.19.4. The 36 active invariants name exported functions, preconditions, controls, and expected proof tiers for the declared compiler pin. The proof gate checks compiler-owned dependency edges, verdicts, qualifiers and non-vacuous guards. Certified-envelope normal-CDF range results remain sound_approximate; real-arithmetic proofs do not certify floating-point execution, and fuzz results are empirical observations. Put-call parity under f32 normal-CDF reflection is deferred under chelis#3116.",
+  "generated_note": "Producer manifest for Shoals 0.24.20 on Chelis 0.19.4. The 37 active invariants name exported functions, preconditions, controls, and expected proof tiers for the declared compiler pin. The proof gate checks compiler-owned dependency edges, verdicts, qualifiers and non-vacuous guards. Certified-envelope normal-CDF range results remain sound_approximate; real-arithmetic proofs do not certify floating-point execution, and fuzz results are empirical observations. Put-call parity under f32 normal-CDF reflection is deferred under chelis#3116.",
   "models": [
     {
       "id": "bs_call",
@@ -2432,6 +2432,65 @@
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond price rises as yield rises -- a duration/DV01 sign violation",
       "fuzz_domain_note": "proven over the reals at Tier B; dP/dy < 0 (the DV01/duration sign) as a two-point difference"
+    },
+    {
+      "id": "shoals.inv.fi_bond_pv_monotone_in_coupon.v1",
+      "kind_applies_to": [
+        "finance.fixed_income.coupon_bond"
+      ],
+      "target_model": null,
+      "anchor_model": "fi_bond_2p",
+      "property": {
+        "file": "properties/canonfixedincome.ch",
+        "name": "fi_bond_pv_monotone_in_coupon",
+        "module": "Shoals.Properties.CanonFixedIncome"
+      },
+      "binding": {
+        "mechanism": "direct-call",
+        "references_output_fn": "direct",
+        "goal_pattern": "({{output_fn}}(c2, y) > {{output_fn}}(c1, y))",
+        "contracts": []
+      },
+      "preconditions": [
+        {
+          "lhs": "c1",
+          "op": "gte",
+          "rhs": {
+            "const": 0.0
+          }
+        },
+        {
+          "lhs": "c2",
+          "op": "gt",
+          "rhs": {
+            "input": "c1"
+          }
+        },
+        {
+          "lhs": "y",
+          "op": "gte",
+          "rhs": {
+            "const": 0.0
+          }
+        }
+      ],
+      "controls": {
+        "satisfying": {
+          "name": "fi_bond_pv_monotone_in_coupon",
+          "expected": "passed"
+        },
+        "violating": {
+          "name": "fi_bond_pv_monotone_in_coupon_corrupted",
+          "expected": "failed",
+          "witness_required": true
+        }
+      },
+      "non_vacuity_witness": "fi_bond_coupon_guards_satisfiable",
+      "expected_tier_per_pin": {
+        "0.19.4": "proven"
+      },
+      "violation_text": "the bond price does not rise when every coupon increases at a fixed yield",
+      "fuzz_domain_note": "proven over the reals at Tier B for the two-period bond; no fuzz evidence is used"
     },
     {
       "id": "shoals.inv.fi_bond_pv_convex_in_yield.v1",

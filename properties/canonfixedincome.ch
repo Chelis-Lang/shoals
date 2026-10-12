@@ -37,7 +37,15 @@ import Shoals.FixedIncome (fi_df2, fi_bond2, fi_bond2_nodisc)
   (fi_bond2(c, y2) >= fi_bond2(c, y1))
 @property fi_bond_mono_guards_satisfiable forall(c: f32, y1: f32, y2: f32) where c > 0.0, y1 >= 0.0, y2 > y1:
   false
--- (4) CONVEXITY (d2P/dy2 > 0, positive bond convexity): the price is convex in
+-- (4) COUPON MONOTONICITY: at a fixed non-negative yield, increasing every
+-- coupon raises the two-period bond price. The opposite direction is refuted.
+@property fi_bond_pv_monotone_in_coupon forall(c1: f32, c2: f32, y: f32) where c1 >= 0.0, c2 > c1, y >= 0.0:
+  (fi_bond2(c2, y) > fi_bond2(c1, y))
+@property fi_bond_pv_monotone_in_coupon_corrupted forall(c1: f32, c2: f32, y: f32) where c1 >= 0.0, c2 > c1, y >= 0.0:
+  (fi_bond2(c2, y) <= fi_bond2(c1, y))
+@property fi_bond_coupon_guards_satisfiable forall(c1: f32, c2: f32, y: f32) where c1 >= 0.0, c2 > c1, y >= 0.0:
+  false
+-- (5) CONVEXITY (d2P/dy2 > 0, positive bond convexity): the price is convex in
 -- yield (a long butterfly on equally-spaced yields y-h, y, y+h has non-negative
 -- value, three-point second difference). Corrupted twin claims concavity.
 @property fi_bond_pv_convex_in_yield forall(c: f32, y: f32, h: f32) where c > 0.0, h > 0.0, y >= h:
