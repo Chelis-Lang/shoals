@@ -313,6 +313,15 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 ## Archived
 
+- **nautilus#170 — small nonzero tridiagonal pivots changed spline values.**
+  `Shoals.Curves.spline_rate_at` delegates to `Nautilus.Interpolation.spline_eval`.
+  Nautilus's original reproducer used four knots and rates scaled by 1e-31;
+  it yielded 2.5e-31 at the midpoint instead of the natural-spline value
+  2.2e-31. The pinned Nautilus 0.7.53 preserves those pivots, and
+  `tests/curves.ch::test_spline_rate_at_small_pillars` passes on the published
+  Shoals dependency graph. The Nautilus issue remains open for its canonical
+  website mirror; the downstream spline failure is resolved.
+
 - **shoals#111 -- former nightly suite hosted-budget tracking (retired).**
   **Archived 2026-10-08 by policy:** the nightly workflow and all hosted long
   numerical runs were removed per maintainer instruction. There is no hosted
