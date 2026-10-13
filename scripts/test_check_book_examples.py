@@ -51,5 +51,53 @@ class SourceSignatureTests(unittest.TestCase):
         self.assertEqual(code, 1, output)
 
 
+class InstallGuideTests(unittest.TestCase):
+    def check(self, commands: list[str], dependency_pin: str = "0.24.22") -> list[str]:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = root / "reef.toml"
+            manifest.write_text(
+                'schema = "3"\n[package]\nname = "shoals"\nversion = "0.24.22"\n'
+                '[dependencies]\nchelis-std = { version = "=0.4.0" }\n'
+                'nautilus = { version = "=0.7.55" }\n'
+                'chelis-clarabel = { version = "=0.1.0" }\n'
+            )
+            page = root / "getting-started.md"
+            page.write_text(
+                "These downloads need no GitHub token:\n```sh\n"
+                + "\n".join(f"chelis reef install --from-github {item}" for item in commands)
+                + "\n```\n"
+                + f'shoals = {{ version = "={dependency_pin}" }}\n'
+            )
+            return book.install_guide_failures(page, manifest)
+
+    def test_install_guide_matches_every_published_dependency(self):
+        self.assertEqual(self.check([
+            "Chelis-Lang/nautilus@v0.7.55",
+            "Chelis-Lang/chelis-clarabel@v0.1.0",
+            "Chelis-Lang/shoals@v0.24.22",
+        ]), [])
+
+    def test_missing_or_wrong_install_coordinate_fails(self):
+        complete = [
+            "Chelis-Lang/nautilus@v0.7.55",
+            "Chelis-Lang/chelis-clarabel@v0.1.0",
+            "Chelis-Lang/shoals@v0.24.22",
+        ]
+        self.assertIn("chelis-clarabel", " ".join(self.check([complete[0], complete[2]])))
+        self.assertIn("nautilus", " ".join(self.check([
+            "Chelis-Lang/nautilus@v0.7.54", *complete[1:]
+        ])))
+        self.assertIn("shoals", " ".join(self.check(complete + [complete[-1]])))
+
+    def test_manifest_and_documented_dependency_pin_must_agree(self):
+        failures = self.check([
+            "Chelis-Lang/nautilus@v0.7.55",
+            "Chelis-Lang/chelis-clarabel@v0.1.0",
+            "Chelis-Lang/shoals@v0.24.22",
+        ], dependency_pin="0.24.21")
+        self.assertIn("shoals", " ".join(failures))
+
+
 if __name__ == "__main__":
     unittest.main()
