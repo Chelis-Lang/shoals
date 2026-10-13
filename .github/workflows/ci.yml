@@ -107,6 +107,8 @@ jobs:
         run: chelis lint --check src/ properties/ references/ demos/ tests/ tests-manual/ manual-gates/ tests_neg/ tests_blocked/
 
       - name: chelis reef build
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: chelis reef build
 
       - name: Check expiry properties and refute their false controls
