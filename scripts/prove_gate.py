@@ -157,18 +157,48 @@ def classify_tier(rec: dict) -> str:
                     certified.append((discharge, discharge_tier, evidence))
             marked_certified = "special_function_certified" in quals
             if marked_certified or certified:
-                valid = bool(certified) and all(
-                    discharge.get("method") == "certified_envelope"
-                    and discharge_tier.get("guarantee") == "certified_envelope"
-                    and evidence.get("status") == "proved"
-                    and evidence.get("guarantee_class") == "certified_envelope"
-                    and evidence.get("soundness") == "sound_approximate"
-                    and {"special_function_certified", "sound_over_approximation"}
-                    <= set(evidence.get("discharge_qualifiers") or [])
-                    for discharge, discharge_tier, evidence in certified
-                )
-                return ("sound_approximate" if marked_certified and valid
-                        and "fuzz" not in quals else "unknown")
+                if not marked_certified or not certified or "fuzz" in quals:
+                    return "unknown"
+                # Every assumption must be discharged. A valid envelope beside
+                # a sampled or unknown contract cannot carry the whole claim.
+                for assumption in assumptions:
+                    discharge = assumption.get("discharge") or {}
+                    discharge_tier = assumption.get("discharge_tier") or {}
+                    evidence = discharge.get("evidence") or {}
+                    method = discharge.get("method")
+                    guarantee = discharge_tier.get("guarantee")
+                    if method == guarantee == "smt":
+                        if evidence.get("status") != "proved":
+                            return "unknown"
+                        continue
+                    if method != "certified_envelope" or guarantee != method:
+                        return "unknown"
+                    certificate = evidence.get("evidence")
+                    contract = "std.normal_cdf.range"
+                    qualifiers = evidence.get("discharge_qualifiers")
+                    if (assumption.get("name") != contract
+                            or assumption.get("producer") != contract
+                            or assumption.get("source_type") != "std_contract"
+                            or discharge_tier.get("source") != contract
+                            or evidence.get("contract_id") != contract
+                            or evidence.get("status") != "proved"
+                            or evidence.get("verdict") != "proved"
+                            or evidence.get("schema_version") != 1
+                            or evidence.get("guarantee_class") != method
+                            or evidence.get("soundness") != "sound_approximate"
+                            or not isinstance(qualifiers, list)
+                            or not all(isinstance(q, str) for q in qualifiers)
+                            or not {"special_function_certified",
+                                    "sound_over_approximation"} <= set(qualifiers)
+                            or not isinstance(certificate, dict)
+                            or certificate.get("contract") != contract
+                            or certificate.get("method") != "structural_erf_boundedness"
+                            or certificate.get("all_segments_gappa_certified") is not True
+                            or not isinstance(certificate.get("envelope_sha256"), str)
+                            or not re.fullmatch(r"[0-9a-f]{64}",
+                                                certificate["envelope_sha256"])):
+                        return "unknown"
+                return "sound_approximate"
             # A fuzz-discharged contract riding an SMT structural proof is
             # proven_modulo_contract (composites: qualifiers [real_arithmetic, fuzz]).
             return "proven_modulo_contract" if "fuzz" in quals else "proven"
@@ -188,28 +218,51 @@ def honesty_self_test() -> bool:
         "status": "passed", "proof_tier": "smt",
         "qualifiers": ["special_function_certified", "real_arithmetic"],
         "composite_verdict": "proven_modulo_real_arithmetic",
-        "assumptions": [{
-            "discharge": {"method": "certified_envelope", "evidence": {
-                "status": "proved", "guarantee_class": "certified_envelope",
-                "soundness": "sound_approximate",
-                "discharge_qualifiers": ["special_function_certified",
-                                         "sound_over_approximation"],
-            }},
-            "discharge_tier": {"guarantee": "certified_envelope"},
-        }],
+        "assumptions": [
+            {"name": "preconditions:property",
+             "discharge": {"method": "smt", "evidence": {"status": "proved"}},
+             "discharge_tier": {"guarantee": "smt"}},
+            {"name": "std.normal_cdf.range", "producer": "std.normal_cdf.range",
+             "source_type": "std_contract",
+             "discharge": {"method": "certified_envelope", "evidence": {
+                 "status": "proved", "verdict": "proved",
+                 "contract_id": "std.normal_cdf.range", "schema_version": 1,
+                 "guarantee_class": "certified_envelope",
+                 "soundness": "sound_approximate",
+                 "discharge_qualifiers": ["special_function_certified",
+                                          "sound_over_approximation"],
+                 "evidence": {"contract": "std.normal_cdf.range",
+                              "method": "structural_erf_boundedness",
+                              "all_segments_gappa_certified": True,
+                              "envelope_sha256": "0" * 64},
+             }},
+             "discharge_tier": {"guarantee": "certified_envelope",
+                                "source": "std.normal_cdf.range"}},
+        ],
     }
     missing_qualifier = copy.deepcopy(certified)
     missing_qualifier["qualifiers"] = ["real_arithmetic"]
     missing_discharge = copy.deepcopy(certified)
     missing_discharge["assumptions"] = []
     wrong_method = copy.deepcopy(certified)
-    wrong_method["assumptions"][0]["discharge"]["method"] = "fuzz"
+    wrong_method["assumptions"][1]["discharge"]["method"] = "fuzz"
     wrong_guarantee = copy.deepcopy(certified)
-    wrong_guarantee["assumptions"][0]["discharge_tier"]["guarantee"] = "fuzz"
+    wrong_guarantee["assumptions"][1]["discharge_tier"]["guarantee"] = "fuzz"
     forged_evidence = copy.deepcopy(certified)
-    forged_evidence["assumptions"][0]["discharge"]["evidence"]["status"] = "unknown"
+    forged_evidence["assumptions"][1]["discharge"]["evidence"]["status"] = "unknown"
     unknown_qualifier = copy.deepcopy(certified)
     unknown_qualifier["qualifiers"].append("unrecognized_method")
+    missing_certificate = copy.deepcopy(certified)
+    del missing_certificate["assumptions"][1]["discharge"]["evidence"]["evidence"]
+    wrong_contract = copy.deepcopy(certified)
+    wrong_contract["assumptions"][1]["discharge"]["evidence"]["contract_id"] = "std.normal_cdf.reflection"
+    wrong_assumption = copy.deepcopy(certified)
+    wrong_assumption["assumptions"][1]["name"] = "std.normal_cdf.reflection"
+    extra_fuzz = copy.deepcopy(certified)
+    extra_fuzz["assumptions"].append({"name": "extra", "discharge": {"method": "fuzz"},
+                                      "discharge_tier": {"guarantee": "fuzz"}})
+    extra_unknown = copy.deepcopy(certified)
+    extra_unknown["assumptions"].append({"name": "extra"})
     cases = [
         ({"status": "passed", "proof_tier": "smt", "qualifiers": ["real_arithmetic"],
           "composite_verdict": "proven_modulo_real_arithmetic"}, "proven"),
@@ -222,6 +275,11 @@ def honesty_self_test() -> bool:
         (wrong_guarantee, "unknown"),
         (forged_evidence, "unknown"),
         (unknown_qualifier, "unknown"),
+        (missing_certificate, "unknown"),
+        (wrong_contract, "unknown"),
+        (wrong_assumption, "unknown"),
+        (extra_fuzz, "unknown"),
+        (extra_unknown, "unknown"),
         ({"status": "passed", "proof_tier": "fuzz", "qualifiers": ["fuzz", "fuzz_base"],
           "composite_verdict": "fuzz_validated"}, "fuzz_validated"),
         # The adversarial case: a fuzz pass wearing a proven-looking verdict
