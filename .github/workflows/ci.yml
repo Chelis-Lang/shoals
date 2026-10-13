@@ -203,3 +203,36 @@ jobs:
         run: python3 scripts/oracle_erf64_accuracy.py --transcription
       - name: Validate the accuracy-floor oracle's own mutations (shoals#64)
         run: python3 scripts/test_oracle_erf64_accuracy.py
+
+  certified-bs-call:
+    name: Direct Black-Scholes Beacon bounds
+    runs-on: ubuntu-latest
+    needs: hard-rule-guard
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned Chelis
+        uses: ./.github/actions/install-chelis
+        with:
+          chelis-tag: ${{ env.CHELIS_TAG }}
+          chelis-version: ${{ env.CHELIS_VERSION }}
+          gh-token: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+      - name: Build the package with released dependencies
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: chelis reef build .
+      - name: Install the published Beacon binary
+        env:
+          GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/beacon"
+          gh release download v0.1.20 --repo Chelis-Lang/beacon --dir "$RUNNER_TEMP/beacon" --pattern 'chelis-beacon-v0.1.20-linux-x86_64*'
+          cd "$RUNNER_TEMP/beacon"
+          sha256sum --check chelis-beacon-v0.1.20-linux-x86_64.sha256
+          chmod +x chelis-beacon-v0.1.20-linux-x86_64
+          echo "CHELIS_BEACON_BIN=$RUNNER_TEMP/beacon/chelis-beacon-v0.1.20-linux-x86_64" >> "$GITHUB_ENV"
+      - name: Verify direct-source bounds and the false-control witness
+        run: python3 scripts/check_proof_additions.py --beacon-only

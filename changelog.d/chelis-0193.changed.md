@@ -1,1 +1,0 @@
-Pin Shoals development and hosted validation to Chelis 0.19.3. Refresh the managed contract and capability guide; retain published dependency versions and the 0.19.2 characterization observations until compatible dependencies are published and measured.
