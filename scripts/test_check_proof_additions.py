@@ -130,6 +130,34 @@ class ProofAdditionTests(unittest.TestCase):
                 "failed": 1,
                 "unsupported": 0,
                 "errors": 0,
+                "dependency_graph": {
+                    "status": "complete",
+                    "declarations": [
+                        {
+                            "id": "bs_call_f64",
+                            "kind": "function",
+                            "package": "shoals",
+                            "module": "Shoals.Pricing",
+                            "name": "bs_call_f64",
+                            "source": {"file": "src/pricing.ch"},
+                        },
+                        *[
+                            {
+                                "id": name,
+                                "kind": "property",
+                                "package": "shoals",
+                                "module": "Shoals.Properties.Beacon_bs_call",
+                                "name": name,
+                                "source": {"file": gate.BS_FILE},
+                            }
+                            for name in gate.BS_GOALS
+                        ],
+                    ],
+                    "edges": [
+                        {"from": name, "to": "bs_call_f64"}
+                        for name in gate.BS_GOALS
+                    ],
+                },
             }
         )
         return records
@@ -161,6 +189,46 @@ class ProofAdditionTests(unittest.TestCase):
 
     def test_accepts_two_beacon_bounds_and_checked_false_witness(self):
         self.assertEqual(gate.check_bs_records(self.bs_records(), "a" * 64), [])
+
+    def test_rejects_missing_partial_or_substituted_bs_dependency_graph(self):
+        mutations = [
+            ("empty", lambda graph: graph.clear()),
+            ("partial", lambda graph: graph.update(status="partial")),
+            ("missing_edge", lambda graph: graph["edges"].pop()),
+            (
+                "substituted_target_module",
+                lambda graph: graph["declarations"][0].update(module="Other.Pricing"),
+            ),
+            (
+                "substituted_target_file",
+                lambda graph: graph["declarations"][0]["source"].update(
+                    file="src/other_pricing.ch"
+                ),
+            ),
+            (
+                "substituted_property_module",
+                lambda graph: graph["declarations"][1].update(
+                    module="Shoals.Properties.Other"
+                ),
+            ),
+        ]
+        records = self.bs_records()
+        del records[-1]["dependency_graph"]
+        self.assertTrue(gate.check_bs_records(records, "a" * 64))
+        for label, mutate in mutations:
+            records = self.bs_records()
+            mutate(records[-1]["dependency_graph"])
+            with self.subTest(graph_change=label):
+                self.assertTrue(gate.check_bs_records(records, "a" * 64))
+        for name in gate.BS_GOALS:
+            records = self.bs_records()
+            records[-1]["dependency_graph"]["edges"] = [
+                edge
+                for edge in records[-1]["dependency_graph"]["edges"]
+                if edge["from"] != name
+            ]
+            with self.subTest(missing_edge=name):
+                self.assertTrue(gate.check_bs_records(records, "a" * 64))
 
     def test_rejects_beacon_source_domain_engine_and_certificate_drift(self):
         for field, value in [

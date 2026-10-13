@@ -149,11 +149,24 @@ def checked_witness(value: object) -> bool:
 
 
 def check_bs_records(records: list[dict], engine_sha256: str) -> list[str]:
-    properties, _, errors = split_records(records, BS_GOALS, 2, 1)
+    properties, summary, errors = split_records(records, BS_GOALS, 2, 1)
     for record in properties:
         name = record.get("name")
         if name not in BS_GOALS:
             continue
+        ok, reason = compiler_graph_directly_references(
+            summary.get("dependency_graph"),
+            property_name=name,
+            property_module="Shoals.Properties.Beacon_bs_call",
+            property_file=BS_FILE,
+            target_name="bs_call_f64",
+            target_module="Shoals.Pricing",
+            target_package="shoals",
+            target_file="src/pricing.ch",
+            package="shoals",
+        )
+        if not ok:
+            errors.append(f"{name}: {reason}")
         passed = name != "bs_call_atm_zero_wrong"
         evidence = record.get("engine_evidence") or {}
         engine = evidence.get("beacon_evidence") or {}
