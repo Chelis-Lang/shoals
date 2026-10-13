@@ -930,6 +930,11 @@ are unchanged. Long numerical suites remain optional local tools.
   The source CDF graph requires the upstream certified scalar route before
   these properties can discharge.
 
+- Prove direct-source CSA residual bounds and haircut monotonicity over real
+  arithmetic, with non-vacuity and false-claim controls in the proof gate.
+  Spell the existing subtraction chain as nested calls so the source body
+  lowers to SMT without changing its operation order.
+
 - **`Shoals.Indicators`: a technical-indicator module with no default
   conventions** (shoals#83). EMA, Wilder's RMA, SMA, true range, ATR, RSI,
   MACD, Bollinger bands, the stochastic oscillator, ADX, Donchian channels,

@@ -8,7 +8,7 @@ def csa_collateralized_exposure(exposure: f32, threshold: f32, mta: f32, indepen
     required = sub(exposure_pos, threshold)
     if lt(required, mta) then exposure_pos else {
       transferred = mul(required, sub(one_f, haircut))
-      effective = exposure_pos |> sub(transferred) |> sub(independent_amount)
+      effective = sub(sub(exposure_pos, transferred), independent_amount)
       if gt(effective, zero_f) then effective else zero_f
     }
   }

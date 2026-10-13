@@ -26,6 +26,50 @@ CONTRACT_SPEC.loader.exec_module(CONTRACT_GATE)
 
 
 class RiskInvariantGateTests(unittest.TestCase):
+    def test_csa_gate_rejects_missing_proof_and_dependency(self) -> None:
+        positive = (
+            "csa_residual_nonnegative", "csa_residual_not_above_exposure",
+            "csa_negative_exposure_zero", "csa_haircut_monotone",
+        )
+        negative = (
+            "csa_residual_bounded_corrupted", "csa_bounded_guards_satisfiable",
+            "csa_haircut_monotone_corrupted", "csa_haircut_guards_satisfiable",
+        )
+        records = {
+            name: {"status": "passed", "proof_tier": "smt",
+                   "arith_model": "real", "samples": 0, "qualifiers": ["real_arithmetic"]}
+            for name in positive
+        }
+        records.update({
+            name: {"status": "failed", "proof_tier": "smt",
+                   "counterexample": {"e": "1.0"}}
+            for name in negative
+        })
+        for name, record in records.items():
+            record["goal"] = PROVE_GATE.CSA_GOALS[name]
+        result = {"returncode": 1, "summary_count": 1, "duplicate_records": [],
+                  "records": records, "dependency_graph": None}
+        ok, errors = PROVE_GATE.check_csa_properties(result)
+        self.assertFalse(ok)
+        self.assertTrue(any("dependency_graph" in error for error in errors))
+        with mock.patch.object(PROVE_GATE, "compiler_graph_directly_references",
+                               return_value=(True, "direct edge")):
+            self.assertTrue(PROVE_GATE.check_csa_properties(result)[0])
+            records["csa_residual_nonnegative"]["goal"] = "(e == e)"
+            self.assertFalse(PROVE_GATE.check_csa_properties(result)[0])
+            records["csa_residual_nonnegative"]["goal"] = PROVE_GATE.CSA_GOALS[
+                "csa_residual_nonnegative"
+            ].replace("h <= 1.0", "h <= 0.9")
+            self.assertFalse(PROVE_GATE.check_csa_properties(result)[0])
+            records["csa_residual_nonnegative"]["goal"] = PROVE_GATE.CSA_GOALS[
+                "csa_residual_nonnegative"
+            ]
+            records["csa_haircut_monotone"]["status"] = "unsupported"
+            self.assertFalse(PROVE_GATE.check_csa_properties(result)[0])
+            records["csa_haircut_monotone"]["status"] = "passed"
+            records["csa_residual_bounded_corrupted"]["counterexample"] = None
+            self.assertFalse(PROVE_GATE.check_csa_properties(result)[0])
+
     def test_actual_ad_manifest_preserves_inline_grad_deferral(self) -> None:
         manifest = json.loads(
             (ROOT / "docs/cnote-import-surface.json").read_text()
