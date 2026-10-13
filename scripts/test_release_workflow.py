@@ -18,6 +18,19 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseWorkflowTests(unittest.TestCase):
+    def test_expected_failure_suites_have_independent_required_budget(self) -> None:
+        ci = live_yaml(ROOT / ".github/workflows/ci.yml")
+        self.assertTrue(expected_failure_suites_are_independent(ci))
+        self.assertFalse(expected_failure_suites_are_independent(
+            ci.replace("chelis test tests_neg/ --expect neg", "true")
+        ))
+        self.assertFalse(expected_failure_suites_are_independent(
+            ci.replace("  expected-failure-suites:\n", "  expected-failure-suites:\n    continue-on-error: true\n")
+        ))
+        self.assertFalse(expected_failure_suites_are_independent(
+            ci.replace("  expected-failure-suites:\n", "  expected-failure-suites:\n    needs: check\n")
+        ))
+
     def test_heston_manual_gate_generates_explicit_key_source(self) -> None:
         script = ROOT / "scripts/manual_gates/phase3l_shoals_oracle_heston_qe.py"
         spec = importlib.util.spec_from_file_location("heston_qe_gate", script)
@@ -181,6 +194,26 @@ class ReleaseWorkflowTests(unittest.TestCase):
 
 def live_yaml(path: Path) -> str:
     return uncommented(path.read_text())
+
+
+def expected_failure_suites_are_independent(ci: str) -> bool:
+    def job(name: str) -> str | None:
+        match = re.search(rf"(?ms)^  {re.escape(name)}:\n(.*?)(?=^  [a-z0-9-]+:\n|\Z)", ci)
+        return match.group(1) if match else None
+
+    check = job("check")
+    suites = job("expected-failure-suites")
+    commands = (
+        "chelis test tests_neg/ --expect neg",
+        "chelis test tests_blocked/ --expect blocked",
+    )
+    return bool(
+        check is not None and suites is not None
+        and "timeout-minutes: 10" in suites
+        and "continue-on-error:" not in suites
+        and "needs:" not in suites
+        and all(command in suites and command not in check for command in commands)
+    )
 
 
 def uncommented(text: str) -> str:
