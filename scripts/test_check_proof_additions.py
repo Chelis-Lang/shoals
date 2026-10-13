@@ -97,13 +97,24 @@ class ProofAdditionTests(unittest.TestCase):
                 "beacon_evidence": {
                     "schema_version": "beacon.scalar_upper_bound.v1",
                     "selected_root_node_id": 12,
+                    "strict_upper": 0.0,
                     "verdict": "certified" if passed else "failed",
                     "counterexample": None if passed else witness,
                     "certificate": {
                         "method": "arb_box_cover_v1",
-                        "leaves_certified": 1 if passed else 0,
+                        "leaves_certified": 2 if passed else 0,
                         "leaves_unresolved": 0 if passed else 1,
-                        "leaves": [{}] if passed else [],
+                        "leaves": (
+                            [
+                                {
+                                    "inputs": {"s": {"lo": lo, "hi": hi}},
+                                    "bound": {"lo": -2.0, "hi": -1.0},
+                                }
+                                for lo, hi in ((96.0, 100.0), (100.0, 104.0))
+                            ]
+                            if passed
+                            else []
+                        ),
                     },
                 },
             }
@@ -154,8 +165,7 @@ class ProofAdditionTests(unittest.TestCase):
                         ],
                     ],
                     "edges": [
-                        {"from": name, "to": "bs_call_f64"}
-                        for name in gate.BS_GOALS
+                        {"from": name, "to": "bs_call_f64"} for name in gate.BS_GOALS
                     ],
                 },
             }
@@ -265,6 +275,39 @@ class ProofAdditionTests(unittest.TestCase):
                 self.bs_records() + [copy.deepcopy(self.bs_records()[0])], "a" * 64
             )
         )
+
+    def test_rejects_incomplete_or_noncertifying_beacon_cover(self):
+        def change_certificate(records, change):
+            engine = records[0]["engine_evidence"]["beacon_evidence"]
+            change(engine)
+            self.assertTrue(gate.check_bs_records(records, "a" * 64))
+
+        change_certificate(self.bs_records(), lambda e: e.update(strict_upper=1000.0))
+
+        def drop_leaf(engine):
+            cert = engine["certificate"]
+            cert["leaves"].pop()
+            cert["leaves_certified"] = 1
+
+        change_certificate(self.bs_records(), drop_leaf)
+        for replacement in (
+            {"lo": 1.0, "hi": 2.0},
+            {"lo": -2.0, "hi": 0.0},
+            {"lo": -2.0, "hi": float("nan")},
+        ):
+            change_certificate(
+                self.bs_records(),
+                lambda e: e["certificate"]["leaves"][0].update(bound=replacement),
+            )
+        for replacement in (
+            {"lo": 96.0, "hi": 99.0},
+            {"lo": 95.0, "hi": 100.0},
+            {"lo": 96.0, "hi": float("inf")},
+        ):
+            change_certificate(
+                self.bs_records(),
+                lambda e: e["certificate"]["leaves"][0]["inputs"].update(s=replacement),
+            )
 
 
 if __name__ == "__main__":

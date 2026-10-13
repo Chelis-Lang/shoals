@@ -148,6 +148,53 @@ def checked_witness(value: object) -> bool:
     )
 
 
+def checked_arb_cover(certificate: object, strict_upper: object) -> bool:
+    if (
+        not isinstance(certificate, dict)
+        or type(strict_upper) not in (int, float)
+        or not math.isfinite(strict_upper)
+        or strict_upper != 0.0
+        or certificate.get("method") != "arb_box_cover_v1"
+    ):
+        return False
+    leaves = certificate.get("leaves")
+    if (
+        not isinstance(leaves, list)
+        or not leaves
+        or type(certificate.get("leaves_certified")) is not int
+        or certificate["leaves_certified"] != len(leaves)
+        or type(certificate.get("leaves_unresolved")) is not int
+        or certificate["leaves_unresolved"] != 0
+    ):
+        return False
+    intervals = []
+    for leaf in leaves:
+        if not isinstance(leaf, dict):
+            return False
+        inputs = leaf.get("inputs")
+        if not isinstance(inputs, dict) or set(inputs) != {"s"}:
+            return False
+        domain = inputs["s"]
+        bound = leaf.get("bound")
+        if not isinstance(domain, dict) or not isinstance(bound, dict):
+            return False
+        values = [domain.get("lo"), domain.get("hi"), bound.get("lo"), bound.get("hi")]
+        if not all(
+            type(value) in (int, float) and math.isfinite(value) for value in values
+        ):
+            return False
+        lo, hi, bound_lo, bound_hi = values
+        if not (96.0 <= lo <= hi <= 104.0 and bound_lo <= bound_hi < 0.0):
+            return False
+        intervals.append((lo, hi))
+    covered_to = 96.0
+    for lo, hi in sorted(intervals):
+        if lo > covered_to:
+            return False
+        covered_to = max(covered_to, hi)
+    return covered_to == 104.0
+
+
 def check_bs_records(records: list[dict], engine_sha256: str) -> list[str]:
     properties, summary, errors = split_records(records, BS_GOALS, 2, 1)
     for record in properties:
@@ -214,13 +261,8 @@ def check_bs_records(records: list[dict], engine_sha256: str) -> list[str]:
             errors.append(f"{name}: actual source/folded graph dispatch missing")
         certificate = engine.get("certificate") or {}
         if passed:
-            leaves = certificate.get("leaves") or []
-            if (
-                engine.get("verdict") != "certified"
-                or certificate.get("method") != "arb_box_cover_v1"
-                or certificate.get("leaves_certified") != len(leaves)
-                or not leaves
-                or certificate.get("leaves_unresolved") != 0
+            if engine.get("verdict") != "certified" or not checked_arb_cover(
+                certificate, engine.get("strict_upper")
             ):
                 errors.append(f"{name}: complete certified Arb cover missing")
         elif (
