@@ -51,6 +51,7 @@ import shutil
 import subprocess
 import sys
 import time
+import tomllib
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -554,6 +555,45 @@ BUILTINS = {
 }
 
 
+def install_guide_failures(page: Path, manifest_path: Path) -> list[str]:
+    """Require the no-token install recipe to cover the pinned Reef graph."""
+    with manifest_path.open("rb") as source:
+        manifest = tomllib.load(source)
+    package = manifest["package"]
+    package_name = package["name"]
+    package_version = package["version"]
+    expected = {f"Chelis-Lang/{package_name}@v{package_version}"}
+    for name, spec in manifest["dependencies"].items():
+        if name == "chelis-std":
+            continue  # Ships with the compiler and has no separate release.
+        version = spec.get("version") if isinstance(spec, dict) else None
+        if not isinstance(version, str) or not version.startswith("="):
+            return [f"{manifest_path}: {name} lacks an exact dependency pin"]
+        expected.add(f"Chelis-Lang/{name}@v{version[1:]}")
+
+    visible_text = re.sub(r"<!--.*?-->", "", page.read_text(), flags=re.DOTALL)
+    shell_blocks = re.findall(
+        r"^```(?:sh|bash|shell|zsh)[ \t]*\n(.*?)^```[ \t]*$",
+        visible_text,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    actual = [
+        coordinate
+        for block in shell_blocks
+        for coordinate in re.findall(
+            r"^chelis reef install --from-github (\S+)[ \t]*$", block, re.MULTILINE
+        )
+    ]
+    failures = [f"{page}: missing install for {item}" for item in sorted(expected - set(actual))]
+    failures.extend(f"{page}: unexpected install for {item}" for item in sorted(set(actual) - expected))
+    failures.extend(f"{page}: duplicate install for {item}" for item in sorted(set(actual))
+                    if actual.count(item) > 1)
+    dependency_pin = f'{package_name} = {{ version = "={package_version}" }}'
+    if dependency_pin not in visible_text:
+        failures.append(f"{page}: missing {package_name} dependency pin {package_version}")
+    return failures
+
+
 def source_signatures(pages: list[Path]) -> int:
     """Compare repository declarations without compiler, dependency or scratch I/O.
 
@@ -565,6 +605,9 @@ def source_signatures(pages: list[Path]) -> int:
     checker = Checker("", names, headers, {}, WORK)
     deferred = 0
     for page in pages:
+        if page.name == "getting-started.md":
+            checker.failures.extend(install_guide_failures(page, REPO / "reef.toml"))
+            checker.failures.extend(install_guide_failures(REPO / "README.md", REPO / "reef.toml"))
         for block in read_blocks(page):
             stmts = statements(block)
             if not stmts or not all(st.text.startswith(("def ", "type ")) for st in stmts):
