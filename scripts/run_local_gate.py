@@ -162,6 +162,10 @@ def main() -> int:
             ["python3", "scripts/test_risk_invariant_gate.py"],
         ),
         (
+            "source-bound proof additions oracle unit tests",
+            ["python3", "scripts/test_check_proof_additions.py"],
+        ),
+        (
             "canonical release-builder unit tests (chelis#1002)",
             ["python3", "scripts/test_build_release_assets.py"],
         ),

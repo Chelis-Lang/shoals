@@ -1,0 +1,1 @@
+Build Shoals 0.24.20 with Chelis 0.19.4 and compatible released dependencies. Validate the exported raw SVI theorem and bounded direct Black-Scholes call through their real-arithmetic proof routes, with false controls.

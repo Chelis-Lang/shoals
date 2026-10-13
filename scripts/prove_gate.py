@@ -1437,6 +1437,10 @@ def main() -> None:
         fail(reason)
     ok = csa_ok and ok
 
+    print("\n== proving the exported raw SVI theorem and false controls ==")
+    svi_run = subprocess.run([sys.executable, str(REPO / "scripts/check_proof_additions.py"), "--smt-only"], cwd=REPO)
+    ok = svi_run.returncode == 0 and ok
+
     print()
     if ok:
         print("PASS: shoals prove_gate green")

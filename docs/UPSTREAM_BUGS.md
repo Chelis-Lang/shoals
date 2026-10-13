@@ -1,7 +1,7 @@
 # Shoals Upstream Bugs
 
 Tracked upstream chelis issues and capability gaps that affect Shoals, per the
-[downstream shell repo contract](https://github.com/Chelis-Lang/chelis/blob/v0.19.2/spec/design/shell_repo_contract.md) §4.
+[downstream shell repo contract](https://github.com/Chelis-Lang/chelis/blob/v0.19.4/spec/design/shell_repo_contract.md) §4.
 The reachability map these entries lean on — what the proof stack can and cannot
 discharge for finance at this pin — is `research/proof-infra/report.md`; keep
 entries consistent with it.
@@ -35,6 +35,9 @@ in code that is CLOSED upstream but not sitting in §Archived.
   returning `0.25` at `x = 4`. The executable
   `tests_blocked/ad/hoisted_scalar_if_grad.ch` and its sidecar pin these
   controls; the expected-failure suite reports `OK` on 0.19.2.
+  The same blocked probe reports `OK` on Chelis 0.19.4 with the published
+  Nautilus, Coral, and Shoreleave graph; the full expiry AD surface has not
+  been reclassified by that result.
     - **Affected Shoals surface:** `src/pricing.ch` hoists
       `den = sigma * sqrt(t)` before a scalar-`if` floor. In an isolated
       Chelis 0.19.2 graph with published Nautilus 0.7.51, Coral 0.7.48, and
@@ -93,14 +96,21 @@ in code that is CLOSED upstream but not sitting in §Archived.
       `src/` citations still present, row 12 reads `NA` if fixed and `FAIL` if
       not. Restore the directory afterwards. Then replace this draft path with
       the issue number everywhere it is cited.
+    - **Chelis 0.19.4 re-probe:** in an isolated source copy with both
+      `.ch` probes under `tests_blocked/` removed, `chelis reef conform audit --explain`
+      still reports `FAIL` for row 11 (`tests-blocked`), citing an upstream
+      blocker without a probe. The unmodified tree reports `PASS` for that row.
+      The chelis#1387 workaround remains necessary.
 
 - **The proof gate checks the pinned finance surface.** Economic and dynamic
   programming properties reach the SMT tier without a transcendental contract.
   The structural upper-bound and delta properties use the validated normal-CDF
   range contract. Put-call parity through the f32 reflection contract is
   deferred: its fixed tolerance fails validation at this pin (chelis#3116).
-  Direct transcendental pricing properties remain fuzz-validated; coupled
-  subterm proofs remain deferred under chelis#637.
+  The unbounded direct transcendental pricing properties remain
+  fuzz-validated; coupled subterm SMT proofs remain deferred under chelis#637.
+  Finite-box `bs_call_f64` bounds use the separate Beacon route with a
+  source-bound real-arithmetic certificate and an in-domain false control.
 
 ## Tracking
 
@@ -128,6 +138,14 @@ in code that is CLOSED upstream but not sitting in §Archived.
       compares two isolated Reef homes: one preseeded through mixed-case
       manual installs and one clean, requiring byte-identical lock, CHB, and
       archive payloads. This does not claim the compiler is fixed.
+    - **Chelis 0.19.4 pin re-probe:** an ignored lock carrying
+      `github://Chelis-Lang/coral` and the old package graph caused
+      `reef conform bump` to reject the uppercase organization as an invalid
+      source locator. A fresh isolated registry installed through lowercase
+      `chelis-lang/...` coordinates resolved the published Nautilus 0.7.55,
+      Coral 0.7.50, and Shoreleave 0.1.4 graph with lowercase lock origins.
+      This observes the stale-lock upgrade path, not the optional two-home
+      byte-determinism comparison.
     - **State at pin 0.18.6 (2026-08-29):** still OPEN upstream and the 0.18.6
       changelog names no origin canonicalization, so the narrowing stays. The
       adversarial pair (`scripts/check_release_artifact_determinism.py`) could
