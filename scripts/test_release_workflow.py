@@ -30,6 +30,26 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertFalse(expected_failure_suites_are_independent(
             ci.replace("  expected-failure-suites:\n", "  expected-failure-suites:\n    needs: check\n")
         ))
+        self.assertFalse(expected_failure_suites_are_independent(
+            ci.replace("  expected-failure-suites:\n", "  expected-failure-suites:\n    if: false\n")
+        ))
+        self.assertFalse(expected_failure_suites_are_independent(
+            ci.replace("    name: negative and blocked tests\n    runs-on: ubuntu-latest\n    timeout-minutes: 10\n",
+                       "    name: negative and blocked tests\n    runs-on: ubuntu-latest\n    timeout-minutes: 100\n")
+        ))
+        self.assertFalse(expected_failure_suites_are_independent(
+            ci.replace("    timeout-minutes: 10", "    timeout-minutes: 100", 1)
+        ))
+        self.assertFalse(expected_failure_suites_are_independent(
+            ci.replace("chelis test tests_neg/ --expect neg", "chelis test tests_neg/ --expect neg || true")
+        ))
+        self.assertFalse(expected_failure_suites_are_independent(
+            ci.replace("      - name: Negative tests\n", "      - name: Negative tests\n        if: false\n")
+        ))
+        self.assertFalse(expected_failure_suites_are_independent(
+            ci.replace("chelis test tests_blocked/ --expect blocked",
+                       "chelis test tests_blocked/ --expect blocked || true")
+        ))
 
     def test_heston_manual_gate_generates_explicit_key_source(self) -> None:
         script = ROOT / "scripts/manual_gates/phase3l_shoals_oracle_heston_qe.py"
@@ -203,16 +223,33 @@ def expected_failure_suites_are_independent(ci: str) -> bool:
 
     check = job("check")
     suites = job("expected-failure-suites")
-    commands = (
-        "chelis test tests_neg/ --expect neg",
-        "chelis test tests_blocked/ --expect blocked",
-    )
-    return bool(
-        check is not None and suites is not None
-        and "timeout-minutes: 10" in suites
-        and "continue-on-error:" not in suites
-        and "needs:" not in suites
-        and all(command in suites and command not in check for command in commands)
+    if check is None or suites is None:
+        return False
+
+    def step(name: str) -> str | None:
+        match = re.search(rf"(?ms)^      - name: {re.escape(name)}\n(.*?)(?=^      - name: |\Z)", suites)
+        return match.group(1) if match else None
+
+    negative = step("Negative tests")
+    blocked = step("Blocked-probe suite")
+    if negative is None or blocked is None:
+        return False
+    if not re.search(r"(?m)^    timeout-minutes: 10$", check):
+        return False
+    if not re.search(r"(?m)^    timeout-minutes: 10$", suites):
+        return False
+    if re.search(r"(?m)^    (?:if|needs|continue-on-error):", suites):
+        return False
+    if any(re.search(r"(?m)^        (?:if|continue-on-error):", body)
+           for body in (negative, blocked)):
+        return False
+    if not re.search(r"(?m)^        run: chelis test tests_neg/ --expect neg$", negative):
+        return False
+    if not re.search(r"(?m)^          chelis test tests_blocked/ --expect blocked$", blocked):
+        return False
+    return (
+        "chelis test tests_neg/ --expect neg" not in check
+        and "chelis test tests_blocked/ --expect blocked" not in check
     )
 
 
