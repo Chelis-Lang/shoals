@@ -18,6 +18,39 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseWorkflowTests(unittest.TestCase):
+    def test_expected_failure_suites_have_independent_required_budget(self) -> None:
+        ci = live_yaml(ROOT / ".github/workflows/ci.yml")
+        self.assertTrue(expected_failure_suites_are_independent(ci))
+        self.assertFalse(expected_failure_suites_are_independent(
+            ci.replace("chelis test tests_neg/ --expect neg", "true")
+        ))
+        self.assertFalse(expected_failure_suites_are_independent(
+            ci.replace("  expected-failure-suites:\n", "  expected-failure-suites:\n    continue-on-error: true\n")
+        ))
+        self.assertFalse(expected_failure_suites_are_independent(
+            ci.replace("  expected-failure-suites:\n", "  expected-failure-suites:\n    needs: check\n")
+        ))
+        self.assertFalse(expected_failure_suites_are_independent(
+            ci.replace("  expected-failure-suites:\n", "  expected-failure-suites:\n    if: false\n")
+        ))
+        self.assertFalse(expected_failure_suites_are_independent(
+            ci.replace("    name: negative and blocked tests\n    runs-on: ubuntu-latest\n    timeout-minutes: 10\n",
+                       "    name: negative and blocked tests\n    runs-on: ubuntu-latest\n    timeout-minutes: 100\n")
+        ))
+        self.assertFalse(expected_failure_suites_are_independent(
+            ci.replace("    timeout-minutes: 10", "    timeout-minutes: 100", 1)
+        ))
+        self.assertFalse(expected_failure_suites_are_independent(
+            ci.replace("chelis test tests_neg/ --expect neg", "chelis test tests_neg/ --expect neg || true")
+        ))
+        self.assertFalse(expected_failure_suites_are_independent(
+            ci.replace("      - name: Negative tests\n", "      - name: Negative tests\n        if: false\n")
+        ))
+        self.assertFalse(expected_failure_suites_are_independent(
+            ci.replace("chelis test tests_blocked/ --expect blocked",
+                       "chelis test tests_blocked/ --expect blocked || true")
+        ))
+
     def test_heston_manual_gate_generates_explicit_key_source(self) -> None:
         script = ROOT / "scripts/manual_gates/phase3l_shoals_oracle_heston_qe.py"
         spec = importlib.util.spec_from_file_location("heston_qe_gate", script)
@@ -181,6 +214,43 @@ class ReleaseWorkflowTests(unittest.TestCase):
 
 def live_yaml(path: Path) -> str:
     return uncommented(path.read_text())
+
+
+def expected_failure_suites_are_independent(ci: str) -> bool:
+    def job(name: str) -> str | None:
+        match = re.search(rf"(?ms)^  {re.escape(name)}:\n(.*?)(?=^  [a-z0-9-]+:\n|\Z)", ci)
+        return match.group(1) if match else None
+
+    check = job("check")
+    suites = job("expected-failure-suites")
+    if check is None or suites is None:
+        return False
+
+    def step(name: str) -> str | None:
+        match = re.search(rf"(?ms)^      - name: {re.escape(name)}\n(.*?)(?=^      - name: |\Z)", suites)
+        return match.group(1) if match else None
+
+    negative = step("Negative tests")
+    blocked = step("Blocked-probe suite")
+    if negative is None or blocked is None:
+        return False
+    if not re.search(r"(?m)^    timeout-minutes: 10$", check):
+        return False
+    if not re.search(r"(?m)^    timeout-minutes: 10$", suites):
+        return False
+    if re.search(r"(?m)^    (?:if|needs|continue-on-error):", suites):
+        return False
+    if any(re.search(r"(?m)^        (?:if|continue-on-error):", body)
+           for body in (negative, blocked)):
+        return False
+    if not re.search(r"(?m)^        run: chelis test tests_neg/ --expect neg$", negative):
+        return False
+    if not re.search(r"(?m)^          chelis test tests_blocked/ --expect blocked$", blocked):
+        return False
+    return (
+        "chelis test tests_neg/ --expect neg" not in check
+        and "chelis test tests_blocked/ --expect blocked" not in check
+    )
 
 
 def uncommented(text: str) -> str:
