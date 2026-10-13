@@ -125,6 +125,32 @@ def test_f64_fit_rejects_overflowed_initial_loss() -> unit ! { Test } = {
     | _ => assert_true(false, "overflowed loss must not become an iteration limit")
   }
 }
+def test_f64_fit_reports_overflowed_upper_bound_distance() -> unit ! { Test } = {
+  theta0 = to_tensor([-1e308f64])
+  lo = to_tensor([-1e308f64])
+  hi = to_tensor([1e308f64])
+  match lm_bounded_nparam(zero_model, to_tensor([0.0f64]), to_tensor([1.0f64]), to_tensor([1.0f64]), theta0, lo, hi, 0.01f64, 1e-6f64, 1i64, 0.00001f64, 1e-6f64, settings()) with {
+    | FitNumericalFailure { parameters, loss, iterations, projection_size, reason } => {
+    _ = assert_true(eq(reason, "nonfinite QP bound distance"), "upper distance overflow must be reported")
+    _ = assert_true(eq(index(to_list(parameters), 0i64), -1e308f64), "last accepted iterate is retained")
+    assert_true(eq(iterations, 0i64), "no solver iteration occurred")
+  }
+    | _ => assert_true(false, "upper distance overflow must return numerical failure")
+  }
+}
+def test_f64_fit_reports_overflowed_lower_bound_distance() -> unit ! { Test } = {
+  theta0 = to_tensor([1e308f64])
+  lo = to_tensor([-1e308f64])
+  hi = to_tensor([1e308f64])
+  match lm_bounded_nparam(zero_model, to_tensor([0.0f64]), to_tensor([1.0f64]), to_tensor([1.0f64]), theta0, lo, hi, 0.01f64, 1e-6f64, 1i64, 0.00001f64, 1e-6f64, settings()) with {
+    | FitNumericalFailure { parameters, loss, iterations, projection_size, reason } => {
+    _ = assert_true(eq(reason, "nonfinite QP bound distance"), "lower distance overflow must be reported")
+    _ = assert_true(eq(index(to_list(parameters), 0i64), 1e308f64), "last accepted iterate is retained")
+    assert_true(eq(iterations, 0i64), "no solver iteration occurred")
+  }
+    | _ => assert_true(false, "lower distance overflow must return numerical failure")
+  }
+}
 def test_f64_fit_rank_deficient_model() -> unit ! { Test } = {
   features = to_tensor([1.0f64, 2.0f64])
   observed = to_tensor([2.0f64, 4.0f64])

@@ -54,6 +54,10 @@ from `Stopped`. `lm_bounded_nparam` computes its model prediction and
 finite-difference Jacobian in `f64`; it does not widen an `f32` Jacobian.
 Its result distinguishes convergence, outer iteration limit, stopped solver,
 and numerical failure.
+The fit reports nonfinite generated QP data, including overflowed bound
+distances, as `FitNumericalFailure` with the last accepted iterate.
+`solve_bounded_step` rejects nonfinite bound distances before calling the
+provider.
 
 On `Solved`, the fit checks the primal and diagnostics for finiteness and
 checks bound violations against a caller-visible tolerance. It projects only

@@ -27,6 +27,7 @@ def clamp_parameters[n](theta: &tensor[n, f64], lo: &tensor[n, f64], hi: &tensor
 def bounds_ordered[n](lo: &tensor[n, f64], hi: &tensor[n, f64]) -> bool = fold(fn (ok: bool, entry: (f64, f64)) -> and(ok, lte(entry.0, entry.1)), true, zip(to_list(lo), to_list(hi)))
 def finite_values[n](values: &tensor[n, f64]) -> bool = fold(fn (ok: bool, value: f64) -> and(ok, eq(sub(value, value), 0.0f64)), true, to_list(values))
 def finite_scalar(value: f64) -> bool = eq(sub(value, value), 0.0f64)
+def finite_bound_distances[n](theta: &tensor[n, f64], lo: &tensor[n, f64], hi: &tensor[n, f64]) -> bool = and(finite_values(sub(hi, theta)), finite_values(sub(theta, lo)))
 def ordered_bounds[n](theta: &tensor[n, f64], lo: &tensor[n, f64], hi: &tensor[n, f64]) -> bool = {
   lower_pairs = zip(to_list(theta), to_list(lo))
   triples = zip(lower_pairs, to_list(hi))
@@ -48,7 +49,7 @@ def solve_bounded_step[n](p: &tensor[n, n, f64], g: &tensor[n, f64], theta: &ten
   flat_p = reshape(p, [mul(n_params, n_params)])
   p_finite = finite_values(flat_p)
   valid = and(gt(n_params, 0i64), and(p_finite, and(finite_values(g), and(finite_values(theta), and(finite_values(lo), and(finite_values(hi), ordered_bounds(theta, lo, hi)))))))
-  if not(valid) then fail("Shoals.ModelFitClarabel: empty, nonfinite, or out-of-bounds QP input") else {
+  if not(valid) then fail("Shoals.ModelFitClarabel: empty, nonfinite, or out-of-bounds QP input") else if not(finite_bound_distances(theta, lo, hi)) then fail("Shoals.ModelFitClarabel: nonfinite QP bound distance") else {
     unit = identity(theta)
     a = concat([copy(unit), neg(unit)], 0i32)
     b = concat([sub(hi, theta), sub(theta, lo)], 0i32)
@@ -123,7 +124,7 @@ def fit_rec[n, m](model: &tensor[n, f64] -> &tensor[m, f64] -> tensor[m, f64], f
       gradient = gradient_acc(model, features, theta, prediction, weighted_residual, template, 0i64, n_params, fd_eps)
       normal = normal_matrix_acc(model, features, theta, prediction, weights, template, 0i64, n_params, fd_eps)
       p = damped_normal(normal, lambda, template, n_params)
-      if not(and(finite_values(gradient), finite_values(reshape(p, [mul(n_params, n_params)])))) then FitNumericalFailure { parameters: theta, loss, iterations: steps_used, projection_size, reason: "nonfinite QP construction" } else {
+      if not(and(finite_values(gradient), finite_values(reshape(p, [mul(n_params, n_params)])))) then FitNumericalFailure { parameters: theta, loss, iterations: steps_used, projection_size, reason: "nonfinite QP construction" } else if not(finite_bound_distances(theta, lo, hi)) then FitNumericalFailure { parameters: theta, loss, iterations: steps_used, projection_size, reason: "nonfinite QP bound distance" } else {
         result = match solve_bounded_step(p, gradient, theta, lo, hi, settings) with {
           | Stopped { status } => FitSolverStopped { parameters: theta, loss, iterations: steps_used, projection_size, status }
           | Solved { primal, dual, slack, iterations, primal_residual, dual_residual } => {
