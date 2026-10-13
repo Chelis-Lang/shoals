@@ -636,7 +636,7 @@ in code that is CLOSED upstream but not sitting in §Archived.
     narrowing sites now cite chelis#637.
   - **Retained discipline:** the contract-abstraction method in
     `properties/composites.ch` (bounded free parameter + separately
-    fuzz-validated contract) remains the canonical pattern for
+    certified range contract) remains the canonical pattern for
     coupling-dependent goals regardless of the envelope capability.
 
 - **chelis#435 — `prove --json` emitted `proven_modulo_fuzz_validated_contract`
