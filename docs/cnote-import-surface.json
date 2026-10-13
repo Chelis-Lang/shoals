@@ -2,9 +2,9 @@
   "schema_id": "chelis-shell.invariant-surface",
   "schema_version": "1.0",
   "pkg": "shoals",
-  "pkg_version": "0.24.20",
+  "pkg_version": "0.24.21",
   "chelis_pin": "0.19.4",
-  "generated_note": "Producer manifest for Shoals 0.24.20 on Chelis 0.19.4. The 37 active invariants name exported functions, preconditions, controls, and expected proof tiers for the declared compiler pin. The proof gate checks compiler-owned dependency edges, verdicts, qualifiers and non-vacuous guards. Certified-envelope normal-CDF range results remain sound_approximate; real-arithmetic proofs do not certify floating-point execution, and fuzz results are empirical observations. Put-call parity under f32 normal-CDF reflection is deferred under chelis#3116.",
+  "generated_note": "Producer manifest for Shoals 0.24.21 on Chelis 0.19.4. The 37 active invariants name exported functions, preconditions, controls, and expected proof tiers for the declared compiler pin. The proof gate checks compiler-owned dependency edges, verdicts, qualifiers and non-vacuous guards. Certified-envelope normal-CDF range results remain sound_approximate; real-arithmetic proofs do not certify floating-point execution, and fuzz results are empirical observations. Put-call parity under f32 normal-CDF reflection is deferred under chelis#3116.",
   "models": [
     {
       "id": "bs_call",

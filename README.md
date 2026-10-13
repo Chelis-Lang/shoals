@@ -7,7 +7,7 @@ The Shoals book is published at <https://chelis.ch/docs/shoals/>, and its source
 ## Install
 
 Shoals is a Reef package; you do not need this repository to use it. Shoals
-0.24.20 requires Chelis 0.19.4 (see the
+0.24.21 requires Chelis 0.19.4 (see the
 [Chelis install guide](https://chelis.ch/docs/chelis/install/)). Create a
 project and download Shoals and the three packages it depends on from their
 GitHub releases; these downloads need no GitHub token:
@@ -19,11 +19,11 @@ cd demo
 chelis reef install --from-github Chelis-Lang/nautilus@v0.7.55
 chelis reef install --from-github Chelis-Lang/coral@v0.7.50
 chelis reef install --from-github Chelis-Lang/shoreleave@v0.1.4
-chelis reef install --from-github Chelis-Lang/shoals@v0.24.20
+chelis reef install --from-github Chelis-Lang/shoals@v0.24.21
 ```
 
 The generated `reef.toml` pins compiler 0.19.4. Add
-`shoals = { version = "=0.24.20" }` under `[dependencies]`, then run
+`shoals = { version = "=0.24.21" }` under `[dependencies]`, then run
 `chelis reef build`. With `GITHUB_TOKEN` set or the `gh`
 CLI signed in, `chelis reef build` downloads missing packages itself and the
 `reef install` lines are unnecessary. [Getting started](https://chelis.ch/docs/shoals/getting-started/)

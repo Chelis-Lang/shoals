@@ -246,6 +246,11 @@ a bond paying `c` each period and the face value with the last coupon.
 `1 / (1 + y)^2`, and `fi_bond2_nodisc` the undiscounted cash flow
 `c + (1 + c)`.
 
+For the two-period bond, a larger coupon raises the price at a fixed
+nonnegative yield. If `0 <= c1 < c2` and `y >= 0`, then
+`fi_bond2(c2, y) - fi_bond2(c1, y) = (c2 - c1) * (1 / (1 + y) + 1 / (1 + y)^2) > 0`.
+The property is proved over real arithmetic; it does not bound `f32` rounding.
+
 A 30-year bond with a 5% annual coupon paid semiannually, at a 4% yield,
 has `c = 0.025`, `y = 0.02`, and 60 periods:
 
