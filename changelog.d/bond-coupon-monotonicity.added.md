@@ -1,0 +1,1 @@
+The two-period coupon-bond canon now proves over the reals that increasing the coupon raises its price at a fixed nonnegative yield. The characterization manifest includes a refuting reverse claim and a guard-satisfiability control.
