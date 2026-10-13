@@ -571,14 +571,25 @@ def install_guide_failures(page: Path, manifest_path: Path) -> list[str]:
             return [f"{manifest_path}: {name} lacks an exact dependency pin"]
         expected.add(f"Chelis-Lang/{name}@v{version[1:]}")
 
-    text = page.read_text()
-    actual = re.findall(r"^chelis reef install --from-github (\S+)\s*$", text, re.MULTILINE)
+    visible_text = re.sub(r"<!--.*?-->", "", page.read_text(), flags=re.DOTALL)
+    shell_blocks = re.findall(
+        r"^```(?:sh|bash|shell|zsh)[ \t]*\n(.*?)^```[ \t]*$",
+        visible_text,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    actual = [
+        coordinate
+        for block in shell_blocks
+        for coordinate in re.findall(
+            r"^chelis reef install --from-github (\S+)[ \t]*$", block, re.MULTILINE
+        )
+    ]
     failures = [f"{page}: missing install for {item}" for item in sorted(expected - set(actual))]
     failures.extend(f"{page}: unexpected install for {item}" for item in sorted(set(actual) - expected))
     failures.extend(f"{page}: duplicate install for {item}" for item in sorted(set(actual))
                     if actual.count(item) > 1)
     dependency_pin = f'{package_name} = {{ version = "={package_version}" }}'
-    if dependency_pin not in text:
+    if dependency_pin not in visible_text:
         failures.append(f"{page}: missing {package_name} dependency pin {package_version}")
     return failures
 

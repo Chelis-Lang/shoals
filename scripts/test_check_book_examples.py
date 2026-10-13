@@ -52,7 +52,7 @@ class SourceSignatureTests(unittest.TestCase):
 
 
 class InstallGuideTests(unittest.TestCase):
-    def check(self, commands: list[str], dependency_pin: str = "0.24.22") -> list[str]:
+    def check(self, commands: list[str], dependency_pin: str = "0.24.22", extras: str = "") -> list[str]:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             manifest = root / "reef.toml"
@@ -67,6 +67,7 @@ class InstallGuideTests(unittest.TestCase):
                 "These downloads need no GitHub token:\n```sh\n"
                 + "\n".join(f"chelis reef install --from-github {item}" for item in commands)
                 + "\n```\n"
+                + extras
                 + f'shoals = {{ version = "={dependency_pin}" }}\n'
             )
             return book.install_guide_failures(page, manifest)
@@ -97,6 +98,19 @@ class InstallGuideTests(unittest.TestCase):
             "Chelis-Lang/shoals@v0.24.22",
         ], dependency_pin="0.24.21")
         self.assertIn("shoals", " ".join(failures))
+
+    def test_hidden_or_unfenced_install_does_not_satisfy_guide(self):
+        visible = [
+            "Chelis-Lang/nautilus@v0.7.55",
+            "Chelis-Lang/shoals@v0.24.22",
+        ]
+        hidden = "chelis reef install --from-github Chelis-Lang/chelis-clarabel@v0.1.0\n"
+        self.assertIn("chelis-clarabel", " ".join(self.check(
+            visible, extras=f"<!--\n{hidden}-->\n"
+        )))
+        self.assertIn("chelis-clarabel", " ".join(self.check(
+            visible, extras=hidden
+        )))
 
 
 if __name__ == "__main__":
