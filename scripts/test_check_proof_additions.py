@@ -283,6 +283,9 @@ class ProofAdditionTests(unittest.TestCase):
             self.assertTrue(gate.check_bs_records(records, "a" * 64))
 
         change_certificate(self.bs_records(), lambda e: e.update(strict_upper=1000.0))
+        records = self.bs_records()
+        records[2]["engine_evidence"]["beacon_evidence"]["strict_upper"] = 1000.0
+        self.assertTrue(gate.check_bs_records(records, "a" * 64))
 
         def drop_leaf(engine):
             cert = engine["certificate"]

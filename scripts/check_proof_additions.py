@@ -148,12 +148,9 @@ def checked_witness(value: object) -> bool:
     )
 
 
-def checked_arb_cover(certificate: object, strict_upper: object) -> bool:
+def checked_arb_cover(certificate: object) -> bool:
     if (
         not isinstance(certificate, dict)
-        or type(strict_upper) not in (int, float)
-        or not math.isfinite(strict_upper)
-        or strict_upper != 0.0
         or certificate.get("method") != "arb_box_cover_v1"
     ):
         return False
@@ -257,12 +254,15 @@ def check_bs_records(records: list[dict], engine_sha256: str) -> list[str]:
             or roots[0] == roots[1]
             or engine.get("selected_root_node_id") != roots[1]
             or engine.get("schema_version") != "beacon.scalar_upper_bound.v1"
+            or type(engine.get("strict_upper")) not in (int, float)
+            or not math.isfinite(engine["strict_upper"])
+            or engine["strict_upper"] != 0.0
         ):
             errors.append(f"{name}: actual source/folded graph dispatch missing")
         certificate = engine.get("certificate") or {}
         if passed:
             if engine.get("verdict") != "certified" or not checked_arb_cover(
-                certificate, engine.get("strict_upper")
+                certificate
             ):
                 errors.append(f"{name}: complete certified Arb cover missing")
         elif (
