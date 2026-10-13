@@ -45,6 +45,8 @@ class RiskInvariantGateTests(unittest.TestCase):
                    "counterexample": {"e": "1.0"}}
             for name in negative
         })
+        for name, record in records.items():
+            record["goal"] = PROVE_GATE.CSA_GOALS[name]
         result = {"returncode": 1, "summary_count": 1, "duplicate_records": [],
                   "records": records, "dependency_graph": None}
         ok, errors = PROVE_GATE.check_csa_properties(result)
@@ -53,6 +55,15 @@ class RiskInvariantGateTests(unittest.TestCase):
         with mock.patch.object(PROVE_GATE, "compiler_graph_directly_references",
                                return_value=(True, "direct edge")):
             self.assertTrue(PROVE_GATE.check_csa_properties(result)[0])
+            records["csa_residual_nonnegative"]["goal"] = "(e == e)"
+            self.assertFalse(PROVE_GATE.check_csa_properties(result)[0])
+            records["csa_residual_nonnegative"]["goal"] = PROVE_GATE.CSA_GOALS[
+                "csa_residual_nonnegative"
+            ].replace("h <= 1.0", "h <= 0.9")
+            self.assertFalse(PROVE_GATE.check_csa_properties(result)[0])
+            records["csa_residual_nonnegative"]["goal"] = PROVE_GATE.CSA_GOALS[
+                "csa_residual_nonnegative"
+            ]
             records["csa_haircut_monotone"]["status"] = "unsupported"
             self.assertFalse(PROVE_GATE.check_csa_properties(result)[0])
             records["csa_haircut_monotone"]["status"] = "passed"

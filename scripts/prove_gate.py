@@ -223,6 +223,32 @@ def run_prove(binary: str, file: str, fuzz: bool, samples: int,
     }
 
 
+# Canonical goals bind each CSA result to its exact imported call and domain.
+CSA_GOALS = {'csa_residual_nonnegative': 'forall(e: f32, th: f32, mta: f32, ia: f32, h: f32) where th >= 0.0, mta >= '
+                             '0.0, ia >= 0.0, h >= 0.0, h <= 1.0: (Shoals.Csa.csa_collateralized_exposure(e, '
+                             'th, mta, ia, h) >= 0.0)',
+ 'csa_residual_not_above_exposure': 'forall(e: f32, th: f32, mta: f32, ia: f32, h: f32) where e >= 0.0, th '
+                                    '>= 0.0, mta >= 0.0, ia >= 0.0, h >= 0.0, h <= 1.0: '
+                                    '(Shoals.Csa.csa_collateralized_exposure(e, th, mta, ia, h) <= e)',
+ 'csa_negative_exposure_zero': 'forall(e: f32, th: f32, mta: f32, ia: f32, h: f32) where e <= 0.0, th >= '
+                               '0.0, mta >= 0.0, ia >= 0.0, h >= 0.0, h <= 1.0: '
+                               '(Shoals.Csa.csa_collateralized_exposure(e, th, mta, ia, h) == 0.0)',
+ 'csa_residual_bounded_corrupted': 'forall(e: f32, th: f32, mta: f32, ia: f32, h: f32) where th >= 0.0, mta '
+                                   '>= 0.0, ia >= 0.0, h >= 0.0, h <= 1.0: '
+                                   '(Shoals.Csa.csa_collateralized_exposure(e, th, mta, ia, h) <= th)',
+ 'csa_bounded_guards_satisfiable': 'forall(e: f32, th: f32, mta: f32, ia: f32, h: f32) where th >= 0.0, mta '
+                                   '>= 0.0, ia >= 0.0, h >= 0.0, h <= 1.0: false',
+ 'csa_haircut_monotone': 'forall(e: f32, th: f32, mta: f32, ia: f32, h1: f32, h2: f32) where th >= 0.0, mta '
+                         '>= 0.0, ia >= 0.0, h1 >= 0.0, h2 <= 1.0, h1 <= h2: '
+                         '(Shoals.Csa.csa_collateralized_exposure(e, th, mta, ia, h1) <= '
+                         'Shoals.Csa.csa_collateralized_exposure(e, th, mta, ia, h2))',
+ 'csa_haircut_monotone_corrupted': 'forall(e: f32, th: f32, mta: f32, ia: f32, h1: f32, h2: f32) where th >= '
+                                   '0.0, mta >= 0.0, ia >= 0.0, h1 >= 0.0, h2 <= 1.0, h1 < h2: '
+                                   '(Shoals.Csa.csa_collateralized_exposure(e, th, mta, ia, h1) >= '
+                                   'Shoals.Csa.csa_collateralized_exposure(e, th, mta, ia, h2))',
+ 'csa_haircut_guards_satisfiable': 'forall(e: f32, th: f32, mta: f32, ia: f32, h1: f32, h2: f32) where th >= '
+                                   '0.0, mta >= 0.0, ia >= 0.0, h1 >= 0.0, h2 <= 1.0, h1 <= h2: false'}
+
 def check_csa_properties(result: dict) -> tuple[bool, list[str]]:
     """Gate direct-source CSA facts outside the C Note model manifest."""
     positive = (
@@ -244,6 +270,9 @@ def check_csa_properties(result: dict) -> tuple[bool, list[str]]:
     records = result["records"]
     if set(records) != set(positive + negative):
         errors.append("CSA proof record names differ from the required set")
+    for name in positive + negative:
+        if records.get(name, {}).get("goal") != CSA_GOALS[name]:
+            errors.append(f"{name}: canonical goal or domain changed")
     for name in positive:
         rec = records.get(name, {})
         if (rec.get("status") != "passed" or rec.get("proof_tier") != "smt"
