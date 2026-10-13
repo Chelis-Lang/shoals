@@ -127,6 +127,10 @@ def resolve_bin() -> str:
 # Equality checks the entire compiler-owned payload, including its envelope
 # identity and qualifier set. A changed pin/certificate must be reviewed before
 # Shoals can keep publishing the sound_approximate tier for these two claims.
+CERTIFIED_NORMAL_CDF_RANGE_PROPERTIES = frozenset({
+    "call_upper_bounded_by_spot", "delta_in_unit_interval",
+})
+
 NORMAL_CDF_RANGE_EVIDENCE_0194 = {
     "contract_id": "std.normal_cdf.range",
     "discharge_qualifiers": ["sound_over_approximation",
@@ -162,7 +166,7 @@ def certified_normal_cdf_range_record(rec: dict) -> bool:
     name = rec.get("name")
     if (rec.get("kind") != "property"
             or not isinstance(name, str)
-            or name not in {"call_upper_bounded_by_spot", "delta_in_unit_interval"}
+            or name not in CERTIFIED_NORMAL_CDF_RANGE_PROPERTIES
             or rec.get("arith_model") != "real"
             or type(rec.get("samples")) is not int or rec["samples"] != 0
             or rec.get("source") != {"file": "properties/composites.ch", "kind": "surf"}
@@ -261,6 +265,14 @@ def classify_tier(rec: dict) -> str:
     quals = set(raw_quals)
     if status == "passed":
         if tier == "smt":
+            # These two published claims have a closed evidence shape. Always
+            # validate it before the generic SMT path so stripped outer
+            # certificate markers cannot masquerade as direct proofs.
+            name = rec.get("name")
+            if (rec.get("kind") == "property" and isinstance(name, str)
+                    and name in CERTIFIED_NORMAL_CDF_RANGE_PROPERTIES):
+                return ("sound_approximate" if certified_normal_cdf_range_record(rec)
+                        else "unknown")
             known_quals = {"real_arithmetic", "fuzz", "fuzz_base",
                            "special_function_certified"}
             if quals - known_quals or "fuzz_base" in quals:
@@ -374,6 +386,11 @@ def honesty_self_test() -> bool:
     malformed_property_name["name"] = ["call_upper_bounded_by_spot"]
     malformed_assumption_name = copy.deepcopy(certified)
     malformed_assumption_name["assumptions"][1]["name"] = {"value": "std.normal_cdf.range"}
+    missing_outer_markers = copy.deepcopy(certified)
+    missing_outer_markers["qualifiers"].remove("special_function_certified")
+    missing_outer_markers["assumptions"][1]["discharge"].pop("method")
+    missing_outer_markers["assumptions"][1]["discharge_tier"].pop("guarantee")
+    missing_outer_markers["assumptions"][1]["discharge"]["evidence"].pop("guarantee_class")
     cases = [
         ({"status": "passed", "proof_tier": "smt", "qualifiers": ["real_arithmetic"],
           "composite_verdict": "proven_modulo_real_arithmetic"}, "proven"),
@@ -402,6 +419,7 @@ def honesty_self_test() -> bool:
         (bool_schema_version, "unknown"),
         (malformed_property_name, "unknown"),
         (malformed_assumption_name, "unknown"),
+        (missing_outer_markers, "unknown"),
         ({"status": "passed", "proof_tier": "fuzz", "qualifiers": ["fuzz", "fuzz_base"],
           "composite_verdict": "fuzz_validated"}, "fuzz_validated"),
         # The adversarial case: a fuzz pass wearing a proven-looking verdict
