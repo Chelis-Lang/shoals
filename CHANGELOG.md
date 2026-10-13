@@ -57,13 +57,6 @@ are unchanged. Long numerical suites remain optional local tools.
 
 ## [Unreleased]
 
-### Added
-
-- Prove direct-source CSA residual bounds and haircut monotonicity over real
-  arithmetic, with non-vacuity and false-claim controls in the proof gate.
-  Spell the existing subtraction chain as nested calls so the source body
-  lowers to SMT without changing its operation order.
-
 ### Changed
 
 - **BREAKING: `Shoals.Stochastic.sto_kou_jump_terminal` samples a compound
@@ -936,6 +929,11 @@ are unchanged. Long numerical suites remain optional local tools.
   `[96, 104]` with price in `[0, 20]`, plus an ATM false-bound control.
   The source CDF graph requires the upstream certified scalar route before
   these properties can discharge.
+
+- Prove direct-source CSA residual bounds and haircut monotonicity over real
+  arithmetic, with non-vacuity and false-claim controls in the proof gate.
+  Spell the existing subtraction chain as nested calls so the source body
+  lowers to SMT without changing its operation order.
 
 - **`Shoals.Indicators`: a technical-indicator module with no default
   conventions** (shoals#83). EMA, Wilder's RMA, SMA, true range, ATR, RSI,
