@@ -935,6 +935,12 @@ are unchanged. Long numerical suites remain optional local tools.
   Spell the existing subtraction chain as nested calls so the source body
   lowers to SMT without changing its operation order.
 
+- State the raw SVI nonnegative-total-variance theorem against the exported
+  `Shoals.VolSurface.vs_total_variance` body under the Gatheral-Jacquier
+  minimum-variance condition, with a missing-guard false claim and a
+  non-vacuity probe. SMT discharge awaits the compiler record/square-root
+  proof route.
+
 - **`Shoals.Indicators`: a technical-indicator module with no default
   conventions** (shoals#83). EMA, Wilder's RMA, SMA, true range, ATR, RSI,
   MACD, Bollinger bands, the stochastic oscillator, ADX, Donchian channels,
