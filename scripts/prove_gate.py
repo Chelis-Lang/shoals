@@ -223,6 +223,50 @@ def run_prove(binary: str, file: str, fuzz: bool, samples: int,
     }
 
 
+def check_csa_properties(result: dict) -> tuple[bool, list[str]]:
+    """Gate direct-source CSA facts outside the C Note model manifest."""
+    positive = (
+        "csa_residual_nonnegative",
+        "csa_residual_not_above_exposure",
+        "csa_negative_exposure_zero",
+        "csa_haircut_monotone",
+    )
+    negative = (
+        "csa_residual_bounded_corrupted",
+        "csa_bounded_guards_satisfiable",
+        "csa_haircut_monotone_corrupted",
+        "csa_haircut_guards_satisfiable",
+    )
+    errors = []
+    if (result["returncode"] not in (0, 1) or result["summary_count"] != 1
+            or result["duplicate_records"]):
+        errors.append("CSA proof has missing or duplicate records")
+    records = result["records"]
+    if set(records) != set(positive + negative):
+        errors.append("CSA proof record names differ from the required set")
+    for name in positive:
+        rec = records.get(name, {})
+        if (rec.get("status") != "passed" or rec.get("proof_tier") != "smt"
+                or rec.get("arith_model") != "real" or rec.get("samples") != 0
+                or "fuzz" in rec.get("qualifiers", [])):
+            errors.append(f"{name}: expected zero-sample real SMT proof")
+        direct, why = compiler_graph_directly_references(
+            result["dependency_graph"], property_name=name,
+            property_module="Shoals.Properties.CanonCsa",
+            property_file="properties/canoncsa.ch",
+            target_name="csa_collateralized_exposure",
+            target_module="Shoals.Csa", target_package="shoals",
+            target_file="src/csa.ch", package="shoals")
+        if not direct:
+            errors.append(f"{name}: {why}")
+    for name in negative:
+        rec = records.get(name, {})
+        if (rec.get("status") != "failed" or rec.get("proof_tier") != "smt"
+                or not rec.get("counterexample")):
+            errors.append(f"{name}: expected SMT counterexample")
+    return not errors, errors
+
+
 def parse_version(pin: str) -> tuple[int, int, int] | None:
     try:
         parts = tuple(int(x) for x in pin.split("."))
@@ -1356,6 +1400,13 @@ def main() -> None:
             binary, manifest, models, manifest["pkg"], pin, samples) and ok
         ok = check_extra_risk_fuzz_seeds(
             binary, manifest, models, manifest["pkg"], pin, samples) and ok
+
+    print("\n== proving direct CSA bounds and haircut monotonicity ==")
+    csa_result = run_prove(binary, "properties/canoncsa.ch", False, 0)
+    csa_ok, csa_errors = check_csa_properties(csa_result)
+    for reason in csa_errors:
+        fail(reason)
+    ok = csa_ok and ok
 
     print()
     if ok:

@@ -57,6 +57,13 @@ are unchanged. Long numerical suites remain optional local tools.
 
 ## [Unreleased]
 
+### Added
+
+- Prove direct-source CSA residual bounds and haircut monotonicity over real
+  arithmetic, with non-vacuity and false-claim controls in the proof gate.
+  Spell the existing subtraction chain as nested calls so the source body
+  lowers to SMT without changing its operation order.
+
 ### Changed
 
 - **BREAKING: `Shoals.Stochastic.sto_kou_jump_terminal` samples a compound
