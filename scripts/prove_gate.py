@@ -123,6 +123,131 @@ def resolve_bin() -> str:
     sys.exit("error: no chelis binary (set CHELIS_SMT_BIN or install the pin)")
 
 
+# Pinned Chelis 0.19.4 emits this certificate for Std.Contracts.normal_cdf.range.
+# Equality checks the entire compiler-owned payload, including its envelope
+# identity and qualifier set. A changed pin/certificate must be reviewed before
+# Shoals can keep publishing the sound_approximate tier for these two claims.
+NORMAL_CDF_RANGE_EVIDENCE_0194 = {
+    "contract_id": "std.normal_cdf.range",
+    "discharge_qualifiers": ["sound_over_approximation",
+                             "special_function_certified"],
+    "evidence": {
+        "all_segments_gappa_certified": True,
+        "contract": "std.normal_cdf.range",
+        "domain": {"hi": 300.0, "lo": -300.0},
+        "envelope_coverage": {"hi": 300.0, "lo": -300.0},
+        "envelope_sha256": "2470666bfb3b57ed85043fd2d0498fd9da2cf3cce61a2db9639d5f20c61b1d43",
+        "justification": [
+            "erf is monotone increasing with erf(0) = 0",
+            "lim_{x->+inf} erf(x) = 1, lim_{x->-inf} erf(x) = -1",
+            "therefore -1 <= erf(x) <= 1 for all x",
+            "N(x) = 0.5*(1 + erf(x/sqrt(2))) is in [0, 1]",
+            "committed envelope tail saturations at +-1 certify the bound",
+        ],
+        "max_tail_eps": 2.2263079006386892e-05,
+        "method": "structural_erf_boundedness",
+        "scaled_argument": {"hi": 212.13203435596427,
+                            "lo": -212.13203435596427},
+    },
+    "guarantee_class": "certified_envelope",
+    "schema_version": 1,
+    "soundness": "sound_approximate",
+    "status": "proved",
+    "verdict": "proved",
+}
+
+
+def certified_normal_cdf_range_record(rec: dict) -> bool:
+    """Accept only the two known property-bound 0.19.4 discharge shapes."""
+    name = rec.get("name")
+    if (rec.get("kind") != "property"
+            or not isinstance(name, str)
+            or name not in {"call_upper_bounded_by_spot", "delta_in_unit_interval"}
+            or rec.get("arith_model") != "real"
+            or type(rec.get("samples")) is not int or rec["samples"] != 0
+            or rec.get("source") != {"file": "properties/composites.ch", "kind": "surf"}
+            or rec.get("qualifiers") != ["special_function_certified",
+                                         "real_arithmetic"]):
+        return False
+    assumptions = rec.get("assumptions")
+    if not isinstance(assumptions, list) or len(assumptions) != 2:
+        return False
+    if not all(isinstance(a, dict) and isinstance(a.get("name"), str)
+               for a in assumptions):
+        return False
+    property_id = f"pkg__shoals__Shoals__Properties__Composites__{name}"
+    precondition_name = f"preconditions:{property_id}"
+    by_name = {a.get("name"): a for a in assumptions}
+    if set(by_name) != {precondition_name, "std.normal_cdf.range"}:
+        return False
+    preconditions = by_name[precondition_name]
+    contract = by_name["std.normal_cdf.range"]
+    if (set(preconditions) != {"name", "discharge", "discharge_tier", "non_vacuity"}
+            or not same_json(preconditions.get("discharge"), {
+                "method": "smt",
+                "evidence": {"arith_model": "real", "property": property_id,
+                             "status": "proved"},
+            })
+            or not same_json(preconditions.get("discharge_tier"), {
+                "engine": "cvc5", "guarantee": "smt", "source": precondition_name,
+            })
+            or not precondition_non_vacuity(preconditions.get("non_vacuity"))):
+        return False
+    if (set(contract) != {"name", "producer", "source_type", "discharge",
+                          "discharge_tier", "non_vacuity"}
+            or contract.get("producer") != "std.normal_cdf.range"
+            or contract.get("source_type") != "std_contract"
+            or not same_json(contract.get("discharge"), {
+                "method": "certified_envelope",
+                "evidence": NORMAL_CDF_RANGE_EVIDENCE_0194,
+            })
+            or not same_json(contract.get("discharge_tier"), {
+                "engine": "beacon-envelope", "guarantee": "certified_envelope",
+                "source": "std.normal_cdf.range",
+            })
+            or not contract_non_vacuity(contract.get("non_vacuity"))):
+        return False
+    return True
+
+
+def same_json(actual: object, expected: object) -> bool:
+    """Compare JSON values without Python's `True == 1` numeric coercion."""
+    try:
+        return (json.dumps(actual, sort_keys=True, separators=(",", ":"), allow_nan=False)
+                == json.dumps(expected, sort_keys=True, separators=(",", ":"),
+                              allow_nan=False))
+    except (TypeError, ValueError):
+        return False
+
+
+def precondition_non_vacuity(value: object) -> bool:
+    if not isinstance(value, dict) or set(value) != {"status", "evidence"}:
+        return False
+    evidence = value.get("evidence")
+    return (value.get("status") == "established"
+            and isinstance(evidence, dict)
+            and set(evidence) == {"assumption_count", "model", "result", "solver"}
+            and type(evidence.get("assumption_count")) is int
+            and evidence["assumption_count"] > 0
+            and isinstance(evidence.get("model"), dict)
+            and evidence.get("result") == "sat"
+            and evidence.get("solver") == "cvc5")
+
+
+def contract_non_vacuity(value: object) -> bool:
+    if not isinstance(value, dict) or set(value) != {"status", "evidence"}:
+        return False
+    evidence = value.get("evidence")
+    return (value.get("status") == "established"
+            and isinstance(evidence, dict)
+            and set(evidence) == {"contract", "method", "result", "samples", "seed"}
+            and evidence.get("contract") == "std.normal_cdf.range"
+            and evidence.get("method") == "fuzz"
+            and evidence.get("result") == "sat"
+            and type(evidence.get("samples")) is int and evidence["samples"] > 0
+            and type(evidence.get("seed")) is int)
+
+
 def classify_tier(rec: dict) -> str:
     """Achieved contract tier from proof tier, qualifiers, and discharge evidence.
 
@@ -130,7 +255,10 @@ def classify_tier(rec: dict) -> str:
     """
     status = rec.get("status")
     tier = rec.get("proof_tier")
-    quals = set(rec.get("qualifiers") or [])
+    raw_quals = rec.get("qualifiers") or []
+    if not isinstance(raw_quals, list) or not all(isinstance(q, str) for q in raw_quals):
+        return "unknown"
+    quals = set(raw_quals)
     if status == "passed":
         if tier == "smt":
             known_quals = {"real_arithmetic", "fuzz", "fuzz_base",
@@ -140,7 +268,7 @@ def classify_tier(rec: dict) -> str:
             assumptions = rec.get("assumptions") or []
             if not isinstance(assumptions, list):
                 return "unknown"
-            certified = []
+            certified = False
             for assumption in assumptions:
                 if not isinstance(assumption, dict):
                     return "unknown"
@@ -154,51 +282,11 @@ def classify_tier(rec: dict) -> str:
                 if (discharge.get("method") == "certified_envelope"
                         or discharge_tier.get("guarantee") == "certified_envelope"
                         or evidence.get("guarantee_class") == "certified_envelope"):
-                    certified.append((discharge, discharge_tier, evidence))
+                    certified = True
             marked_certified = "special_function_certified" in quals
             if marked_certified or certified:
-                if not marked_certified or not certified or "fuzz" in quals:
-                    return "unknown"
-                # Every assumption must be discharged. A valid envelope beside
-                # a sampled or unknown contract cannot carry the whole claim.
-                for assumption in assumptions:
-                    discharge = assumption.get("discharge") or {}
-                    discharge_tier = assumption.get("discharge_tier") or {}
-                    evidence = discharge.get("evidence") or {}
-                    method = discharge.get("method")
-                    guarantee = discharge_tier.get("guarantee")
-                    if method == guarantee == "smt":
-                        if evidence.get("status") != "proved":
-                            return "unknown"
-                        continue
-                    if method != "certified_envelope" or guarantee != method:
-                        return "unknown"
-                    certificate = evidence.get("evidence")
-                    contract = "std.normal_cdf.range"
-                    qualifiers = evidence.get("discharge_qualifiers")
-                    if (assumption.get("name") != contract
-                            or assumption.get("producer") != contract
-                            or assumption.get("source_type") != "std_contract"
-                            or discharge_tier.get("source") != contract
-                            or evidence.get("contract_id") != contract
-                            or evidence.get("status") != "proved"
-                            or evidence.get("verdict") != "proved"
-                            or evidence.get("schema_version") != 1
-                            or evidence.get("guarantee_class") != method
-                            or evidence.get("soundness") != "sound_approximate"
-                            or not isinstance(qualifiers, list)
-                            or not all(isinstance(q, str) for q in qualifiers)
-                            or not {"special_function_certified",
-                                    "sound_over_approximation"} <= set(qualifiers)
-                            or not isinstance(certificate, dict)
-                            or certificate.get("contract") != contract
-                            or certificate.get("method") != "structural_erf_boundedness"
-                            or certificate.get("all_segments_gappa_certified") is not True
-                            or not isinstance(certificate.get("envelope_sha256"), str)
-                            or not re.fullmatch(r"[0-9a-f]{64}",
-                                                certificate["envelope_sha256"])):
-                        return "unknown"
-                return "sound_approximate"
+                return ("sound_approximate" if certified_normal_cdf_range_record(rec)
+                        else "unknown")
             # A fuzz-discharged contract riding an SMT structural proof is
             # proven_modulo_contract (composites: qualifiers [real_arithmetic, fuzz]).
             return "proven_modulo_contract" if "fuzz" in quals else "proven"
@@ -215,29 +303,30 @@ def classify_tier(rec: dict) -> str:
 def honesty_self_test() -> bool:
     """The classifier must read discharge evidence, never trust a verdict string."""
     certified = {
-        "status": "passed", "proof_tier": "smt",
+        "kind": "property", "name": "call_upper_bounded_by_spot",
+        "status": "passed", "proof_tier": "smt", "arith_model": "real", "samples": 0,
+        "source": {"file": "properties/composites.ch", "kind": "surf"},
         "qualifiers": ["special_function_certified", "real_arithmetic"],
         "composite_verdict": "proven_modulo_real_arithmetic",
         "assumptions": [
-            {"name": "preconditions:property",
-             "discharge": {"method": "smt", "evidence": {"status": "proved"}},
-             "discharge_tier": {"guarantee": "smt"}},
+            {"name": "preconditions:pkg__shoals__Shoals__Properties__Composites__call_upper_bounded_by_spot",
+             "discharge": {"method": "smt", "evidence": {
+                 "status": "proved", "arith_model": "real",
+                 "property": "pkg__shoals__Shoals__Properties__Composites__call_upper_bounded_by_spot"}},
+             "discharge_tier": {"engine": "cvc5", "guarantee": "smt",
+                                "source": "preconditions:pkg__shoals__Shoals__Properties__Composites__call_upper_bounded_by_spot"},
+             "non_vacuity": {"status": "established", "evidence": {
+                 "assumption_count": 8, "model": {}, "result": "sat", "solver": "cvc5"}}},
             {"name": "std.normal_cdf.range", "producer": "std.normal_cdf.range",
              "source_type": "std_contract",
-             "discharge": {"method": "certified_envelope", "evidence": {
-                 "status": "proved", "verdict": "proved",
-                 "contract_id": "std.normal_cdf.range", "schema_version": 1,
-                 "guarantee_class": "certified_envelope",
-                 "soundness": "sound_approximate",
-                 "discharge_qualifiers": ["special_function_certified",
-                                          "sound_over_approximation"],
-                 "evidence": {"contract": "std.normal_cdf.range",
-                              "method": "structural_erf_boundedness",
-                              "all_segments_gappa_certified": True,
-                              "envelope_sha256": "0" * 64},
-             }},
-             "discharge_tier": {"guarantee": "certified_envelope",
-                                "source": "std.normal_cdf.range"}},
+             "discharge": {"method": "certified_envelope",
+                           "evidence": copy.deepcopy(NORMAL_CDF_RANGE_EVIDENCE_0194)},
+             "discharge_tier": {"engine": "beacon-envelope",
+                                "guarantee": "certified_envelope",
+                                "source": "std.normal_cdf.range"},
+             "non_vacuity": {"status": "established", "evidence": {
+                 "contract": "std.normal_cdf.range", "method": "fuzz",
+                 "result": "sat", "samples": 8192, "seed": 3235848230}}},
         ],
     }
     missing_qualifier = copy.deepcopy(certified)
@@ -263,6 +352,28 @@ def honesty_self_test() -> bool:
                                       "discharge_tier": {"guarantee": "fuzz"}})
     extra_unknown = copy.deepcopy(certified)
     extra_unknown["assumptions"].append({"name": "extra"})
+    nested_fuzz = copy.deepcopy(certified)
+    nested_fuzz["assumptions"][1]["discharge"]["evidence"]["discharge_qualifiers"].append("fuzz")
+    nested_unknown = copy.deepcopy(certified)
+    nested_unknown["assumptions"][1]["discharge"]["evidence"]["discharge_qualifiers"].append("unrecognized_method")
+    wrong_precondition_name = copy.deepcopy(certified)
+    wrong_precondition_name["assumptions"][0]["name"] = "preconditions:unrelated_property"
+    wrong_precondition_property = copy.deepcopy(certified)
+    wrong_precondition_property["assumptions"][0]["discharge"]["evidence"]["property"] = "unrelated_property"
+    wrong_top_level_property = copy.deepcopy(certified)
+    wrong_top_level_property["name"] = "unrelated_property"
+    wrong_envelope_hash = copy.deepcopy(certified)
+    wrong_envelope_hash["assumptions"][1]["discharge"]["evidence"]["evidence"]["envelope_sha256"] = "0" * 64
+    duplicated_cert = copy.deepcopy(certified)
+    duplicated_cert["assumptions"].append(copy.deepcopy(certified["assumptions"][1]))
+    wrong_non_vacuity_contract = copy.deepcopy(certified)
+    wrong_non_vacuity_contract["assumptions"][1]["non_vacuity"]["evidence"]["contract"] = "std.normal_cdf.reflection"
+    bool_schema_version = copy.deepcopy(certified)
+    bool_schema_version["assumptions"][1]["discharge"]["evidence"]["schema_version"] = True
+    malformed_property_name = copy.deepcopy(certified)
+    malformed_property_name["name"] = ["call_upper_bounded_by_spot"]
+    malformed_assumption_name = copy.deepcopy(certified)
+    malformed_assumption_name["assumptions"][1]["name"] = {"value": "std.normal_cdf.range"}
     cases = [
         ({"status": "passed", "proof_tier": "smt", "qualifiers": ["real_arithmetic"],
           "composite_verdict": "proven_modulo_real_arithmetic"}, "proven"),
@@ -280,6 +391,17 @@ def honesty_self_test() -> bool:
         (wrong_assumption, "unknown"),
         (extra_fuzz, "unknown"),
         (extra_unknown, "unknown"),
+        (nested_fuzz, "unknown"),
+        (nested_unknown, "unknown"),
+        (wrong_precondition_name, "unknown"),
+        (wrong_precondition_property, "unknown"),
+        (wrong_top_level_property, "unknown"),
+        (wrong_envelope_hash, "unknown"),
+        (duplicated_cert, "unknown"),
+        (wrong_non_vacuity_contract, "unknown"),
+        (bool_schema_version, "unknown"),
+        (malformed_property_name, "unknown"),
+        (malformed_assumption_name, "unknown"),
         ({"status": "passed", "proof_tier": "fuzz", "qualifiers": ["fuzz", "fuzz_base"],
           "composite_verdict": "fuzz_validated"}, "fuzz_validated"),
         # The adversarial case: a fuzz pass wearing a proven-looking verdict
