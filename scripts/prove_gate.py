@@ -50,6 +50,7 @@ one-off or starved sample.
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import re
@@ -123,13 +124,51 @@ def resolve_bin() -> str:
 
 
 def classify_tier(rec: dict) -> str:
-    """Achieved contract tier from proof_tier + qualifiers + status ONLY.
-    composite_verdict is deliberately ignored (it may demote, never promote)."""
+    """Achieved contract tier from proof tier, qualifiers, and discharge evidence.
+
+    composite_verdict is deliberately ignored: it cannot promote a result.
+    """
     status = rec.get("status")
     tier = rec.get("proof_tier")
     quals = set(rec.get("qualifiers") or [])
     if status == "passed":
         if tier == "smt":
+            known_quals = {"real_arithmetic", "fuzz", "fuzz_base",
+                           "special_function_certified"}
+            if quals - known_quals or "fuzz_base" in quals:
+                return "unknown"
+            assumptions = rec.get("assumptions") or []
+            if not isinstance(assumptions, list):
+                return "unknown"
+            certified = []
+            for assumption in assumptions:
+                if not isinstance(assumption, dict):
+                    return "unknown"
+                discharge = assumption.get("discharge") or {}
+                discharge_tier = assumption.get("discharge_tier") or {}
+                if not isinstance(discharge, dict) or not isinstance(discharge_tier, dict):
+                    return "unknown"
+                evidence = discharge.get("evidence") or {}
+                if not isinstance(evidence, dict):
+                    return "unknown"
+                if (discharge.get("method") == "certified_envelope"
+                        or discharge_tier.get("guarantee") == "certified_envelope"
+                        or evidence.get("guarantee_class") == "certified_envelope"):
+                    certified.append((discharge, discharge_tier, evidence))
+            marked_certified = "special_function_certified" in quals
+            if marked_certified or certified:
+                valid = bool(certified) and all(
+                    discharge.get("method") == "certified_envelope"
+                    and discharge_tier.get("guarantee") == "certified_envelope"
+                    and evidence.get("status") == "proved"
+                    and evidence.get("guarantee_class") == "certified_envelope"
+                    and evidence.get("soundness") == "sound_approximate"
+                    and {"special_function_certified", "sound_over_approximation"}
+                    <= set(evidence.get("discharge_qualifiers") or [])
+                    for discharge, discharge_tier, evidence in certified
+                )
+                return ("sound_approximate" if marked_certified and valid
+                        and "fuzz" not in quals else "unknown")
             # A fuzz-discharged contract riding an SMT structural proof is
             # proven_modulo_contract (composites: qualifiers [real_arithmetic, fuzz]).
             return "proven_modulo_contract" if "fuzz" in quals else "proven"
@@ -144,12 +183,45 @@ def classify_tier(rec: dict) -> str:
 
 
 def honesty_self_test() -> bool:
-    """The classifier must key on proof_tier+qualifiers, never composite_verdict."""
+    """The classifier must read discharge evidence, never trust a verdict string."""
+    certified = {
+        "status": "passed", "proof_tier": "smt",
+        "qualifiers": ["special_function_certified", "real_arithmetic"],
+        "composite_verdict": "proven_modulo_real_arithmetic",
+        "assumptions": [{
+            "discharge": {"method": "certified_envelope", "evidence": {
+                "status": "proved", "guarantee_class": "certified_envelope",
+                "soundness": "sound_approximate",
+                "discharge_qualifiers": ["special_function_certified",
+                                         "sound_over_approximation"],
+            }},
+            "discharge_tier": {"guarantee": "certified_envelope"},
+        }],
+    }
+    missing_qualifier = copy.deepcopy(certified)
+    missing_qualifier["qualifiers"] = ["real_arithmetic"]
+    missing_discharge = copy.deepcopy(certified)
+    missing_discharge["assumptions"] = []
+    wrong_method = copy.deepcopy(certified)
+    wrong_method["assumptions"][0]["discharge"]["method"] = "fuzz"
+    wrong_guarantee = copy.deepcopy(certified)
+    wrong_guarantee["assumptions"][0]["discharge_tier"]["guarantee"] = "fuzz"
+    forged_evidence = copy.deepcopy(certified)
+    forged_evidence["assumptions"][0]["discharge"]["evidence"]["status"] = "unknown"
+    unknown_qualifier = copy.deepcopy(certified)
+    unknown_qualifier["qualifiers"].append("unrecognized_method")
     cases = [
         ({"status": "passed", "proof_tier": "smt", "qualifiers": ["real_arithmetic"],
           "composite_verdict": "proven_modulo_real_arithmetic"}, "proven"),
         ({"status": "passed", "proof_tier": "smt", "qualifiers": ["real_arithmetic", "fuzz"],
           "composite_verdict": "proven_modulo_fuzz_validated_contract"}, "proven_modulo_contract"),
+        (certified, "sound_approximate"),
+        (missing_qualifier, "unknown"),
+        (missing_discharge, "unknown"),
+        (wrong_method, "unknown"),
+        (wrong_guarantee, "unknown"),
+        (forged_evidence, "unknown"),
+        (unknown_qualifier, "unknown"),
         ({"status": "passed", "proof_tier": "fuzz", "qualifiers": ["fuzz", "fuzz_base"],
           "composite_verdict": "fuzz_validated"}, "fuzz_validated"),
         # The adversarial case: a fuzz pass wearing a proven-looking verdict
@@ -168,6 +240,10 @@ def honesty_self_test() -> bool:
             fail(f"honesty self-test: classify({rec['composite_verdict']}"
                  f"/{rec['proof_tier']}) = {got}, expected {want}")
             ok = False
+    if outcome("sound_approximate") != "proved":
+        fail("honesty self-test: a certified-envelope proof is not a proved "
+             "metamorphic baseline")
+        ok = False
     print(f"  honesty self-test: {'PASS' if ok else 'FAIL'} "
           f"({len(cases)} cases, composite_verdict ignored)")
     return ok
@@ -934,11 +1010,11 @@ STRUCT_CONTRACT_SUBS = ["2.0", "0.3"]  # constants VIOLATING the normal_cdf cont
 
 
 def outcome(tier: str) -> str:
-    """Coarse metamorphic outcome. proven_modulo_contract collapses to `proved`
+    """Coarse metamorphic outcome. Qualified proof tiers collapse to `proved`
     so a structural substitution (which drops the modulo-contract qualifier)
     only counts as a flip when it changes proved<->disproved, not merely the
     qualifier."""
-    if tier in ("proven", "proven_modulo_contract"):
+    if tier in ("proven", "proven_modulo_contract", "sound_approximate"):
         return "proved"
     if tier == "disproved":
         return "disproved"

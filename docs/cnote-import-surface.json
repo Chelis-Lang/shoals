@@ -4,7 +4,7 @@
   "pkg": "shoals",
   "pkg_version": "0.24.20",
   "chelis_pin": "0.19.4",
-  "generated_note": "Producer manifest for Shoals 0.24.20 on Chelis 0.19.4. The 36 active invariants name exported functions, preconditions, controls, and expected proof tiers for the declared compiler pin. The proof gate checks compiler-owned dependency edges, verdicts, qualifiers and non-vacuous guards. Real-arithmetic proofs do not certify floating-point execution; fuzz results are empirical observations. Put-call parity under f32 normal-CDF reflection is deferred under chelis#3116.",
+  "generated_note": "Producer manifest for Shoals 0.24.20 on Chelis 0.19.4. The 36 active invariants name exported functions, preconditions, controls, and expected proof tiers for the declared compiler pin. The proof gate checks compiler-owned dependency edges, verdicts, qualifiers and non-vacuous guards. Certified-envelope normal-CDF range results remain sound_approximate; real-arithmetic proofs do not certify floating-point execution, and fuzz results are empirical observations. Put-call parity under f32 normal-CDF reflection is deferred under chelis#3116.",
   "models": [
     {
       "id": "bs_call",
@@ -1610,12 +1610,12 @@
         "0.19.1": "proven_modulo_contract",
         "0.19.2": "proven_modulo_contract",
         "0.19.3": "proven_modulo_contract",
-        "0.19.4": "proven_modulo_contract"
+        "0.19.4": "sound_approximate"
       },
-      "tier_upgrade_trigger": "chelis#434",
+      "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p12_shoals_published_composites",
       "violation_text": "the call is priced above the underlying spot -- admits arbitrage",
-      "fuzz_domain_note": "structure proven at Tier B for any N satisfying the range contract; the contract is fuzz-validated on the real n_cdf"
+      "fuzz_domain_note": "structural SMT proof with a certified-envelope normal-CDF range contract; sound_approximate over real arithmetic, not a floating-point execution bound"
     },
     {
       "id": "shoals.inv.delta_in_unit_interval.v1",
@@ -1677,12 +1677,12 @@
         "0.19.1": "proven_modulo_contract",
         "0.19.2": "proven_modulo_contract",
         "0.19.3": "proven_modulo_contract",
-        "0.19.4": "proven_modulo_contract"
+        "0.19.4": "sound_approximate"
       },
-      "tier_upgrade_trigger": "chelis#434",
+      "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p12_shoals_published_composites",
       "violation_text": "the call delta N(d1) falls outside [0,1]",
-      "fuzz_domain_note": "structure proven at Tier B for any N satisfying the range contract; the contract is fuzz-validated on the real n_cdf"
+      "fuzz_domain_note": "structural SMT proof with a certified-envelope normal-CDF range contract; sound_approximate over real arithmetic, not a floating-point execution bound"
     },
     {
       "id": "shoals.inv.crr_rn_call_nonneg.v1",

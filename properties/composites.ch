@@ -1,31 +1,25 @@
 module Shoals.Properties.Composites
 import Std.Contracts (normal_cdf)
--- Shipped derivatives property corpus, authored as COMPOSITES against the
--- chelis 0.8.0 contract mechanism (`chelis prove --tier smt-only`).
+-- Structural derivatives properties using `chelis prove --tier smt-only`.
 --
--- Scope (read this before quoting any result). Each @property here proves the
--- STRUCTURE of a Black-Scholes identity given a fuzz-validated contract on the
--- normal CDF. The prover abstracts every syntactic call to
+-- These goals concern the Black-Scholes algebra under separately discharged
+-- normal-CDF contracts; they do not prove the direct pricing export. The
+-- prover abstracts each syntactic call to
 -- `Std.Contracts.normal_cdf` into a fresh symbol carrying the declared
--- contract's assumptions (range `0<=N<=1`, reflection `N(-x)=1-N(x)`), proves
--- the polynomial structural goal in terms of those symbols at Tier B (cvc5 over
--- the reals), and discharges the contract separately by the std fuzz corpus
--- (8192 samples, tol 1e-10) plus a cvc5 non-vacuity SAT check. The emitted
--- verdict is therefore `proven_modulo_fuzz_validated_contract`: NOT
--- "Black-Scholes proven", but "this structure holds for any N satisfying the
--- fuzz-validated normal-CDF contract".
+-- assumptions. The upper-bound and delta-range goals use the certified
+-- `0<=N<=1` envelope and an SMT structural proof over the reals; their result
+-- is `proven_modulo_certified_envelope` / `sound_approximate` in the C Note
+-- manifest. The reflection/parity candidate remains deferred under
+-- chelis#3116; its contract is sampled, not a certified range proof.
 --
--- `Std.Contracts.normal_cdf` is the certified A&S f32 normal CDF
--- (0.5*erfc(-x/sqrt2), the Abramowitz-Stegun 7.1.26 coefficients). The shipped
--- pricer (`Shoals.Pricing.bs_call_scalar`) evaluates Chelis's
--- `standard_normal_cdf` in f64 before downcasting. The binding is measured
+-- `Std.Contracts.normal_cdf` delegates to Chelis's `standard_normal_cdf` at
+-- its input precision. The scalar pricer (`Shoals.Pricing.bs_call_scalar`)
+-- evaluates that function in f64 before downcasting. The binding is measured
 -- agreement within a stated f32 bound, not identity of the evaluated graph.
 -- Their price-level gap
 -- scales with spot, so no fixed figure bounds it over free parameters.
--- That binding is the S7 cross-check
--- (`tests/composites_binding.ch`), not a value-level proof, because erf/log are
--- not cvc5-lowerable so the link from the abstract symbol to the real N is
--- asserted-and-fuzz-validated, never machine-checked.
+-- That binding is the S7 cross-check (`tests/composites_binding.ch`), not a
+-- value-level proof of the direct pricer or its f32 execution.
 --
 -- Abstracted bodies (exactly the Shoals.Pricing structure, transcendentals
 -- lifted to the abstracted normal_cdf calls):
@@ -35,27 +29,29 @@ import Std.Contracts (normal_cdf)
 -- and disc = exp(-r t). Preconditions encode only the SOUND domain facts that do
 -- not require the discarded moneyness coupling: s,k >= 0 and disc in [0,1].
 -- ===========================================================================
--- PROVEN composites
+-- COMPOSITE CANDIDATES AND CERTIFIED BOUNDS
 -- ===========================================================================
 -- C1 -- Put-call parity C - P = S - K*disc, resting on the reflection contract.
 -- Parity is NOT a free algebraic identity under abstraction: it needs
 -- N(-x) = 1 - N(x), which the reflection contract supplies. The body must call
 -- normal_cdf(d1)/normal_cdf(neg(d1)) and normal_cdf(d2)/normal_cdf(neg(d2)) so
--- the prover can pair the negated-argument calls. Expect:
--- composite_verdict = proven_modulo_fuzz_validated_contract.
+-- the prover can pair the negated-argument calls. This candidate is deferred
+-- under chelis#3116 and carries no active manifest proof claim.
 @property put_call_parity_reflection forall(s: f32, k: f32, d1: f32, d2: f32, disc: f32) where s >= 0.0, k >= 0.0, disc >= 0.0, disc <= 1.0:
   ((((s * normal_cdf(d1)) - (k * (disc * normal_cdf(d2)))) - ((k * (disc * normal_cdf(neg(d2)))) - (s * normal_cdf(neg(d1))))) == (s - (k * disc)))
   with contract = "std.normal_cdf.reflection"
 -- C2 -- Upper bound C <= S. From ranges alone: s,k,disc,N(d2) >= 0 and
 -- N(d1) <= 1, so s*N(d1) - k*disc*N(d2) <= s. Rests on the range contract.
--- Expect: composite_verdict = proven_modulo_fuzz_validated_contract.
+-- The range assumption discharges through a certified envelope at this pin.
+-- Expect: composite_verdict = proven_modulo_certified_envelope.
 @property call_upper_bounded_by_spot forall(s: f32, k: f32, d1: f32, d2: f32, disc: f32) where s >= 0.0, k >= 0.0, disc >= 0.0, disc <= 1.0:
   (((s * normal_cdf(d1)) - (k * (disc * normal_cdf(d2)))) <= s)
   with contract = "std.normal_cdf.range"
 -- C3 -- Delta bounds: the call delta N(d1) lies in [0,1] (its sign and bound,
 -- the structural Greek fact paired with the AD-derived delta value). Directly
 -- the range contract on a single normal_cdf call.
--- Expect: composite_verdict = proven_modulo_fuzz_validated_contract.
+-- The range assumption discharges through a certified envelope at this pin.
+-- Expect: composite_verdict = proven_modulo_certified_envelope.
 @property delta_in_unit_interval forall(d1: f32):
   ((normal_cdf(d1) >= 0.0) && (normal_cdf(d1) <= 1.0))
   with contract = "std.normal_cdf.range"

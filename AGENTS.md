@@ -319,7 +319,7 @@ C Note is the consumer. Shoals' local obligations:
 - `docs/cnote-import-surface.json` is the invariant-surface manifest
   (`chelis-shell.invariant-surface/1.0`): reference models with kinds/domains,
   and an active invariant set spanning the SMT tiers (`proven` CRR lane, the
-  `proven_modulo_contract` composites lane, and the `disproved`
+  `sound_approximate` certified-envelope composites lane, and the `disproved`
   defective-model break) plus `fuzz_validated` direct-pricer positivity and
   Black-Scholes Greek-sign lanes, and the `defective: true` in-region-break
   model. Every below-proven active
