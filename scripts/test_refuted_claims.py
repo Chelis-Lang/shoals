@@ -132,6 +132,11 @@ class RefutedClaimContractTests(unittest.TestCase):
         (self.repo / "properties/link.ch").symlink_to(self.repo / "properties/p.ch")
         with self.assertRaises(ValueError): refuted.source_path(self.repo, {"file": "properties/link.ch"})
 
+    def test_source_digest_binds_original_bytes_without_newline_normalization(self):
+        (self.repo / "properties/p.ch").write_bytes(self.source.replace("\n", "\r\n").encode())
+        self.assertTrue(refuted.manifest_errors(self.manifest, self.repo))
+        self.assertTrue(refuted.record_errors(self.record, self.claim, self.repo))
+
     def test_only_exact_single_false_root_admits_replay(self):
         good = {"roots": [{"name": "cnote_refuted_result", "value": {"type": "bool", "value": False}}]}
         self.assertTrue(refuted.replay_failed(good))

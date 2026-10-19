@@ -79,7 +79,7 @@ def manifest_errors(manifest: dict, repo: Path) -> list[str]:
                     primary_model = inv.get("target_model") or inv.get("anchor_model")
                     if claim["model"] == primary_model and prop == inv.get("property") and inv["expected_tier_per_pin"][pin] != "disproved":
                         raise ValueError("selected refuted primary must declare disproved")
-                    source = source_path(repo, prop).read_text()
+                    source = source_path(repo, prop).read_bytes().decode("utf-8")
                     if sha256(source) != claim["source_sha256"]:
                         raise ValueError("original property source digest mismatch")
                     if re.search(r"^module " + re.escape(prop["module"]) + r"$", source, re.M) is None:
@@ -151,7 +151,7 @@ def record_errors(record: dict, claim: dict, repo: Path) -> list[str]:
     if not isinstance(goal, str) or sha256(goal) != claim["goal_sha256"]:
         errors.append("refuted original goal digest mismatch")
     try:
-        source = source_path(repo, prop).read_text()
+        source = source_path(repo, prop).read_bytes().decode("utf-8")
         if sha256(source) != claim["source_sha256"]:
             raise ValueError("refuted original source digest mismatch")
         replay_source(source, prop["name"], record.get("counterexample"))
@@ -187,7 +187,7 @@ def replay(binary: str, repo: Path, pin: str, record: dict, claim: dict) -> bool
                 shutil.copy2(source, package / path)
         prop = claim["property"]
         target = package / prop["file"]
-        target.write_text(replay_source(source_path(repo, prop).read_text(), prop["name"], record["counterexample"]))
+        target.write_text(replay_source(source_path(repo, prop).read_bytes().decode("utf-8"), prop["name"], record["counterexample"]))
         fmt = subprocess.run([binary, "fmt", "--inplace", str(target)], cwd=package, capture_output=True, text=True, timeout=30)
         if fmt.returncode != 0:
             return False
