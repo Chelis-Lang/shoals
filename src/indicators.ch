@@ -2,7 +2,7 @@ module Shoals.Indicators
 export (EmaSeed, SeedFirstValue, SeedSma, Alpha, AlphaSpan, AlphaWilder, Smoothing, SmoothWilder, SmoothEma, SmoothSimple, Ddof, DdofPopulation, DdofSample, ind_rolling_sum, ind_rolling_mean, ind_rolling_std, ind_rolling_min, ind_rolling_max, ind_shift, ind_diff, sma, ema, rma, true_range, atr, rsi, macd, bollinger, stochastic, adx, donchian, cumulative_vwap, rolling_vwap, crossover, crossunder, tensor_ind_rolling_sum, tensor_ind_rolling_mean, tensor_ind_rolling_std, tensor_ind_rolling_min, tensor_ind_rolling_max, tensor_ind_shift, tensor_ind_diff, tensor_sma, tensor_ema, tensor_rma, tensor_true_range, tensor_atr, tensor_rsi, tensor_macd, tensor_bollinger, tensor_stochastic, tensor_adx, tensor_donchian, tensor_cumulative_vwap, tensor_rolling_vwap, tensor_crossover, tensor_crossunder)
 import Nautilus.Rolling (rolling_sum, rolling_mean, rolling_std, rolling_min, rolling_max, shift, diff)
 -- Technical indicators over `List[f64]`, specified in
--- `spec/shoals_quant_surface.md` §2.15 and issue shoals#83.
+-- `spec/shoals_quant_surface.md` §2.15.
 --
 -- WHY THIS MODULE NAMES ITS CONVENTIONS. The indicator families here were
 -- absent from the whole Chelis ecosystem while being the most frequently
@@ -307,7 +307,7 @@ def bollinger(close: List[f64], n: i64, k: f64, ddof: Ddof) -> (List[Option[f64]
 -- inside that sub-epsilon band, so it is an arbitrary point in [0, 100]
 -- rather than necessarily 100. Matching
 -- the scaled test is a dtype-aware epsilon decision, so it is tracked rather
--- than guessed at: shoals#83 follow-up.
+-- than guessed at: shoals#184.
 def stochastic(high: List[f64], low: List[f64], close: List[f64], k_n: i64, d_n: i64, smoothing: Smoothing) -> (List[Option[f64]], List[Option[f64]]) = {
   kn = ind_require_period(k_n)
   dn = ind_require_period(d_n)
@@ -415,14 +415,11 @@ def ind_cross(a: List[Option[f64]], b: List[Option[f64]], rising: bool) -> List[
 }
 def crossover(a: List[Option[f64]], b: List[Option[f64]]) -> List[Option[bool]] = ind_cross(a, b, true)
 def crossunder(a: List[Option[f64]], b: List[Option[f64]]) -> List[Option[bool]] = ind_cross(a, b, false)
--- TENSOR-ACCEPTING FORMS. shoals#83 asks that every function "accept
--- `List[f64]` or `tensor[n, f64]`"; that bullet governs the INPUT. The
--- return contract is the issue's separate bullet -- "a length-n series with
--- a warm-up mask" -- which `List[Option[f64]]` already satisfies, so these
--- return exactly what their list counterparts return. A tensor CANNOT carry
--- the warm-up: `tensor[n, Option[f64]]` is rejected ("expected precision
--- type name"), so returning a tensor would force a second, weaker warm-up
--- convention. These do not.
+-- TENSOR-ACCEPTING FORMS accept `tensor[n, f64]` inputs and return exactly
+-- what their list counterparts return: a length-n series with a warm-up mask.
+-- A tensor CANNOT carry the warm-up: `tensor[n, Option[f64]]` is rejected
+-- ("expected precision type name"), so returning a tensor would force a
+-- second, weaker warm-up convention. These do not.
 --
 -- WHY NOT A TENSOR RETURN. Three grounds, one per candidate shape that has
 -- actually been proposed. This deliberately does NOT claim to enumerate every

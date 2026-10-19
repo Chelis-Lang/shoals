@@ -114,6 +114,15 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 ## Tracking
 
+- **shoals#184 — stochastic near-flat range convention.** The oscillator
+  tests its f64 range for exact zero; its reference note distinguishes
+  TA-Lib's scaled-zero test. The dtype-aware threshold decision remains
+  separate from the delivered indicator API. This is a numerical convention,
+  not a compiler rejection, so an expected-to-fail compiler probe cannot
+  represent it. Re-probe when the stochastic zero-range contract or its
+  reference implementation changes; preserve the finite-input and Option
+  warm-up contracts.
+
 - **chelis#2825 — nested gradients reject a generated logical `not` in a
   nonlinear clamp.** Shoals spells the small-region clamp and erfc dispatcher
   as sequential selections. `tests-manual/greeks_secondorder.ch` and the Greek
