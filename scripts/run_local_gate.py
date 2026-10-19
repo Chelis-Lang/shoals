@@ -146,6 +146,10 @@ def main() -> int:
         ),
         ("chelis reef conform audit", ["chelis", "reef", "conform", "audit"]),
         (
+            "WireDag schema/payload adversarial unit tests",
+            ["python3", "scripts/test_validate_bs_wire_root.py"],
+        ),
+        (
             "contract_gate (offline manifest resolvability + pin freshness)",
             ["python3", "scripts/contract_gate.py"],
         ),

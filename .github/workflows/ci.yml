@@ -120,6 +120,8 @@ jobs:
 
       - name: Validate Black-Scholes WireDag root (shoals#19)
         run: python3 scripts/validate_bs_wire_root.py
+      - name: Check WireDag schema and payload controls
+        run: python3 scripts/test_validate_bs_wire_root.py
 
       # Contract §11 conformance + §7 pin-bump guard (toolchain-native since
       # chelis 0.15.1, chelis#628).
