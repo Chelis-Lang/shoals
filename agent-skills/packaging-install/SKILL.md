@@ -15,9 +15,11 @@ Three layers (design: `spec/design/chelis_packaging_and_install.md`):
 - **Layer 0 — `chelisup`** (`crates/chelisup`): the toolchain installer and the
   pin-resolving `chelis` **shim**. One binary, dual role by `argv[0]`: invoked
   as `chelis` it resolves + execs a toolchain; invoked as `chelisup` it runs
-  the installer CLI (`install`, `default`, `show`, `list-installed`, `which`,
-  `uninstall`, `update`, `self {uninstall,update}`). Bootstrap:
-  `crates/chelisup/bootstrap/chelisup.sh` (the one permitted shell script).
+  the installer CLI (`install`, `link`, `default`, `show`, `list-installed`,
+  `which`, `uninstall`, `update`, `self {uninstall,update}`). `link <dir>`
+  registers an external toolchain directory as a store link (design §5.1.1).
+  Bootstrap: `crates/chelisup/bootstrap/chelisup.sh` (the one permitted shell
+  script).
 - **Layer 1 — reef** (`crates/chelis-reef`): resolve/verify/place source
   packages, chelis-std, source crates (`reef src`), and binary artifacts
   (`[artifacts]` / `LockSource::Binary`).
@@ -41,7 +43,8 @@ design doc §5.5.
 ```
 ~/.chelis/
   bin/{chelis, chelisup}     the shim + the installer
-  toolchains/<ver>/          side-by-side toolchains (<ver>/bin/chelis is real)
+  toolchains/<ver>/          side-by-side toolchains (<ver>/bin/chelis is real,
+                             or <ver> is a `chelisup link`)
   reef/                       the reef registry
   src/                        the source-crate store
   default                     the recorded default version
@@ -53,19 +56,36 @@ shim/default, and the binary-artifact dir at once.
 ## Nix `chelisup` Closure
 
 The Nix package uses `bin/chelisup` as a wrapper around `libexec/chelisup`.
-Before `install`, the wrapper creates `$CHELIS_HOME/nix-gcroots/chelisup.next`.
+Before `install` or `default`, the wrapper creates
+`$CHELIS_HOME/nix-gcroots/chelisup.next`.
 After success, it promotes `$CHELIS_HOME/nix-gcroots/chelisup` and removes the
-staging root. A failed install preserves the prior root. If the install copied
-a new binary, the wrapper promotes `$CHELIS_HOME/nix-gcroots/chelisup.partial`.
+staging root. A failed install preserves the stable root.
+
+If the install copied a new binary, the wrapper promotes
+`$CHELIS_HOME/nix-gcroots/chelisup.partial`.
+It removes a partial root that points to the same package as the stable root.
 A new attempt recovers a stale staging root before it changes that root.
+
 After success, the Nix wrapper restores itself at `$CHELIS_HOME/bin/chelisup`.
+If restoration fails, the wrapper names the destination file and returns failure.
+Help and missing-operand requests change no root and need no `nix-store`.
+
 The generic Rust installer contains no Nix root path or cleanup logic. The
 installed Nix wrapper removes all three roots after the real `self uninstall`
-command succeeds.
+command succeeds. It also intercepts `link` and `uninstall <ver>`. A link to
+a store path gets the root `$CHELIS_HOME/nix-gcroots/toolchain-<ver>`, and a
+successful uninstall removes that root.
+After a successful install, the wrapper removes each toolchain root whose
+`toolchains/<ver>` entry is no longer a link into the store path of that root.
+A failed install keeps every toolchain root.
 
 The wrapper, package inventory, self-uninstall behavior, Nix contract test,
 and native Nix workflows form one contract. A direct Nix-built executable
 copy is invalid because external copies do not become Nix GC roots.
+
+The wrapper sets `CHELISUP_UPGRADE_ADVICE`, which changes only advice text.
+A refusal of a newer release then names the Nix upgrade command, not the
+bootstrap installer. An unset or blank setting retains the bootstrap advice.
 
 ## The Embedded chelis-std Runtime
 
