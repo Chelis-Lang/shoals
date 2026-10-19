@@ -12,11 +12,11 @@ from their GitHub releases. These downloads need no GitHub token:
 chelisup install 0.21.0
 chelis +0.21.0 reef init demo --module-prefix Demo --output demo
 cd demo
-chelis reef install --from-github Chelis-Lang/nautilus@v0.7.57
-chelis reef install --from-github Chelis-Lang/coral@v0.7.51
-chelis reef install --from-github Chelis-Lang/shoreleave@v0.1.5
-chelis reef install --from-github Chelis-Lang/chelis-clarabel@v0.1.1
-chelis reef install --from-github Chelis-Lang/shoals@v0.25.0
+chelis reef install --from-github chelis-lang/nautilus@v0.7.57
+chelis reef install --from-github chelis-lang/coral@v0.7.51
+chelis reef install --from-github chelis-lang/shoreleave@v0.1.5
+chelis reef install --from-github chelis-lang/chelis-clarabel@v0.1.1
+chelis reef install --from-github chelis-lang/shoals@v0.25.0
 ```
 
 The generated `reef.toml` pins compiler 0.21.0. Add the Shoals dependency:
