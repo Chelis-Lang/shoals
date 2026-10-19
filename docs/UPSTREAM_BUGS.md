@@ -1,7 +1,7 @@
 # Shoals Upstream Bugs
 
 Tracked upstream chelis issues and capability gaps that affect Shoals, per the
-[downstream shell repo contract](https://github.com/Chelis-Lang/chelis/blob/v0.19.4/spec/design/shell_repo_contract.md) §4.
+[downstream shell repo contract](https://github.com/Chelis-Lang/chelis/blob/v0.21.0/spec/design/shell_repo_contract.md) §4.
 The reachability map these entries lean on — what the proof stack can and cannot
 discharge for finance at this pin — is `research/proof-infra/report.md`; keep
 entries consistent with it.
@@ -35,9 +35,9 @@ in code that is CLOSED upstream but not sitting in §Archived.
   returning `0.25` at `x = 4`. The executable
   `tests_blocked/ad/hoisted_scalar_if_grad.ch` and its sidecar pin these
   controls; the expected-failure suite reports `OK` on 0.19.2.
-  The same blocked probe reports `OK` on Chelis 0.19.4 with the published
-  Nautilus, Coral, and Shoreleave graph; the full expiry AD surface has not
-  been reclassified by that result.
+  The blocked probe remains `OK` on the official Chelis 0.21.0 binary with
+  published Nautilus 0.7.57, Coral 0.7.51, and Shoreleave 0.1.5; the full
+  expiry AD surface has not been reclassified by that result.
     - **Affected Shoals surface:** `src/pricing.ch` hoists
       `den = sigma * sqrt(t)` before a scalar-`if` floor. In an isolated
       Chelis 0.19.2 graph with published Nautilus 0.7.51, Coral 0.7.48, and
@@ -270,9 +270,9 @@ in code that is CLOSED upstream but not sitting in §Archived.
 
 - **nautilus#70 — the `Nautilus.TimeSeries` EWMA entry is f32-only.**
   The executable `tests_blocked/timeseries/rolling_f64_absent.ch` checks
-  `ts_ewma_series` with an f64 tensor argument. Its last published observation
-  is the expected `f32` versus `f64` precision mismatch; the 0.21.0 package
-  graph has not been re-probed.
+  `ts_ewma_series` with an f64 tensor argument. The official Chelis 0.21.0
+  package graph with Nautilus 0.7.57 retains the expected `f32` versus `f64`
+  precision mismatch (`chelis test tests_blocked/ --expect blocked`: 2 OK).
     - **Affected capability:** callers cannot use that EWMA entry at f64.
       This is separate from the f64 `Nautilus.Rolling` module. The Shoals
       rolling and lag wrappers delegate to the latter; the EWMA probe does
@@ -290,8 +290,12 @@ in code that is CLOSED upstream but not sitting in §Archived.
   to those operations while preserving complete-window masks, Ddof mapping,
   and lag validation; its seven tensor wrappers call the same list surface.
   The former TimeSeries-width probe remains scoped to nautilus#70.
-  The 0.21.0 release qualification of this migration is pending; no new
-  numerical execution is claimed by the source migration.
+  On the official Chelis 0.21.0 package graph with published Nautilus 0.7.57,
+  Coral 0.7.51, Shoreleave 0.1.5, and chelis-clarabel 0.1.1,
+  `tests/indicators_rolling.ch` passes 7/7 cases and
+  `tests/indicators_tensor.ch` passes 11/11 cases. These cover finite fixtures,
+  warm-up masks, Ddof choices, lag alignment, and list/tensor agreement; they
+  do not claim a fresh long numerical-oracle campaign.
 
 
 - **nautilus#170 — small nonzero tridiagonal pivots changed spline values.**
