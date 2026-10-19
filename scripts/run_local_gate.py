@@ -146,6 +146,10 @@ def main() -> int:
         ),
         ("chelis reef conform audit", ["chelis", "reef", "conform", "audit"]),
         (
+            "WireDag schema/payload adversarial unit tests",
+            ["python3", "scripts/test_validate_bs_wire_root.py"],
+        ),
+        (
             "contract_gate (offline manifest resolvability + pin freshness)",
             ["python3", "scripts/contract_gate.py"],
         ),
@@ -156,6 +160,10 @@ def main() -> int:
         (
             "chelis#924 latency-oracle unit tests",
             ["python3", "scripts/test_check_package_prove_latency.py"],
+        ),
+        (
+            "v2 refuted claim admission unit tests",
+            ["python3", "-m", "unittest", "discover", "-s", "scripts", "-p", "test_refuted_claims.py"],
         ),
         (
             "risk invariant adversarial unit tests",

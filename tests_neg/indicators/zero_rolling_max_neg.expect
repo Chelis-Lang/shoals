@@ -1,0 +1,4 @@
+Shoals.Indicators: period must be >= 1
+
+The exported rolling wrapper must validate its period before delegating,
+including on an empty input (spec/shoals_quant_surface.md section 2.15.6).

@@ -74,37 +74,44 @@ class InstallGuideTests(unittest.TestCase):
 
     def test_install_guide_matches_every_published_dependency(self):
         self.assertEqual(self.check([
-            "Chelis-Lang/nautilus@v0.7.55",
-            "Chelis-Lang/chelis-clarabel@v0.1.0",
-            "Chelis-Lang/shoals@v0.24.22",
+            "chelis-lang/nautilus@v0.7.55",
+            "chelis-lang/chelis-clarabel@v0.1.0",
+            "chelis-lang/shoals@v0.24.22",
         ]), [])
 
     def test_missing_or_wrong_install_coordinate_fails(self):
         complete = [
-            "Chelis-Lang/nautilus@v0.7.55",
-            "Chelis-Lang/chelis-clarabel@v0.1.0",
-            "Chelis-Lang/shoals@v0.24.22",
+            "chelis-lang/nautilus@v0.7.55",
+            "chelis-lang/chelis-clarabel@v0.1.0",
+            "chelis-lang/shoals@v0.24.22",
         ]
         self.assertIn("chelis-clarabel", " ".join(self.check([complete[0], complete[2]])))
         self.assertIn("nautilus", " ".join(self.check([
-            "Chelis-Lang/nautilus@v0.7.54", *complete[1:]
+            "chelis-lang/nautilus@v0.7.54", *complete[1:]
         ])))
         self.assertIn("shoals", " ".join(self.check(complete + [complete[-1]])))
 
+    def test_mixed_case_github_owner_is_not_an_installable_recipe(self):
+        self.assertIn("nautilus", " ".join(self.check([
+            "Chelis-Lang/nautilus@v0.7.55",
+            "chelis-lang/chelis-clarabel@v0.1.0",
+            "chelis-lang/shoals@v0.24.22",
+        ])))
+
     def test_manifest_and_documented_dependency_pin_must_agree(self):
         failures = self.check([
-            "Chelis-Lang/nautilus@v0.7.55",
-            "Chelis-Lang/chelis-clarabel@v0.1.0",
-            "Chelis-Lang/shoals@v0.24.22",
+            "chelis-lang/nautilus@v0.7.55",
+            "chelis-lang/chelis-clarabel@v0.1.0",
+            "chelis-lang/shoals@v0.24.22",
         ], dependency_pin="0.24.21")
         self.assertIn("shoals", " ".join(failures))
 
     def test_hidden_or_unfenced_install_does_not_satisfy_guide(self):
         visible = [
-            "Chelis-Lang/nautilus@v0.7.55",
-            "Chelis-Lang/shoals@v0.24.22",
+            "chelis-lang/nautilus@v0.7.55",
+            "chelis-lang/shoals@v0.24.22",
         ]
-        hidden = "chelis reef install --from-github Chelis-Lang/chelis-clarabel@v0.1.0\n"
+        hidden = "chelis reef install --from-github chelis-lang/chelis-clarabel@v0.1.0\n"
         self.assertIn("chelis-clarabel", " ".join(self.check(
             visible, extras=f"<!--\n{hidden}-->\n"
         )))

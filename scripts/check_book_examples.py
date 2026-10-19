@@ -562,14 +562,14 @@ def install_guide_failures(page: Path, manifest_path: Path) -> list[str]:
     package = manifest["package"]
     package_name = package["name"]
     package_version = package["version"]
-    expected = {f"Chelis-Lang/{package_name}@v{package_version}"}
+    expected = {f"chelis-lang/{package_name}@v{package_version}"}
     for name, spec in manifest["dependencies"].items():
         if name == "chelis-std":
             continue  # Ships with the compiler and has no separate release.
         version = spec.get("version") if isinstance(spec, dict) else None
         if not isinstance(version, str) or not version.startswith("="):
             return [f"{manifest_path}: {name} lacks an exact dependency pin"]
-        expected.add(f"Chelis-Lang/{name}@v{version[1:]}")
+        expected.add(f"chelis-lang/{name}@v{version[1:]}")
 
     visible_text = re.sub(r"<!--.*?-->", "", page.read_text(), flags=re.DOTALL)
     shell_blocks = re.findall(

@@ -95,7 +95,13 @@ EXPECTED_NODE_COUNT = 1635
 # named loads and op kinds all still match. The node count is checked BEFORE the
 # hash, so a hash-only failure already tells you the count agreed. Confirm that
 # shape, then re-pin; do not go looking for a numerical regression.
-EXPECTED_RAW_SHA256 = "c172b7ffb3e08da1f0e272feeea4c1ff94413994d2c848a877b8b13c1fec861c"
+# Schema 30 adds FloatClassify (v29) and Cumsum (v30) to the wire vocabulary.
+# Neither occurs in this selected closure. Its complete response differs from
+# the schema-28 receipt only in that mandatory version stamp; root 844, 1635
+# nodes, operation payloads, named loads, types and source spans are identical.
+# This hash is observed from two cold optimized 6cb89e0a candidate lowerings;
+# final published-compiler qualification remains a release obligation.
+EXPECTED_RAW_SHA256 = "10a8f656cd5f1882b21363613cdf3caa73217fe0eb6caf148e8a549d4c85de28"
 FORBIDDEN_HOST_NAMES = ("vmap", "shape", "to_list", "map", "tensor_to_scalar")
 EXPECTED_LOADS = {
     "a1",
@@ -115,7 +121,7 @@ EXPECTED_LOADS = {
     "two_over_sqrt_pi",
 }
 # Exact version, checked against each published compiler during a pin bump.
-WIRE_DAG_SCHEMA_VERSION = 28
+WIRE_DAG_SCHEMA_VERSION = 30
 WIRE_OPS = {
     "add",
     "cast",
@@ -184,7 +190,7 @@ def validate_response(
     named_roots = result.get("named_roots")
     if not isinstance(dag, dict) or not isinstance(named_roots, dict):
         raise ValidationError("Chelis lower response omitted dag/named_roots")
-    if dag.get("schema_version") != WIRE_DAG_SCHEMA_VERSION:
+    if type(dag.get("schema_version")) is not int or dag["schema_version"] != WIRE_DAG_SCHEMA_VERSION:
         raise ValidationError(
             f"unexpected WireDag schema {dag.get('schema_version')!r}; "
             f"expected {WIRE_DAG_SCHEMA_VERSION}"
@@ -273,6 +279,14 @@ def validate_response(
             raise ValidationError(
                 f"{ENTRY} comparison drifted at node {node_id}: {op!r}"
             )
+        if kind == "cast":
+            output = node.get("output_type")
+            if (not isinstance(op.get("new_precision"), str)
+                    or not isinstance(output, dict)
+                    or op["new_precision"] != output.get("precision")):
+                raise ValidationError(
+                    f"{ENTRY} Cast target/type drifted at node {node_id}: {op!r}"
+                )
         if kind == "load":
             name = op.get("name")
             if not isinstance(name, str):
@@ -387,7 +401,7 @@ def validate_corruption_controls() -> None:
     dag["nodes"].extend([
         {"id": 8, "op": {"kind": "compare", "comparison": "lt"},
          "inputs": [7, 7], "output_type": {**tensor_type, "precision": "bool"}},
-        {"id": 9, "op": {"kind": "cast", "precision": "f64"},
+        {"id": 9, "op": {"kind": "cast", "new_precision": "f64"},
          "inputs": [8], "output_type": tensor_type},
     ])
     dag["roots"] = [9]

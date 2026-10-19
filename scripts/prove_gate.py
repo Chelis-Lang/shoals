@@ -59,6 +59,9 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "scripts"))
+import refuted_claims
+
 MANIFEST = REPO / "docs" / "cnote-import-surface.json"
 SMT_TIMEOUT_MS = "20000"
 DEFAULT_FUZZ_SAMPLES = 25
@@ -448,7 +451,7 @@ def honesty_self_test() -> bool:
 
 
 def run_prove(binary: str, file: str, fuzz: bool, samples: int,
-              seed: str = FUZZ_SEED) -> dict:
+              seed: str = FUZZ_SEED, timeout: int | None = None) -> dict:
     """Run prove on one canon file, preserving compiler attribution evidence.
 
     Property records are keyed by name only after duplicate detection. The
@@ -464,7 +467,11 @@ def run_prove(binary: str, file: str, fuzz: bool, samples: int,
         cmd += ["--tier", "fuzz-only", "--samples", str(samples), "--seed", seed]
     else:
         cmd += ["--tier", "smt-only", "--smt-timeout", SMT_TIMEOUT_MS]
-    out = subprocess.run(cmd, cwd=REPO, capture_output=True, text=True)
+    try:
+        out = subprocess.run(cmd, cwd=REPO, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return {"records": {}, "duplicate_records": [], "summary_count": 0,
+                "dependency_graph": None, "returncode": 124}
     recs: dict[str, dict] = {}
     duplicate_records: list[str] = []
     summaries: list[dict] = []
@@ -1077,6 +1084,9 @@ def check_instantiation(recs, graph, inv, inst, pin, model, package) -> bool:
     output_fn = model["output_fn"]
     effective = {**inv, "property": inst.get("property", inv["property"])}
     inv_with_fn = {**effective, "_output_fn": output_fn}
+    claim = refuted_claims.find(inv, pin, model["id"], effective["property"])
+    if claim:
+        exp_tier = "disproved"
 
     def check_dependency(rec: dict, control_name: str, label: str) -> bool:
         bound, why = dependency_binding_references(
@@ -1086,6 +1096,22 @@ def check_instantiation(recs, graph, inv, inst, pin, model, package) -> bool:
         if not bound:
             fail(f"{label} `{control_name}` compiler attribution: {why}")
             return False
+        if claim:
+            module_files = [path for path in (REPO / "src").rglob("*.ch")
+                            if f"module {model['module']}" in path.read_text().splitlines()]
+            if len(module_files) != 1:
+                fail(f"{label}: exact output module source is ambiguous or absent")
+                return False
+            exact, why = compiler_graph_directly_references(
+                graph, property_name=control_name,
+                property_module=effective["property"]["module"],
+                property_file=effective["property"]["file"],
+                target_name=output_fn, target_module=model["module"],
+                target_package=package, package=package,
+                target_file=module_files[0].relative_to(REPO).as_posix())
+            if not exact:
+                fail(f"{label}: exact output source attribution: {why}")
+                return False
         if version_at_least(pin, (0, 17, 2)):
             print(f"    compiler attribution `{control_name}`: {why}")
         extras_ok = True
@@ -1139,7 +1165,7 @@ def check_instantiation(recs, graph, inv, inst, pin, model, package) -> bool:
 
     # Satisfying control: exact expected tier + anti-vacuity goal ref.
     sg = controls["satisfying"]
-    okc, rec = check_control(recs, sg["name"], "passed", "satisfying")
+    okc, rec = check_control(recs, sg["name"], "failed" if claim else "passed", "original claim")
     ok = okc and ok
     if rec:
         ok = check_dependency(rec, sg["name"], "satisfying") and ok
@@ -1148,6 +1174,15 @@ def check_instantiation(recs, graph, inv, inst, pin, model, package) -> bool:
             fail(f"TIER DRIFT: `{sg['name']}` achieved {got}, expected {exp_tier} "
                  f"(either direction fails -- run the de-narrowing motion)")
             ok = False
+        if claim:
+            errors = refuted_claims.record_errors(rec, claim, REPO)
+            ind, why = failed_witness_in_domain(rec, inst.get("preconditions", []), True)
+            if sg["name"] != effective["property"]["name"] or errors or not ind:
+                fail(f"refuted claim `{sg['name']}`: {errors}; witness: {why}")
+                ok = False
+            elif not refuted_claims.replay(resolve_bin(), REPO, pin, rec, claim, inst.get("preconditions", [])):
+                fail(f"refuted claim `{sg['name']}` original predicate replay failed")
+                ok = False
         if got == "fuzz_validated":
             non_vacuous, why = fuzz_non_vacuity(rec)
             if not non_vacuous:
@@ -1175,6 +1210,16 @@ def check_instantiation(recs, graph, inv, inst, pin, model, package) -> bool:
         if not ind:
             fail(f"violating `{vg['name']}` witness not in-domain: {why}")
             ok = False
+        if claim:
+            # Only the explicit v2 route gains typed original-control replay.
+            # Preserve the historical generic positive/control admission path.
+            control_claim = {**claim, "property": {**claim["property"], "name": vg["name"]},
+                             "goal_sha256": refuted_claims.sha256(vrec.get("goal", ""))}
+            errors = refuted_claims.record_errors(vrec, control_claim, REPO)
+            if errors or not refuted_claims.replay(resolve_bin(), REPO, pin, vrec, control_claim,
+                                                   inst.get("preconditions", [])):
+                fail(f"refuted corrupt control `{vg['name']}` typed guard/predicate replay failed: {errors}")
+                ok = False
     return ok
 
 
@@ -1599,9 +1644,14 @@ def main() -> None:
           f"fuzz_lane={'on' if include_fuzz else 'off (opt in locally)'}")
 
     def gated(inv: dict) -> bool:
-        return include_fuzz or inv["expected_tier_per_pin"].get(pin) != "fuzz_validated"
+        return include_fuzz or (inv["expected_tier_per_pin"].get(pin) != "fuzz_validated"
+                                and not inv.get("refuted_claims_per_pin", {}).get(pin))
 
-    ok = honesty_self_test()
+    errors = refuted_claims.manifest_errors(manifest, REPO)
+    for detail in errors:
+        fail(detail)
+    ok = not errors
+    ok = honesty_self_test() and ok
     ok = witness_domain_self_test() and ok
     ok = dependency_graph_self_test() and ok
     ok = metamorphic_self_test(binary) and ok
@@ -1623,10 +1673,11 @@ def main() -> None:
             by_file.setdefault(inst["property"]["file"], []).append(inv)
 
     fuzz_files = {inv["property"]["file"] for inv in gated_invs
-                  if inv["expected_tier_per_pin"].get(pin) == "fuzz_validated"}
+                  if inv["expected_tier_per_pin"].get(pin) == "fuzz_validated"
+                  or inv.get("refuted_claims_per_pin", {}).get(pin)}
     for inv in gated_invs:
         for inst in inv.get("also_instantiated_for", []):
-            if inv["expected_tier_per_pin"].get(pin) == "fuzz_validated":
+            if inv["expected_tier_per_pin"].get(pin) == "fuzz_validated" or inv.get("refuted_claims_per_pin", {}).get(pin):
                 fuzz_files.add(inst["property"]["file"])
 
     recs_by_file = {}
@@ -1685,7 +1736,7 @@ def main() -> None:
         # abstracted contract and require the outcome to flip. The syntactic
         # goal_names_ref check above is a fast necessary condition; this is the
         # real one. (Fuzz-tier invariants -- none active -- are out of scope.)
-        if exp != "fuzz_validated":
+        if exp != "fuzz_validated" and not refuted_claims.find(inv, pin, anchor, inv["property"]):
             i_ok = check_metamorphic(inv, models, binary) and i_ok
         for inst in inv.get("also_instantiated_for", []):
             inst_result = recs_by_file[inst["property"]["file"]]

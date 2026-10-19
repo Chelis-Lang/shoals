@@ -5,7 +5,7 @@ to this file so Claude-style and Codex-style entry points do not drift.
 
 ## Repo Identity
 
-<!-- BEGIN CHELIS MANAGED BLOCK: agents-inheritance chelis@0.19.4 (sha256:87b52f330529a2c8) -->
+<!-- BEGIN CHELIS MANAGED BLOCK: agents-inheritance chelis@0.21.0 (sha256:fc0ef06e875c6c08) -->
 # Chelis Agent Contract
 
 Keep this file concise and relevant to every agent working in this repository.
@@ -108,7 +108,7 @@ function of those inputs, and feedback that varies between identical runs is a d
 
 ## Subagents
 
-[`docs/investigations/agent_contract_rationale.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.4/docs/investigations/agent_contract_rationale.md)
+[`docs/investigations/agent_contract_rationale.md`](https://github.com/Chelis-Lang/chelis/blob/v0.21.0/docs/investigations/agent_contract_rationale.md)
 holds the measurements behind these rules.
 
 - Every subagent prompt names the delivery mechanism and the complete expected report.
@@ -193,9 +193,9 @@ published, take the change when that release is documented.
   there. One trap it enforces at compile time: `reef setup` subprocesses the real
   `chelisup` binary, never `chelisup::install::install` in-process, because that helper
   copies `current_exe()` over the shim. Design:
-  [`spec/design/chelis_packaging_and_install.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.4/spec/design/chelis_packaging_and_install.md).
+  [`spec/design/chelis_packaging_and_install.md`](https://github.com/Chelis-Lang/chelis/blob/v0.21.0/spec/design/chelis_packaging_and_install.md).
 - **Downstream shells** inherit this complete contract through a stamped managed block
-  and must satisfy [`spec/design/shell_repo_contract.md`](https://github.com/Chelis-Lang/chelis/blob/v0.19.4/spec/design/shell_repo_contract.md),
+  and must satisfy [`spec/design/shell_repo_contract.md`](https://github.com/Chelis-Lang/chelis/blob/v0.21.0/spec/design/shell_repo_contract.md),
   shipped in the toolchain as `chelis reef conform`. Full inheritance is the default,
   but each shell decides which portions apply. Shell-owned additions stay outside the
   block and should remain when they are relevant and current. To omit an inherited
@@ -313,11 +313,13 @@ canon proof gate re-probes those per surface instead.
 
 Shoals is a **producer** for the Verified Model Characterization cross-repo
 seam. The normative contract is
-`c-note/docs/contracts/characterization_contract_v1.md` (frozen, additive-only);
+`c-note/docs/contracts/characterization_contract_v1.md` (frozen) and
+`c-note/docs/contracts/characterization_contract_v2.md` for the explicit v2
+refuted-observation envelope;
 C Note is the consumer. Shoals' local obligations:
 
 - `docs/cnote-import-surface.json` is the invariant-surface manifest
-  (`chelis-shell.invariant-surface/1.0`): reference models with kinds/domains,
+  (`chelis-shell.invariant-surface/2.0`): reference models with kinds/domains,
   and an active invariant set spanning the SMT tiers (`proven` CRR lane, the
   `sound_approximate` certified-envelope composites lane, and the `disproved`
   defective-model break) plus `fuzz_validated` direct-pricer positivity and
@@ -354,7 +356,13 @@ C Note is the consumer. Shoals' local obligations:
   invariants remain deferred until their own per-surface probes demonstrate a
   stable tier. That unsupported inline-`grad` claim is distinct from the active
   records that call already-exported AD sensitivity functions.
-- Additive-only within schema major 1; renames/removals need a major bump and a
+- Historical observations and control identities stay intact. V2 refuted
+  observations select an exact compiler pin, model and original property; the
+  producer and consumer require classified in-domain counterexamples, complete
+  compiler attribution and actual original-predicate replay. A refuted claim
+  is never a positive result or a globally defective model. Legacy readers
+  reject the explicit major-2 envelope; Shoals 0.25.0 carries this consumer break.
+- Additive-only within each schema major; renames/removals need a major bump and a
   relayed heads-up (the master agent relays between repos; shells never read
   each other's manifest).
 

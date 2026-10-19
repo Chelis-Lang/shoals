@@ -17,8 +17,8 @@ concurrency:
 # so a literal has to exist for the guard to check). The extract step below
 # re-derives the pin from reef.toml only to assert this literal has not drifted.
 env:
-  CHELIS_TAG: v0.19.4
-  CHELIS_VERSION: 0.19.4
+  CHELIS_TAG: v0.21.0
+  CHELIS_VERSION: 0.21.0
 
 jobs:
   hard-rule-guard:
@@ -120,6 +120,8 @@ jobs:
 
       - name: Validate Black-Scholes WireDag root (shoals#19)
         run: python3 scripts/validate_bs_wire_root.py
+      - name: Check WireDag schema and payload controls
+        run: python3 scripts/test_validate_bs_wire_root.py
 
       # Contract §11 conformance + §7 pin-bump guard (toolchain-native since
       # chelis 0.15.1, chelis#628).
@@ -230,6 +232,9 @@ jobs:
         run: python3 scripts/contract_gate.py
       - name: Run adversarial risk invariant gate regressions
         run: python3 scripts/test_risk_invariant_gate.py
+
+      - name: v2 refuted claim admission unit tests
+        run: python3 -m unittest discover -s scripts -p test_refuted_claims.py
       - name: Validate canonical release builder (chelis#1002)
         run: python3 scripts/test_build_release_assets.py
       - name: Validate the chelis#924 release oracle
@@ -275,10 +280,10 @@ jobs:
           GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
         run: |
           mkdir -p "$RUNNER_TEMP/beacon"
-          gh release download v0.1.20 --repo Chelis-Lang/beacon --dir "$RUNNER_TEMP/beacon" --pattern 'chelis-beacon-v0.1.20-linux-x86_64*'
+          gh release download v0.1.22 --repo Chelis-Lang/beacon --dir "$RUNNER_TEMP/beacon" --pattern 'chelis-beacon-v0.1.22-linux-x86_64*'
           cd "$RUNNER_TEMP/beacon"
-          sha256sum --check chelis-beacon-v0.1.20-linux-x86_64.sha256
-          chmod +x chelis-beacon-v0.1.20-linux-x86_64
-          echo "CHELIS_BEACON_BIN=$RUNNER_TEMP/beacon/chelis-beacon-v0.1.20-linux-x86_64" >> "$GITHUB_ENV"
+          sha256sum --check chelis-beacon-v0.1.22-linux-x86_64.sha256
+          chmod +x chelis-beacon-v0.1.22-linux-x86_64
+          echo "CHELIS_BEACON_BIN=$RUNNER_TEMP/beacon/chelis-beacon-v0.1.22-linux-x86_64" >> "$GITHUB_ENV"
       - name: Verify direct-source bounds and the false-control witness
         run: python3 scripts/check_proof_additions.py --beacon-only

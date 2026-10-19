@@ -1,16 +1,10 @@
 # Shoals Quant Finance Surface
 
-Companion to `spec/phase3l.md`. Extends the Phase 3l baseline
-(pricing, risk, curves, stochastic, orderbook — Shoals's v0.0.1
-starting surface, originally shipped under the v0.7.x version track
-that has since been reset) with the full quant finance functional
-surface and the structural commitments required for the verified-AD-
-for-quant-finance application of the Chelis trust stack.
-
-This document is forward-looking. The current Shoals release implements
-the baseline in `phase3l.md`; the milestones in
-`docs/plan-quant-surface.md` build out the surface below. Land any
-edits here together with the matching update to the chelis monorepo
+This document specifies the quant-finance surface and the structural
+commitments for verified automatic differentiation. `spec/phase3l.md`
+defines the pricing, risk, curves, stochastic, and orderbook baseline;
+`docs/plan-quant-surface.md` owns implementation sequence. Changes to
+this contract also update the Chelis monorepo
 `spec/design/chelis_phase3_plan.md` (Shoals shell scoping rules).
 
 ---
@@ -573,28 +567,23 @@ and look-ahead defects appear (nautilus#85). `Option[T]` is `@pin` in
 `docs/CHELIS_SURFACE.md`.
 
 Warm-up lengths are part of the contract and are stated per function in
-`src/indicators.ch`. No export reads any input index greater than its
-own output index -- for the whole surface, not only where it is pinned.
-Two properties check it executably rather than by inspection, by perturbing
-only the last input and requiring every earlier output to be unchanged;
-they cover `ema` and `rsi`. The committed suite does not pin the rest.
-Review evidence for the unpinned exports belongs in the pull request record,
-not here.
+`src/indicators.ch`. No export reads an input index greater than its
+output index.
 
-#### 2.15.3 Rolling layer (on loan from Nautilus)
+#### 2.15.3 Rolling and lag wrappers
 
 `ind_rolling_sum`, `ind_rolling_mean`, `ind_rolling_std`,
 `ind_rolling_min`, `ind_rolling_max`, `ind_shift` and `ind_diff` are
-generic time-series primitives, not finance. They belong in Nautilus and
-are requested there as nautilus#85. They live here, under an `ind_`
-prefix that marks them as the borrowed layer, because the rolling family exists in exactly one place in the ecosystem and that copy does not serve `List[f64]`:
-`Coral.Window` has `rolling_sum`, `rolling_mean`, `rolling_std`,
-`rolling_min` and `rolling_max`, but only on `tensor[n, f32]`, and Coral is
-not a compiled lane (coral#26). `Nautilus.TimeSeries` is not a second copy —
-it has no rolling family at any width, only exponential smoothing and
-AR/ARMA prediction (nautilus#70, shoals#72). `ind_shift` and `ind_diff`
-duplicate nothing: neither package has a shift, lag or diff. Delete this
-layer and re-export from Nautilus when nautilus#85 lands.
+wrappers over the corresponding `Nautilus.Rolling` operations. Their public
+names and `List[Option[f64]]` result types are stable. The five reductions
+require complete windows: their Nautilus `min_periods` argument equals the
+window width, retaining exactly `n - 1` warm-up entries when the input is long
+enough. `DdofPopulation` maps to divisor adjustment 0 and `DdofSample` to 1.
+`ind_shift` requires a nonnegative lag; `ind_diff` requires a positive lag.
+The wrappers validate these constraints before delegating, including for an
+empty input, and preserve Shoals's domain diagnostics. Their tensor forms
+continue to convert and call the same list wrappers. Internal masked-series
+kernels remain available to the higher-level indicators that compose them.
 
 The rolling reductions re-sum each window rather than carrying a running
 total. That is `O(n * w)` where a running total is `O(n)`, and it is the

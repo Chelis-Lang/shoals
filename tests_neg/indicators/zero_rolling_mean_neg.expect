@@ -1,0 +1,3 @@
+Shoals.Indicators: period must be >= 1
+
+The public mean wrapper validates its period before visiting any element.
