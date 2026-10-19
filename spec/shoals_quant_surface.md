@@ -1,16 +1,10 @@
 # Shoals Quant Finance Surface
 
-Companion to `spec/phase3l.md`. Extends the Phase 3l baseline
-(pricing, risk, curves, stochastic, orderbook — Shoals's v0.0.1
-starting surface, originally shipped under the v0.7.x version track
-that has since been reset) with the full quant finance functional
-surface and the structural commitments required for the verified-AD-
-for-quant-finance application of the Chelis trust stack.
-
-This document is forward-looking. The current Shoals release implements
-the baseline in `phase3l.md`; the milestones in
-`docs/plan-quant-surface.md` build out the surface below. Land any
-edits here together with the matching update to the chelis monorepo
+This document specifies the quant-finance surface and the structural
+commitments for verified automatic differentiation. `spec/phase3l.md`
+defines the pricing, risk, curves, stochastic, and orderbook baseline;
+`docs/plan-quant-surface.md` owns implementation sequence. Changes to
+this contract also update the Chelis monorepo
 `spec/design/chelis_phase3_plan.md` (Shoals shell scoping rules).
 
 ---
@@ -573,13 +567,8 @@ and look-ahead defects appear (nautilus#85). `Option[T]` is `@pin` in
 `docs/CHELIS_SURFACE.md`.
 
 Warm-up lengths are part of the contract and are stated per function in
-`src/indicators.ch`. No export reads any input index greater than its
-own output index -- for the whole surface, not only where it is pinned.
-Two properties check it executably rather than by inspection, by perturbing
-only the last input and requiring every earlier output to be unchanged;
-they cover `ema` and `rsi`. The committed suite does not pin the rest.
-Review evidence for the unpinned exports belongs in the pull request record,
-not here.
+`src/indicators.ch`. No export reads an input index greater than its
+output index.
 
 #### 2.15.3 Rolling and lag wrappers
 

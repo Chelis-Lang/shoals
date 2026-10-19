@@ -831,9 +831,6 @@ round-trip witness. `chelis deep`/`surf` are the CLI views; `spec/02`
 
 # Chelis Capability Surface for Shoals
 
-Pinned compiler: Chelis 0.21.0. Latest upstream compiler release checked:
-0.21.0. Last refreshed: 2026-10-19.
-
 The compiler and dependency versions are declared in [`reef.toml`](../reef.toml).
 The installed artifact hashes are recorded in `reef.lock` when Reef resolves
 the published releases.
