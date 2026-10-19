@@ -6,6 +6,7 @@ import json
 import math
 import re
 import shutil
+import struct
 import subprocess
 import tempfile
 from pathlib import Path
@@ -121,19 +122,67 @@ def property_parts(source: str, name: str) -> tuple[list[tuple[str, str]], str]:
 def numeric(value: object) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError("counterexample input must be an exact numeric JSON value")
-    number = float(value)
-    if not math.isfinite(number):
-        raise ValueError("nonfinite counterexample input")
-    return number
+    try:
+        number = float(value)
+        typed = struct.unpack("!f", struct.pack("!f", number))[0]
+    except (OverflowError, struct.error) as exc:
+        raise ValueError("counterexample input is outside finite f32") from exc
+    # Compare with the original integer too: float(int) may already have rounded.
+    if not math.isfinite(number) or not math.isfinite(typed) or number != value or typed != value:
+        raise ValueError("counterexample input changes value at f32 ingress")
+    if number == 0.0 and math.copysign(1.0, number) != math.copysign(1.0, typed):
+        raise ValueError("counterexample input changes zero sign")
+    return typed
 
 
-def replay_source(source: str, name: str, witness: dict) -> str:
+def guards(header: str) -> list[str]:
+    if not isinstance(header, str) or ")" not in header:
+        raise ValueError("unsupported original guard header")
+    tail = header.split(")", 1)[1].strip()
+    if tail == ":":
+        return []
+    if not tail.startswith("where ") or not tail.endswith(":"):
+        raise ValueError("unsupported original guard layout")
+    values = [value.strip() for value in tail[6:-1].split(",")]
+    if not all(values):
+        raise ValueError("empty original guard")
+    return values
+
+
+def declared_guards(preconditions: list) -> list[str]:
+    ops = {"gt": ">", "gte": ">=", "lt": "<", "lte": "<=", "eq": "==", "ne": "!="}
+    result = []
+    for pre in preconditions:
+        rhs = pre["rhs"]
+        if len(rhs) != 1:
+            raise ValueError("ambiguous declared guard")
+        value = rhs.get("input", rhs.get("param", rhs.get("expr")))
+        if "const" in rhs:
+            value = repr(float(rhs["const"]))
+        if not isinstance(value, str) or pre["op"] not in ops:
+            raise ValueError("unsupported declared guard")
+        result.append(f"({pre['lhs']}) {ops[pre['op']]} ({value})")
+    return result
+
+
+def replay_source(source: str, name: str, witness: dict, goal: str | None = None, preconditions: list = ()) -> str:
     params, body = property_parts(source, name)
     if not isinstance(witness, dict) or set(witness) != {p for p, _ in params}:
         raise ValueError("counterexample must contain exactly the quantified inputs")
     if "cnote_refuted_" in source:
         raise ValueError("original source collides with reserved replay identity")
     args = ", ".join(f"cast({numeric(witness[p])!r}{'f64' if ty == 'f64' else ''}, {ty})" for p, ty in params)
+    header = re.search(r"^@property " + re.escape(name) + r"\s+forall[^\n]*", source, re.M)[0]
+    conditions = guards(header)
+    if goal is not None:
+        if not isinstance(goal, str):
+            raise ValueError("unsupported compiler goal")
+        conditions.extend(guards(goal[:goal.index(":", goal.index(")") + 1) + 1]))
+    conditions.extend(declared_guards(preconditions))
+    guard = " && ".join(f"({condition})" for condition in conditions) or "true"
+    # False admits a refutation only inside every original typed guard.
+    # Out-of-domain inputs yield true and cannot masquerade as counterexamples.
+    body = f"if ({guard}) then {body} else true"
     signature = ", ".join(f"{p}: {ty}" for p, ty in params)
     return source + f"\ndef cnote_refuted_replay({signature}) -> bool = {body}\n{ROOT} = cnote_refuted_replay({args})\n"
 
@@ -154,7 +203,7 @@ def record_errors(record: dict, claim: dict, repo: Path) -> list[str]:
         source = source_path(repo, prop).read_bytes().decode("utf-8")
         if sha256(source) != claim["source_sha256"]:
             raise ValueError("refuted original source digest mismatch")
-        replay_source(source, prop["name"], record.get("counterexample"))
+        replay_source(source, prop["name"], record.get("counterexample"), goal)
     except (ValueError, TypeError, KeyError) as exc:
         errors.append(str(exc))
     return errors
@@ -171,7 +220,7 @@ def replay_failed(output: dict) -> bool:
             and matches[0]["value"].get("value") is False)
 
 
-def replay(binary: str, repo: Path, pin: str, record: dict, claim: dict) -> bool:
+def replay(binary: str, repo: Path, pin: str, record: dict, claim: dict, preconditions: list = ()) -> bool:
     if record_errors(record, claim, repo):
         return False
     version = subprocess.run([binary, "--version"], capture_output=True, text=True, timeout=30)
@@ -187,7 +236,7 @@ def replay(binary: str, repo: Path, pin: str, record: dict, claim: dict) -> bool
                 shutil.copy2(source, package / path)
         prop = claim["property"]
         target = package / prop["file"]
-        target.write_text(replay_source(source_path(repo, prop).read_bytes().decode("utf-8"), prop["name"], record["counterexample"]))
+        target.write_text(replay_source(source_path(repo, prop).read_bytes().decode("utf-8"), prop["name"], record["counterexample"], record["goal"], preconditions))
         fmt = subprocess.run([binary, "fmt", "--inplace", str(target)], cwd=package, capture_output=True, text=True, timeout=30)
         if fmt.returncode != 0:
             return False

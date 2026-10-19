@@ -20,7 +20,7 @@ class RefutedClaimContractTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.repo = Path(self.directory.name)
         (self.repo / "properties").mkdir()
-        self.source = "module Shoals.Properties.P\nimport Shoals.A (f)\n@property p forall(x: f32) where x > 0.0:\n  (f(x) > 0.0)\n"
+        self.source = "module Shoals.Properties.P\nimport Shoals.A (f)\n@property p forall(x: f32) where x > 0.0:\n  (f(x) > 0.0)\n@property wrong forall(x: f32) where x > 0.0:\n  (f(x) > 2.0)\n"
         (self.repo / "properties/p.ch").write_text(self.source)
         self.prop = {"file": "properties/p.ch", "module": "Shoals.Properties.P", "name": "p"}
         self.goal = "forall(x: f32) where x > 0.0: (Shoals.A.f(x) > 0.0)"
@@ -94,6 +94,25 @@ class RefutedClaimContractTests(unittest.TestCase):
             with self.subTest(inputs=inputs), self.assertRaises(ValueError):
                 refuted.replay_source(self.source, "p", inputs)
 
+    def test_typed_ingress_rejects_value_changes(self):
+        for value in [1e-50, 1e40, 0.500000001, 16777217, 9007199254740993]:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                refuted.replay_source(self.source, "p", {"x": value})
+
+    def test_exact_adjacent_subnormal_max_and_signed_zero_inputs(self):
+        import struct
+        for bits in [0, 0x80000000, 1, 0x80000001, 0x3f000001, 0x7f7fffff]:
+            value = struct.unpack("!f", struct.pack("!I", bits))[0]
+            text = refuted.replay_source(self.source, "p", {"x": value})
+            self.assertIn(repr(value), text)
+        self.assertIn("cast(-0.0, f32)", refuted.replay_source(self.source, "p", {"x": -0.0}))
+
+    def test_original_typed_guards_gate_predicate(self):
+        source = "module P\n@property p forall(x: f32) where x > 0.5, x < 1.0:\n  false\n"
+        text = refuted.replay_source(source, "p", {"x": 0.5})
+        self.assertIn("if ((x > 0.5) && (x < 1.0)) then", text)
+        self.assertIn("else true", text)
+
     def test_owning_gate_enforces_graph_corrupt_control_witness_and_actual_replay(self):
         (self.repo / "src").mkdir()
         (self.repo / "src/a.ch").write_text("module Shoals.A\ndef f(x: f32) -> f32 = neg(x)\n")
@@ -121,8 +140,23 @@ class RefutedClaimContractTests(unittest.TestCase):
                 if mutate == "wrong-file": forged["dependency_graph"]["declarations"][-1]["source"]["file"] = "src/forged.ch"
                 if mutate == "missing-edge": forged["dependency_graph"]["edges"] = []
                 self.assertFalse(check_refuted_claims.check_result(forged, self.manifest, self.prop["file"], "unused")[0], mutate)
+            forged = copy.deepcopy(result)
+            forged["records"]["wrong"]["counterexample"] = {"x": 1e-50}
+            self.assertFalse(check_refuted_claims.check_result(forged, self.manifest, self.prop["file"], "unused")[0])
             with mock.patch.object(refuted, "replay", return_value=False):
                 self.assertFalse(check_refuted_claims.check_result(result, self.manifest, self.prop["file"], "unused")[0])
+
+    def test_emitted_and_declared_guards_are_typed_replay_conditions(self):
+        text = refuted.replay_source(self.source, "p", {"x": 1.0}, self.goal,
+                                    [{"lhs": "x", "op": "lt", "rhs": {"const": 2.0}}])
+        self.assertIn("(x) < (2.0)", text)
+        self.assertEqual(text.count("(x > 0.0)"), 2)
+        for invalid in [1e-50, 1e40, 0.500000001, 16777217, 9007199254740993]:
+            forged = {**self.record, "counterexample": {"x": invalid}}
+            self.assertTrue(refuted.record_errors(forged, self.claim, self.repo))
+        for goal in ["unsupported", "forall(x: f32) where : false"]:
+            with self.assertRaises(ValueError):
+                refuted.replay_source(self.source, "p", {"x": 1.0}, goal)
 
     def test_primary_cannot_be_positive_with_a_refuted_selector_and_paths_stay_authentic(self):
         self.inv["expected_tier_per_pin"]["0.21.0"] = "fuzz_validated"

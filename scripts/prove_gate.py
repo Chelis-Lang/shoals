@@ -1180,7 +1180,7 @@ def check_instantiation(recs, graph, inv, inst, pin, model, package) -> bool:
             if sg["name"] != effective["property"]["name"] or errors or not ind:
                 fail(f"refuted claim `{sg['name']}`: {errors}; witness: {why}")
                 ok = False
-            elif not refuted_claims.replay(resolve_bin(), REPO, pin, rec, claim):
+            elif not refuted_claims.replay(resolve_bin(), REPO, pin, rec, claim, inst.get("preconditions", [])):
                 fail(f"refuted claim `{sg['name']}` original predicate replay failed")
                 ok = False
         if got == "fuzz_validated":
@@ -1210,6 +1210,16 @@ def check_instantiation(recs, graph, inv, inst, pin, model, package) -> bool:
         if not ind:
             fail(f"violating `{vg['name']}` witness not in-domain: {why}")
             ok = False
+        if claim:
+            # Only the explicit v2 route gains typed original-control replay.
+            # Preserve the historical generic positive/control admission path.
+            control_claim = {**claim, "property": {**claim["property"], "name": vg["name"]},
+                             "goal_sha256": refuted_claims.sha256(vrec.get("goal", ""))}
+            errors = refuted_claims.record_errors(vrec, control_claim, REPO)
+            if errors or not refuted_claims.replay(resolve_bin(), REPO, pin, vrec, control_claim,
+                                                   inst.get("preconditions", [])):
+                fail(f"refuted corrupt control `{vg['name']}` typed guard/predicate replay failed: {errors}")
+                ok = False
     return ok
 
 
