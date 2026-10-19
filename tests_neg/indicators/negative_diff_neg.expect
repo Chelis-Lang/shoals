@@ -1,0 +1,4 @@
+Shoals.Indicators: diff lag must be >= 1
+
+Shoals differences require a positive lag. Nautilus accepts zero and negative
+lags, so this wrapper guard remains necessary even when the input is empty.

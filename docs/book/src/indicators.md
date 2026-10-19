@@ -235,9 +235,8 @@ A zero-total-volume *rolling* VWAP window reports the unweighted mean of
 its prices. A *cumulative* VWAP remains `None` until cumulative volume
 becomes positive.
 
-The module assumes finite numeric inputs. It does not check every `NaN` or
-infinity: rolling minimum and maximum can handle a `NaN` differently
-depending on its position in the window. Two other cases need care:
+The module assumes finite numeric inputs and does not validate every `NaN` or
+infinity. Two other cases need care:
 
 - `ind_rolling_std(xs, 1, DdofSample)` yields `Some(NaN)` because its
   divisor is zero. In `bollinger(close, 1, k, DdofSample)`, the lower and

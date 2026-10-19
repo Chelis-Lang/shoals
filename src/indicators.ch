@@ -1,5 +1,6 @@
 module Shoals.Indicators
 export (EmaSeed, SeedFirstValue, SeedSma, Alpha, AlphaSpan, AlphaWilder, Smoothing, SmoothWilder, SmoothEma, SmoothSimple, Ddof, DdofPopulation, DdofSample, ind_rolling_sum, ind_rolling_mean, ind_rolling_std, ind_rolling_min, ind_rolling_max, ind_shift, ind_diff, sma, ema, rma, true_range, atr, rsi, macd, bollinger, stochastic, adx, donchian, cumulative_vwap, rolling_vwap, crossover, crossunder, tensor_ind_rolling_sum, tensor_ind_rolling_mean, tensor_ind_rolling_std, tensor_ind_rolling_min, tensor_ind_rolling_max, tensor_ind_shift, tensor_ind_diff, tensor_sma, tensor_ema, tensor_rma, tensor_true_range, tensor_atr, tensor_rsi, tensor_macd, tensor_bollinger, tensor_stochastic, tensor_adx, tensor_donchian, tensor_cumulative_vwap, tensor_rolling_vwap, tensor_crossover, tensor_crossunder)
+import Nautilus.Rolling (rolling_sum, rolling_mean, rolling_std, rolling_min, rolling_max, shift, diff)
 -- Technical indicators over `List[f64]`, specified in
 -- `spec/shoals_quant_surface.md` §2.15 and issue shoals#83.
 --
@@ -30,11 +31,9 @@ export (EmaSeed, SeedFirstValue, SeedSma, Alpha, AlphaSpan, AlphaWilder, Smoothi
 -- also names where the module and current TA-Lib DIFFER rather than
 -- claiming a parity it does not have.
 --
--- Three cases reach a reported `Some` that is not an ordinary value, and
--- they are limitations rather than conventions: `DdofSample` with n = 1
--- divides by zero, a negative Bollinger `k` swaps the bands, and a
--- non-finite input is position-dependent in the rolling min/max fold.
--- Inputs are assumed finite. See docs/book/src/indicators.md.
+-- Inputs are assumed finite. `DdofSample` with n = 1 yields `Some(NaN)`,
+-- and a negative Bollinger `k` swaps the bands. These reported values are
+-- not warm-up entries. See docs/book/src/indicators.md.
 --
 -- Keeping `None` to one meaning is what lets the internal representation
 -- carry a leading warm-up count rather than arbitrary holes.
@@ -169,39 +168,39 @@ def ind_zip_series(a: Series, b: Series, f: f64 -> f64 -> f64) -> Series = {
   w = ind_max_i64(a.warmup, b.warmup)
   Series { values: map(fn (p: (f64, f64)) -> f(p.0, p.1), zip(a.values, b.values)), warmup: w }
 }
--- Lag by `k`. A negative `k` is a look-ahead, not a shift, so it traps
--- rather than silently reading the future.
-def ind_shift_series(s: Series, k: i64) -> Series = {
-  vs = s.values
-  m = len(vs)
-  kk = if lt(k, cast(0, i64)) then fail("Shoals.Indicators: shift must be >= 0 (a negative shift reads the future)") else k
-  w = ind_min_i64(add(s.warmup, kk), m)
-  out = map(fn (i: i64) -> if lt(i, w) then ind_filler() else index(vs, sub(i, kk)), range(cast(0, i64), m))
-  Series { values: out, warmup: w }
+-- Nautilus supplies the arithmetic. Shoals keeps its complete-window mask,
+-- convention arguments, and domain diagnostics at these public wrappers.
+def ind_rolling_sum(xs: List[f64], n: i64) -> List[Option[f64]] = {
+  nn = ind_require_period(n)
+  rolling_sum(xs, nn, nn)
 }
-def ind_rolling_sum(xs: List[f64], n: i64) -> List[Option[f64]] = ind_mask(ind_roll(ind_dense(xs), ind_require_period(n), ind_sum_list))
-def ind_rolling_mean(xs: List[f64], n: i64) -> List[Option[f64]] = ind_mask(ind_roll(ind_dense(xs), ind_require_period(n), ind_mean_list))
-def ind_rolling_min(xs: List[f64], n: i64) -> List[Option[f64]] = ind_mask(ind_roll(ind_dense(xs), ind_require_period(n), ind_min_list))
-def ind_rolling_max(xs: List[f64], n: i64) -> List[Option[f64]] = ind_mask(ind_roll(ind_dense(xs), ind_require_period(n), ind_max_list))
+def ind_rolling_mean(xs: List[f64], n: i64) -> List[Option[f64]] = {
+  nn = ind_require_period(n)
+  rolling_mean(xs, nn, nn)
+}
+def ind_rolling_min(xs: List[f64], n: i64) -> List[Option[f64]] = {
+  nn = ind_require_period(n)
+  rolling_min(xs, nn, nn)
+}
+def ind_rolling_max(xs: List[f64], n: i64) -> List[Option[f64]] = {
+  nn = ind_require_period(n)
+  rolling_max(xs, nn, nn)
+}
 def ind_rolling_std(xs: List[f64], n: i64, ddof: Ddof) -> List[Option[f64]] = {
   nn = ind_require_period(n)
-  red = match ddof with {
-    | DdofPopulation => ind_std_pop
-    | DdofSample => ind_std_sample
+  divisor = match ddof with {
+    | DdofPopulation => cast(0, i64)
+    | DdofSample => cast(1, i64)
   }
-  ind_mask(ind_roll(ind_dense(xs), nn, red))
+  rolling_std(xs, nn, nn, divisor)
 }
-def ind_shift(xs: List[f64], k: i64) -> List[Option[f64]] = ind_mask(ind_shift_series(ind_dense(xs), k))
+def ind_shift(xs: List[f64], k: i64) -> List[Option[f64]] = {
+  kk = if lt(k, cast(0, i64)) then fail("Shoals.Indicators: shift must be >= 0 (a negative shift reads the future)") else k
+  shift(xs, kk)
+}
 def ind_diff(xs: List[f64], k: i64) -> List[Option[f64]] = {
   kk = if lt(k, cast(1, i64)) then fail("Shoals.Indicators: diff lag must be >= 1") else k
-  ind_mask(ind_diff_series(ind_dense(xs), kk))
-}
-def ind_diff_series(s: Series, k: i64) -> Series = {
-  vs = s.values
-  m = len(vs)
-  w = ind_min_i64(add(s.warmup, k), m)
-  out = map(fn (i: i64) -> if lt(i, w) then ind_filler() else sub(index(vs, i), index(vs, sub(i, k))), range(cast(0, i64), m))
-  Series { values: out, warmup: w }
+  diff(xs, kk)
 }
 -- Rolling arithmetic mean. Warm-up n - 1.
 def sma(xs: List[f64], n: i64) -> List[Option[f64]] = ind_rolling_mean(xs, n)
@@ -453,7 +452,7 @@ def crossunder(a: List[Option[f64]], b: List[Option[f64]]) -> List[Option[bool]]
 --
 -- The name of every variant is `tensor_` prepended to the list name, with no
 -- exceptions, so a generator can derive it by rule rather than by lookup.
--- That is also why the borrowed-layer `ind_` marker survives into
+-- That is also why the rolling-wrapper `ind_` prefix survives into
 -- `tensor_ind_rolling_sum` instead of being tidied away: predictability beats
 -- the shorter spelling. A `_tensor` SUFFIX was rejected for a duller reason --
 -- `true_range_tensor` shares the `true_` prefix with `true_range` and trips

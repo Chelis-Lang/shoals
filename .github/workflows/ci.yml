@@ -275,10 +275,10 @@ jobs:
           GH_TOKEN: ${{ secrets.CHELIS_RELEASE_TOKEN }}
         run: |
           mkdir -p "$RUNNER_TEMP/beacon"
-          gh release download v0.1.20 --repo Chelis-Lang/beacon --dir "$RUNNER_TEMP/beacon" --pattern 'chelis-beacon-v0.1.20-linux-x86_64*'
+          gh release download v0.1.22 --repo Chelis-Lang/beacon --dir "$RUNNER_TEMP/beacon" --pattern 'chelis-beacon-v0.1.22-linux-x86_64*'
           cd "$RUNNER_TEMP/beacon"
-          sha256sum --check chelis-beacon-v0.1.20-linux-x86_64.sha256
-          chmod +x chelis-beacon-v0.1.20-linux-x86_64
-          echo "CHELIS_BEACON_BIN=$RUNNER_TEMP/beacon/chelis-beacon-v0.1.20-linux-x86_64" >> "$GITHUB_ENV"
+          sha256sum --check chelis-beacon-v0.1.22-linux-x86_64.sha256
+          chmod +x chelis-beacon-v0.1.22-linux-x86_64
+          echo "CHELIS_BEACON_BIN=$RUNNER_TEMP/beacon/chelis-beacon-v0.1.22-linux-x86_64" >> "$GITHUB_ENV"
       - name: Verify direct-source bounds and the false-control witness
         run: python3 scripts/check_proof_additions.py --beacon-only

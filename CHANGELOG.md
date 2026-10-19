@@ -9,6 +9,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - Pin Shoals to Chelis 0.21.0 and compatible released dependencies.
+- Delegate the rolling and lag wrappers to Nautilus.Rolling while retaining
+  their public signatures, complete-window masks, Ddof convention, and domain
+  diagnostics. Tensor wrappers continue through the same list operations.
 
 ## [0.24.17] - 2026-10-08
 

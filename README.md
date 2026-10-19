@@ -19,7 +19,7 @@ cd demo
 chelis reef install --from-github Chelis-Lang/nautilus@v0.7.57
 chelis reef install --from-github Chelis-Lang/coral@v0.7.51
 chelis reef install --from-github Chelis-Lang/shoreleave@v0.1.5
-chelis reef install --from-github Chelis-Lang/chelis-clarabel@v0.1.0
+chelis reef install --from-github Chelis-Lang/chelis-clarabel@v0.1.1
 chelis reef install --from-github Chelis-Lang/shoals@v0.24.23
 ```
 

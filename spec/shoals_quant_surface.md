@@ -581,20 +581,20 @@ they cover `ema` and `rsi`. The committed suite does not pin the rest.
 Review evidence for the unpinned exports belongs in the pull request record,
 not here.
 
-#### 2.15.3 Rolling layer (on loan from Nautilus)
+#### 2.15.3 Rolling and lag wrappers
 
 `ind_rolling_sum`, `ind_rolling_mean`, `ind_rolling_std`,
 `ind_rolling_min`, `ind_rolling_max`, `ind_shift` and `ind_diff` are
-generic time-series primitives, not finance. They belong in Nautilus and
-are requested there as nautilus#85. They live here, under an `ind_`
-prefix that marks them as the borrowed layer, because the rolling family exists in exactly one place in the ecosystem and that copy does not serve `List[f64]`:
-`Coral.Window` has `rolling_sum`, `rolling_mean`, `rolling_std`,
-`rolling_min` and `rolling_max`, but only on `tensor[n, f32]`, and Coral is
-not a compiled lane (coral#26). `Nautilus.TimeSeries` is not a second copy —
-it has no rolling family at any width, only exponential smoothing and
-AR/ARMA prediction (nautilus#70, shoals#72). `ind_shift` and `ind_diff`
-duplicate nothing: neither package has a shift, lag or diff. Delete this
-layer and re-export from Nautilus when nautilus#85 lands.
+wrappers over the corresponding `Nautilus.Rolling` operations. Their public
+names and `List[Option[f64]]` result types are stable. The five reductions
+require complete windows: their Nautilus `min_periods` argument equals the
+window width, retaining exactly `n - 1` warm-up entries when the input is long
+enough. `DdofPopulation` maps to divisor adjustment 0 and `DdofSample` to 1.
+`ind_shift` requires a nonnegative lag; `ind_diff` requires a positive lag.
+The wrappers validate these constraints before delegating, including for an
+empty input, and preserve Shoals's domain diagnostics. Their tensor forms
+continue to convert and call the same list wrappers. Internal masked-series
+kernels remain available to the higher-level indicators that compose them.
 
 The rolling reductions re-sum each window rather than carrying a running
 total. That is `O(n * w)` where a running total is `O(n)`, and it is the

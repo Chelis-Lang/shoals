@@ -259,77 +259,31 @@ in code that is CLOSED upstream but not sitting in §Archived.
       `chelis prove <probe>.ch --json --tier smt-only --smt-timeout 20000`.
       Still gates nothing on the current Shoals surface.
 
-- **nautilus#70 / nautilus#85 — `Nautilus.TimeSeries` is f32-and-tensor-only,
-  so `Shoals.Indicators` carries its own rolling and lag layer.** nautilus
-  0.7.46 declares
-  `ts_ewma_series[n](values: &tensor[n, f32], alpha: f32, initial: f32) -> tensor[n, f32]`
-  — the nearest thing in the ecosystem to a rolling-series primitive. An f64
-  `List[f64]` indicator path cannot call it at any argument.
-    - **Affected surface / narrowing:** `Shoals.Indicators` ships
-      `ind_rolling_sum`, `ind_rolling_mean`, `ind_rolling_std`,
-      `ind_rolling_min`, `ind_rolling_max`, `ind_shift` and `ind_diff`
-      (shoals#83). These are generic time-series primitives, not finance; the
-      `ind_` prefix marks them as a borrowed layer. No Shoals-facing behaviour
-      is narrowed — the layer is complete for the indicators built on it. The
-      cost is duplication, and it is narrower than it first looks: the rolling
-      family exists in exactly ONE other place in the ecosystem, so
-      `ind_rolling_*` is the SECOND implementation, and `ind_shift` / `ind_diff`
-      duplicate nothing at all — no package has a shift, lag or diff at any
-      width or shape. Measured 2026-10-01: zero defs matching
-      rolling|window|shift|lag|diff among nautilus 0.7.46's `src/` DEFINITIONS
-      and exports (a bare substring sweep also hits `gauss_laguerre_10` and
-      `smoke_sde_diff`, which ARE definitions but are not members of the
-      rolling/shift/lag/diff family), and
-      `Coral.Window` exporting exactly `rolling_sum`, `rolling_mean`,
-      `rolling_std`, `rolling_min`, `rolling_max`, `ewm`.
-    - **Why the one existing copy does not serve, and why Nautilus is not a
-      second copy:** `Nautilus.TimeSeries` is
-      f32 and tensor-shaped, per the declaration above. `Coral.Window` has
-      rolling sum, mean, std, min, max and `ewm` already, but is f32-only AND
-      not a compiled lane (coral#26).
-    - **The INPUT shape converged; the RETURN shape and the warm-up
-      representation did not.** shoals#83's tensor forms take
-      `tensor[n, f64]`, so the duplication is closer than it was on the
-      argument side. Three differences remain, measured against
-      `coral-0.7.43` as pinned: `Coral.Window` is f32 throughout (the package
-      contains no `f64` at all -- `src/frame.ch` is `FloatCol(tensor[n, f32])`);
-      it RETURNS `tensor[n, f32]` where these return `List[Option[f64]]`; and
-      it fills the warm-up with `nan_f32()` (`src/window.ch` lines 34, 39, 44, 49 -- 4 fill sites; the other four `nan_f32` tokens there are its definition, a degenerate-window guard, and two propagation sites in the min/max folds) where
-      these carry an `Option` mask -- the very representation
-      `spec/shoals_quant_surface.md` §2.15.5 exists to require. It also offers
-      no `Ddof` choice (sample only) and no shift or diff.
-      **A previous revision of this bullet said the remaining difference was
-      dtype alone and that the narrowing was therefore wider. That
-      over-corrected.** The risk it created is concrete: a future bump could
-      retire the borrowed layer believing only width separates it, and lose
-      the mask.
-    - **The layer's export footprint doubled from 7 to 14** with those tensor
-      forms, so §2.15.3's commitment to delete it when nautilus#85 lands now
-      covers 14 exports. The deletion stays mechanical -- each tensor form is a
-      one-line `to_list` delegation -- but the count is recorded here so the
-      bump that retires the layer is not surprised by it.
-    - **Executable probe:** `tests_blocked/timeseries/rolling_f64_absent.ch`,
-      keyed on `ts_ewma_series` because it EXISTS. A probe naming a
-      not-yet-written `rolling_mean` would keep failing after nautilus#85
-      landed under any other name, and that false negative is
-      indistinguishable from "still blocked".
-    - **The two fixes are disjoint, and the probe only detects one.** An f64
-      signature on `Nautilus.TimeSeries` (nautilus#70) flips the probe but does
-      NOT retire the layer: the Nautilus surface is exponential and
-      tensor-shaped, and `ind_rolling_min`, `ind_rolling_max`, `ind_shift` and
-      `ind_diff` have no counterpart there at any width. nautilus#85 —
-      rolling-window and lag primitives on `List[f64]` — is what retires the
-      layer, and it can land while the probe still fails. Re-probe trigger:
-      any Nautilus release whose notes touch `TimeSeries` widths or close
-      nautilus#85. The probe's sidecar carries the branch-by-branch
-      de-narrowing steps.
-    - **State at pin 0.18.11 / nautilus 0.7.46 (measured 2026-10-01):** the
-      declaration was read out of the pinned package
-      (`nautilus-0.7.46.tar.zst`, `src/timeseries.ch:13`), not off a changelog.
-      The probe reports `tensor precision mismatch: f32 vs f64`. Both
-      nautilus#70 and nautilus#85 are OPEN and unassigned.
+- **nautilus#70 — the `Nautilus.TimeSeries` EWMA entry is f32-only.**
+  The executable `tests_blocked/timeseries/rolling_f64_absent.ch` checks
+  `ts_ewma_series` with an f64 tensor argument. Its last published observation
+  is the expected `f32` versus `f64` precision mismatch; the 0.21.0 package
+  graph has not been re-probed.
+    - **Affected capability:** callers cannot use that EWMA entry at f64.
+      This is separate from the f64 `Nautilus.Rolling` module. The Shoals
+      rolling and lag wrappers delegate to the latter; the EWMA probe does
+      not determine whether that delegation is available.
+    - **Re-probe trigger:** each Nautilus pin bump that changes TimeSeries
+      widths, or closure of nautilus#70. If the probe starts passing, promote
+      it to a cross-width test and update this entry. Preserve the rolling
+      wrappers' warm-up, optional result, and domain contracts independently.
 
 ## Archived
+
+- **nautilus#85 — f64 rolling-window and lag primitives.** Nautilus #108
+  resolves the upstream request with `Nautilus.Rolling`, including optional
+  f64 list results and tensor twins. Shoals's seven list wrappers delegate
+  to those operations while preserving complete-window masks, Ddof mapping,
+  and lag validation; its seven tensor wrappers call the same list surface.
+  The former TimeSeries-width probe remains scoped to nautilus#70.
+  The 0.21.0 release qualification of this migration is pending; no new
+  numerical execution is claimed by the source migration.
+
 
 - **nautilus#170 — small nonzero tridiagonal pivots changed spline values.**
   `Shoals.Curves.spline_rate_at` delegates to `Nautilus.Interpolation.spline_eval`.

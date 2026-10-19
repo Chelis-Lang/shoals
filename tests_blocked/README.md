@@ -9,10 +9,11 @@ entry in the same change set).
 
 ## Current probes
 
-**`timeseries/rolling_f64_absent.ch`** — Nautilus's current TimeSeries
-surface remains tensor-shaped and f32-only (nautilus#70 / nautilus#85).
-Re-probe it against the next compatible Nautilus release and follow its
-sidecar before retiring Shoals's list-shaped f64 indicator layer.
+**`timeseries/rolling_f64_absent.ch`** — the TimeSeries EWMA entry's f32
+signature is tracked by nautilus#70. Re-probe it against the next compatible
+Nautilus release and follow its cross-width sidecar. The independent
+Nautilus.Rolling f64 surface supplies Shoals's rolling and lag wrappers;
+this probe does not establish whether that separate surface is available.
 
 **`ad/hoisted_scalar_if_grad.ch`** — chelis#3582 is the residual scalar-`if`
 cotangent defect when a singular value is hoisted before the condition and
