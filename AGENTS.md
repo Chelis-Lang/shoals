@@ -313,11 +313,13 @@ canon proof gate re-probes those per surface instead.
 
 Shoals is a **producer** for the Verified Model Characterization cross-repo
 seam. The normative contract is
-`c-note/docs/contracts/characterization_contract_v1.md` (frozen, additive-only);
+`c-note/docs/contracts/characterization_contract_v1.md` (frozen) and
+`c-note/docs/contracts/characterization_contract_v2.md` for the explicit v2
+refuted-observation envelope;
 C Note is the consumer. Shoals' local obligations:
 
 - `docs/cnote-import-surface.json` is the invariant-surface manifest
-  (`chelis-shell.invariant-surface/1.0`): reference models with kinds/domains,
+  (`chelis-shell.invariant-surface/2.0`): reference models with kinds/domains,
   and an active invariant set spanning the SMT tiers (`proven` CRR lane, the
   `sound_approximate` certified-envelope composites lane, and the `disproved`
   defective-model break) plus `fuzz_validated` direct-pricer positivity and
@@ -354,7 +356,13 @@ C Note is the consumer. Shoals' local obligations:
   invariants remain deferred until their own per-surface probes demonstrate a
   stable tier. That unsupported inline-`grad` claim is distinct from the active
   records that call already-exported AD sensitivity functions.
-- Additive-only within schema major 1; renames/removals need a major bump and a
+- Historical observations and control identities stay intact. V2 refuted
+  observations select an exact compiler pin, model and original property; the
+  producer and consumer require classified in-domain counterexamples, complete
+  compiler attribution and actual original-predicate replay. A refuted claim
+  is never a positive result or a globally defective model. Legacy readers
+  reject the explicit major-2 envelope; Shoals 0.25.0 carries this consumer break.
+- Additive-only within each schema major; renames/removals need a major bump and a
   relayed heads-up (the master agent relays between repos; shells never read
   each other's manifest).
 

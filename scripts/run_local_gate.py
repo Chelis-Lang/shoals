@@ -158,6 +158,10 @@ def main() -> int:
             ["python3", "scripts/test_check_package_prove_latency.py"],
         ),
         (
+            "v2 refuted claim admission unit tests",
+            ["python3", "-m", "unittest", "discover", "-s", "scripts", "-p", "test_refuted_claims.py"],
+        ),
+        (
             "risk invariant adversarial unit tests",
             ["python3", "scripts/test_risk_invariant_gate.py"],
         ),

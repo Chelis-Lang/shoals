@@ -2,7 +2,7 @@
 
 [Shoals](https://github.com/Chelis-Lang/shoals) is a Chelis library for
 financial calculations. You use its released package as a Reef dependency;
-there is no need to check out Shoals' source repository. Shoals 0.24.23
+there is no need to check out Shoals' source repository. Shoals 0.25.0
 requires Chelis 0.21.0 (see the [Chelis install guide](https://chelis.ch/docs/chelis/install/)).
 
 Create a project, then download Shoals and the four packages it depends on
@@ -16,7 +16,7 @@ chelis reef install --from-github Chelis-Lang/nautilus@v0.7.57
 chelis reef install --from-github Chelis-Lang/coral@v0.7.51
 chelis reef install --from-github Chelis-Lang/shoreleave@v0.1.5
 chelis reef install --from-github Chelis-Lang/chelis-clarabel@v0.1.1
-chelis reef install --from-github Chelis-Lang/shoals@v0.24.23
+chelis reef install --from-github Chelis-Lang/shoals@v0.25.0
 ```
 
 The generated `reef.toml` pins compiler 0.21.0. Add the Shoals dependency:
@@ -26,7 +26,7 @@ The generated `reef.toml` pins compiler 0.21.0. Add the Shoals dependency:
 compiler = "=0.21.0"
 
 [dependencies]
-shoals = { version = "=0.24.23" }
+shoals = { version = "=0.25.0" }
 ```
 
 Then run `chelis reef build`. If `GITHUB_TOKEN` is set or the `gh` CLI is

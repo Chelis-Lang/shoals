@@ -4,11 +4,16 @@ All notable changes to this project are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.24.23] - 2026-10-18
+## [0.25.0] - 2026-10-18
 
 ### Changed
 
 - Pin Shoals to Chelis 0.21.0 and compatible released dependencies.
+- Publish invariant-surface schema 2.0. Legacy schema-1 consumers reject the
+  new envelope. Exact pin/model/property dispositions record refuted claims
+  without changing historical observations, domains, tolerances or control
+  identities; admission requires compiler attribution and original-predicate
+  replay. Numerical defects remain tracked in Shoals #182 and #183.
 - Delegate the rolling and lag wrappers to Nautilus.Rolling while retaining
   their public signatures, complete-window masks, Ddof convention, and domain
   diagnostics. Tensor wrappers continue through the same list operations.

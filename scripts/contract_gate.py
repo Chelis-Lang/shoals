@@ -31,6 +31,9 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "scripts"))
+import refuted_claims
+
 MANIFEST = REPO / "docs" / "cnote-import-surface.json"
 BELOW_PROVEN = {"proven_modulo_contract", "sound_approximate", "fuzz_validated"}
 OP = {"gt": ">", "gte": ">=", "lt": "<", "lte": "<=", "eq": "=="}
@@ -268,8 +271,10 @@ def risk_family_errors(manifest: dict, pin: str) -> list[str]:
             or binding.get("goal_pattern") != RISK_GOAL_PATTERNS[inv_id]
         ):
             out.append(f"{inv_id}: direct-call binding contract drifted")
-        if inv.get("expected_tier_per_pin", {}).get(pin) != "fuzz_validated":
-            out.append(f"{inv_id}: expected {pin} tier must be fuzz_validated")
+        refuted = refuted_claims.find(inv, pin, model_id, prop)
+        expected_method = "disproved" if manifest.get("schema_version") == "2.0" and refuted else "fuzz_validated"
+        if inv.get("expected_tier_per_pin", {}).get(pin) != expected_method:
+            out.append(f"{inv_id}: expected {pin} tier must be {expected_method}")
         if not inv.get("tier_upgrade_trigger"):
             out.append(f"{inv_id}: missing tier_upgrade_trigger")
         domain_note = inv.get("fuzz_domain_note", "")
@@ -605,8 +610,10 @@ def main() -> None:
 
     if manifest.get("schema_id") != "chelis-shell.invariant-surface":
         err(f"schema_id={manifest.get('schema_id')!r} (expected chelis-shell.invariant-surface)")
-    if manifest.get("schema_version") != "1.0":
-        err(f"schema_version={manifest.get('schema_version')!r} (expected '1.0')")
+    if manifest.get("schema_version") not in {"1.0", "2.0"}:
+        err(f"unsupported schema_version={manifest.get('schema_version')!r}")
+    for detail in refuted_claims.manifest_errors(manifest, REPO):
+        err(detail)
     if manifest.get("pkg_version") != ver:
         err(f"pkg_version={manifest.get('pkg_version')} != reef.toml version {ver}")
     if manifest.get("chelis_pin") != pin:

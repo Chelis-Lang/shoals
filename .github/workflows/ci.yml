@@ -230,6 +230,9 @@ jobs:
         run: python3 scripts/contract_gate.py
       - name: Run adversarial risk invariant gate regressions
         run: python3 scripts/test_risk_invariant_gate.py
+
+      - name: v2 refuted claim admission unit tests
+        run: python3 -m unittest discover -s scripts -p test_refuted_claims.py
       - name: Validate canonical release builder (chelis#1002)
         run: python3 scripts/test_build_release_assets.py
       - name: Validate the chelis#924 release oracle

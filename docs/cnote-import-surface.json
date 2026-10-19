@@ -1,10 +1,10 @@
 {
   "schema_id": "chelis-shell.invariant-surface",
-  "schema_version": "1.0",
+  "schema_version": "2.0",
   "pkg": "shoals",
-  "pkg_version": "0.24.23",
+  "pkg_version": "0.25.0",
   "chelis_pin": "0.21.0",
-  "generated_note": "Producer manifest for Shoals 0.24.23 on Chelis 0.21.0. The 37 active invariants name exported functions, preconditions, controls, and expected proof tiers for the declared compiler pin. The proof gate checks compiler-owned dependency edges, verdicts, qualifiers and non-vacuous guards. Certified-envelope normal-CDF range results remain sound_approximate; real-arithmetic proofs do not certify floating-point execution, and fuzz results are empirical observations. Put-call parity under f32 normal-CDF reflection is deferred under chelis#3116. Version-indexed tiers name expected methods; a missing compiler entry carries no method claim. The metadata does not imply a full characterization rerun.",
+  "generated_note": "Producer manifest for Shoals 0.25.0 on Chelis 0.21.0. The 37 active invariants name exported functions, preconditions, controls, and expected proof tiers for the declared compiler pin. The proof gate checks compiler-owned dependency edges, verdicts, qualifiers and non-vacuous guards. Certified-envelope normal-CDF range results remain sound_approximate; real-arithmetic proofs do not certify floating-point execution, and fuzz results are empirical observations. Put-call parity under f32 normal-CDF reflection is deferred under chelis#3116. Version-indexed tiers name expected methods; a missing compiler entry carries no method claim. The metadata does not imply a full characterization rerun.",
   "models": [
     {
       "id": "bs_call",
@@ -761,12 +761,28 @@
         "0.19.1": "fuzz_validated",
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
-        "0.19.4": "fuzz_validated"
+        "0.19.4": "fuzz_validated",
+        "0.21.0": "disproved"
       },
       "tier_upgrade_trigger": "prove a sound monotonic contract for Nautilus.Distributions.normal_inv_cdf through the real parametric_var body",
       "dischargeability_probe": "shoals37_risk_multi_seed",
       "violation_text": "parametric VaR decreases as confidence increases",
-      "fuzz_domain_note": "real parametric_var body; 25 accepted constraint-directed samples at each deterministic seed 0, 1, and 2; sampled characterization, not a global proof"
+      "fuzz_domain_note": "real parametric_var body; 25 accepted constraint-directed samples at each deterministic seed 0, 1, and 2; sampled characterization, not a global proof",
+      "refuted_claims_per_pin": {
+        "0.21.0": [
+          {
+            "model": "parametric_var",
+            "property": {
+              "file": "properties/canonrisk.ch",
+              "name": "var_monotone_in_confidence",
+              "module": "Shoals.Properties.CanonRisk"
+            },
+            "source_sha256": "78dfaeb9509e86043724a3372175491cd7cf5d1f7f1a02a735f2052f8a1adb49",
+            "goal_sha256": "cb1cb6c081b078623c65e6a7060396df820f24eddd4db98716095db985bf0b15",
+            "issue": "Chelis-Lang/shoals#182"
+          }
+        ]
+      }
     },
     {
       "id": "shoals.inv.cvar_dominates_var.v1",
@@ -837,12 +853,28 @@
         "0.19.1": "fuzz_validated",
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
-        "0.19.4": "fuzz_validated"
+        "0.19.4": "fuzz_validated",
+        "0.21.0": "disproved"
       },
       "tier_upgrade_trigger": "prove the Gaussian inverse-CDF and tail-ratio relation through the real parametric_var and parametric_cvar bodies",
       "dischargeability_probe": "shoals37_risk_multi_seed",
       "violation_text": "parametric expected shortfall falls below parametric VaR",
-      "fuzz_domain_note": "real parametric_var and parametric_cvar bodies, both compiler-attributed; 25 accepted constraint-directed samples at each deterministic seed 0, 1, and 2"
+      "fuzz_domain_note": "real parametric_var and parametric_cvar bodies, both compiler-attributed; 25 accepted constraint-directed samples at each deterministic seed 0, 1, and 2",
+      "refuted_claims_per_pin": {
+        "0.21.0": [
+          {
+            "model": "parametric_var",
+            "property": {
+              "file": "properties/canonrisk.ch",
+              "name": "cvar_dominates_var",
+              "module": "Shoals.Properties.CanonRisk"
+            },
+            "source_sha256": "78dfaeb9509e86043724a3372175491cd7cf5d1f7f1a02a735f2052f8a1adb49",
+            "goal_sha256": "9e5f975ebbd3fa6cc08b817ac514ae92f76bc75695a98aa95d558339c77ee444",
+            "issue": "Chelis-Lang/shoals#182"
+          }
+        ]
+      }
     },
     {
       "id": "shoals.inv.var_nonneg_positive_mean.v1",
@@ -1075,12 +1107,28 @@
         "0.19.1": "fuzz_validated",
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
-        "0.19.4": "fuzz_validated"
+        "0.19.4": "fuzz_validated",
+        "0.21.0": "disproved"
       },
       "tier_upgrade_trigger": "prove empirical tail-mean dominance through historical_var and historical_cvar",
       "dischargeability_probe": "shoals37_risk_multi_seed",
       "violation_text": "historical expected shortfall falls below historical VaR",
-      "fuzz_domain_note": "real historical_var and historical_cvar bodies, both compiler-attributed; 25 accepted constraint-directed samples at each deterministic seed 0, 1, and 2"
+      "fuzz_domain_note": "real historical_var and historical_cvar bodies, both compiler-attributed; 25 accepted constraint-directed samples at each deterministic seed 0, 1, and 2",
+      "refuted_claims_per_pin": {
+        "0.21.0": [
+          {
+            "model": "historical_var",
+            "property": {
+              "file": "properties/canonriskhistorical.ch",
+              "name": "historical_cvar_dominates_var",
+              "module": "Shoals.Properties.CanonRiskHistorical"
+            },
+            "source_sha256": "95297976791b5387e2f45617d44912dcdce5b72fb71f12240cc1c812a0f4c2d0",
+            "goal_sha256": "f0607befb05721cb3e26208fa722e6a3650635672529a51536692dd1b076194f",
+            "issue": "Chelis-Lang/shoals#182"
+          }
+        ]
+      }
     },
     {
       "id": "shoals.inv.historical_var_nonneg_positive_losses.v1",
@@ -3198,12 +3246,28 @@
         "0.19.1": "fuzz_validated",
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
-        "0.19.4": "fuzz_validated"
+        "0.19.4": "fuzz_validated",
+        "0.21.0": "fuzz_validated"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p08_pkg_bs_positive",
       "violation_text": "the direct call pricer returns a negative present value on its positive-input domain",
-      "fuzz_domain_note": "observed with the official Chelis 0.18.1 / Nautilus 0.7.38 / Coral 0.7.35 chain; --tier fuzz-only completes both direct Black-Scholes and Black-76 positivity properties, and corrupted twins refute with in-domain fuzz witnesses. Proven-tier promotion still requires chelis#637."
+      "fuzz_domain_note": "observed with the official Chelis 0.18.1 / Nautilus 0.7.38 / Coral 0.7.35 chain; --tier fuzz-only completes both direct Black-Scholes and Black-76 positivity properties, and corrupted twins refute with in-domain fuzz witnesses. Proven-tier promotion still requires chelis#637.",
+      "refuted_claims_per_pin": {
+        "0.21.0": [
+          {
+            "model": "b76_call",
+            "property": {
+              "file": "properties/canonpricing.ch",
+              "name": "b76_call_price_nonneg",
+              "module": "Shoals.Properties.CanonPricing"
+            },
+            "source_sha256": "4508712954022e8f453130672a977bfea62c450a53ddbb70d76785a3ab94302c",
+            "goal_sha256": "8d57eb91eac03310618decb5a9069ac73d6750de5311d9d3dc8cc7bbbd55b837",
+            "issue": "Chelis-Lang/shoals#183"
+          }
+        ]
+      }
     },
     {
       "id": "shoals.inv.call_monotone_in_s.bs.v1",
@@ -3373,12 +3437,28 @@
         "0.19.1": "fuzz_validated",
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
-        "0.19.4": "fuzz_validated"
+        "0.19.4": "fuzz_validated",
+        "0.21.0": "disproved"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p15_bs_greeks_multi_seed",
       "violation_text": "the real Black-Scholes call price decreases as volatility increases",
-      "fuzz_domain_note": "observed against the real bs_call_scalar body across deterministic seeds 0, 1, and 2 at r=0.05; sampled vega sign, not a global proof"
+      "fuzz_domain_note": "observed against the real bs_call_scalar body across deterministic seeds 0, 1, and 2 at r=0.05; sampled vega sign, not a global proof",
+      "refuted_claims_per_pin": {
+        "0.21.0": [
+          {
+            "model": "bs_call",
+            "property": {
+              "file": "properties/canonpricing.ch",
+              "name": "bs_call_vega_sign",
+              "module": "Shoals.Properties.CanonPricing"
+            },
+            "source_sha256": "4508712954022e8f453130672a977bfea62c450a53ddbb70d76785a3ab94302c",
+            "goal_sha256": "b45fddadf58f3dcb6852efc961e93907674fcd5c273efb517444169d2e4cc2d9",
+            "issue": "Chelis-Lang/shoals#183"
+          }
+        ]
+      }
     },
     {
       "id": "shoals.inv.bs_rho_sign.v1",
@@ -3548,12 +3628,28 @@
         "0.19.1": "fuzz_validated",
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
-        "0.19.4": "fuzz_validated"
+        "0.19.4": "fuzz_validated",
+        "0.21.0": "disproved"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p15_bs_greeks_multi_seed",
       "violation_text": "the real Black-Scholes call price is materially concave in spot",
-      "fuzz_domain_note": "observed against the real bs_call_scalar body across deterministic seeds 0, 1, and 2 at r=0.05; sampled convexity with an explicit f32 roundoff allowance, not a global gamma proof"
+      "fuzz_domain_note": "observed against the real bs_call_scalar body across deterministic seeds 0, 1, and 2 at r=0.05; sampled convexity with an explicit f32 roundoff allowance, not a global gamma proof",
+      "refuted_claims_per_pin": {
+        "0.21.0": [
+          {
+            "model": "bs_call",
+            "property": {
+              "file": "properties/canonpricing.ch",
+              "name": "bs_call_gamma_sign",
+              "module": "Shoals.Properties.CanonPricing"
+            },
+            "source_sha256": "4508712954022e8f453130672a977bfea62c450a53ddbb70d76785a3ab94302c",
+            "goal_sha256": "1ce4b9ff7425265ee7ded383fc246c37d7cbf69850ad451ebb23d620a5cbab1c",
+            "issue": "Chelis-Lang/shoals#183"
+          }
+        ]
+      }
     },
     {
       "id": "shoals.inv.bs_ad_delta_fd_consistency.v1",
