@@ -1,17 +1,10 @@
 module Shoals.FixedIncome
 export (fi_df2, fi_bond2, fi_bond2_nodisc, fi_bond_general)
--- Discrete-compounding fixed-income canon anchors: closed-form, fixed 2-period
--- schedule, priced in the yield variable y (per-period yield). Pure arithmetic +
--- division (no transcendentals, no fold/induction), so the pricing structure
--- lowers to cvc5 -- the genuine proven-over-reals rates lane (dischargeability
--- lane p14; properties in Shoals.Properties.CanonFixedIncome). The schedule is
--- held at n = 2: the three-point convexity second difference over reciprocal
--- powers 1/(1+y)^i is tractable at n <= 2 and goes unsupported at n >= 3 at this
--- pin, so a 2-period bond is the largest schedule that proves d2P/dy2 > 0 in the
--- faithful yield form (rather than reparameterizing to the discount factor, which
--- is a different statement). General-schedule discounting needs a fold over the
--- cashflow list (no induction tier at 0.16.1) and is held out -- do NOT build the
--- rates canon via curves.ch tensor-fold/interp, which falls to fuzz.
+-- Fixed two-period, discrete-compounding formulas in the per-period yield y.
+-- These arithmetic bodies avoid list folds and transcendentals, so their
+-- guarded properties can be submitted directly to the SMT verifier.
+-- fi_bond_general below discounts an explicit cashflow list; a property of
+-- the two-period formulas does not establish a general-schedule theorem.
 -- 2-period discount factor at per-period yield y: 1 / (1 + y)^2. In (0, 1] for
 -- y >= 0. Denominator 1 + y >= 1 > 0 under the guard, so the reciprocal is well
 -- defined.

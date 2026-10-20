@@ -11,70 +11,10 @@ def horizon_finite(t: f32) -> bool = eq(sub(t, t), cast(0.0, f32))
 -- Thread the checked value into the computation so the guard stays in its
 -- dataflow. sub(x, x) distinguishes non-finite values from negative inputs.
 def checked_horizon(t: f32) -> f32 = if not(horizon_finite(t)) then fail("Shoals.Stochastic: the time horizon must be finite; a non-finite horizon makes the log drift and sigma * sqrt(t) non-finite, so no path value would be usable") else if not(gte(t, cast(0.0, f32))) then fail("Shoals.Stochastic: the time horizon must be non-negative; sqrt of a negative horizon is NaN, so every path value would be NaN") else t
--- The step count is a SEPARATE precondition, one parameter over from the
--- horizon, and checked_horizon above cannot see it: `t = 1.0` is perfectly
--- legal, and it is `n_steps` that decides whether a discretisation exists at
--- all. With `n_steps <= 0` the step range is empty, so the fold over it
--- returns its initial state `(log_s0, v0, v0)` unevaluated and the sampler
--- returns `exp(log_s0)` -- s0 to within the log/exp round trip -- for a
--- horizon over which the process really did evolve. Measured at s0 = 100,
--- v0 = 0.04, t = 1.0, seed 7 on the unguarded tree: `n_steps = 0` and
--- `n_steps = -8` both returned 100.00001 for the terminal spot and 0.04 for
--- the terminal variance, while `n_steps = 64` returned 146.3306.
---
--- A finiteness check on `dt` is not a substitute, and the reason is narrower
--- than it first looks. `dt = t / n_steps` is `+inf` at `n_steps = 0` and NaN
--- at `t = 0, n_steps = 0`; the shipped code never consumes it, but ADDING a
--- finiteness check creates the consumer, so such a check does catch
--- `n_steps = 0`. It does not catch a NEGATIVE count: `t / -8` is finite, the
--- fold range is still empty, and the sampler returns `(log_s0, v0, v0)`
--- silently. Measured by building that exact mutant: the two zero fixtures
--- died because the `dt` check fired with the wrong diagnostic, and the two
--- negative fixtures died because it never fired at all. Guarding the INPUT
--- covers both with one check. That is still the horizon guard's lesson from
--- the other side -- there the derived value was a product that destroyed a
--- sign, here it is a quotient that is only diagnostic for half the domain.
---
--- Zero and negative are refused TOGETHER but on different warrants, and the
--- fixtures separate them so the zero decision can be revisited without
--- disturbing the negative one. A negative step count is not a quantity; there
--- is nothing to decide. A zero step count carries an identity argument -- "no
--- steps, so no evolution, so s0" -- and that argument is REJECTED here.
--- `n_steps` is a RESOLUTION parameter, not a modelled quantity: zero
--- resolution is unspecified rather than degenerate, and `s0` is the terminal
--- spot of a Heston process over a positive horizon only on an event of
--- probability zero. `n_steps = 1` is a crude discretisation and still draws;
--- `n_steps = 0` draws nothing.
---
--- This is the one axis on which the step count differs from the horizon, and
--- the difference is the reason `t = 0` stays admitted while `n_steps = 0` does
--- not: at `t = 0` s0 IS the right answer, which
--- test_zero_horizon_is_admitted_by_every_sampler pins at n_steps = 8.
--- Refusing `n_steps < 1` therefore takes away no reachable correct answer -- a
--- caller who wants s0 passes `t = 0` with any valid step count and still gets
--- it. Measured: `t = 0` returns 100.00001 at n_steps 1, 8 and 64 alike.
---
--- The integer domain makes this boundary exactly pinnable, unlike the
--- horizon's. 1 is the extremal admitted value and 0 the extremal refused one,
--- with nothing between them, so a positive case at `n_steps = 1` kills every
--- upward threshold shift and a fixture at `n_steps = 0` kills every downward
--- one. The horizon needed a negative min subnormal for the same job; here no
--- subnormal argument exists or is needed.
---
--- Returned rather than asserted, for checked_horizon's reason: every use of
--- the step count consumes the checked value, so the guard is in the dataflow
--- rather than in a binding that could be eliminated before it is evaluated.
---
--- That is a DEFENSIVE choice and NOT a demonstrated necessity, on the same
--- measured footing as checked_horizon's. A mutant that discards the result
--- (`_ = checked_step_count(n_steps)` with raw `n_steps` downstream) was run
--- against all four step-count fixtures and the positive case and SURVIVED all
--- five: the guard still fires in the evaluator lane, which is the lane every
--- test here runs in. No gate stage lowers these samplers, so the elimination
--- hazard is untested rather than refuted. Threading costs nothing and does not
--- depend on which lane evaluates the binding, so it stays -- but no test in
--- this repository distinguishes the two forms, and a reader should not infer
--- from this comment that one does.
+-- n_steps is a resolution parameter and must be positive, independently of
+-- the horizon. A zero horizon is valid and returns the initial state; a zero
+-- or negative resolution does not define a discretization. Return the checked
+-- count so every downstream use consumes the validated value.
 def checked_step_count(n_steps: i64) -> i64 = if lt(n_steps, cast(1, i64)) then fail(string_concat("Shoals.Stochastic: the step count must be at least 1, got ", string_concat(to_string(n_steps), "; with no steps the evolution loop never runs, so the sampler would return s0 and v0 unchanged for a horizon it did not simulate"))) else n_steps
 def gbm_path[n](rng_key: key, template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, t: f32) -> tensor[n, f32] = {
   z = normal_sample(rng_key, template, cast(0.0, f32), cast(1.0, f32))
@@ -174,15 +114,10 @@ def count_log_pmf(k: i64, rate: f32) -> f32 = {
   kf = cast(k, f32)
   if eq(rate, zero) then if eq(kf, zero) then zero else log(zero) else sub(sub(mul(kf, log(rate)), rate), log_gamma(add(kf, one)))
 }
--- The jump-count law a sampler draws from, as one table so that the sampler
--- and the compensator cannot read different numbers. The triple is
--- (cumulative count distribution over the enumerated slots, the mass those
--- slots carry, log E[exp(J)] for the aggregate log jump J). The enumerated
--- mass is one minus the truncated Poisson tail, and BOTH the count draw and
--- the log moment divide by it, so each describes the same renormalized law
--- bit for bit. That is the invariant this module owes its callers: the drift
--- compensates the distribution that was sampled, not a closed form standing
--- beside it. The tests that pin it are named in the moment functions below.
+-- Share one enumerated count law between the sampler and drift compensator.
+-- Return the cumulative count distribution, enumerated mass, and log E[exp(J)].
+-- Both the draw and moment use the same mass normalization, so the drift
+-- compensates the distribution actually sampled, including truncation.
 def count_table(rate: f32, log_w: f32, slot_count: i64) -> (List[f32], f32, f32) = {
   log_pmf_l = map(fn (k: i64) -> count_log_pmf(k, rate), range(cast(0, i64), slot_count))
   log_tilted_l = map(fn (lp: (f32, i64)) -> add(lp.0, mul(cast(lp.1, f32), log_w)), zip(log_pmf_l, range(cast(0, i64), slot_count)))
@@ -423,13 +358,9 @@ def sto_kou_jump_sample(p: f32, eta_up: f32, eta_dn: f32, u_branch: f32, e_size:
 -- log moment. That one substitution is the entire Kou/Merton difference in the
 -- count machinery; the jump SIZE law is where the two models really diverge.
 --
--- For positive p, Kou's eta_up > 1 requirement arrives as NON-FINITE log_w
--- rather than its own guard: eta_up <= 1 makes E[exp(Y)] divergent, sto_kou_compensator
--- returns its NaN sentinel, and count_params_finite rejects it. This sampler
--- previously multiplied that NaN straight into its drift and returned NaN for
--- every terminal value -- a wrong answer dressed as an answer, which is the
--- failure mode this repository files bugs about. See
--- tests_neg/stochastic/kou_divergent_jump_multiplier_neg.expect.
+-- For positive p, eta_up must exceed 1 for E[exp(Y)] to be finite.
+-- sto_kou_compensator returns a NaN sentinel otherwise, and count_params_finite
+-- rejects it before the sampler constructs a drift.
 def sto_kou_jump_slots(lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> i64 = {
   zero = cast(0.0, f32)
   rate = mul(lambda_jump, t)
@@ -450,17 +381,9 @@ def sto_kou_count_table(lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f
 -- which is why its terminal mean is s0 * exp(mu * t) by construction rather
 -- than by a closed form standing beside the sampler.
 --
--- For an UNTRUNCATED Poisson count this equals lambda_jump * t * zeta exactly,
--- because E[w^N] = exp(rate * (w - 1)) and zeta = w - 1. That identity is why
--- the thinned-count defect was a SAMPLER defect and not a compensator one: the
--- closed form was always correct for a Poisson count, and the previous sampler
--- drew a Binomial(n_max, rate / n_max) count instead. What this function adds
--- over the closed form is the enumeration correction, so the mean identity
--- survives truncation at any slot count. tests/stochastic_extended.ch pins
--- both legs:
--- agreement with lambda_jump * t * zeta where the Poisson law is enumerated
--- essentially completely, and disagreement with the thinned-count moment
--- log(1 + q * zeta) * n_max that the previous sampler actually realized.
+-- For an untruncated Poisson count, log E[w^N] = rate * (w - 1).
+-- Using the enumerated count law's moment also accounts for its truncation,
+-- keeping the drift compensation consistent with the sampled counts.
 def sto_kou_sampler_log_jump_moment(lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> f32 = sto_kou_count_table(lambda_jump, p, eta_up, eta_dn, t).2
 -- Kou jump-diffusion terminal values. The aggregate log jump is a genuine
 -- compound Poisson sum: one uniform picks the jump count N from the enumerated
@@ -468,15 +391,9 @@ def sto_kou_sampler_log_jump_moment(lambda_jump: f32, p: f32, eta_up: f32, eta_d
 -- jumps are added. The log drift subtracts sto_kou_sampler_log_jump_moment for
 -- that same law, so the terminal mean is s0 * exp(mu * t).
 --
--- The count was previously drawn by thinning a fixed slot budget
--- n_max = trunc(5 * lambda_jump * t + 1) at probability rate / n_max, which is
--- Binomial(n_max, rate / n_max) and not Poisson(rate). Two consequences, both
--- now pinned by tests: below rate = 0.2 the budget was exactly ONE slot, so a
--- second jump was impossible where Poisson puts up to 1.5e-2 of its mass; and
--- the count variance was rate * (1 - rate / n_max) rather than rate at EVERY
--- parameter, a deficit the slot budget's 5x ratio bounds at 20% and does not
--- shrink away. The slot array survives as the jump-size budget. What changed
--- is that the count law is now the law the drift compensates.
+-- The slot array bounds the number of jump sizes available to each path.
+-- The count is sampled from the enumerated Poisson law, and the drift uses
+-- the moment of that same law.
 def sto_kou_jump_terminal[n](rng_key: key, paths_template: tensor[n, f32], jumps_template: tensor[n, f32], s0: f32, mu: f32, sigma: f32, lambda_jump: f32, p: f32, eta_up: f32, eta_dn: f32, t: f32) -> tensor[n, f32] = {
   zero = cast(0.0, f32)
   one = cast(1.0, f32)

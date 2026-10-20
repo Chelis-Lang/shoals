@@ -1,9 +1,10 @@
 module Shoals.Demos.Businesswrong
 -- Business-wrong demos: well-typed models that compile and run cleanly but encode a
--- financial error. The fuzz tier returns a concrete counterexample whose bindings explain
+-- financial error. Bounded property search returns a concrete counterexample whose bindings explain
 -- the business mistake. Binders are raw f32 clamped inside each model (no bounded
 -- preconditions) so the generator does not starve. Each wrong model is paired with a
--- corrected control that passes.
+-- corrected control. Variance inputs are clamped to [0, 1] to keep the
+-- Euler calculation finite over the sampled f32 inputs.
 --   wrong:    chelis prove demos/businesswrong.ch --tier fuzz-only --samples 500 --seed 0 --json
 --   controls: same invocation; the *_fixed properties report passed.
 def nn(x: f32) -> f32 = if lt(x, cast(0.0, f32)) then cast(0.0, f32) else x
@@ -44,15 +45,15 @@ def discount_right(r: f32, t: f32) -> f32 = {
     factor = discount_right(r, t)
     lte(factor, one)
   }
--- variance_nonneg: Euler step of a mean-reverting variance can go negative (Feller-condition
--- violation): v_next = v + kappa(theta - v) dt - shock. A negative variance is nonsensical
--- (imaginary volatility).
+-- An Euler variance step can be negative even with normalized nonnegative
+-- inputs: v_next = v + kappa(theta - v) dt - shock. A negative variance has
+-- no real-valued volatility.
 def var_next_wrong(v: f32, kappa: f32, theta: f32, dt: f32, shock: f32) -> f32 = {
-  vv = nn(v)
-  kk = nn(kappa)
-  th = nn(theta)
-  dd = nn(dt)
-  sh = nn(shock)
+  vv = clamp01(v)
+  kk = clamp01(kappa)
+  th = clamp01(theta)
+  dd = clamp01(dt)
+  sh = clamp01(shock)
   gap = sub(th, vv)
   drift_rate = mul(kk, gap)
   drift = mul(drift_rate, dd)

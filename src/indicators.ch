@@ -208,13 +208,11 @@ def sma(xs: List[f64], n: i64) -> List[Option[f64]] = ind_rolling_mean(xs, n)
 -- `AlphaSpan` is TA-Lib `EMA`; `SeedFirstValue` + `AlphaSpan` is pandas
 -- `ewm(span=n, adjust=False)`. Neither is a default.
 def ema(xs: List[f64], n: i64, seed: EmaSeed, alpha: Alpha) -> List[Option[f64]] = ind_mask(ind_ema_series(ind_dense(xs), ind_require_period(n), seed, alpha))
--- Wilder's smoothing (Wilder 1978; TA-Lib RMA), named because "Wilder"
--- with alpha = 2/(n+1) was the single most common measured convention
--- error. Defined as the composition so the two cannot drift apart.
+-- Wilder smoothing uses alpha = 1/n with an SMA seed. Define it through
+-- ema so the recurrence and warm-up mask share one implementation.
 def rma(xs: List[f64], n: i64) -> List[Option[f64]] = ema(xs, n, SeedSma, AlphaWilder)
--- max(h - l, |h - prev_c|, |l - prev_c|), Wilder 1978. Warm-up 1: the
--- first bar has no previous close, so it is `None` and NOT h - l. That
--- substitution is one of the three ATR variants the measurements found.
+-- True range is max(h-l, |h-prev_c|, |l-prev_c|). The first bar has no
+-- previous close and is None rather than a high-low substitute.
 def ind_true_range_series(high: List[f64], low: List[f64], close: List[f64]) -> Series = {
   m = ind_require_same_len(ind_require_same_len(len(high), len(low)), len(close))
   out = map(fn (i: i64) -> if lt(i, cast(1, i64)) then ind_filler() else {
@@ -322,14 +320,8 @@ def stochastic(high: List[f64], low: List[f64], close: List[f64], k_n: i64, d_n:
   kser = Series { values: kvals, warmup: kw }
   (ind_mask(kser), ind_mask(ind_smooth_series(kser, dn, smoothing)))
 }
--- +DI / -DI from a Wilder-smoothed directional movement over a
--- Wilder-smoothed true range. A ZERO SMOOTHED RANGE YIELDS 0 here. TA-Lib
--- does something different: `ta_ADX.c` wraps the whole DI/DX/ADX block in
--- `if (prevTR > 0.0)` and SKIPS it, holding the previous ADX rather than
--- emitting a value. The divergence needs a Wilder-smoothed true range of
--- exactly 0.0, which decays geometrically and does not reach it, so no
--- numerical difference has been demonstrated -- but the citation is stated
--- as a difference rather than as parity.
+-- +DI/-DI divide Wilder-smoothed movement by smoothed true range.
+-- A zero smoothed range yields 0 here; TA-Lib instead holds its previous ADX.
 def ind_di(d: f64, t: f64) -> f64 = if eq(t, cast(0.0, f64)) then cast(0.0, f64) else mul(cast(100.0, f64), div(d, t))
 -- DX = 100 * |+DI - -DI| / (+DI + -DI). A ZERO SUM YIELDS 0 here; TA-Lib
 -- again SKIPS the ADX update and holds `prevADX` (`!TA_IS_ZERO(tempReal)`),
@@ -415,45 +407,9 @@ def ind_cross(a: List[Option[f64]], b: List[Option[f64]], rising: bool) -> List[
 }
 def crossover(a: List[Option[f64]], b: List[Option[f64]]) -> List[Option[bool]] = ind_cross(a, b, true)
 def crossunder(a: List[Option[f64]], b: List[Option[f64]]) -> List[Option[bool]] = ind_cross(a, b, false)
--- TENSOR-ACCEPTING FORMS accept `tensor[n, f64]` inputs and return exactly
--- what their list counterparts return: a length-n series with a warm-up mask.
--- A tensor CANNOT carry the warm-up: `tensor[n, Option[f64]]` is rejected
--- ("expected precision type name"), so returning a tensor would force a
--- second, weaker warm-up convention. These do not.
---
--- WHY NOT A TENSOR RETURN. Three grounds, one per candidate shape that has
--- actually been proposed. This deliberately does NOT claim to enumerate every
--- conceivable tensor return -- three successive red-team rounds each broke a
--- completeness claim here (first "only two candidates", then one criterion,
--- then two), and the claim was never load-bearing: the decision is the return
--- type, not a proof of impossibility. If a fourth shape turns up, judge it on
--- its own terms rather than extending a lemma.
---
---   * A SIBLING channel -- a scalar count, a parallel `bool` tensor, a record
---     field, a tuple component -- is droppable: a caller reads one component
---     and the marker is gone. That is §2.15.2's hazard verbatim.
---     `(tensor[n, f64], tensor[n, bool])` type-checks at this pin and falls
---     here, not to non-existence.
---   * An IN-ELEMENT SENTINEL (a NaN fill) has no sibling to drop, so the
---     droppability ground does not reach it. It fails because it is
---     indistinguishable from a computed value and propagates silently --
---     "represented, not filled", above.
---   * A MARKER-FREE return (hand the tensor back and document that the first
---     n-1 entries are unspecified) or a SHORTENED one fails on a
---     ground §2.15.2 already states: it moves the alignment burden onto the
---     caller, which is where the measured off-by-one and look-ahead defects
---     appear (nautilus#85).
---
--- `tensor[n, Option[f64]]` is separately not expressible: a tensor element
--- must be a precision type.
---
--- The name of every variant is `tensor_` prepended to the list name, with no
--- exceptions, so a generator can derive it by rule rather than by lookup.
--- That is also why the rolling-wrapper `ind_` prefix survives into
--- `tensor_ind_rolling_sum` instead of being tidied away: predictability beats
--- the shorter spelling. A `_tensor` SUFFIX was rejected for a duller reason --
--- `true_range_tensor` shares the `true_` prefix with `true_range` and trips
--- §7.1's shared-prefix rule.
+-- Tensor adapters return the same length-n, masked List[Option[f64]] as
+-- their list counterparts. The mask stays attached to each value, preserving
+-- alignment through warm-up. Names prepend tensor_ to the list API name.
 def tensor_ind_rolling_sum[n](xs: tensor[n, f64], window: i64) -> List[Option[f64]] = ind_rolling_sum(to_list(xs), window)
 def tensor_ind_rolling_mean[n](xs: tensor[n, f64], window: i64) -> List[Option[f64]] = ind_rolling_mean(to_list(xs), window)
 def tensor_ind_rolling_std[n](xs: tensor[n, f64], window: i64, ddof: Ddof) -> List[Option[f64]] = ind_rolling_std(to_list(xs), window, ddof)
@@ -479,32 +435,14 @@ def tensor_rolling_vwap[n](price: tensor[n, f64], volume: tensor[n, f64], window
 def ind_mask_tensor[n](t: tensor[n, f64], warmup: i64) -> List[Option[f64]] = {
   vs = to_list(t)
   m = len(vs)
-  -- The warm-up is the only integer the tensor surface accepts that the list
-  -- surface does not, and it was the only one on this module with no domain
-  -- guard. Unguarded, a negative warm-up read silently as 0, and a warm-up
-  -- past the end returned an all-`None` series -- which §2.15.6 names in so
-  -- many words as the wrong answer to a caller bug. `ind_shift` traps its
-  -- negative offset; this is the same defect shape and now traps too. A
-  -- warm-up EQUAL to the length stays legal: a producing indicator whose
-  -- window exceeded the series legitimately warms up for all of it.
+  -- Require 0 <= warmup <= series length. Equality is legal: an indicator
+  -- whose window exceeds the series can legitimately mask every value.
   bounded = if lt(warmup, cast(0, i64)) then fail("Shoals.Indicators: warm-up must be >= 0") else if lt(m, warmup) then fail("Shoals.Indicators: warm-up must not exceed the series length") else warmup
   map(fn (pr: (i64, f64)) -> if lt(pr.0, bounded) then None else Some(pr.1), enumerate(vs))
 }
--- THE CROSSOVER PAIR NEEDS AN ARGUMENT ITS LIST FORM DOES NOT, and this is
--- the one place the tensor surface is not a pure adapter. `crossover` consumes
--- already-masked series, and a tensor cannot carry a mask, so each side's
--- warm-up has to come in separately.
---
--- Supplying it as a REQUIRED PARAMETER is what makes this acceptable. The
--- reason a `valid_from` count was rejected for the RETURN type is that a
--- caller can drop it and read filler as data; a required parameter cannot be
--- dropped -- the call does not compile without it. So the same integer that
--- was unsafe outbound is safe inbound.
---
--- Pass the warm-up the producing indicator documents: `n - 1` for
--- `sma`/`rma`/`ind_rolling_*`, 0 for `SeedFirstValue`, `n` for Wilder ATR and
--- RSI, `2n - 1` for ADX. Getting it wrong reports a crossing out of a
--- warm-up, which is the defect the masked form exists to prevent -- so prefer
--- the list forms, which carry the mask for you, whenever you have the choice.
+-- Tensor crossover inputs need explicit warm-up counts because tensors
+-- cannot carry Option elements. Pass n-1 for SMA/RMA/rolling operations,
+-- 0 for SeedFirstValue, n for Wilder ATR/RSI, and 2*n-1 for ADX.
+-- Prefer the list forms when possible: their values already carry the mask.
 def tensor_crossover[n](fast: tensor[n, f64], fast_warmup: i64, slow: tensor[n, f64], slow_warmup: i64) -> List[Option[bool]] = crossover(ind_mask_tensor(fast, fast_warmup), ind_mask_tensor(slow, slow_warmup))
 def tensor_crossunder[n](fast: tensor[n, f64], fast_warmup: i64, slow: tensor[n, f64], slow_warmup: i64) -> List[Option[bool]] = crossunder(ind_mask_tensor(fast, fast_warmup), ind_mask_tensor(slow, slow_warmup))

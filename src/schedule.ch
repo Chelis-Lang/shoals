@@ -21,7 +21,7 @@ def month_end_of(d: Date) -> Date = date(date_year(d), date_month(d), days_in_mo
 -- one, so a clamped day of month cannot drift. With `end_of_month` and a
 -- month-end anchor, a whole-month tenor keeps every date on its month end.
 --
--- A schedule is built in two phases. Selection decides which dates are
+-- A schedule is built in two steps. Selection decides which dates are
 -- emitted, as step indices and the explicit start and end, and never applies
 -- the caller's overflow policy: it locates dates by clamping, which cannot
 -- fail. Materialization then applies the policy exactly once to each
