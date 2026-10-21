@@ -1,6 +1,6 @@
 module Shoals.Demos.Businesswrong
 -- Business-wrong demos: well-typed models that compile and run cleanly but encode a
--- financial error. Bounded property search returns a concrete counterexample whose bindings explain
+-- financial error. The fuzz tier returns a concrete counterexample whose bindings explain
 -- the business mistake. Binders are raw f32 clamped inside each model (no bounded
 -- preconditions) so the generator does not starve. Each wrong model is paired with a
 -- corrected control. Variance inputs are clamped to [0, 1] to keep the

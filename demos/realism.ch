@@ -4,8 +4,8 @@ import Shoals.Trees (tr_crr_european_call)
 import Shoals.Pricing (bs_call_scalar, mc_call_price)
 import Shoals.FixedIncome (fi_bond_general)
 -- Numerical comparisons at representative pricing sizes and parameters.
--- These sampled tests compare prices with closed-form references; they do
--- not establish properties over every input or every lattice size.
+-- These sampled comparisons are characterization tests, not proof-tier claims.
+-- They do not establish properties over every input or every lattice size.
 -- Run: chelis test demos/realism.ch --timeout 120
 -- ===========================================================================
 -- (1) 200-STEP CRR LATTICE: price a 1Y ATM European call on a 200-step CRR
