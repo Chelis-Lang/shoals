@@ -9,25 +9,9 @@ type CurveKind =
   | Sonia
   | Estr
   | Custom { label: string }
--- Opaque (`spec/02-surf-syntax.md` P16): constructible and inspectable only
--- inside this module. That is what makes the pillar-order guarantee a property
--- of the *type* rather than of four call sites. Every producer below either
--- runs the strictly-increasing guard on caller-supplied times, or reuses the
--- times of a curve that already passed it, so by induction no `YieldCurve`
--- value anywhere can carry unreadable pillars. While the constructors were
--- guarded but the representation was public, a downstream
--- `YieldCurve { kind, times, rates }` literal still read 0.025 for reordered
--- pillars where 0.035 is correct, and the guards could not see it. Record
--- patterns close with construction because `@opaque` closes both together and
--- hiding the representation is the point; the ordering rule itself is already
--- defended by the producer guards, which a field-by-field rebuild must pass
--- through.
---
--- A declared `@invariant` would state the ordering rule as well as its
--- provenance, but cannot express it at this pin: a `tensor[n, f32]` field is
--- outside the V1 invariant value class (it admits only fixed-shape numeric
--- tensors) and `index` is outside the predicate grammar. Opacity plus guarded
--- producers gives the same closure without it.
+-- YieldCurve is opaque: construction and field access stay in this module.
+-- Every producer validates strictly increasing times or reuses validated
+-- times, so clients cannot forge an out-of-order curve through a record literal.
 @opaque
 type YieldCurve[n] =
   | YieldCurve { kind: CurveKind, times: tensor[n, f32], rates: tensor[n, f32] }
@@ -37,22 +21,9 @@ def sofr() -> CurveKind = Sofr
 def sonia() -> CurveKind = Sonia
 def estr() -> CurveKind = Estr
 def custom_curve(label: string) -> CurveKind = Custom { label }
--- Pillar times are read through `linear_interp_sorted`, which brackets a query
--- by traversal order and interpolates across whichever consecutive pair
--- straddles it. Unsorted pillars therefore interpolate over the wrong interval
--- and return a confident wrong number: no trap, no NaN, no diagnostic. The
--- bootstrap path already rejects non-increasing tenors and says so
--- (`cur_increasing_pillars_below`), so the pillar-order precondition is not an
--- open question in this module -- it simply was not enforced on the entry
--- points that take the times directly. Reject rather than re-sort: re-sorting
--- would answer a different question from the one the caller asked, and
--- `docs/book/src/curves.md` already records that decision for the bootstrap ("It
--- never snaps a schedule or re-sorts pillars").
---
--- Index of the first pillar time that does not exceed its predecessor, or -1
--- when the times are strictly increasing. A NaN time fails every comparison
--- and so reports as out of order, which is the right answer: it has no
--- position relative to anything.
+-- linear_interp_sorted needs strictly increasing pillars. Reject unsorted
+-- inputs rather than silently reordering them. Return the first offending
+-- index, or -1 for a valid sequence; NaN also fails the ordering check.
 def cur_first_unsorted_time(times: List[f32]) -> i64 = {
   idxs = range(cast(1, i64), len(times))
   fold(fn (acc: i64, j: i64) -> if gte(acc, cast(0, i64)) then acc else if gt(index(times, j), index(times, sub(j, cast(1, i64)))) then acc else j, cast(-1, i64), idxs)
@@ -318,33 +289,9 @@ def cur_increasing_pillars_below(times_so_far: List[f32], tenor: f32) -> bool = 
 -- candidate's rate belongs and the answer is silently wrong; a longer time list
 -- indexes past the rates and traps without naming the contract.
 def cur_pillars_aligned(times_so_far: List[f32], rates_so_far: List[f32]) -> bool = eq(len(times_so_far), len(rates_so_far))
--- The search bracket is this module's choice, not `brent`'s, so when `brent`
--- cannot return a rate it is this module that says why. Both ways of missing
--- the bracket used to leave a silent NaN pillar that `instrument_validate`
--- accepted and `rate_at`, `discount_factor` and the IFT gradients then
--- propagated, so a price could come back NaN far from the instrument that
--- caused it (shoals#79), measured on `130d235`:
---
---   * a quote whose zero rate lies outside the bracket leaves the residual the
---     same sign at both endpoints (`par_rate` 10.0 at a 2y pillar: +38.516483
---     and +8.816857), which `brent` answers with NaN; and
---   * a residual that is not finite over the bracket (a swap beyond about 177
---     years, whose `exp(0.5 * tenor)` overflows f32, or caller-supplied earlier
---     pillars carrying a NaN) exhausts the iteration budget and answers NaN as
---     well.
---
--- `brent` is therefore called first and with the arguments it has always had,
--- and the endpoints are read only to classify a NaN it has already returned.
--- An earlier revision checked the endpoints *before* the solve, to name the
--- condition without entering `brent_rec`'s recursion; a red-team round found
--- that this reordered `brent`'s own tests and broke a quote that solved on
--- `130d235`. `brent` accepts an endpoint root before it so much as evaluates
--- the other endpoint, so `cur_par_swap(200.0, 6.3890557, 1)` -- residual `inf`
--- at -0.5 and exactly 0.0 at 2.0 -- returned 2.0 there, while the pre-check
--- rejected it as non-finite and printed `0.0 at 2.0` in a message asserting no
--- zero rate existed. Classifying after the call cannot make that mistake:
--- every input for which `brent` returns a finite rate takes the identical path
--- it took before.
+-- Call Brent before classifying failure so its endpoint-root checks retain
+-- their order. Only if the solve returns NaN, inspect the bracket endpoints
+-- to distinguish a missing sign change from a non-finite residual.
 def cur_bracket_detail(inst: Instrument, f_lo: f32, f_hi: f32) -> string = string_concat(to_string(f_lo), string_concat(" at -0.5 and ", string_concat(to_string(f_hi), string_concat(" at 2.0 (instrument tenor ", string_concat(to_string(instrument_tenor(inst)), string_concat(", quote ", string_concat(to_string(instrument_market_price_or_rate(inst)), ")")))))))
 -- A malformed instrument, or a tenor that does not extend the pillars already
 -- solved, is a structural error with no meaningful rate to propagate: fail
@@ -375,27 +322,9 @@ def bootstrap_multi(instruments: List[Instrument]) -> (List[f32], List[f32]) = {
     (append(ts_so_far, t_new), append(rs_so_far, r_new))
   }, init, instruments)
 }
--- `times_template` is the only source of the type-level `n` in the result -- a
--- list's length is not a type-level value, so the template is what bridges
--- list-shaped pillars into a tensor-shaped type. It was load-bearing for the
--- signature and dead in the body: the pillars come from
--- `bootstrap_multi(instruments)`, whose length is `len(instruments)`, and
--- nothing related that to the declared extent. A caller could satisfy the
--- relationship but not rely on it.
---
--- A narrower template is the silent direction and the reason this fails rather
--- than warns: three instruments under a two-wide template declared
--- `YieldCurve[2]` over three real pillars, so reads by time answered from a
--- pillar the declared extent says does not exist and nothing ever trapped. A
--- wider template is the loud one -- two instruments under a three-wide template
--- type-checked as `YieldCurve[3]` carrying two pillars, correct for every read
--- of a real pillar and an out-of-bounds trap on the declared third.
---
--- Only the template's length is read; its values are not, and the pillar times
--- are the instrument tenors. The sibling `bootstrap_grad_full_jacobian`
--- detects the same mismatch and answers it with a silent NaN tensor; a declared
--- extent that disagrees with the data has no curve to propagate, so fail
--- loudly instead.
+-- times_template supplies the result's type-level extent. Its values are
+-- unused; require its length to match the instrument count before constructing
+-- the curve. Pillar times come from the instrument tenors.
 def bootstrap_multi_curve[n](instruments: List[Instrument], times_template: tensor[n, f32]) -> YieldCurve[n] =
   if eq(len(to_list(times_template)), len(instruments)) then {
     out = bootstrap_multi(instruments)
@@ -446,19 +375,9 @@ def cur_whole_periods(tenor: f32, payments_per_year: i64) -> bool = {
   within = if lt(diff, cast(0.0, f32)) then lte(neg(diff), cast(0.0001, f32)) else lte(diff, cast(0.0001, f32))
   if gte(n_periods, cast(1, i64)) then within else false
 }
--- Every numeric field is checked for finiteness first, because the bounds
--- below are ordered comparisons and a NaN satisfies all of them vacuously: a
--- NaN deposit rate, zero-coupon price or swap par rate was accepted here and
--- then bootstrapped to a NaN pillar (shoals#79). Only the swap *tenor* was
--- already covered.
---
--- A deposit keeps its `rate > -1` bound and gains `1 + rate * tenor > 0`, the
--- condition for its implied discount factor to be positive. The old bound is
--- the new one only at a one-year tenor, so `deposit(2.0, -0.6)` passed and
--- then took `log` of a negative discount factor, leaving its residual NaN at
--- every candidate rate. Both bounds are kept so that this narrows the
--- predicate in every direction and widens it in none: `1 + rate * tenor > 0`
--- alone would newly accept a rate below -1 at a short tenor.
+-- Require finite numeric fields before ordered domain checks. Deposit
+-- validation requires both rate > -1 and 1 + rate*tenor > 0: the second
+-- condition keeps the implied discount factor positive at the actual tenor.
 def instrument_validate(inst: Instrument) -> bool =
   match inst with {
     | Deposit { tenor: t, rate: r } => if not(and(cur_finite(t), cur_finite(r))) then false else if lte(t, cast(0.0, f32)) then false else if lte(r, cast(-1.0, f32)) then false else gt(add(cast(1.0, f32), mul(r, t)), cast(0.0, f32))
@@ -505,22 +424,10 @@ def cur_full_jacobian_rows(instruments: List[Instrument], m_len: i64) -> List[Li
   }, init, instruments)
   out.2
 }
--- `paths_template` carries only the result's extent, exactly as
--- `times_template` does for `bootstrap_multi_curve`, and both mismatch
--- directions used to be answered with a full matrix of NaN -- nothing
--- distinguished a structurally invalid call from a Jacobian whose entries were
--- NaN for a numerical reason (shoals#79). A length mismatch has no numerical
--- reading at all, so both report their counts and fail, as shoals#113 chose
--- for the sibling (`3ddd518`). The invalid-instrument arm defers to
--- `solve_pillar_rate`'s own diagnostic rather than restating it.
---
--- This does not make every entry finite. `bootstrap_grad_diagonal`'s own
--- arithmetic can still produce one that is not: a zero-coupon at a subnormal
--- tenor gives `neg(div(1.0, mul(t, p)))` = -inf, and `cur_dot_l_j` then turns
--- that into NaN for a later row. That is unchanged from `130d235` and is the
--- numerical NaN `docs/book/src/curves.md` distinguishes from this structural one;
--- the deleted `eq(r_new, r_new)` branches never guarded it, only the solved
--- rate.
+-- Require the template extent to equal the instrument count. An extent
+-- mismatch is an invalid call and fails with both counts, rather than
+-- returning a numerical NaN matrix. Valid shapes can still produce non-finite
+-- Jacobian entries through overflow or subnormal arithmetic.
 def bootstrap_grad_full_jacobian[m](paths_template: &tensor[m, f32], instruments: List[Instrument]) -> tensor[m, m, f32] = {
   m_len = len(to_list(paths_template))
   insts_len = len(instruments)

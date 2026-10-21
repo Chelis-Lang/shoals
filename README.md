@@ -2,7 +2,9 @@
 
 Shoals is a quantitative finance library for [Chelis](https://github.com/Chelis-Lang/chelis). It provides option pricing, Greeks, yield curves, volatility surfaces, stochastic models, risk measures, market data, calendars, and valuation adjustments under the `Shoals` module prefix.
 
-The Shoals book is published at <https://chelis.ch/docs/shoals/>, and its source is in [`docs/book/`](docs/book/) (render it with `mdbook build docs/book`). It starts with a pricing example and documents each module's API, assumptions and limits.
+The [Shoals book](https://chelis.ch/docs/shoals/) starts with a pricing
+example and documents each module's API, assumptions, and limits. A local
+copy is available in [`docs/book/`](docs/book/).
 
 ## Install
 
