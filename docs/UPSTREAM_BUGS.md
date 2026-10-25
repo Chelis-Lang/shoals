@@ -1,7 +1,7 @@
 # Shoals Upstream Bugs
 
 Tracked upstream chelis issues and capability gaps that affect Shoals, per the
-[downstream shell repo contract](https://github.com/Chelis-Lang/chelis/blob/v0.21.0/spec/design/shell_repo_contract.md) §4.
+[downstream shell repo contract](https://github.com/Chelis-Lang/chelis/blob/v0.22.1/spec/design/shell_repo_contract.md) §4.
 The reachability map these entries lean on — what the proof stack can and cannot
 discharge for finance at this pin — is `research/proof-infra/report.md`; keep
 entries consistent with it.
@@ -101,6 +101,11 @@ in code that is CLOSED upstream but not sitting in §Archived.
       still reports `FAIL` for row 11 (`tests-blocked`), citing an upstream
       blocker without a probe. The unmodified tree reports `PASS` for that row.
       The chelis#1387 workaround remains necessary.
+    - **Chelis 0.22.1 re-probe:** an isolated source copy preserving the
+      repository symlinks, with both `.ch` blocked probes removed, reports
+      `FAIL` for row 11 as its only MUST failure.
+      The diagnostic remains "an upstream blocker is cited but
+      tests_blocked/ has no probe"; this does not remove the workaround.
 
 - **The proof gate checks the pinned finance surface.** Economic and dynamic
   programming properties reach the SMT tier without a transcendental contract.

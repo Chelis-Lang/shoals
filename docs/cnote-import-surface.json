@@ -2,9 +2,9 @@
   "schema_id": "chelis-shell.invariant-surface",
   "schema_version": "2.0",
   "pkg": "shoals",
-  "pkg_version": "0.25.0",
-  "chelis_pin": "0.21.0",
-  "generated_note": "Producer manifest for Shoals 0.25.0 on Chelis 0.21.0. The 37 active invariants name exported functions, preconditions, controls, and expected proof tiers for the declared compiler pin. The proof gate checks compiler-owned dependency edges, verdicts, qualifiers and non-vacuous guards. Certified-envelope normal-CDF range results remain sound_approximate; real-arithmetic proofs do not certify floating-point execution, and fuzz results are empirical observations. Put-call parity under f32 normal-CDF reflection is deferred under chelis#3116. Version-indexed tiers name expected methods; a missing compiler entry carries no method claim. The metadata does not imply a full characterization rerun.",
+  "pkg_version": "0.25.1",
+  "chelis_pin": "0.22.1",
+  "generated_note": "Producer manifest for Shoals 0.25.1 on Chelis 0.22.1. The 37 active invariants name exported functions, preconditions, controls, and expected proof tiers for the declared compiler pin. The proof gate checks compiler-owned dependency edges, verdicts, qualifiers and non-vacuous guards. Certified-envelope normal-CDF range results remain sound_approximate; real-arithmetic proofs do not certify floating-point execution, and fuzz results are empirical observations. Put-call parity under f32 normal-CDF reflection is deferred under chelis#3116. Version-indexed tiers name expected methods; a missing compiler entry carries no method claim. The metadata does not imply a full characterization rerun. The Chelis 0.22.1 method entries are predictions; recorded numerical, multi-seed risk and AD evidence retains its historical scope. Six refuted instantiations have fresh local 25-sample seed-0 checks, compiler attribution, corrupt controls and original-predicate replay; these observations do not refresh the broader historical campaigns.",
   "models": [
     {
       "id": "bs_call",
@@ -762,7 +762,8 @@
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
         "0.19.4": "fuzz_validated",
-        "0.21.0": "disproved"
+        "0.21.0": "disproved",
+        "0.22.1": "disproved"
       },
       "tier_upgrade_trigger": "prove a sound monotonic contract for Nautilus.Distributions.normal_inv_cdf through the real parametric_var body",
       "dischargeability_probe": "shoals37_risk_multi_seed",
@@ -770,6 +771,19 @@
       "fuzz_domain_note": "real parametric_var body; 25 accepted constraint-directed samples at each deterministic seed 0, 1, and 2; sampled characterization, not a global proof",
       "refuted_claims_per_pin": {
         "0.21.0": [
+          {
+            "model": "parametric_var",
+            "property": {
+              "file": "properties/canonrisk.ch",
+              "name": "var_monotone_in_confidence",
+              "module": "Shoals.Properties.CanonRisk"
+            },
+            "source_sha256": "78dfaeb9509e86043724a3372175491cd7cf5d1f7f1a02a735f2052f8a1adb49",
+            "goal_sha256": "cb1cb6c081b078623c65e6a7060396df820f24eddd4db98716095db985bf0b15",
+            "issue": "Chelis-Lang/shoals#182"
+          }
+        ],
+        "0.22.1": [
           {
             "model": "parametric_var",
             "property": {
@@ -854,7 +868,8 @@
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
         "0.19.4": "fuzz_validated",
-        "0.21.0": "disproved"
+        "0.21.0": "disproved",
+        "0.22.1": "disproved"
       },
       "tier_upgrade_trigger": "prove the Gaussian inverse-CDF and tail-ratio relation through the real parametric_var and parametric_cvar bodies",
       "dischargeability_probe": "shoals37_risk_multi_seed",
@@ -862,6 +877,19 @@
       "fuzz_domain_note": "real parametric_var and parametric_cvar bodies, both compiler-attributed; 25 accepted constraint-directed samples at each deterministic seed 0, 1, and 2",
       "refuted_claims_per_pin": {
         "0.21.0": [
+          {
+            "model": "parametric_var",
+            "property": {
+              "file": "properties/canonrisk.ch",
+              "name": "cvar_dominates_var",
+              "module": "Shoals.Properties.CanonRisk"
+            },
+            "source_sha256": "78dfaeb9509e86043724a3372175491cd7cf5d1f7f1a02a735f2052f8a1adb49",
+            "goal_sha256": "9e5f975ebbd3fa6cc08b817ac514ae92f76bc75695a98aa95d558339c77ee444",
+            "issue": "Chelis-Lang/shoals#182"
+          }
+        ],
+        "0.22.1": [
           {
             "model": "parametric_var",
             "property": {
@@ -958,7 +986,8 @@
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
         "0.19.4": "fuzz_validated",
-        "0.21.0": "fuzz_validated"
+        "0.21.0": "fuzz_validated",
+        "0.22.1": "fuzz_validated"
       },
       "tier_upgrade_trigger": "prove normal_inv_cdf(alpha) > 0 for alpha > 0.5 through the real parametric_var body",
       "dischargeability_probe": "shoals37_risk_multi_seed",
@@ -1032,7 +1061,8 @@
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
         "0.19.4": "fuzz_validated",
-        "0.21.0": "fuzz_validated"
+        "0.21.0": "fuzz_validated",
+        "0.22.1": "fuzz_validated"
       },
       "tier_upgrade_trigger": "bridge std.quantile.monotonicity through the exported Shoals.Risk.historical_var wrapper",
       "dischargeability_probe": "shoals37_risk_multi_seed",
@@ -1108,7 +1138,8 @@
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
         "0.19.4": "fuzz_validated",
-        "0.21.0": "disproved"
+        "0.21.0": "disproved",
+        "0.22.1": "disproved"
       },
       "tier_upgrade_trigger": "prove empirical tail-mean dominance through historical_var and historical_cvar",
       "dischargeability_probe": "shoals37_risk_multi_seed",
@@ -1116,6 +1147,19 @@
       "fuzz_domain_note": "real historical_var and historical_cvar bodies, both compiler-attributed; 25 accepted constraint-directed samples at each deterministic seed 0, 1, and 2",
       "refuted_claims_per_pin": {
         "0.21.0": [
+          {
+            "model": "historical_var",
+            "property": {
+              "file": "properties/canonriskhistorical.ch",
+              "name": "historical_cvar_dominates_var",
+              "module": "Shoals.Properties.CanonRiskHistorical"
+            },
+            "source_sha256": "95297976791b5387e2f45617d44912dcdce5b72fb71f12240cc1c812a0f4c2d0",
+            "goal_sha256": "f0607befb05721cb3e26208fa722e6a3650635672529a51536692dd1b076194f",
+            "issue": "Chelis-Lang/shoals#182"
+          }
+        ],
+        "0.22.1": [
           {
             "model": "historical_var",
             "property": {
@@ -1211,7 +1255,8 @@
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
         "0.19.4": "fuzz_validated",
-        "0.21.0": "fuzz_validated"
+        "0.21.0": "fuzz_validated",
+        "0.22.1": "fuzz_validated"
       },
       "tier_upgrade_trigger": "prove quantile range preservation through the exported historical_var wrapper",
       "dischargeability_probe": "shoals37_risk_multi_seed",
@@ -1331,7 +1376,8 @@
         "0.19.2": "proven",
         "0.19.3": "proven",
         "0.19.4": "proven",
-        "0.21.0": "proven"
+        "0.21.0": "proven",
+        "0.22.1": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice pricer returns a negative call price -- free money at these inputs",
@@ -1457,7 +1503,8 @@
         "0.19.2": "proven",
         "0.19.3": "proven",
         "0.19.4": "proven",
-        "0.21.0": "proven"
+        "0.21.0": "proven",
+        "0.22.1": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price falls when spot rises -- a monotonicity (delta-sign) violation",
@@ -1573,7 +1620,8 @@
         "0.19.2": "disproved",
         "0.19.3": "disproved",
         "0.19.4": "disproved",
-        "0.21.0": "disproved"
+        "0.21.0": "disproved",
+        "0.22.1": "disproved"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "admits arbitrage: the undiscounted model prices the call at 1.125 when the underlying spot is only 1.0 (C > s)",
@@ -1665,7 +1713,8 @@
         "0.19.2": "proven_modulo_contract",
         "0.19.3": "proven_modulo_contract",
         "0.19.4": "sound_approximate",
-        "0.21.0": "sound_approximate"
+        "0.21.0": "sound_approximate",
+        "0.22.1": "sound_approximate"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p12_shoals_published_composites",
@@ -1733,7 +1782,8 @@
         "0.19.2": "proven_modulo_contract",
         "0.19.3": "proven_modulo_contract",
         "0.19.4": "sound_approximate",
-        "0.21.0": "sound_approximate"
+        "0.21.0": "sound_approximate",
+        "0.22.1": "sound_approximate"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p12_shoals_published_composites",
@@ -1840,7 +1890,8 @@
         "0.19.2": "proven",
         "0.19.3": "proven",
         "0.19.4": "proven",
-        "0.21.0": "proven"
+        "0.21.0": "proven",
+        "0.22.1": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the european-call pricer returns a negative price -- free money at these inputs",
@@ -1946,7 +1997,8 @@
         "0.19.2": "proven",
         "0.19.3": "proven",
         "0.19.4": "proven",
-        "0.21.0": "proven"
+        "0.21.0": "proven",
+        "0.22.1": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the call is priced above the underlying spot -- admits arbitrage",
@@ -2052,7 +2104,8 @@
         "0.19.2": "proven",
         "0.19.3": "proven",
         "0.19.4": "proven",
-        "0.21.0": "proven"
+        "0.21.0": "proven",
+        "0.22.1": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the call is priced below its discounted intrinsic value s - k*disc^2 -- admits arbitrage (buy and exercise)",
@@ -2165,7 +2218,8 @@
         "0.19.2": "proven",
         "0.19.3": "proven",
         "0.19.4": "proven",
-        "0.21.0": "proven"
+        "0.21.0": "proven",
+        "0.22.1": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "a lower-strike call is worth less than a higher-strike call -- a bull-spread (strike-monotonicity) violation admitting arbitrage",
@@ -2278,7 +2332,8 @@
         "0.19.2": "proven",
         "0.19.3": "proven",
         "0.19.4": "proven",
-        "0.21.0": "proven"
+        "0.21.0": "proven",
+        "0.22.1": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "a long butterfly on equally-spaced strikes has negative value -- a convexity-in-strike violation admitting arbitrage",
@@ -2342,7 +2397,8 @@
         "0.19.2": "proven",
         "0.19.3": "proven",
         "0.19.4": "proven",
-        "0.21.0": "proven"
+        "0.21.0": "proven",
+        "0.22.1": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the multi-period discount factor falls outside (0, 1] -- discounting a non-negative yield either creates value or turns it negative",
@@ -2413,7 +2469,8 @@
         "0.19.2": "proven",
         "0.19.3": "proven",
         "0.19.4": "proven",
-        "0.21.0": "proven"
+        "0.21.0": "proven",
+        "0.22.1": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond PV is non-positive or exceeds the undiscounted sum of its cashflows -- not a proper present value",
@@ -2491,7 +2548,8 @@
         "0.19.2": "proven",
         "0.19.3": "proven",
         "0.19.4": "proven",
-        "0.21.0": "proven"
+        "0.21.0": "proven",
+        "0.22.1": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond price rises as yield rises -- a duration/DV01 sign violation",
@@ -2552,7 +2610,8 @@
       "non_vacuity_witness": "fi_bond_coupon_guards_satisfiable",
       "expected_tier_per_pin": {
         "0.19.4": "proven",
-        "0.21.0": "proven"
+        "0.21.0": "proven",
+        "0.22.1": "proven"
       },
       "violation_text": "the bond price does not rise when every coupon increases at a fixed yield",
       "fuzz_domain_note": "proven over the reals at Tier B for the two-period bond; no fuzz evidence is used"
@@ -2629,7 +2688,8 @@
         "0.19.2": "proven",
         "0.19.3": "proven",
         "0.19.4": "proven",
-        "0.21.0": "proven"
+        "0.21.0": "proven",
+        "0.22.1": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the bond price is concave in yield -- a negative-convexity violation",
@@ -2716,7 +2776,8 @@
         "0.19.2": "disproved",
         "0.19.3": "disproved",
         "0.19.4": "disproved",
-        "0.21.0": "disproved"
+        "0.21.0": "disproved",
+        "0.22.1": "disproved"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "reports zero rate sensitivity: the undiscounted bond prices at 3.0 whether the yield is 0.0 or 1.0 (dP/dy = 0, DV01 understated to zero)",
@@ -2842,7 +2903,8 @@
         "0.19.2": "proven",
         "0.19.3": "proven",
         "0.19.4": "proven",
-        "0.21.0": "proven"
+        "0.21.0": "proven",
+        "0.22.1": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price falls when the up-move factor increases -- a vega-sign violation (wider volatility decreases the option value)",
@@ -2968,7 +3030,8 @@
         "0.19.2": "proven",
         "0.19.3": "proven",
         "0.19.4": "proven",
-        "0.21.0": "proven"
+        "0.21.0": "proven",
+        "0.22.1": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price falls when the discount factor increases -- the call value should rise with less discounting",
@@ -3101,7 +3164,8 @@
         "0.19.2": "proven",
         "0.19.3": "proven",
         "0.19.4": "proven",
-        "0.21.0": "proven"
+        "0.21.0": "proven",
+        "0.22.1": "proven"
       },
       "dischargeability_probe": "p14_crr_two_step",
       "violation_text": "the lattice call price is concave in spot -- a gamma-sign violation (the second derivative in spot is negative)",
@@ -3247,7 +3311,8 @@
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
         "0.19.4": "fuzz_validated",
-        "0.21.0": "fuzz_validated"
+        "0.21.0": "fuzz_validated",
+        "0.22.1": "fuzz_validated"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p08_pkg_bs_positive",
@@ -3255,6 +3320,19 @@
       "fuzz_domain_note": "observed with the official Chelis 0.18.1 / Nautilus 0.7.38 / Coral 0.7.35 chain; --tier fuzz-only completes both direct Black-Scholes and Black-76 positivity properties, and corrupted twins refute with in-domain fuzz witnesses. Proven-tier promotion still requires chelis#637.",
       "refuted_claims_per_pin": {
         "0.21.0": [
+          {
+            "model": "b76_call",
+            "property": {
+              "file": "properties/canonpricing.ch",
+              "name": "b76_call_price_nonneg",
+              "module": "Shoals.Properties.CanonPricing"
+            },
+            "source_sha256": "4508712954022e8f453130672a977bfea62c450a53ddbb70d76785a3ab94302c",
+            "goal_sha256": "8d57eb91eac03310618decb5a9069ac73d6750de5311d9d3dc8cc7bbbd55b837",
+            "issue": "Chelis-Lang/shoals#183"
+          }
+        ],
+        "0.22.1": [
           {
             "model": "b76_call",
             "property": {
@@ -3350,7 +3428,8 @@
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
         "0.19.4": "fuzz_validated",
-        "0.21.0": "fuzz_validated"
+        "0.21.0": "fuzz_validated",
+        "0.22.1": "fuzz_validated"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p15_bs_greeks_multi_seed",
@@ -3438,7 +3517,8 @@
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
         "0.19.4": "fuzz_validated",
-        "0.21.0": "disproved"
+        "0.21.0": "disproved",
+        "0.22.1": "disproved"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p15_bs_greeks_multi_seed",
@@ -3446,6 +3526,19 @@
       "fuzz_domain_note": "observed against the real bs_call_scalar body across deterministic seeds 0, 1, and 2 at r=0.05; sampled vega sign, not a global proof",
       "refuted_claims_per_pin": {
         "0.21.0": [
+          {
+            "model": "bs_call",
+            "property": {
+              "file": "properties/canonpricing.ch",
+              "name": "bs_call_vega_sign",
+              "module": "Shoals.Properties.CanonPricing"
+            },
+            "source_sha256": "4508712954022e8f453130672a977bfea62c450a53ddbb70d76785a3ab94302c",
+            "goal_sha256": "b45fddadf58f3dcb6852efc961e93907674fcd5c273efb517444169d2e4cc2d9",
+            "issue": "Chelis-Lang/shoals#183"
+          }
+        ],
+        "0.22.1": [
           {
             "model": "bs_call",
             "property": {
@@ -3541,7 +3634,8 @@
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
         "0.19.4": "fuzz_validated",
-        "0.21.0": "fuzz_validated"
+        "0.21.0": "fuzz_validated",
+        "0.22.1": "fuzz_validated"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p15_bs_greeks_multi_seed",
@@ -3629,7 +3723,8 @@
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
         "0.19.4": "fuzz_validated",
-        "0.21.0": "disproved"
+        "0.21.0": "disproved",
+        "0.22.1": "disproved"
       },
       "tier_upgrade_trigger": "chelis#637",
       "dischargeability_probe": "p15_bs_greeks_multi_seed",
@@ -3637,6 +3732,19 @@
       "fuzz_domain_note": "observed against the real bs_call_scalar body across deterministic seeds 0, 1, and 2 at r=0.05; sampled convexity with an explicit f32 roundoff allowance, not a global gamma proof",
       "refuted_claims_per_pin": {
         "0.21.0": [
+          {
+            "model": "bs_call",
+            "property": {
+              "file": "properties/canonpricing.ch",
+              "name": "bs_call_gamma_sign",
+              "module": "Shoals.Properties.CanonPricing"
+            },
+            "source_sha256": "4508712954022e8f453130672a977bfea62c450a53ddbb70d76785a3ab94302c",
+            "goal_sha256": "1ce4b9ff7425265ee7ded383fc246c37d7cbf69850ad451ebb23d620a5cbab1c",
+            "issue": "Chelis-Lang/shoals#183"
+          }
+        ],
+        "0.22.1": [
           {
             "model": "bs_call",
             "property": {
@@ -3735,7 +3843,8 @@
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
         "0.19.4": "fuzz_validated",
-        "0.21.0": "fuzz_validated"
+        "0.21.0": "fuzz_validated",
+        "0.22.1": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -3849,7 +3958,8 @@
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
         "0.19.4": "fuzz_validated",
-        "0.21.0": "fuzz_validated"
+        "0.21.0": "fuzz_validated",
+        "0.22.1": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -3963,7 +4073,8 @@
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
         "0.19.4": "fuzz_validated",
-        "0.21.0": "fuzz_validated"
+        "0.21.0": "fuzz_validated",
+        "0.22.1": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -4077,7 +4188,8 @@
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
         "0.19.4": "fuzz_validated",
-        "0.21.0": "fuzz_validated"
+        "0.21.0": "fuzz_validated",
+        "0.22.1": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -4191,7 +4303,8 @@
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
         "0.19.4": "fuzz_validated",
-        "0.21.0": "fuzz_validated"
+        "0.21.0": "fuzz_validated",
+        "0.22.1": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -4305,7 +4418,8 @@
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
         "0.19.4": "fuzz_validated",
-        "0.21.0": "fuzz_validated"
+        "0.21.0": "fuzz_validated",
+        "0.22.1": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
@@ -4419,7 +4533,8 @@
         "0.19.2": "fuzz_validated",
         "0.19.3": "fuzz_validated",
         "0.19.4": "fuzz_validated",
-        "0.21.0": "fuzz_validated"
+        "0.21.0": "fuzz_validated",
+        "0.22.1": "fuzz_validated"
       },
       "evidence_levels": {
         "runtime_oracle": {
