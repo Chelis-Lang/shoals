@@ -9,24 +9,24 @@ Create a project, then download Shoals and the four packages it depends on
 from their GitHub releases. These downloads need no GitHub token:
 
 ```sh
-chelisup install 0.21.0
-chelis +0.21.0 reef init demo --module-prefix Demo --output demo
+chelisup install 0.22.1
+chelis +0.22.1 reef init demo --module-prefix Demo --output demo
 cd demo
-chelis reef install --from-github chelis-lang/nautilus@v0.7.57
-chelis reef install --from-github chelis-lang/coral@v0.7.51
-chelis reef install --from-github chelis-lang/shoreleave@v0.1.5
-chelis reef install --from-github chelis-lang/chelis-clarabel@v0.1.1
-chelis reef install --from-github chelis-lang/shoals@v0.25.0
+chelis reef install --from-github chelis-lang/nautilus@v0.7.58
+chelis reef install --from-github chelis-lang/coral@v0.7.52
+chelis reef install --from-github chelis-lang/shoreleave@v0.1.6
+chelis reef install --from-github chelis-lang/chelis-clarabel@v0.1.2
+chelis reef install --from-github chelis-lang/shoals@v0.25.1
 ```
 
 Add the Shoals dependency to the generated `reef.toml`:
 
 ```toml
 [package]
-compiler = "=0.21.0"
+compiler = "=0.22.1"
 
 [dependencies]
-shoals = { version = "=0.25.0" }
+shoals = { version = "=0.25.1" }
 ```
 
 Then run `chelis reef build`. If `GITHUB_TOKEN` is set or the `gh` CLI is

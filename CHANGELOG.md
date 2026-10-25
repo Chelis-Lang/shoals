@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.25.1] - 2026-10-25
+
+### Changed
+
+- Pin Shoals to Chelis 0.22.1 and compatible released dependencies.
+- Carry the 37 expected verification methods to the compiler pin without
+  claiming a full characterization rerun. Historical numerical and multi-seed
+  risk and automatic-differentiation observations retain their recorded scope.
+- Re-admit six refuted instantiations on the published dependency graph with
+  bounded local 25-sample, seed-0 checks, exact compiler attribution, original
+  predicate replay and unchanged corrupt controls. The numerical defects in
+  Shoals #182 and #183 remain unresolved.
+- Keep counterexample controls finite over their sampled inputs; describe
+  numerical behavior without repair history and archive superseded coverage
+  planning and validation snapshots.
+
 ## [0.25.0] - 2026-10-19
 
 ### Changed
