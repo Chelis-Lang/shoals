@@ -71,7 +71,7 @@ domains, and failure behavior.
 
 ## Comparisons and supported domains
 
-The [Reference oracles](references.md) and
+The [Textbook references](references.md) and
 [Property specifications](properties.md) chapters describe
 comparisons with standard formulas and finance relationships. The
 [Scope and limitations](scope.md) chapter summarizes the supported
