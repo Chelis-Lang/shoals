@@ -18,7 +18,7 @@ Module: `Shoals.Properties.Pricing`.
   does not exceed spot at the supplied point.
 - `matches_textbook_reference` and `matches_textbook_reference_put`:
   `bs_call_scalar` and `bs_put_scalar` are within `5e-5` of the textbook
-  formulas in [Reference oracles](references.md) at the supplied
+  formulas in [Textbook references](references.md) at the supplied
   point.
 - `mc_matches_textbook_mc_reference(template, s0, k, r, sigma, t)`: under a
   shared seed the optimized Monte Carlo agrees with the scalar Monte Carlo
@@ -85,7 +85,7 @@ Module: `Shoals.Properties.Distributions`.
 
 - `lognormal_pdf_matches_textbook`, `lognormal_cdf_matches_textbook`,
   `student_t_pdf_matches_textbook`, `bvn_pdf_matches_textbook`: each density
-  or cumulative agrees with its `Shoals.References.Distributions` oracle.
+  or cumulative agrees with its `Shoals.References.Distributions` reference.
 - `lognormal_pdf_nonneg`: the lognormal density is non-negative.
 - `student_t_pdf_symmetric_at_zero`: the Student-t density is symmetric.
 

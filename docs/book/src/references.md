@@ -1,4 +1,4 @@
-# Reference oracles
+# Textbook references
 
 The `Shoals.References` modules compute the same quantities as the library
 directly from their textbook formulas, written for clarity rather than speed.

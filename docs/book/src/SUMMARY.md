@@ -25,7 +25,7 @@
 - [Calibration](modelfit.md)
 - [XVA](xva.md)
 - [Currency-tagged money](currency.md)
-- [Reference oracles](references.md)
+- [Textbook references](references.md)
 - [Property specifications](properties.md)
 - [Counterexample examples](demos.md)
 - [Scope and limitations](scope.md)
