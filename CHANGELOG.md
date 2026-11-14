@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.25.2] - 2026-11-14
+
+### Changed
+
+- Build with Chelis 0.23.1 and matching source dependencies.
+- Retain all historical evidence and 37 method predictions without a new characterization claim.
+- Re-admit six refuted instantiations through bounded checks with exact compiler attribution, corrupt controls, and original-predicate replay.
+- Refresh compiler guidance and canonical installation instructions.
+
 ## [0.25.1] - 2026-10-25
 
 ### Changed
