@@ -5,7 +5,7 @@ to this file so Claude-style and Codex-style entry points do not drift.
 
 ## Repo Identity
 
-<!-- BEGIN CHELIS MANAGED BLOCK: agents-inheritance chelis@0.22.1 (sha256:3bf5225811d3b4c5) -->
+<!-- BEGIN CHELIS MANAGED BLOCK: agents-inheritance chelis@0.23.1 (sha256:8762582045865988) -->
 # Chelis Agent Contract
 
 Keep this file concise and relevant to every agent working in this repository.
@@ -108,7 +108,7 @@ function of those inputs, and feedback that varies between identical runs is a d
 
 ## Subagents
 
-[`docs/investigations/agent_contract_rationale.md`](https://github.com/Chelis-Lang/chelis/blob/v0.22.1/docs/investigations/agent_contract_rationale.md)
+[`docs/investigations/agent_contract_rationale.md`](https://github.com/Chelis-Lang/chelis/blob/v0.23.1/docs/investigations/agent_contract_rationale.md)
 holds the measurements behind these rules.
 
 - Every subagent prompt names the delivery mechanism and the complete expected report.
@@ -132,11 +132,8 @@ holds the measurements behind these rules.
   here, not a certified safe width, and it is a separate budget from the CPU one above.
 - Every spawn names its model tier and says in one clause why that tier fits: the
   expensive tier for judgement whose errors are costly to detect, the cheap tier for
-  mechanical work such as waiting on CI, polling, or transcribing a result. The
-  orchestrator states its own context size in the message that announces a spawn.
-- Every brief states a numeric report-length budget, and a numeric context budget except
-  for red-team rounds. An agent that will exceed its context budget says so and returns
-  what it has.
+  mechanical work such as waiting on CI, polling, or transcribing a result.
+- Every brief states a numeric report-length budget.
 - A brief says which facts the orchestrator has already verified, against what head, and
   that the agent must not re-derive them, and it names what the agent still has to
   establish itself.
@@ -193,9 +190,9 @@ published, take the change when that release is documented.
   there. One trap it enforces at compile time: `reef setup` subprocesses the real
   `chelisup` binary, never `chelisup::install::install` in-process, because that helper
   copies `current_exe()` over the shim. Design:
-  [`spec/design/chelis_packaging_and_install.md`](https://github.com/Chelis-Lang/chelis/blob/v0.22.1/spec/design/chelis_packaging_and_install.md).
+  [`spec/design/chelis_packaging_and_install.md`](https://github.com/Chelis-Lang/chelis/blob/v0.23.1/spec/design/chelis_packaging_and_install.md).
 - **Downstream shells** inherit this complete contract through a stamped managed block
-  and must satisfy [`spec/design/shell_repo_contract.md`](https://github.com/Chelis-Lang/chelis/blob/v0.22.1/spec/design/shell_repo_contract.md),
+  and must satisfy [`spec/design/shell_repo_contract.md`](https://github.com/Chelis-Lang/chelis/blob/v0.23.1/spec/design/shell_repo_contract.md),
   shipped in the toolchain as `chelis reef conform`. Full inheritance is the default,
   but each shell decides which portions apply. Shell-owned additions stay outside the
   block and should remain when they are relevant and current. To omit an inherited

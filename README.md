@@ -14,21 +14,21 @@ project and download Shoals and the four packages it depends on from their
 GitHub releases; these downloads need no GitHub token:
 
 ```sh
-chelisup install 0.22.1
-chelis +0.22.1 reef init demo --module-prefix Demo --output demo
+chelisup install 0.23.1
+chelis +0.23.1 reef init demo --module-prefix Demo --output demo
 cd demo
-chelis reef install --from-github chelis-lang/nautilus@v0.7.58
-chelis reef install --from-github chelis-lang/coral@v0.7.52
-chelis reef install --from-github chelis-lang/shoreleave@v0.1.6
-chelis reef install --from-github chelis-lang/chelis-clarabel@v0.1.2
-chelis reef install --from-github chelis-lang/shoals@v0.25.1
+chelis reef install --from-github chelis-lang/nautilus@v0.7.59
+chelis reef install --from-github chelis-lang/coral@v0.7.53
+chelis reef install --from-github chelis-lang/shoreleave@v0.1.7
+chelis reef install --from-github chelis-lang/chelis-clarabel@v0.1.4
+chelis reef install --from-github chelis-lang/shoals@v0.25.2
 ```
 
-Add `shoals = { version = "=0.25.1" }` under `[dependencies]`, then run
-`chelis reef build`. With `GITHUB_TOKEN` set or the `gh`
-CLI signed in, `chelis reef build` downloads missing packages itself and the
-`reef install` lines are unnecessary. [Getting started](https://chelis.ch/docs/shoals/getting-started/)
-continues with a first pricing call.
+Add `shoals = { version = "=0.25.2" }` under `[dependencies]`.
+Then run `chelis reef build`.
+With `GITHUB_TOKEN` or a signed-in `gh` CLI, Reef downloads missing packages.
+The four dependency install commands are then optional.
+[Getting started](https://chelis.ch/docs/shoals/getting-started/) gives a first pricing call.
 
 ## Modules
 
